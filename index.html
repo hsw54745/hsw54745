@@ -684,8 +684,8 @@ function renderCompanyContactSection(){
   const ci = DB.companyInfo || {};
   wrap.innerHTML = `
     <div class="field-row">
-      <div class="field"><label>전화번호 (T.)</label><input type="text" id="f-company-phone" value="${escR(ci.phone||'')}" placeholder="예: 031-355-2569"></div>
-      <div class="field"><label>휴대폰 (H.P)</label><input type="text" id="f-company-mobile" value="${escR(ci.mobile||'')}" placeholder="예: 010-5644-3732"></div>
+      <div class="field"><label>전화번호 (T.)</label><input type="text" id="f-company-phone" value="${escR(ci.phone||'')}" placeholder="예: 031-355-2569" oninput="this.value=formatPhoneNumber(this.value)"></div>
+      <div class="field"><label>휴대폰 (H.P)</label><input type="text" id="f-company-mobile" value="${escR(ci.mobile||'')}" placeholder="예: 010-5644-3732" oninput="this.value=formatPhoneNumber(this.value)"></div>
     </div>
     <div id="f-company-contact-msg" class="hint" style="display:none;margin-bottom:8px;"></div>
     <button class="btn primary" onclick="saveCompanyContactForm()">저장</button>
@@ -952,6 +952,20 @@ function daysFromToday(dateStr){
   const d = new Date(dateStr+'T00:00:00');
   const t = new Date(todayStr()+'T00:00:00');
   return Math.round((d-t)/86400000);
+}
+// 전화번호 입력칸에서 숫자만 입력해도 자동으로 하이픈(-)을 넣어줍니다.
+// 서울(02) 지역번호는 2-3-4자리, 그 외(휴대폰 010 등, 지역번호)는 3-3-4 또는 3-4-4자리로 나눕니다.
+function formatPhoneNumber(v){
+  const num = (v||'').replace(/[^0-9]/g,'').slice(0,11);
+  if(num.length < 4) return num;
+  if(num.startsWith('02')){
+    if(num.length <= 5) return num.slice(0,2)+'-'+num.slice(2);
+    if(num.length <= 9) return num.slice(0,2)+'-'+num.slice(2,5)+'-'+num.slice(5);
+    return num.slice(0,2)+'-'+num.slice(2,6)+'-'+num.slice(6,10);
+  }
+  if(num.length <= 6) return num.slice(0,3)+'-'+num.slice(3);
+  if(num.length <= 10) return num.slice(0,3)+'-'+num.slice(3,6)+'-'+num.slice(6);
+  return num.slice(0,3)+'-'+num.slice(3,7)+'-'+num.slice(7,11);
 }
 function dow(dateStr){
   if(!dateStr) return dateStr;
@@ -2172,7 +2186,7 @@ function renderHistoryTab(){
 function renderRecentMaint(){
   const wrap = document.getElementById('recent-maint-wrap');
   if(!wrap) return;
-  const recent = [...DB.maint].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,20);
+  const recent = [...DB.maint].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,10);
   if(recent.length===0){
     wrap.innerHTML = `<div class="empty">등록된 정비 이력이 없습니다.</div>`;
     return;
@@ -2866,7 +2880,7 @@ function renderManualTab(){
       ['정비 임박/필요', '정비 시점이 다가오거나 지난 발전기를 최대 15대까지 보여줍니다.'],
       ['출고 대기 최근 요약', '출고 대기 중인 건을 상차대기 우선으로 최대 5건 보여줍니다. "전체보기"를 누르면 [출고 대기] 탭으로 이동합니다.'],
       ['출고중 최근 요약', '출고일이 최근인 순서로 최대 5대를 보여줍니다. "전체보기"를 누르면 [출고중] 탭으로 이동합니다.'],
-      ['최근 정비 이력', '전체 발전기의 최근 정비 기록을 모아서 보여줍니다.'],
+      ['최근 정비 이력', '전체 발전기의 최근 정비 기록을 날짜 최신순으로 최대 10건 보여줍니다.'],
       ['소모품주문내역 요약', '미구입 항목을 우선으로 최대 5건 보여주고, 미구입 건수를 배지로 표시합니다. "전체보기"로 [소모품주문] 탭으로 이동합니다.'],
       ['보완요청 요약', '미해결 요청을 우선으로 최근 5건을 보여주고, 미해결 건수를 배지로 표시합니다. "전체보기"로 [보완요청] 탭으로 이동합니다.']
     ])}
@@ -3838,14 +3852,14 @@ function openRetireDetailModal(id, label){
   const fieldsHtml = isDisposal ? `
       <div class="field"><label>폐기일자</label><input type="date" id="f-ret-schedule" value="${todayStr()}"></div>
       <div class="field"><label>폐기업체명</label><input type="text" id="f-ret-company" placeholder="예: 00고철상사"></div>
-      <div class="field"><label>전화번호</label><input type="text" id="f-ret-phone" placeholder="예: 010-1234-5678"></div>
+      <div class="field"><label>전화번호</label><input type="text" id="f-ret-phone" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
       <div class="field"><label>처리방법</label><input type="text" id="f-ret-method" placeholder="예: 고철업체 매각, 부품 재활용 후 폐차"></div>
       <div class="field"><label>폐기사유</label><textarea id="f-ret-reason" placeholder="예: 엔진 노후화로 수리비 과다"></textarea></div>
       <div class="field"><label>폐차수익(원)</label><input type="number" id="f-ret-revenue" min="0" placeholder="예: 500000"></div>
     ` : `
       <div class="field"><label>구매자 이름</label><input type="text" id="f-ret-buyername" placeholder="예: 홍길동"></div>
       <div class="field"><label>구매자 업체명</label><input type="text" id="f-ret-buyercompany" placeholder="예: 00중고기계"></div>
-      <div class="field"><label>연락처</label><input type="text" id="f-ret-buyerphone" placeholder="예: 010-1234-5678"></div>
+      <div class="field"><label>연락처</label><input type="text" id="f-ret-buyerphone" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
       <div class="field"><label>주소</label><input type="text" id="f-ret-buyeraddress" placeholder="예: 경기 화성시 ..."></div>
       <div class="field"><label>매각가격(원)</label><input type="number" id="f-ret-saleamount" min="0" placeholder="예: 3000000"></div>
     `;
@@ -5442,7 +5456,7 @@ function openOutInfoEditModal(id){
       <div class="field"><label>현장 주소</label><input type="text" id="f-oie-address" value="${(rt.address||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
       <div class="field-row">
         <div class="field"><label>담당자</label><input type="text" id="f-oie-manager" value="${(rt.manager||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
-        <div class="field"><label>연락처</label><input type="text" id="f-oie-phone" value="${(rt.phone||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678"></div>
+        <div class="field"><label>연락처</label><input type="text" id="f-oie-phone" value="${(rt.phone||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
       </div>
       <div class="field-row">
         <div class="field"><label>전압</label>
@@ -5674,7 +5688,7 @@ function openOutModal(id, reservationId){
       <div class="field"><label>현장 주소</label><input type="text" id="f-address" value="${(res&&res.address||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
       <div class="field-row">
         <div class="field"><label>담당자</label><input type="text" id="f-manager" value="${(res&&res.manager||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
-        <div class="field"><label>연락처</label><input type="text" id="f-phone" value="${(res&&res.phone||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678"></div>
+        <div class="field"><label>연락처</label><input type="text" id="f-phone" value="${(res&&res.phone||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
       </div>
       <div class="field-row">
         <div class="field"><label>전압</label>
@@ -6470,6 +6484,35 @@ ${body}
   URL.revokeObjectURL(a.href);
   flash('인쇄용 파일이 다운로드되었습니다. 다운로드된 파일을 열면 인쇄창이 뜹니다.');
 }
+function printReceiptNow(id){
+  const g = findGen(id);
+  const rt = receiptOverrideRT || (g && g.rental);
+  if(!g || !rt) return;
+  // "저장해서 인쇄"(다운로드 파일)와 완전히 동일한 문서를 새 창에 띄워서 인쇄합니다.
+  // 이렇게 해야 여백·글자크기 등이 두 방식에서 항상 똑같이 나옵니다.
+  const body = `<div class="print-page">${receiptCopyHtml(g,'공급자용',rt)}<div class="r-divider"><span>✂ - - - - - 절취선 - - - - - ✂</span></div>${receiptCopyHtml(g,'공급받는자용',rt)}</div>`;
+  const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>인수증 - ${escR(g.id)}</title>
+<style>${receiptPrintCss()}</style>
+</head><body>
+${body}
+</body></html>`;
+  const win = window.open('', '_blank', 'width=900,height=1000');
+  if(!win){
+    showInfoModal('팝업이 차단되어 바로 인쇄 창을 열 수 없습니다. 브라우저에서 이 사이트의 팝업을 허용하거나, "인쇄용 파일 다운로드"를 이용해주세요.');
+    return;
+  }
+  win.document.open();
+  win.document.write(doc);
+  win.document.close();
+  win.onload = function(){
+    setTimeout(function(){
+      win.focus();
+      win.print();
+    }, 300);
+  };
+  win.onafterprint = function(){ win.close(); };
+}
 function printReceipt(id, rtOverride){
   const g = findGen(id);
   const rt = rtOverride || (g && g.rental);
@@ -6482,7 +6525,7 @@ function printReceipt(id, rtOverride){
         <div class="r-toolbar no-print">
           <span class="r-toolbar-title">인수증 미리보기 · ${escR(g.id)}${rtOverride? ' (상차대기 예정본)':''}</span>
           <div class="btn-row" style="justify-content:flex-end;">
-            <button class="btn sm primary" onclick="window.print()">🖨 인쇄하기</button>
+            <button class="btn sm primary" onclick="printReceiptNow('${g.id}')">🖨 인쇄하기</button>
             <button class="btn sm" onclick="downloadReceiptFile('${g.id}')">인쇄용 파일 다운로드</button>
             <button class="btn sm" onclick="openShareModal('${g.id}')">공유하기</button>
             <button class="btn sm" onclick="closeReceipt()">닫기</button>
