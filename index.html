@@ -4761,7 +4761,8 @@ async function addSuppliesCatalogItem(){
   const qtyEl = document.getElementById('f-newsupply-qty');
   const baseName = nameEl.value.trim();
   if(!baseName) return;
-  const spec = specEl ? specEl.value.trim() : '';
+  let spec = specEl ? specEl.value.trim() : '';
+  if(spec && spec.toLowerCase()===baseName.toLowerCase()) spec = ''; // 품명과 규격이 같으면 규격은 무시 (예: "ATS ATS" 같은 중복 표시 방지)
   const qty = Number(qtyEl.value)||0;
   const key = spec ? `${baseName} ${spec}` : baseName;
   DB.suppliesStock = DB.suppliesStock || {};
@@ -5160,7 +5161,8 @@ async function submitEditStockQty(name){
 async function addStockPart(){
   const baseName = document.getElementById('f-newpart-name').value.trim();
   const category = document.getElementById('f-newpart-category').value.trim();
-  const spec = document.getElementById('f-newpart-spec').value.trim();
+  let spec = document.getElementById('f-newpart-spec').value.trim();
+  if(spec && spec.toLowerCase()===baseName.toLowerCase()) spec = ''; // 품명과 규격이 같으면 규격은 무시 (중복 표시 방지)
   const qty = Number(document.getElementById('f-newpart-qty').value)||0;
   if(!baseName) return;
   const key = spec ? `${baseName} ${spec}` : baseName;
