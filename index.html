@@ -3763,6 +3763,7 @@ function loadingListPopupHtml(){
     const extra = [r.supplies? `부자재: ${escR(r.supplies)}` : '', r.note? `비고: ${escR(r.note)}` : ''].filter(Boolean).join(' · ');
     return `<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
       <div><b>${escR(r.genId)}</b> ${g? escR(g.model||''):''}</div>
+      <div class="muted">${escR(r.customer||'거래처 미기재')} · ${escR(r.address||'-')}</div>
       <div class="muted">전압 ${r.voltage? escR(r.voltage):'-'} · 연료 ${fuel!=null? fuel+'L':'-'}</div>
       ${extra? `<div class="muted" style="font-size:11.5px;">${extra}</div>` : ''}
     </div>`;
@@ -3771,7 +3772,7 @@ function loadingListPopupHtml(){
     const rt = g.rental;
     return `<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
       <div><b>${escR(g.id)}</b> ${escR(g.model||'')}</div>
-      <div class="muted">${escR(rt.customer||'거래처 미기재')} · ${escR(rt.site||rt.address||'-')}</div>
+      <div class="muted">${escR(rt.customer||'거래처 미기재')} · ${escR(rt.address||'-')}</div>
     </div>`;
   };
   const section = (title,list,rowFn)=> `<div style="margin-bottom:10px;">
