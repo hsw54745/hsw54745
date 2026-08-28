@@ -183,24 +183,25 @@
   .r-toolbar-title{font-size:13px;font-weight:700;color:var(--ink-soft);}
   .print-msg{background:var(--warn-tint);border:1px solid var(--warn);color:#7a5314;font-size:12.5px;padding:10px 12px;border-radius:8px;margin-bottom:14px;}
   .r-copy{border:2px solid #222;border-radius:4px;padding:16px 18px;margin-bottom:12px;position:relative;overflow:hidden;}
-  .r-watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-24deg);font-size:52px;font-weight:900;letter-spacing:10px;color:rgba(120,120,120,0.20);white-space:nowrap;pointer-events:none;z-index:5;user-select:none;}
-  .r-title{text-align:center;font-size:22px;font-weight:900;letter-spacing:4px;margin-bottom:12px;}
-  .r-title .r-copy-tag{display:block;font-size:13px;font-weight:500;letter-spacing:2px;color:var(--ink-soft);margin-top:2px;}
-  .r-row{display:flex;gap:16px;font-size:13px;margin-bottom:9px;}
+  .r-watermark{position:absolute;top:14px;right:14px;font-size:28px;font-weight:900;letter-spacing:1px;color:rgba(90,90,90,0.85);white-space:nowrap;pointer-events:none;z-index:5;user-select:none;}
+  .r-title{text-align:center;font-size:24px;font-weight:900;letter-spacing:4px;margin-bottom:12px;}
+  .r-title .r-copy-tag{display:block;font-size:14.5px;font-weight:500;letter-spacing:2px;color:var(--ink-soft);margin-top:2px;}
+  .r-row{display:flex;gap:16px;font-size:14.5px;margin-bottom:9px;}
   .r-top{justify-content:space-between;}
   .r-half{flex:1;} .r-full{flex:1;}
   .r-fill{display:inline-block;border-bottom:1px solid #999;min-width:130px;padding:0 4px;}
   .r-fill.wide{min-width:260px;}
-  .r-table{width:100%;border-collapse:collapse;margin-bottom:9px;font-size:12.5px;}
-  .r-table th,.r-table td{border:1px solid #333;padding:8px 6px;text-align:center;}
+  .r-table{width:100%;border-collapse:collapse;margin-bottom:9px;font-size:14px;}
+  .r-table th{border:1px solid #333;padding:8px 6px;text-align:center;font-size:14.5px;}
+  .r-table td{border:1px solid #333;padding:8px 6px;text-align:center;}
   .r-table th{background:#f0f0f0;}
-  .r-confirm-text{font-size:16px;font-weight:800;border-top:1px dashed #999;padding-top:9px;margin-bottom:2px;}
-  .r-sign-row{display:flex;justify-content:flex-end;padding-right:10%;margin-top:14px;margin-bottom:6px;}
-  .r-sign-label{font-size:12.5px;}
-  .r-footer{text-align:center;font-size:16px;font-weight:700;color:#333;margin-top:6px;}
-  .r-notice{text-align:center;font-size:15px;color:#666;margin-top:3px;}
+  .r-confirm-text{font-size:17.5px;font-weight:800;border-top:1px dashed #999;padding-top:9px;margin-bottom:2px;}
+  .r-sign-row{display:flex;justify-content:flex-end;padding-right:22%;margin-top:-14px;margin-bottom:6px;}
+  .r-sign-label{font-size:14px;display:inline-block;border:2px solid #333;border-radius:50%;width:44px;height:44px;line-height:40px;text-align:center;}
+  .r-footer{text-align:center;font-size:17.5px;font-weight:700;color:#333;margin-top:6px;}
+  .r-notice{text-align:center;font-size:16.5px;color:#666;margin-top:3px;}
   .r-divider{position:relative;border-top:2px dashed #999;margin:14px 0;text-align:center;}
-  .r-divider span{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:#fff;padding:0 12px;font-size:13px;color:#888;letter-spacing:2px;}
+  .r-divider span{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:#fff;padding:0 12px;font-size:14.5px;color:#888;letter-spacing:2px;}
   @media print{
     body > header, body > nav, body > main, body > #modal-root, body > #flash{display:none!important;}
     #receipt-overlay{position:static!important;background:#fff!important;padding:0!important;}
@@ -1002,11 +1003,18 @@ function voltageColor(voltage){
   };
   return map[v] || null;
 }
-function voltageButtonsHtml(targetInputId){
+function voltageButtonsHtml(targetInputId, opts){
+  opts = opts || {};
   const voltages = ['220V','380V','440V','480V'];
-  return `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:nowrap;">${voltages.map(v=>{
+  const containerStyle = opts.vertical
+    ? 'display:flex;flex-direction:column;gap:8px;margin-top:8px;'
+    : 'display:flex;gap:4px;margin-top:6px;flex-wrap:nowrap;';
+  return `<div style="${containerStyle}">${voltages.map(v=>{
     const c = voltageColor(v);
-    return `<button type="button" style="flex:1;min-width:0;padding:4px 2px;font-size:11px;border-radius:6px;border:1px solid ${c};color:${c};background:${c}15;font-weight:700;cursor:pointer;" onclick="document.getElementById('${targetInputId}').value='${v}'">${v}</button>`;
+    const btnStyle = opts.big
+      ? `padding:14px 8px;font-size:17px;border-radius:8px;border:2px solid ${c};color:${c};background:${c}15;font-weight:800;cursor:pointer;width:100%;`
+      : `flex:1;min-width:0;padding:4px 2px;font-size:11px;border-radius:6px;border:1px solid ${c};color:${c};background:${c}15;font-weight:700;cursor:pointer;`;
+    return `<button type="button" style="${btnStyle}" onclick="document.getElementById('${targetInputId}').value='${v}'">${v}</button>`;
   }).join('')}</div>`;
 }
 function dateQuickButtonsHtml(fnName){
@@ -1376,17 +1384,49 @@ function renderDashboard(){
   }).join('');
   if(urgent.length===0) rows = `<tr><td colspan="5" class="muted" style="text-align:center;padding:20px;">정비가 임박한 발전기가 없습니다.</td></tr>`;
 
-  // 입고 예정 리스트 (출고일 + 사용일수 기반)
-  const expList = active.filter(g=>g.status==='out' && g.rental && expectedInDate(g.rental))
-    .map(g=>({g, date: expectedInDate(g.rental)}))
-    .sort((a,b)=>a.date.localeCompare(b.date));
-  let expRows = expList.map(x=>{
-    const rt = x.g.rental;
+  // 최근 입고 처리한 발전기 (최근 5건)
+  const recentIn = [...DB.rentals].filter(r=>r.inDate).sort((a,b)=>((b.inProcessedAt||b.inDate||'')).localeCompare((a.inProcessedAt||a.inDate||''))).slice(0,5);
+  const recentInRows = recentIn.map(r=>{
+    const g = findGen(r.genId);
+    const given = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+    let fuelCell = '<span class="muted">-</span>';
+    if(given!=null){
+      if(r.measuredFuelHeightCm==null){
+        fuelCell = '<span class="pill danger">연료 미확인</span>';
+      } else {
+        const remain = g ? computeFuelLiters(g, r.measuredFuelHeightCm) : null;
+        fuelCell = remain!=null
+          ? `<span style="color:var(--primary-dark);font-weight:700;">${given}L→${remain}L<br><span class="muted" style="font-weight:400;">(사용 ${Math.round((given-remain)*10)/10}L)</span></span>`
+          : `<span class="muted">측정 ${r.measuredFuelHeightCm}cm</span>`;
+      }
+    }
     return `<tr>
+      <td class="gid">${escR(r.genId)}</td>
+      <td class="wrap-ok">${g? displayModel(g):'-'}</td>
+      <td class="muted" style="font-size:12px;">${escR(r.inProcessedAt || dow(r.inDate) || '-')}</td>
+      <td>${g? voltagePillHtml(g.id, g.voltage) : '-'}</td>
+      <td class="muted" style="font-size:12px;">${escR(r.inProcessedBy||'-')}</td>
+      <td class="wrap-ok" style="font-size:12px;">${escR(r.customer||'-')}</td>
+      <td class="wrap-ok" style="font-size:12px;">${escR(r.address||'-')}</td>
+      <td style="font-size:12px;">${fuelCell}</td>
+    </tr>`;
+  }).join('');
+
+  // 입고 예정 (5일 이내, 최근 5건)
+  const soonList = active.filter(g=>g.status==='out' && g.rental && expectedInDate(g.rental))
+    .map(g=>({g, date: expectedInDate(g.rental)}))
+    .filter(x=>daysFromToday(x.date)<=5)
+    .sort((a,b)=>a.date.localeCompare(b.date))
+    .slice(0,5);
+  const soonRows = soonList.map(x=>{
+    const rt = x.g.rental;
+    const diff = daysFromToday(x.date);
+    return `<tr${diff<0? ` style="background:var(--danger-tint);"`:''}>
       <td class="gid">${x.g.id}</td>
       <td class="wrap-ok">${displayModel(x.g)}</td>
       <td class="wrap-ok">${rt.customer||'-'}${rt.site? `<div class="muted" style="font-size:11px;">${rt.site}</div>`:''}</td>
-      <td><span class="pill ${daysFromToday(x.date)<=0?'warn':'gray'}">${inDateLabel(x.date)}</span></td>
+      <td><span class="pill ${diff<=0?'warn':'gray'}">${inDCountLabel(x.date)}</span></td>
+      <td><button class="btn sm primary" onclick="openInModal('${x.g.id}')">입고 처리</button></td>
     </tr>`;
   }).join('');
 
@@ -1495,6 +1535,26 @@ function renderDashboard(){
       <tbody>${rows}</tbody>
     </table></div>
     <p class="muted" style="font-size:13px;">누적 사용시간이 마지막 정비 이후 정비 주기(기본 350h, 발전기별 개별 설정 가능)를 넘기면 정비가 필요합니다. 장기 임대 중인 발전기는 [출고중] 탭에서 예상 일일 사용시간을 입력하면 정비 도래 시점을 미리 확인할 수 있습니다.</p>
+
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <span>🕐 최근 입고 처리한 발전기 <span class="cnt">최근 5대</span></span>
+      <button class="btn sm" onclick="switchTab('in')">전체보기</button>
+    </div>
+    ${recentIn.length===0? `<div class="empty">최근 입고 처리한 발전기가 없습니다.</div>` : `
+    <div class="table-scroll"><table>
+      <thead><tr><th>번호</th><th>모델</th><th>입고 처리 시각</th><th>전압</th><th>처리자</th><th>거래처</th><th>지역</th><th>연료체크</th></tr></thead>
+      <tbody>${recentInRows}</tbody>
+    </table></div>`}
+
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <span>입고 예정 (5일 이내) <span class="cnt">최근 5대</span></span>
+      <button class="btn sm" onclick="switchTab('in')">전체보기</button>
+    </div>
+    ${soonList.length===0? `<div class="empty">5일 이내 입고 예정인 발전기가 없습니다.</div>` : `
+    <div class="table-scroll"><table>
+      <thead><tr><th>번호</th><th>모델</th><th>거래처/현장</th><th>입고예정</th><th></th></tr></thead>
+      <tbody>${soonRows}</tbody>
+    </table></div>`}
 
     <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
       <span>출고 대기 최근 요약 <span class="cnt">${resCount}건</span></span>
@@ -1694,24 +1754,6 @@ function renderInList(){
     </tr>`;
   }).join('');
 
-  // 입고 예정 (5일 이내) - 출고중이지만 곧 반납 예정인 발전기
-  const soonList = activeGens()
-    .filter(g=>g.status==='out' && g.rental && expectedInDate(g.rental))
-    .map(g=>({g, date: expectedInDate(g.rental)}))
-    .filter(x=>daysFromToday(x.date)<=5)
-    .sort((a,b)=>a.date.localeCompare(b.date));
-  const soonRows = soonList.map(x=>{
-    const rt = x.g.rental;
-    const diff = daysFromToday(x.date);
-    return `<tr${diff<0? ` style="background:var(--danger-tint);"`:''}>
-      <td class="gid">${x.g.id}</td>
-      <td class="wrap-ok">${displayModel(x.g)}</td>
-      <td class="wrap-ok">${rt.customer||'-'}${rt.site? `<div class="muted" style="font-size:11px;">${rt.site}</div>`:''}</td>
-      <td><span class="pill ${diff<=0?'warn':'gray'}">${inDCountLabel(x.date)}</span></td>
-      <td><button class="btn sm primary" onclick="openInModal('${x.g.id}')">입고 처리</button></td>
-    </tr>`;
-  }).join('');
-
   const allInGens = activeGens().filter(g=>g.status==='in');
   const brokenCount = list.filter(g=>g.underRepair).length;
 
@@ -1729,35 +1771,8 @@ function renderInList(){
       ${capacityEntries.map(([cap,cnt])=>`<button class="btn sm${inCapacityFilter===cap?' primary':''}" onclick="viewCapacityInList(${cap})">${cap}kW <span class="muted" style="font-size:11px;">(${cnt})</span></button>`).join('')}
     </div>`;
 
-  const recentIn = [...DB.rentals].filter(r=>r.inProcessedAt).sort((a,b)=>(b.inProcessedAt||'').localeCompare(a.inProcessedAt||'')).slice(0,5);
-  const recentInRows = recentIn.map(r=>{
-    const g = findGen(r.genId);
-    return `<tr>
-      <td class="gid">${escR(r.genId)}</td>
-      <td class="wrap-ok">${g? displayModel(g):'-'}</td>
-      <td class="muted" style="font-size:12px;">${escR(r.inProcessedAt||'-')}</td>
-      <td>${g? voltagePillHtml(g.id, g.voltage) : '-'}</td>
-      <td class="muted" style="font-size:12px;">${escR(r.inProcessedBy||'-')}</td>
-    </tr>`;
-  }).join('');
-  const recentInHtml = recentIn.length===0 ? '' : `
-    <div class="section-title" style="margin-top:0;">🕐 최근 입고 처리한 발전기 <span class="cnt">최근 5대</span></div>
-    <p class="muted" style="font-size:12px;margin-top:-4px;">방금 처리한 전압이 맞게 반영됐는지 여기서 바로 확인·수정할 수 있습니다. 전압을 클릭하면 수정할 수 있습니다.</p>
-    <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th>입고 처리 시각</th><th>전압</th><th>처리자</th></tr></thead>
-      <tbody>${recentInRows}</tbody>
-    </table></div>
-  `;
-
   return `
-    ${recentInHtml}
-    <div class="section-title">입고 예정 (5일 이내) <span class="cnt">${soonList.length}대</span></div>
-    ${soonList.length===0? `<div class="empty">5일 이내 입고 예정인 발전기가 없습니다.</div>` : `
-    <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th>거래처/현장</th><th>입고예정</th><th></th></tr></thead>
-      <tbody>${soonRows}</tbody>
-    </table></div>`}
-    <div class="section-title">입고 발전기 <span class="cnt">${list.length}대</span>${brokenCount>0? ` <span class="cnt" style="background:var(--danger-tint);color:var(--danger);border-color:var(--danger);">고장/수리중 ${brokenCount}대</span>`:''}${inCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${inCapacityFilter}kW <button onclick="clearInCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}
+    <div class="section-title" style="margin-top:0;">입고 발전기 <span class="cnt">${list.length}대</span>${brokenCount>0? ` <span class="cnt" style="background:var(--danger-tint);color:var(--danger);border-color:var(--danger);">고장/수리중 ${brokenCount}대</span>`:''}${inCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${inCapacityFilter}kW <button onclick="clearInCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}
       <button class="btn sm" style="margin-left:8px;vertical-align:middle;" onclick="downloadInGensPrintFile()">🖨 인쇄</button>
     </div>
     ${capacityButtonsHtml}
@@ -3038,6 +3053,8 @@ function renderManualTab(){
       ['알림 배너', '백업 안내, 부품 재고 부족, 장기임대 정비 임박, 하루 10시간 초과 과다사용 이력이 있으면 빨간 배너로 뜹니다. 배너의 버튼을 누르면 관련 화면으로 이동합니다.'],
       ['지역별 출고 현황', '출고중인 발전기를 지역(경기북부/남부 등)별로 몇 대씩 나가있는지 보여줍니다. 카드를 누르면 그 지역만 걸러서 [출고중] 목록을 봅니다.'],
       ['정비 임박/필요', '정비 시점이 다가오거나 지난 발전기를 최대 15대까지 보여줍니다.'],
+      ['🕐 최근 입고 처리한 발전기', '최근 입고 처리한 발전기 5대를 번호·모델·처리시각·전압·처리자·거래처·지역과 함께 보여줍니다. 방금 전압을 바꿨는지 기억이 안 날 때 여기서 바로 확인할 수 있고, 전압을 클릭하면 곧바로 수정할 수도 있습니다. 연료를 넣어드린 건은 "50L→25L (사용 25L)"처럼 반납시 확인한 사용량이 표시되고, 아직 확인을 안 한 건은 "연료 미확인"으로 빨갛게 표시됩니다. "전체보기"를 누르면 [입고] 탭으로 이동합니다.'],
+      ['입고 예정 (5일 이내)', '5일 이내 반납 예정인 발전기 중 최근 5대를 보여줍니다. "입고 처리" 버튼으로 바로 처리할 수 있습니다. "전체보기"를 누르면 [입고] 탭으로 이동합니다.'],
       ['출고 대기 최근 요약', '출고 대기 중인 건을 상차대기 우선으로 최대 5건 보여줍니다. "전체보기"를 누르면 [출고 대기] 탭으로 이동합니다.'],
       ['출고중 최근 요약', '출고일이 최근인 순서로 최대 5대를 보여줍니다. "전체보기"를 누르면 [출고중] 탭으로 이동합니다.'],
       ['최근 정비 이력', '전체 발전기의 최근 정비 기록을 날짜 최신순으로 최대 10건 보여줍니다.'],
@@ -3055,8 +3072,7 @@ function renderManualTab(){
       ['⚡ 정보없이 강제출고', '거래처명·날짜 등 아무 정보도 입력하지 않고 바로 [출고중] 상태로 전환합니다. 잘못 입고 처리한 발전기를 빠르게 되돌릴 때 사용하며, 상세 정보는 이후 [출고중] 탭의 "정보 수정"에서 입력하면 됩니다.'],
       ['한번에 출고', '왼쪽 체크박스로 여러 대를 선택하면 뜨는 "한번에 출고" 버튼으로, 같은 거래처에 여러 대를 한 번에 내보낼 수 있습니다. 발전기별 출고시 누적 사용시간은 대별로 각각 입력합니다.'],
       ['수리 완료 처리', '고장 등록된 발전기에 표시됩니다. 수리가 끝났으면 눌러서 다시 출고 가능하게 만듭니다.'],
-      ['출고대기중(비활성)', '이미 [출고 대기]에 등록된 발전기는 중복 출고를 막기 위해 버튼이 비활성화됩니다.'],
-      ['입고 예정 목록의 "입고 처리"', '5일 이내 반납 예정 발전기를 바로 입고 처리할 수 있는 바로가기입니다.']
+      ['출고대기중(비활성)', '이미 [출고 대기]에 등록된 발전기는 중복 출고를 막기 위해 버튼이 비활성화됩니다.']
     ])}
 
     ${manualSection('⏳','출고 대기', false,
@@ -3177,8 +3193,8 @@ function renderManualTab(){
       ['⛽ 연료 체크 필요 표시 · 사용량 자동 계산', '출고할 때 "⛽ 연료넣고 출고하기" 체크박스를 켜야 고객요청/실제주입 입력칸이 나타납니다. 체크한 발전기에만 [출고중] 목록에 "⛽ 기름체크 필요" 표시가 뜨고, 입고 처리 화면에도 연료 높이 측정칸이 나타납니다. 체크하지 않은 출고는 확인이 필요 없다는 안내만 뜨고 측정칸 자체가 생략됩니다. 입고 처리시 연료 높이를 재서 입력하면, 임대 이력에 "OOL 중 OOL 남아서 반납 → 사용량 약 OOL"이 자동으로 기록됩니다.'],
       ['입고 목록 연료 "초기화" 버튼', '입고 목록의 연료 칸에 뜬 값 옆 "초기화" 버튼은, 실제로 탱크의 기름을 기준점까지 다시 빼낸 뒤 눌러주는 용도입니다. 누르면 화면에 표시되던 지난 연료량이 사라지고(이력 기록 자체는 그대로 남습니다) 다음 출고를 위한 준비가 끝났다는 뜻이 됩니다.'],
       ['🕐 마지막 수정 시각 표시', '누적 사용시간을 수정(누적시간 수정 · 정보 직접 수정)하면, 다음에 그 화면을 다시 열 때 "마지막 수정: 날짜 시간 (수정한 사람)"이 노란 알림으로 표시되어 언제 누가 마지막으로 고쳤는지 바로 알 수 있습니다.'],
+      ['전압 수정 팝업 개선', '[입고] 목록에서 전압을 클릭하면 뜨는 팝업에 "셋팅 전압" 라벨 옆으로 마지막으로 수정한 날짜·시간·수정자가 함께 표시됩니다. 24시간 이내에 이미 전압을 바꾼 발전기를 또 바꾸려고 하면 "이미 변경했는데 다시 변경하시겠습니까?" 확인창이 한 번 더 뜹니다. 220V/380V/440V/480V 버튼은 세로로 크게 배치되어 색상과 함께 누르기 편합니다.'],
       ['⚡ 전압변경 자동 정비기록', '[입고] 목록의 전압 클릭 수정, [출고중 → 정보 수정], 입고 처리시 전압 확인 화면 — 이 세 곳 중 어디서든 발전기의 전압 값이 실제로 바뀌면 "전압을 실제로 변경하셨습니까?" 확인창이 뜹니다. "예"를 누르면 정비 기록에 몇 볼트에서 몇 볼트로, 누가, 언제 바꿨는지 자동으로 기록되고, "아니오"를 누르면 기록되지 않습니다.'],
-      ['🕐 최근 입고 처리한 발전기', '[입고] 탭 맨 위에 최근 입고 처리한 발전기 5대가 번호·모델·처리시각·전압·처리자와 함께 표시됩니다. 방금 전압을 바꿨는지 기억이 안 날 때 여기서 바로 확인할 수 있고, 전압을 클릭하면 곧바로 수정할 수도 있습니다.'],
       ['🟢 온라인 상태 배지', '화면 상단 오른쪽에 🟢 온라인 / 🟡 로컬 임시저장 배지가 표시됩니다. 인터넷이 안 되는 상황에서도 입력이 막히지 않고 이 기기에 임시 저장되며, 다시 연결되면 정상 저장됩니다.'],
       ['🗑 발전기 등록 실수 바로잡기', '[설정 → 발전기 모델 설정]의 "관리" 버튼으로 번호(ID)를 수정하거나, 잘못 등록한 발전기를 완전히 삭제할 수 있습니다. 완전 삭제는 사용 이력이 있으면 경고가 뜨며, 이력이 있는 발전기는 삭제 대신 폐기/매각 처리를 권장합니다.'],
       ['📅 상단 실시간 날짜·시간 표시', '화면 맨 위 "전체저장" 버튼 아래에 오늘 날짜와 현재 시각이 1초마다 갱신되며 표시됩니다.']
@@ -3497,20 +3513,24 @@ function loadingListPopupHtml(){
   const tomorrowList = pending.filter(r=>dateOf(r)===tomorrow).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
   const rowHtml = r=>{
     const g = findGen(r.genId);
-    return `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
-      <b>${escR(r.genId)}</b> ${g? displayModel(g):''} — ${escR(r.customer||'-')} <span class="muted">(${escR(r.address||'-')})</span>
+    const fuel = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+    const extra = [r.supplies? `부자재: ${escR(r.supplies)}` : '', r.note? `비고: ${escR(r.note)}` : ''].filter(Boolean).join(' · ');
+    return `<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
+      <div><b>${escR(r.genId)}</b> ${g? escR(g.model||''):''}</div>
+      <div class="muted">전압 ${r.voltage? escR(r.voltage):'-'} · 연료 ${fuel!=null? fuel+'L':'-'}</div>
+      ${extra? `<div class="muted" style="font-size:11.5px;">${extra}</div>` : ''}
     </div>`;
   };
-  const section = (title,list)=> `<div style="margin-bottom:12px;">
+  const section = (title,list)=> `<div>
     <div style="font-weight:700;font-size:13.5px;margin-bottom:4px;">${title} <span class="muted" style="font-weight:400;">(${list.length}건)</span></div>
     ${list.length===0? `<div class="muted" style="font-size:12.5px;">없음</div>` : list.map(rowHtml).join('')}
   </div>`;
-  return section(`🚚 오늘(${dow(today)}) 상차`, todayList) + section(`📅 내일(${dow(tomorrow)}) 상차`, tomorrowList);
+  return `<div class="util-two-col" style="align-items:flex-start;">${section(`🚚 오늘(${dow(today)}) 상차`, todayList)}${section(`📅 내일(${dow(tomorrow)}) 상차`, tomorrowList)}</div>`;
 }
 function showLoadingListPopup(isNewNotice){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
+    <div class="modal" style="max-width:600px;">
       <h3>🚚 상차 예정 안내${isNewNotice? ' <span class="pill" style="font-size:11px;background:var(--primary-tint);color:var(--primary-dark);">새 등록</span>':''}</h3>
       <div class="modal-sub">전체 목록은 [출고대기] 탭에서 확인할 수 있습니다.</div>
       ${loadingListPopupHtml()}
@@ -4432,6 +4452,9 @@ async function updateModelTankDim(model, field, value){
 async function updateVoltage(id, value){
   const g = findGen(id);
   g.voltage = value.trim();
+  g.voltageUpdatedAt = nowDateTimeStr();
+  g.voltageUpdatedAtMs = Date.now();
+  g.voltageUpdatedBy = DB.currentUserName || null;
   await saveGens();
   renderContent();
   flash('저장되었습니다');
@@ -4460,14 +4483,16 @@ async function logVoltageChangeMaint(genId, oldVoltage, newVoltage){
 }
 function openVoltageModal(id){
   const g = findGen(id);
+  const lastInfo = g.voltageUpdatedAt ? `<span style="font-size:13px;font-weight:700;color:var(--danger);">마지막 수정: ${escR(g.voltageUpdatedAt)}${g.voltageUpdatedBy? ` (${escR(g.voltageUpdatedBy)})`:''}</span>` : '';
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
+    <div class="modal" style="max-width:360px;">
       <h3>전압 수정</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
-      <div class="field"><label>셋팅 전압</label>
+      <div class="field">
+        <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><span>셋팅 전압</span>${lastInfo}</label>
         <input type="text" id="f-volt-edit" value="${(g.voltage||'').replace(/"/g,'&quot;')}" placeholder="예: 380V">
-        ${voltageButtonsHtml('f-volt-edit')}
+        ${voltageButtonsHtml('f-volt-edit', {vertical:true, big:true})}
         ${voltageGuideGalleryHtml(g.model)}
       </div>
       <div class="modal-actions">
@@ -4481,6 +4506,15 @@ async function submitVoltageEdit(id){
   const g = findGen(id);
   const oldVoltage = g ? (g.voltage||'') : '';
   const value = document.getElementById('f-volt-edit').value;
+  const changed = value.trim() !== oldVoltage.trim();
+  if(changed && g && g.voltageUpdatedAtMs && (Date.now()-g.voltageUpdatedAtMs) < 24*60*60*1000){
+    openConfirmModal(`이 발전기는 24시간 이내(${g.voltageUpdatedAt||''})에 이미 전압을 변경했습니다. 그래도 다시 변경하시겠습니까?`, async function(){
+      closeModal();
+      await updateVoltage(id, value);
+      maybeLogVoltageChange(id, oldVoltage, value);
+    }, '예, 변경합니다', '아니오');
+    return;
+  }
   await updateVoltage(id, value);
   closeModal();
   maybeLogVoltageChange(id, oldVoltage, value);
@@ -6808,26 +6842,26 @@ function receiptCopyHtml(g, copyLabel, rtIn){
     : (rt.fuelRequested!=null? escR(rt.fuelRequested) : '-');
   return `
   <div class="r-copy">
-    <div class="r-watermark">${escR(copyLabel)}</div>
-    <div class="r-title">인&nbsp;&nbsp;&nbsp;수&nbsp;&nbsp;&nbsp;증<span class="r-copy-tag">(${escR(copyLabel)})</span></div>
+    <div class="r-watermark">${escR(isSupplier ? '회사보관용' : '공급받는자용')}</div>
+    <div class="r-title">인&nbsp;&nbsp;&nbsp;수&nbsp;&nbsp;&nbsp;증</div>
     <div class="r-row r-top">
-      <div>도착일&nbsp;&nbsp;${fmtDateKR(rt.outDate)}${rt.arriveTime? ` (${escR(rt.arriveTime)})` : ''}</div>
-      <div>거래처명&nbsp;&nbsp;<span class="r-fill">${escR(rt.customer)}</span></div>
+      <div style="font-size:18px;font-weight:800;">도착일&nbsp;&nbsp;${fmtDateKR(rt.outDate)}${rt.arriveTime? ` (${escR(rt.arriveTime)})` : ''}</div>
+      <div>거래처명&nbsp;&nbsp;<span class="r-fill" style="font-weight:800;">${escR(rt.customer)}</span></div>
     </div>
     <table class="r-table">
       <thead><tr><th>품목 및 용량</th><th>전압</th><th>수량</th><th>${fuelFieldLabel}</th></tr></thead>
-      <tbody><tr>
+      <tbody><tr style="font-weight:700;font-size:18px;">
         <td>${escR(receiptItemLabel(g))} (${escR(g.id)})</td>
         <td>${escR(rt.voltage)}</td>
         <td>${escR(rt.qty||1)}</td>
         <td>${fuelCellHtml}</td>
       </tr></tbody>
     </table>
-    <div class="r-row" style="margin-bottom:16px;"><div class="r-full">부자재&nbsp;&nbsp;<span class="r-fill wide">${escR(rt.supplies||'없음')}</span></div></div>
-    <div class="r-row"><div class="r-full">현장 주소&nbsp;&nbsp;<span class="r-fill wide">${escR(addrFull)}</span></div></div>
+    <div class="r-row" style="margin-bottom:16px;"><div class="r-full">부자재&nbsp;&nbsp;<span class="r-fill wide" style="font-weight:700;">${escR(rt.supplies||'없음')}</span></div></div>
+    <div class="r-row"><div class="r-full">현장 주소&nbsp;&nbsp;<span class="r-fill wide" style="font-weight:700;">${escR(addrFull)}</span></div></div>
     <div class="r-row">
-      <div class="r-half">담당자 성명&nbsp;&nbsp;<span class="r-fill">${escR(rt.manager)}</span></div>
-      <div class="r-half">연락처&nbsp;&nbsp;<span class="r-fill">${escR(rt.phone)}</span></div>
+      <div class="r-half">담당자 성명&nbsp;&nbsp;<span class="r-fill" style="font-weight:700;">${escR(rt.manager)}</span></div>
+      <div class="r-half">연락처&nbsp;&nbsp;<span class="r-fill" style="font-weight:700;">${escR(rt.phone)}</span></div>
     </div>
     ${rt.note? `<div class="r-row"><div class="r-full">비고&nbsp;&nbsp;<span class="r-fill wide">${escR(rt.note)}</span></div></div>`:''}
     <div class="r-confirm-text">상기 물품을 정히 인수 하였음을 확인 합니다.</div>
@@ -6921,24 +6955,25 @@ function receiptPrintCss(){
     .print-hint button{margin-left:8px;font-size:13px;font-weight:700;padding:6px 14px;border-radius:6px;border:none;background:#2C4A66;color:#fff;cursor:pointer;}
     .print-page{display:flex;flex-direction:column;gap:8mm;height:265mm;max-width:170mm;margin:0 auto;padding:0;}
     .r-copy{flex:1;display:flex;flex-direction:column;justify-content:space-between;border:2px solid #222;border-radius:4px;padding:5mm 7mm;position:relative;overflow:hidden;}
-    .r-watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-24deg);font-size:78px;font-weight:900;letter-spacing:14px;color:rgba(60,60,60,0.22);white-space:nowrap;pointer-events:none;z-index:5;user-select:none;}
-    .r-title{text-align:center;font-size:30px;font-weight:900;letter-spacing:8px;}
-    .r-title .r-copy-tag{display:block;text-align:center;font-size:14px;font-weight:500;letter-spacing:2px;color:#999;margin-top:2px;}
-    .r-row{display:flex;gap:16px;font-size:15px;}
+    .r-watermark{position:absolute;top:3.5mm;right:5mm;font-size:32px;font-weight:900;letter-spacing:1px;color:rgba(50,50,50,0.85);white-space:nowrap;pointer-events:none;z-index:5;user-select:none;}
+    .r-title{text-align:center;font-size:32px;font-weight:900;letter-spacing:8px;}
+    .r-title .r-copy-tag{display:block;text-align:center;font-size:15.5px;font-weight:500;letter-spacing:2px;color:#999;margin-top:2px;}
+    .r-row{display:flex;gap:16px;font-size:16.5px;}
     .r-top{justify-content:space-between;}
     .r-half{flex:1;} .r-full{flex:1;}
     .r-fill{display:inline-block;border-bottom:1px solid #999;min-width:150px;padding:0 4px;}
     .r-fill.wide{min-width:300px;}
-    .r-table{width:100%;border-collapse:collapse;font-size:14.5px;}
-    .r-table th,.r-table td{border:1px solid #333;padding:12px 8px;text-align:center;}
+    .r-table{width:100%;border-collapse:collapse;font-size:16px;}
+    .r-table th{border:1px solid #333;padding:12px 8px;text-align:center;font-size:16.5px;}
+    .r-table td{border:1px solid #333;padding:12px 8px;text-align:center;}
     .r-table th{background:#f0f0f0;}
-    .r-confirm-text{font-size:18px;font-weight:800;border-top:1px dashed #999;padding-top:10px;margin-bottom:2px;}
-    .r-sign-row{display:flex;justify-content:flex-end;padding-right:10%;margin-top:16px;margin-bottom:6px;}
-    .r-sign-label{font-size:14px;}
-    .r-footer{text-align:center;font-size:17px;font-weight:700;color:#333;}
-    .r-notice{text-align:center;font-size:16px;color:#666;}
+    .r-confirm-text{font-size:19.5px;font-weight:800;border-top:1px dashed #999;padding-top:10px;margin-bottom:2px;}
+    .r-sign-row{display:flex;justify-content:flex-end;padding-right:22%;margin-top:-12px;margin-bottom:6px;}
+    .r-sign-label{font-size:15.5px;display:inline-block;border:2px solid #333;border-radius:50%;width:50px;height:50px;line-height:46px;text-align:center;}
+    .r-footer{text-align:center;font-size:18.5px;font-weight:700;color:#333;}
+    .r-notice{text-align:center;font-size:17.5px;color:#666;}
     .r-divider{position:relative;border-top:2px dashed #999;text-align:center;height:0;}
-    .r-divider span{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:#fff;padding:0 12px;font-size:13px;color:#888;letter-spacing:2px;}
+    .r-divider span{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:#fff;padding:0 12px;font-size:14.5px;color:#888;letter-spacing:2px;}
     @media print{ .print-hint{display:none;} }
   `;
 }
