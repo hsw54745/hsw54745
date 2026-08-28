@@ -33,7 +33,9 @@
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;padding-bottom:60px;}
-  header{background:var(--primary-dark);color:#fff;padding:22px 20px 18px;}
+  header{background:var(--primary-dark);color:#fff;padding:22px 20px 18px;position:relative;overflow:hidden;}
+  .header-generator-photo{position:absolute;top:-16px;left:6px;width:260px;height:190px;background:url('https://images.unsplash.com/photo-1523559094051-53bac879eb80?auto=format&fit=crop&w=900&q=80') center/cover no-repeat;-webkit-mask-image:radial-gradient(ellipse 68% 62% at 40% 45%,#000 30%,transparent 72%);mask-image:radial-gradient(ellipse 68% 62% at 40% 45%,#000 30%,transparent 72%);opacity:.6;z-index:-1;pointer-events:none;}
+  @media (max-width:480px){.header-generator-photo{width:190px;height:150px;top:-10px;left:-10px;}}
   .brand-row{display:flex;align-items:center;gap:10px;}
   .brand-mark{width:34px;height:34px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:16px;flex-shrink:0;}
   .brand-name{font-size:13px;color:#B9C6D2;letter-spacing:.02em;}
@@ -42,6 +44,7 @@
   nav{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);display:flex;overflow-x:auto;box-shadow:0 1px 0 rgba(0,0,0,.02);}
   nav button{flex:1;min-width:80px;border:none;background:transparent;padding:13px 6px;font-family:var(--sans);font-size:12.5px;font-weight:500;color:var(--ink-soft);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;}
   nav button.active{color:var(--primary-dark);border-bottom-color:var(--primary);font-weight:700;background:var(--surface-2);}
+  .tab-unread-badge{display:inline-block;min-width:16px;height:16px;line-height:16px;padding:0 4px;border-radius:9px;background:var(--danger);color:#fff;font-size:10px;font-weight:800;vertical-align:top;margin-left:1px;}
   main{max-width:1500px;width:100%;margin:0 auto;padding:18px 24px 40px;box-sizing:border-box;}
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:18px;}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 12px;}
@@ -220,6 +223,7 @@
 <div id="pw-gate"></div>
 
 <header>
+  <div class="header-generator-photo"></div>
   <div class="brand-row">
     <div class="brand-mark">S</div>
     <div class="brand-name" id="brand-name-text">해성발전기</div>
@@ -386,7 +390,7 @@ const TABS = [
   {id:'settings', label:'⚙️ 설정', color:'#555B6E'},
   {id:'manual', label:'📖 사용설명서', color:'#0F766E'}
 ];
-let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, customerNotes:{}, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
+let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, customerNotes:{}, readMarkers:{}, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
 let currentTab = 'dashboard';
 let seenNoticeIds = new Set();
 let seenEventIds = new Set();
@@ -754,6 +758,7 @@ async function saveSuppliesSizes(){ await storageSetChecked('gen-supplies-sizes-
 async function saveSuppliesSpecs(){ await storageSetChecked('gen-supplies-specs-v1', JSON.stringify(DB.suppliesSpecs), true); }
 async function saveSuppliesCategories(){ await storageSetChecked('gen-supplies-categories-v1', JSON.stringify(DB.suppliesCategories), true); }
 async function saveCustomerNotes(){ await storageSetChecked('gen-customer-notes-v1', JSON.stringify(DB.customerNotes), true); }
+async function saveReadMarkers(){ await storageSetChecked('gen-read-markers-v1', JSON.stringify(DB.readMarkers), true); }
 async function saveWarnThreshold(){ await storageSetChecked('gen-warn-threshold-v1', JSON.stringify(DB.warnThreshold), true); }
 async function saveOveruseDailyLimit(){ await storageSetChecked('gen-overuse-daily-limit-v1', JSON.stringify(DB.overuseDailyLimit), true); }
 async function savePartsStock(){ await storageSetChecked('gen-parts-stock-v1', JSON.stringify(DB.partsStock), true); }
@@ -1257,14 +1262,57 @@ function materialCandidatePartsFromMaterial(m){
   return parts;
 }
 
+function unreadCountFor(category, items){
+  const user = (DB.currentUserName||'').trim();
+  if(!user || !items || items.length===0) return 0;
+  const readIds = new Set((((DB.readMarkers||{})[user]||{})[category]) || []);
+  return items.filter(item=>item && item.id && !readIds.has(item.id)).length;
+}
+async function markAllReadFor(category, items){
+  const user = (DB.currentUserName||'').trim();
+  if(!user || !items || items.length===0) return;
+  DB.readMarkers = DB.readMarkers || {};
+  const userMarkers = DB.readMarkers[user] || {};
+  const existing = new Set(userMarkers[category] || []);
+  let changed = false;
+  items.forEach(item=>{ if(item && item.id && !existing.has(item.id)){ existing.add(item.id); changed = true; } });
+  if(!changed) return;
+  userMarkers[category] = [...existing];
+  DB.readMarkers[user] = userMarkers;
+  await saveReadMarkers();
+}
+function markOneReadFor(category, id){
+  const user = (DB.currentUserName||'').trim();
+  if(!user || !id) return;
+  DB.readMarkers = DB.readMarkers || {};
+  const userMarkers = DB.readMarkers[user] || {};
+  const existing = new Set(userMarkers[category] || []);
+  if(existing.has(id)) return;
+  existing.add(id);
+  userMarkers[category] = [...existing];
+  DB.readMarkers[user] = userMarkers;
+  saveReadMarkers();
+}
 function switchTab(id){
   currentTab = id;
   renderTabbar();
   renderContent();
+  if(id==='notice') markAllReadFor('notice', DB.notices||[]).then(renderTabbar);
+  else if(id==='improvements') markAllReadFor('improvements', DB.improvements||[]).then(renderTabbar);
+  else if(id==='consumable-order') markAllReadFor('consumableOrder', DB.consumableOrders||[]).then(renderTabbar);
 }
 function renderTabbar(){
   const nav = document.getElementById('tabbar');
-  nav.innerHTML = TABS.map(t=>`<button class="${t.id===currentTab?'active':''}" style="color:${t.color};${t.id===currentTab?`border-bottom-color:${t.color};`:''}" onclick="switchTab('${t.id}')">${t.label}</button>`).join('');
+  const unreadFor = t=>{
+    if(t.id==='notice') return unreadCountFor('notice', DB.notices||[]);
+    if(t.id==='improvements') return unreadCountFor('improvements', DB.improvements||[]);
+    if(t.id==='consumable-order') return unreadCountFor('consumableOrder', DB.consumableOrders||[]);
+    return 0;
+  };
+  nav.innerHTML = TABS.map(t=>{
+    const n = unreadFor(t);
+    return `<button class="${t.id===currentTab?'active':''}" style="color:${t.color};${t.id===currentTab?`border-bottom-color:${t.color};`:''}" onclick="switchTab('${t.id}')">${t.label}${n>0? ` <span class="tab-unread-badge">${n}</span>`:''}</button>`;
+  }).join('');
 }
 
 function captureFocusState(){
@@ -2701,6 +2749,7 @@ function resetEverything(){
       DB.suppliesSpecs = {};
       DB.suppliesCategories = {};
       DB.customerNotes = {};
+      DB.readMarkers = {};
       DB.vehicleTypes = [];
       DB.modelColors = {};
       DB.notices = [];
@@ -2745,7 +2794,7 @@ function downloadFullBackup(){
     data: {
       gens: DB.gens, rentals: DB.rentals, maint: DB.maint, reservations: DB.reservations,
       materials: DB.materials, technicians: DB.technicians, teamMembers: DB.teamMembers, warnThreshold: DB.warnThreshold, overuseDailyLimit: DB.overuseDailyLimit,
-      partsStock: DB.partsStock, partsSpecs: DB.partsSpecs, partsUnit: DB.partsUnit, partsCategory: DB.partsCategory, partsSupplier: DB.partsSupplier, partsMinStock: DB.partsMinStock, partsPurchaseLog: DB.partsPurchaseLog, consumableOrders: DB.consumableOrders, orderMarks: DB.orderMarks, improvements: DB.improvements, suppliesCatalog: DB.suppliesCatalog, suppliesStock: DB.suppliesStock, vehicleTypes: DB.vehicleTypes, vehicleSuggestEnabled: DB.vehicleSuggestEnabled, genSizeDisplayEnabled: DB.genSizeDisplayEnabled, modelColors: DB.modelColors, notices: DB.notices, calendarEvents: DB.calendarEvents, genColorOverrides: DB.genColorOverrides, suppliesSizes: DB.suppliesSizes, suppliesSpecs: DB.suppliesSpecs, suppliesCategories: DB.suppliesCategories, customerNotes: DB.customerNotes, companyInfo: DB.companyInfo
+      partsStock: DB.partsStock, partsSpecs: DB.partsSpecs, partsUnit: DB.partsUnit, partsCategory: DB.partsCategory, partsSupplier: DB.partsSupplier, partsMinStock: DB.partsMinStock, partsPurchaseLog: DB.partsPurchaseLog, consumableOrders: DB.consumableOrders, orderMarks: DB.orderMarks, improvements: DB.improvements, suppliesCatalog: DB.suppliesCatalog, suppliesStock: DB.suppliesStock, vehicleTypes: DB.vehicleTypes, vehicleSuggestEnabled: DB.vehicleSuggestEnabled, genSizeDisplayEnabled: DB.genSizeDisplayEnabled, modelColors: DB.modelColors, notices: DB.notices, calendarEvents: DB.calendarEvents, genColorOverrides: DB.genColorOverrides, suppliesSizes: DB.suppliesSizes, suppliesSpecs: DB.suppliesSpecs, suppliesCategories: DB.suppliesCategories, customerNotes: DB.customerNotes, readMarkers: DB.readMarkers, companyInfo: DB.companyInfo
     }
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json;charset=utf-8;'});
@@ -2814,6 +2863,7 @@ function handleRestoreFile(input){
       DB.suppliesSpecs = d.suppliesSpecs || {};
       DB.suppliesCategories = d.suppliesCategories || {};
       DB.customerNotes = d.customerNotes || {};
+      DB.readMarkers = d.readMarkers || {};
       DB.companyInfo = (d.companyInfo && d.companyInfo.name) ? d.companyInfo : DB.companyInfo;
       await saveGens();
       await saveRentals();
@@ -3132,9 +3182,12 @@ async function addConsumableOrder(){
   const url = document.getElementById('f-co-url').value.trim();
   const note = document.getElementById('f-co-note').value.trim();
   if(!name){ flash('품명을 입력해주세요'); return; }
-  DB.consumableOrders = [...(DB.consumableOrders||[]), {id: uid(), name, spec1, spec2, url, note, purchasedBy:null, purchasedDate:null}];
+  const newId = uid();
+  DB.consumableOrders = [...(DB.consumableOrders||[]), {id: newId, name, spec1, spec2, url, note, purchasedBy:null, purchasedDate:null}];
+  markOneReadFor('consumableOrder', newId);
   await saveConsumableOrders();
   renderConsumableOrderTable();
+  renderTabbar();
   document.getElementById('f-co-name').value='';
   document.getElementById('f-co-spec1').value='';
   document.getElementById('f-co-spec2').value='';
@@ -3222,7 +3275,8 @@ function renderManualTab(){
       ['공지 작성', '제목과 내용을 입력해 등록합니다. 작성자 이름과 작성일이 자동으로 기록됩니다.'],
       ['댓글', '게시글 아래에서 댓글을 달 수 있고, 댓글도 작성자·날짜가 남습니다. 게시글/댓글 모두 삭제할 수 있습니다.'],
       ['일정표', '이번 달 달력이 표시되고 "◀ 이전달 / 오늘 / 다음달 ▶"으로 이동합니다. 날짜를 클릭하면 그 날의 일정을 보고 추가할 수 있습니다.'],
-      ['🔔 새 소식 팝업', '다른 팀원이 새 공지나 새 일정을 올리면, 앱이 켜져 있는 모든 사람에게 자동으로 팝업 알림이 뜹니다. "내용 확인"을 누르면 해당 내용으로 바로 이동합니다. 본인이 직접 올린 글로는 본인에게 팝업이 뜨지 않습니다.']
+      ['🔔 새 소식 팝업', '다른 팀원이 새 공지나 새 일정을 올리면, 앱이 켜져 있는 모든 사람에게 자동으로 팝업 알림이 뜹니다. "내용 확인"을 누르면 해당 내용으로 바로 이동합니다. 본인이 직접 올린 글로는 본인에게 팝업이 뜨지 않습니다.'],
+      ['🔴 안 읽은 글 숫자 표시', '누군가 새 공지사항·보완요청·소모품주문을 올리면, 아직 그 탭을 안 열어본 사람에게는 상단 탭 이름 옆에 빨간 숫자 배지(예: "보완요청 ①")가 뜹니다. 사람마다 따로 기록되어서, 그 탭에 들어가서 읽으면 본인 화면에서만 배지가 사라지고, 아직 안 읽은 다른 팀원 화면에는 계속 남아있습니다.']
     ])}
 
     ${manualSection('🏠','전체현황', false,
@@ -3325,7 +3379,8 @@ function renderManualTab(){
       ['소모품 추가', '품명·규격1·규격2·사이트 링크 주소·비고를 입력해서 등록합니다. 규격/비고는 입력한 것만 목록에 표시됩니다.'],
       ['구입완료처리', '품명 앞 버튼을 누르면 구매완료로 표시되고 누른 사람 이름·날짜가 남습니다. 다시 누르면 취소됩니다.'],
       ['🔗 바로가기', '등록해둔 사이트 링크로 새 탭에서 바로 이동합니다.'],
-      ['수정 / 삭제', '항목 내용을 고치거나 목록에서 지웁니다.']
+      ['수정 / 삭제', '항목 내용을 고치거나 목록에서 지웁니다.'],
+      ['🔴 안 읽은 글 숫자 표시', '새 소모품이 등록되면 아직 이 탭을 안 열어본 사람에게 탭 이름 옆에 빨간 숫자 배지가 뜨고, 탭을 열어보면 본인 화면에서만 사라집니다. (공지사항·보완요청도 같은 방식)']
     ])}
 
     ${manualSection('⚙️','설정', false,
@@ -3428,13 +3483,16 @@ async function addImprovement(){
   const ta = document.getElementById('f-imp-content');
   const content = ta.value.trim();
   if(!content){ flash('내용을 입력해주세요'); return; }
+  const newId = uid();
   DB.improvements = [...(DB.improvements||[]), {
-    id: uid(), content, authorBy: DB.currentUserName||'이름미상', createdDate: todayStr(),
+    id: newId, content, authorBy: DB.currentUserName||'이름미상', createdDate: todayStr(),
     completedBy: null, completedDate: null
   }];
+  markOneReadFor('improvements', newId);
   await saveImprovements();
   ta.value = '';
   renderImprovementsList();
+  renderTabbar();
   flash('보완요청이 등록되었습니다');
 }
 async function markImprovementDone(id){
@@ -3542,9 +3600,11 @@ async function addNotice(){
     id: newId, title, content, authorBy: DB.currentUserName||'이름미상', createdDate: todayStr(), comments: []
   }];
   seenNoticeIds.add(newId);
+  markOneReadFor('notice', newId);
   await saveNotices();
   titleEl.value=''; contentEl.value='';
   renderNoticeList();
+  renderTabbar();
   flash('공지사항이 등록되었습니다');
 }
 function removeNotice(id){
@@ -7875,8 +7935,8 @@ function openMaintModal(id, editId, repairComplete){
       }).join('');
   const kindToPartIndex = {};
   candidates.forEach((p,i)=>{ if(p.kind) kindToPartIndex[p.kind] = i; });
-  const CONTENT_TO_KIND = {'엔진오일교체':'engineOil','오일필터1교체':'oilFilter1','오일필터2교체':'oilFilter2','연료필터1교체':'fuelFilter1','연료필터2교체':'fuelFilter2','에어필터교체':'airFilter'};
-  const contentOptions = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1교체','오일필터1점검','오일필터2교체','오일필터2점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소'];
+  const CONTENT_TO_KIND = {'엔진오일교체':'engineOil','오일필터1차교체':'oilFilter1','오일필터2차교체':'oilFilter2','연료필터1교체':'fuelFilter1','연료필터2교체':'fuelFilter2','에어필터교체':'airFilter'};
+  const contentOptions = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1차교체','오일필터1차점검','오일필터2차교체','오일필터2차점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검 및 보충','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소'];
   const prevContentList = rec && rec.contentItems ? rec.contentItems : [];
   const contentCheckLabel = (c,i)=>{
     const kind = CONTENT_TO_KIND[c];
@@ -7885,7 +7945,7 @@ function openMaintModal(id, editId, repairComplete){
     const linkTxt = partIdx!==undefined ? ` <span class="muted" style="font-size:11px;">(체크시 아래 사용부품 자동선택)</span>` : '';
     return `<label class="part-check" style="flex:1;border-bottom:none;padding:2px 0;"><input type="checkbox" id="f-mcontent-${i}" value="${c}" ${prevContentList.includes(c)?'checked':''}${syncAttr}> ${c}${linkTxt}</label>`;
   };
-  const pairGroups = [['엔진오일교체','엔진오일점검'],['에어필터교체','에어필터점검'],['오일필터1교체','오일필터1점검'],['오일필터2교체','오일필터2점검'],['연료필터1교체','연료필터1점검'],['연료필터2교체','연료필터2점검'],['부동액교체','부동액점검'],['배터리교체','배터리점검'],['팬벨트교체','출력단자체결상태'],['누전차단기볼트교체','배터리터미널조임상태']];
+  const pairGroups = [['엔진오일교체','엔진오일점검'],['에어필터교체','에어필터점검'],['오일필터1차교체','오일필터1차점검'],['오일필터2차교체','오일필터2차점검'],['연료필터1교체','연료필터1점검'],['연료필터2교체','연료필터2점검'],['부동액교체','부동액점검 및 보충'],['배터리교체','배터리점검'],['팬벨트교체','출력단자체결상태'],['누전차단기볼트교체','배터리터미널조임상태']];
   const pairedItems = new Set(pairGroups.flat());
   let contentChecksHtml = '';
   const doneItems = new Set();
@@ -7978,7 +8038,7 @@ async function submitMaint(id, editId, completeRepair){
   const hours = Number(document.getElementById('f-mhours').value);
   const type = document.getElementById('f-mtype').value;
   const technician = document.getElementById('f-mtech').value;
-  const contentOptions = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1교체','오일필터1점검','오일필터2교체','오일필터2점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소'];
+  const contentOptions = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1차교체','오일필터1차점검','오일필터2차교체','오일필터2차점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검 및 보충','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소'];
   const contentItems = contentOptions.filter((c,i)=>{
     const el = document.getElementById(`f-mcontent-${i}`);
     return el && el.checked;
@@ -8069,6 +8129,7 @@ async function init(){
     ['suppliesSpecs', 'gen-supplies-specs-v1', {}, true],
     ['suppliesCategories', 'gen-supplies-categories-v1', {}, true],
     ['customerNotes', 'gen-customer-notes-v1', {}, true],
+    ['readMarkers', 'gen-read-markers-v1', {}, true],
     ['palletDefaultRemoved', 'gen-pallet-default-removed-v1', false, true],
     ['companyInfo', 'gen-company-info-v1', {name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}, true],
     ['currentUserName', 'gen-user-name-v1', '', false]
@@ -8121,6 +8182,7 @@ async function init(){
   DB.suppliesSpecs = results.suppliesSpecs;
   DB.suppliesCategories = results.suppliesCategories || {};
   DB.customerNotes = results.customerNotes || {};
+  DB.readMarkers = results.readMarkers || {};
   DB.companyInfo = results.companyInfo && results.companyInfo.name ? results.companyInfo : {name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'};
   if(!results.palletDefaultRemoved && (DB.suppliesCatalog||[]).includes('깔판')){
     DB.suppliesCatalog = DB.suppliesCatalog.filter(n=>n!=='깔판');
@@ -8199,6 +8261,7 @@ async function submitUserName(nameArg){
   DB.currentUserName = name;
   closeModal();
   renderUserBadge();
+  renderTabbar();
   flash(`${name}님, 환영합니다`);
   saveWithRetry(saveCurrentUserName);
   if(!(DB.teamMembers||[]).includes(name)){
@@ -8225,7 +8288,7 @@ async function syncFromStorage(){
   if(shouldSkipSync()) return;
   syncInFlight = true;
   try{
-    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, overuseDailyLimit, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, vehicleTypes, vehicleSuggestEnabled, genSizeDisplayEnabled, modelColors, notices, calendarEvents, genColorOverrides, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, companyInfo, lastBackupDate] = await Promise.all([
+    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, overuseDailyLimit, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, vehicleTypes, vehicleSuggestEnabled, genSizeDisplayEnabled, modelColors, notices, calendarEvents, genColorOverrides, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
       peekStorage('gen-fleet-v2', DB.gens),
       peekStorage('gen-rentals-v2', DB.rentals),
       peekStorage('gen-maintenance-v2', DB.maint),
@@ -8258,11 +8321,12 @@ async function syncFromStorage(){
       peekStorage('gen-supplies-specs-v1', DB.suppliesSpecs),
       peekStorage('gen-supplies-categories-v1', DB.suppliesCategories),
       peekStorage('gen-customer-notes-v1', DB.customerNotes),
+      peekStorage('gen-read-markers-v1', DB.readMarkers),
       peekStorage('gen-company-info-v1', DB.companyInfo),
       peekStorage('gen-last-backup-date-v1', DB.lastBackupDate)
     ]);
-    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,overuseDailyLimit:DB.overuseDailyLimit,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,vehicleTypes:DB.vehicleTypes,vehicleSuggestEnabled:DB.vehicleSuggestEnabled,genSizeDisplayEnabled:DB.genSizeDisplayEnabled,modelColors:DB.modelColors,notices:DB.notices,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
-    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,overuseDailyLimit,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,vehicleTypes,vehicleSuggestEnabled,genSizeDisplayEnabled,modelColors,notices,calendarEvents,genColorOverrides,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,companyInfo,lastBackupDate});
+    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,overuseDailyLimit:DB.overuseDailyLimit,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,vehicleTypes:DB.vehicleTypes,vehicleSuggestEnabled:DB.vehicleSuggestEnabled,genSizeDisplayEnabled:DB.genSizeDisplayEnabled,modelColors:DB.modelColors,notices:DB.notices,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
+    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,overuseDailyLimit,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,vehicleTypes,vehicleSuggestEnabled,genSizeDisplayEnabled,modelColors,notices,calendarEvents,genColorOverrides,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate});
     if(before !== after){
       const newNotices = (notices||[]).filter(n=>n && !seenNoticeIds.has(n.id) && n.authorBy!==DB.currentUserName);
       const newEvents = (calendarEvents||[]).filter(e=>e && !seenEventIds.has(e.id) && e.authorBy!==DB.currentUserName);
@@ -8272,7 +8336,7 @@ async function syncFromStorage(){
       seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad).map(r=>r.id));
       DB.gens = gens; DB.rentals = rentals; DB.maint = maint; DB.reservations = reservations;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold; DB.overuseDailyLimit = overuseDailyLimit;
-      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
+      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
       applyCompanyBranding();
       if(!shouldSkipSync()){
         renderTabbar();
