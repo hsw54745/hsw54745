@@ -33,9 +33,7 @@
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;padding-bottom:60px;}
-  header{background:var(--primary-dark);color:#fff;padding:22px 20px 18px;position:relative;overflow:hidden;}
-  .header-generator-photo{position:absolute;top:-16px;left:6px;width:260px;height:190px;background:url('https://images.unsplash.com/photo-1523559094051-53bac879eb80?auto=format&fit=crop&w=900&q=80') center/cover no-repeat;-webkit-mask-image:radial-gradient(ellipse 68% 62% at 40% 45%,#000 30%,transparent 72%);mask-image:radial-gradient(ellipse 68% 62% at 40% 45%,#000 30%,transparent 72%);opacity:.6;z-index:-1;pointer-events:none;}
-  @media (max-width:480px){.header-generator-photo{width:190px;height:150px;top:-10px;left:-10px;}}
+  header{background:var(--primary-dark);color:#fff;padding:22px 20px 18px;}
   .brand-row{display:flex;align-items:center;gap:10px;}
   .brand-mark{width:34px;height:34px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:16px;flex-shrink:0;}
   .brand-name{font-size:13px;color:#B9C6D2;letter-spacing:.02em;}
@@ -223,7 +221,6 @@
 <div id="pw-gate"></div>
 
 <header>
-  <div class="header-generator-photo"></div>
   <div class="brand-row">
     <div class="brand-mark">S</div>
     <div class="brand-name" id="brand-name-text">해성발전기</div>
@@ -7415,6 +7412,7 @@ function printReceipt(id, rtOverride){
           <div class="btn-row" style="justify-content:flex-end;">
             <button class="btn sm primary" onclick="printReceiptNow('${g.id}')">🖨 인쇄하기</button>
             <button class="btn sm" onclick="downloadReceiptFile('${g.id}')">인쇄용 파일 다운로드</button>
+            <button class="btn sm" onclick="sendShareSms('${g.id}')">📱 문자로 보내기</button>
             <button class="btn sm" onclick="openShareModal('${g.id}')">공유하기</button>
             <button class="btn sm" onclick="closeReceipt()">닫기</button>
           </div>
@@ -7451,14 +7449,11 @@ function openShareModal(id){
   const rt = receiptOverrideRT || (g && g.rental);
   if(!g || !rt) return;
   const text = receiptTextSummary(g, rt);
-  const canNativeShare = !!navigator.share;
-  const mailSubject = encodeURIComponent(`[${(DB.companyInfo&&DB.companyInfo.name)||'해성발전기'}] 인수증 - ${g.id} ${rt.customer||''}`);
-  const mailBody = encodeURIComponent(text);
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" style="z-index:350;" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
       <h3>인수증 공유</h3>
-      <div class="modal-sub">아래 내용을 복사해서 카카오톡/문자에 붙여넣거나, 이메일로 보낼 수 있습니다.</div>
+      <div class="modal-sub">아래 내용을 복사해서 카카오톡/문자에 붙여넣거나, 문자로 바로 보낼 수 있습니다.</div>
       <div class="field"><textarea id="f-share-text" rows="10" readonly style="font-family:var(--mono);font-size:12px;white-space:pre-wrap;">${text.replace(/</g,'&lt;')}</textarea></div>
       <div class="field">
         <label>📱 문자 받는 사람 번호 (여러 명이면 콤마로 구분)</label>
@@ -7469,8 +7464,6 @@ function openShareModal(id){
       <div class="modal-actions" style="flex-wrap:wrap;">
         <button class="btn primary" onclick="copyShareText()">복사하기</button>
         <button class="btn" style="white-space:nowrap;" onclick="sendShareSms('${g.id}')">📱 문자로 보내기</button>
-        ${canNativeShare? `<button class="btn" style="white-space:nowrap;" onclick="tryNativeShare('${g.id}')">공유 시트 열기</button>` : ''}
-        <a class="btn" style="display:inline-flex;align-items:center;justify-content:center;text-align:center;text-decoration:none;white-space:nowrap;" href="mailto:?subject=${mailSubject}&body=${mailBody}">이메일로 보내기</a>
         <button class="btn" onclick="closeModal()">닫기</button>
       </div>
     </div>
@@ -7488,15 +7481,6 @@ function sendShareSms(id){
   const body = encodeURIComponent(text);
   const to = numbers.join(',');
   window.location.href = `sms:${to}?body=${body}`;
-}
-async function tryNativeShare(id){
-  const g = findGen(id);
-  if(!g) return;
-  const rt = receiptOverrideRT || g.rental;
-  if(!rt) return;
-  try{
-    await navigator.share({title:`인수증 - ${g.id}`, text: receiptTextSummary(g, rt)});
-  }catch(e){ /* 사용자가 취소한 경우 등은 무시 */ }
 }
 function readAndCompressImageToDataUrl(file, maxW, quality){
   return new Promise((resolve, reject)=>{
