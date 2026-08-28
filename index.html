@@ -3316,7 +3316,7 @@ function renderManualTab(){
       ['전압변경 표시', '출고 전압이 발전기 기존 전압과 다르면 빨간 글씨로 뜹니다. 클릭하면 그 모델의 전압 설정 방법 목록이 뜨고, "220V (2장)"처럼 나오는 글자를 클릭하면 사진을 크게 볼 수 있습니다.'],
       ['부자재확인', '출고시 선택한 부자재 목록만 간단히 팝업으로 보여줍니다 (비고확인과 같은 형식 — 내용만 표시, 닫기 버튼만 있음). 부자재가 없으면 "부자재없음"으로 표시됩니다.'],
       ['비고확인', '출고하기에서 비고란에 내용을 적어두면 부자재확인 버튼 바로 아래에 파란색 버튼으로 "비고확인"이 뜹니다 (부자재확인과 같은 크기·모양). 클릭하면 비고 내용만 바로 보여줍니다. 비고가 없으면 표시되지 않습니다.'],
-      ['🚚 상차 예정 안내 팝업', '이름을 선택해 접속(로그인)할 때마다 오늘 상차할 목록과 내일 상차할 목록을 팝업으로 보여줍니다 (모든 사용자, 접속할 때마다 매번). 또한 다른 사람이 출고하기에서 상차대기 건을 새로 등록하면, 약 2분 이내에 등록한 사람을 제외한 나머지 팀원들에게 이 팝업이 자동으로 뜹니다 (등록한 사람 본인에게는 뜨지 않습니다). 팝업 안 내용은 [출고대기] 탭과 동일하며 누구나 볼 수 있습니다.']
+      ['🚚 발전기 상차·입고 안내 팝업', '이름을 선택해 접속(로그인)할 때마다 오늘/내일 상차할 목록과 오늘/내일 입고예정 목록을 함께 팝업으로 보여줍니다 (모든 사용자, 접속할 때마다 매번). 오늘·내일 상차·입고가 전부 없으면 팝업 자체가 뜨지 않습니다. 또한 다른 사람이 출고하기에서 상차대기 건을 새로 등록하면, 약 2분 이내에 등록한 사람을 제외한 나머지 팀원들에게 이 팝업이 자동으로 뜹니다 (등록한 사람 본인에게는 뜨지 않습니다). 팝업 안 상차 내용은 [출고대기] 탭, 입고예정 내용은 [출고중] 탭과 동일하며 누구나 볼 수 있습니다.']
     ])}
 
     ${manualSection('📤','출고중', false,
@@ -3743,13 +3743,21 @@ function tomorrowStr(){
   d.setDate(d.getDate()+1);
   return toLocalDateStr(d);
 }
-function loadingListPopupHtml(){
+function loadingPopupData(){
   const today = todayStr(), tomorrow = tomorrowStr();
   const pending = (DB.reservations||[]).filter(r=>r.pendingLoad);
-  const dateOf = r => r.loadDate || r.outDate;
-  const todayList = pending.filter(r=>dateOf(r)===today).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
-  const tomorrowList = pending.filter(r=>dateOf(r)===tomorrow).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
-  const rowHtml = r=>{
+  const loadDateOf = r => r.loadDate || r.outDate;
+  const todayLoad = pending.filter(r=>loadDateOf(r)===today).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
+  const tomorrowLoad = pending.filter(r=>loadDateOf(r)===tomorrow).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
+  const outWithExpected = activeGens().filter(g=>g.status==='out' && g.rental && expectedInDate(g.rental));
+  const todayIn = outWithExpected.filter(g=>expectedInDate(g.rental)===today).sort(sortByIdNatural);
+  const tomorrowIn = outWithExpected.filter(g=>expectedInDate(g.rental)===tomorrow).sort(sortByIdNatural);
+  return {today, tomorrow, todayLoad, tomorrowLoad, todayIn, tomorrowIn,
+    total: todayLoad.length+tomorrowLoad.length+todayIn.length+tomorrowIn.length};
+}
+function loadingListPopupHtml(){
+  const {today, tomorrow, todayLoad, tomorrowLoad, todayIn, tomorrowIn} = loadingPopupData();
+  const loadRowHtml = r=>{
     const g = findGen(r.genId);
     const fuel = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
     const extra = [r.supplies? `부자재: ${escR(r.supplies)}` : '', r.note? `비고: ${escR(r.note)}` : ''].filter(Boolean).join(' · ');
@@ -3759,18 +3767,28 @@ function loadingListPopupHtml(){
       ${extra? `<div class="muted" style="font-size:11.5px;">${extra}</div>` : ''}
     </div>`;
   };
-  const section = (title,list)=> `<div>
+  const inRowHtml = g=>{
+    const rt = g.rental;
+    return `<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px;">
+      <div><b>${escR(g.id)}</b> ${escR(g.model||'')}</div>
+      <div class="muted">${escR(rt.customer||'거래처 미기재')} · ${escR(rt.site||rt.address||'-')}</div>
+    </div>`;
+  };
+  const section = (title,list,rowFn)=> `<div style="margin-bottom:10px;">
     <div style="font-weight:700;font-size:13.5px;margin-bottom:4px;">${title} <span class="muted" style="font-weight:400;">(${list.length}건)</span></div>
-    ${list.length===0? `<div class="muted" style="font-size:12.5px;">없음</div>` : list.map(rowHtml).join('')}
+    ${list.length===0? `<div class="muted" style="font-size:12.5px;">없음</div>` : list.map(rowFn).join('')}
   </div>`;
-  return `<div class="util-two-col" style="align-items:flex-start;">${section(`🚚 오늘(${dow(today)}) 상차`, todayList)}${section(`📅 내일(${dow(tomorrow)}) 상차`, tomorrowList)}</div>`;
+  const loadCol = `<div style="flex:1;min-width:0;">${section(`🚚 오늘(${dow(today)}) 상차`, todayLoad, loadRowHtml)}${section(`🚚 내일(${dow(tomorrow)}) 상차`, tomorrowLoad, loadRowHtml)}</div>`;
+  const inCol = `<div style="flex:1;min-width:0;">${section(`📥 오늘(${dow(today)}) 입고예정`, todayIn, inRowHtml)}${section(`📥 내일(${dow(tomorrow)}) 입고예정`, tomorrowIn, inRowHtml)}</div>`;
+  return `<div class="util-two-col" style="align-items:flex-start;">${loadCol}${inCol}</div>`;
 }
 function showLoadingListPopup(isNewNotice){
+  if(loadingPopupData().total===0) return;
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:600px;">
-      <h3>🚚 상차 예정 안내${isNewNotice? ' <span class="pill" style="font-size:11px;background:var(--primary-tint);color:var(--primary-dark);">새 등록</span>':''}</h3>
-      <div class="modal-sub">전체 목록은 [출고대기] 탭에서 확인할 수 있습니다.</div>
+    <div class="modal" style="max-width:760px;">
+      <h3>📥 상차·입고 예정 안내${isNewNotice? ' <span class="pill" style="font-size:11px;background:var(--primary-tint);color:var(--primary-dark);">새 등록</span>':''}</h3>
+      <div class="modal-sub">상차 전체 목록은 [출고대기] 탭, 입고예정 전체 목록은 [출고중] 탭에서 확인할 수 있습니다.</div>
       ${loadingListPopupHtml()}
       <div class="modal-actions">
         <button class="btn" onclick="closeModal()">닫기</button>
