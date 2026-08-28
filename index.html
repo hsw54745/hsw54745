@@ -183,7 +183,7 @@
   .r-toolbar-title{font-size:13px;font-weight:700;color:var(--ink-soft);}
   .print-msg{background:var(--warn-tint);border:1px solid var(--warn);color:#7a5314;font-size:12.5px;padding:10px 12px;border-radius:8px;margin-bottom:14px;}
   .r-copy{border:2px solid #222;border-radius:4px;padding:16px 18px;margin-bottom:12px;position:relative;overflow:hidden;}
-  .r-watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-24deg);font-size:52px;font-weight:900;letter-spacing:10px;color:rgba(120,120,120,0.07);white-space:nowrap;pointer-events:none;z-index:5;user-select:none;}
+  .r-watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-24deg);font-size:52px;font-weight:900;letter-spacing:10px;color:rgba(120,120,120,0.20);white-space:nowrap;pointer-events:none;z-index:5;user-select:none;}
   .r-title{text-align:center;font-size:22px;font-weight:900;letter-spacing:4px;margin-bottom:12px;}
   .r-title .r-copy-tag{display:block;font-size:13px;font-weight:500;letter-spacing:2px;color:var(--ink-soft);margin-top:2px;}
   .r-row{display:flex;gap:16px;font-size:13px;margin-bottom:9px;}
@@ -385,10 +385,11 @@ const TABS = [
   {id:'settings', label:'⚙️ 설정', color:'#555B6E'},
   {id:'manual', label:'📖 사용설명서', color:'#0F766E'}
 ];
-let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
+let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, customerNotes:{}, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
 let currentTab = 'dashboard';
 let seenNoticeIds = new Set();
 let seenEventIds = new Set();
+let seenReservationIds = new Set();
 let uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 // ---------- 비밀번호 게이트 ----------
@@ -741,6 +742,7 @@ async function saveGenColorOverrides(){ await storageSetChecked('gen-gen-color-o
 async function saveSuppliesSizes(){ await storageSetChecked('gen-supplies-sizes-v1', JSON.stringify(DB.suppliesSizes), true); }
 async function saveSuppliesSpecs(){ await storageSetChecked('gen-supplies-specs-v1', JSON.stringify(DB.suppliesSpecs), true); }
 async function saveSuppliesCategories(){ await storageSetChecked('gen-supplies-categories-v1', JSON.stringify(DB.suppliesCategories), true); }
+async function saveCustomerNotes(){ await storageSetChecked('gen-customer-notes-v1', JSON.stringify(DB.customerNotes), true); }
 async function saveWarnThreshold(){ await storageSetChecked('gen-warn-threshold-v1', JSON.stringify(DB.warnThreshold), true); }
 async function saveOveruseDailyLimit(){ await storageSetChecked('gen-overuse-daily-limit-v1', JSON.stringify(DB.overuseDailyLimit), true); }
 async function savePartsStock(){ await storageSetChecked('gen-parts-stock-v1', JSON.stringify(DB.partsStock), true); }
@@ -1242,7 +1244,7 @@ function renderContent(){
   else if(currentTab==='manual') c.innerHTML = renderManualTab();
   else if(currentTab==='improvements') c.innerHTML = renderImprovementsTab();
   else if(currentTab==='settings') c.innerHTML = renderSettingsTab();
-  if(currentTab==='history') initHistorySelect();
+  if(currentTab==='history'){ if(historyViewMode==='customer') renderCustomerHistoryView(); else initHistorySelect(); }
   if(currentTab==='maint') renderMaintList();
   if(currentTab==='materials') { renderPartsStockTable(); renderSuppliesCatalogTable(); }
   if(currentTab==='consumable-order') renderConsumableOrderTable();
@@ -1727,7 +1729,28 @@ function renderInList(){
       ${capacityEntries.map(([cap,cnt])=>`<button class="btn sm${inCapacityFilter===cap?' primary':''}" onclick="viewCapacityInList(${cap})">${cap}kW <span class="muted" style="font-size:11px;">(${cnt})</span></button>`).join('')}
     </div>`;
 
+  const recentIn = [...DB.rentals].filter(r=>r.inProcessedAt).sort((a,b)=>(b.inProcessedAt||'').localeCompare(a.inProcessedAt||'')).slice(0,5);
+  const recentInRows = recentIn.map(r=>{
+    const g = findGen(r.genId);
+    return `<tr>
+      <td class="gid">${escR(r.genId)}</td>
+      <td class="wrap-ok">${g? displayModel(g):'-'}</td>
+      <td class="muted" style="font-size:12px;">${escR(r.inProcessedAt||'-')}</td>
+      <td>${g? voltagePillHtml(g.id, g.voltage) : '-'}</td>
+      <td class="muted" style="font-size:12px;">${escR(r.inProcessedBy||'-')}</td>
+    </tr>`;
+  }).join('');
+  const recentInHtml = recentIn.length===0 ? '' : `
+    <div class="section-title" style="margin-top:0;">🕐 최근 입고 처리한 발전기 <span class="cnt">최근 5대</span></div>
+    <p class="muted" style="font-size:12px;margin-top:-4px;">방금 처리한 전압이 맞게 반영됐는지 여기서 바로 확인·수정할 수 있습니다. 전압을 클릭하면 수정할 수 있습니다.</p>
+    <div class="table-scroll"><table>
+      <thead><tr><th>번호</th><th>모델</th><th>입고 처리 시각</th><th>전압</th><th>처리자</th></tr></thead>
+      <tbody>${recentInRows}</tbody>
+    </table></div>
+  `;
+
   return `
+    ${recentInHtml}
     <div class="section-title">입고 예정 (5일 이내) <span class="cnt">${soonList.length}대</span></div>
     ${soonList.length===0? `<div class="empty">5일 이내 입고 예정인 발전기가 없습니다.</div>` : `
     <div class="table-scroll"><table>
@@ -2205,14 +2228,121 @@ function renderHistorySelectOptions(keepId){
   sel.innerHTML = list.map(g=>`<option value="${g.id}">${g.id}${g.model? ' · '+g.model:''}${g.retired? ' (폐기됨)':''}</option>`).join('');
   if(keepId && list.some(g=>g.id===keepId)) sel.value = keepId;
 }
+let historyViewMode = 'gen';
 function renderHistoryTab(){
   return `
-    <div class="section-title">발전기별 이력 조회</div>
+    <div class="btn-row" style="margin-bottom:10px;">
+      <button class="btn sm${historyViewMode==='gen'?' primary':''}" onclick="switchHistoryView('gen')">발전기별 이력</button>
+      <button class="btn sm${historyViewMode==='customer'?' primary':''}" onclick="switchHistoryView('customer')">거래처별 이력</button>
+    </div>
+    ${historyViewMode==='gen' ? `
+    <div class="section-title" style="margin-top:0;">발전기별 이력 조회</div>
     <div class="toolbar">
       <select id="hist-select" onchange="renderGenHistory()"></select>
     </div>
     <div id="hist-result"></div>
+    ` : `
+    <div class="section-title" style="margin-top:0;">거래처별 이력 · 주의사항</div>
+    <div id="customer-history-wrap"></div>
+    `}
   `;
+}
+function switchHistoryView(mode){
+  historyViewMode = mode;
+  renderContent();
+}
+const CUSTOMER_TAG_PRESETS = ['입금 문제','장비 관리 불량','회수일자 지연'];
+function customerRentalStats(customer){
+  const all = [];
+  DB.rentals.forEach(r=>{ if(r.customer===customer) all.push(r); });
+  DB.reservations.forEach(r=>{ if(r.customer===customer) all.push(r); });
+  DB.gens.forEach(g=>{ if(g.rental && g.rental.customer===customer) all.push(g.rental); });
+  return all;
+}
+function renderCustomerHistoryView(){
+  const wrap = document.getElementById('customer-history-wrap');
+  if(!wrap) return;
+  const records = knownCustomerRecords();
+  if(records.length===0){ wrap.innerHTML = `<div class="empty">임대 이력이 없습니다.</div>`; return; }
+  const rows = records.map(r=>{
+    const notes = DB.customerNotes && DB.customerNotes[r.customer];
+    const tags = (notes && notes.tags) || [];
+    const cnt = customerRentalStats(r.customer).length;
+    return `<tr${tags.length>0? ` style="background:var(--danger-tint);"`:''}>
+      <td class="wrap-ok" style="cursor:pointer;text-decoration:underline dotted;" onclick="openCustomerNotesModal('${r.customer.replace(/'/g,"\\'")}')">${escR(r.customer)}</td>
+      <td class="muted">${cnt}건</td>
+      <td>${tags.length>0? tags.map(t=>`<span class="pill danger" style="margin-right:3px;">${escR(t)}</span>`).join('') : `<span class="muted">-</span>`}</td>
+      <td class="muted" style="font-size:12px;">${notes&&notes.note? escR(notes.note) : '-'}</td>
+      <td><button class="btn sm" onclick="openCustomerNotesModal('${r.customer.replace(/'/g,"\\'")}')">주의사항 설정</button></td>
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `<div class="table-scroll"><table>
+    <thead><tr><th>거래처명</th><th>임대건수</th><th>주의태그</th><th>주의사항</th><th></th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+function openCustomerNotesModal(customer){
+  const notes = (DB.customerNotes && DB.customerNotes[customer]) || {tags:[], note:''};
+  const rentals = customerRentalStats(customer).sort((a,b)=>(b.outDate||'').localeCompare(a.outDate||''));
+  const histHtml = rentals.length>0 ? `<div style="max-height:360px;overflow-y:auto;margin-top:6px;"><table style="width:100%;table-layout:fixed;">
+    <thead><tr><th style="width:100px;">출고일</th><th style="width:80px;">번호</th><th>현장</th></tr></thead>
+    <tbody>${rentals.map(r=>`<tr><td class="muted">${dow(r.outDate)||'-'}</td><td class="gid">${escR(r.genId||'-')}</td><td class="muted wrap-ok" style="font-size:12px;">${escR(r.address||'-')}</td></tr>`).join('')}</tbody>
+  </table></div>` : `<div class="hint">임대 이력이 없습니다.</div>`;
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal" style="max-width:820px;">
+      <h3>거래처 주의사항</h3>
+      <div class="modal-sub">${escR(customer)}</div>
+      <div class="field">
+        <label>주의 태그 (여러 개 선택 가능)</label>
+        <div class="btn-row" id="cn-tags-wrap">${CUSTOMER_TAG_PRESETS.map(t=>`<button type="button" class="btn sm${notes.tags.includes(t)?' danger':''}" onclick="toggleCustomerTag(this)" data-tag="${escR(t)}">${escR(t)}</button>`).join('')}</div>
+      </div>
+      <div class="field"><label>주의사항 (자유 입력)</label><textarea id="cn-note" placeholder="예: 2026년 3월 대금 3주 지연 지급됨" style="min-height:110px;">${escR(notes.note||'')}</textarea></div>
+      <div class="section-title" style="font-size:13px;">이 거래처 임대 이력</div>
+      ${histHtml}
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">취소</button>
+        ${(notes.tags.length>0||notes.note)? `<button class="btn danger" onclick="clearCustomerNotes('${customer.replace(/'/g,"\\'")}')">주의사항 삭제</button>`:''}
+        <button class="btn primary" onclick="submitCustomerNotes('${customer.replace(/'/g,"\\'")}')">저장</button>
+      </div>
+    </div>
+  </div>`;
+}
+function toggleCustomerTag(btn){
+  btn.classList.toggle('danger');
+}
+async function submitCustomerNotes(customer){
+  const tagBtns = document.querySelectorAll('#cn-tags-wrap button');
+  const tags = [...tagBtns].filter(b=>b.classList.contains('danger')).map(b=>b.dataset.tag);
+  const note = document.getElementById('cn-note').value.trim();
+  DB.customerNotes = DB.customerNotes || {};
+  if(tags.length===0 && !note){
+    delete DB.customerNotes[customer];
+  } else {
+    DB.customerNotes[customer] = {tags, note, updatedBy: DB.currentUserName||null, updatedAt: todayStr()};
+  }
+  await saveCustomerNotes();
+  closeModal();
+  renderContent();
+  flash('저장되었습니다');
+}
+function clearCustomerNotes(customer){
+  openConfirmModal(`"${customer}"의 주의사항을 전부 삭제할까요?`, async function(){
+    if(DB.customerNotes) delete DB.customerNotes[customer];
+    await saveCustomerNotes();
+    closeModal();
+    renderContent();
+    flash('삭제되었습니다');
+  }, '삭제');
+}
+function customerWarningHtml(customer){
+  const notes = DB.customerNotes && DB.customerNotes[(customer||'').trim()];
+  if(!notes || (notes.tags.length===0 && !notes.note)) return '';
+  return `<div style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:10px 12px;margin-top:6px;">
+    <div style="font-weight:800;font-size:13.5px;color:var(--danger);margin-bottom:4px;">⚠️ 이 거래처 주의사항</div>
+    ${notes.tags.length>0? `<div style="margin-bottom:4px;">${notes.tags.map(t=>`<span class="pill danger" style="margin-right:3px;">${escR(t)}</span>`).join('')}</div>`:''}
+    ${notes.note? `<div style="font-size:12.5px;color:var(--ink);white-space:pre-wrap;">${escR(notes.note)}</div>`:''}
+  </div>`;
 }
 function renderRecentMaint(){
   const wrap = document.getElementById('recent-maint-wrap');
@@ -2378,6 +2508,7 @@ function resetEverything(){
       DB.suppliesSizes = {};
       DB.suppliesSpecs = {};
       DB.suppliesCategories = {};
+      DB.customerNotes = {};
       DB.vehicleTypes = [];
       DB.modelColors = {};
       DB.notices = [];
@@ -2422,7 +2553,7 @@ function downloadFullBackup(){
     data: {
       gens: DB.gens, rentals: DB.rentals, maint: DB.maint, reservations: DB.reservations,
       materials: DB.materials, technicians: DB.technicians, teamMembers: DB.teamMembers, warnThreshold: DB.warnThreshold, overuseDailyLimit: DB.overuseDailyLimit,
-      partsStock: DB.partsStock, partsSpecs: DB.partsSpecs, partsUnit: DB.partsUnit, partsCategory: DB.partsCategory, partsSupplier: DB.partsSupplier, partsMinStock: DB.partsMinStock, partsPurchaseLog: DB.partsPurchaseLog, consumableOrders: DB.consumableOrders, orderMarks: DB.orderMarks, improvements: DB.improvements, suppliesCatalog: DB.suppliesCatalog, suppliesStock: DB.suppliesStock, vehicleTypes: DB.vehicleTypes, vehicleSuggestEnabled: DB.vehicleSuggestEnabled, genSizeDisplayEnabled: DB.genSizeDisplayEnabled, modelColors: DB.modelColors, notices: DB.notices, calendarEvents: DB.calendarEvents, genColorOverrides: DB.genColorOverrides, suppliesSizes: DB.suppliesSizes, suppliesSpecs: DB.suppliesSpecs, suppliesCategories: DB.suppliesCategories, companyInfo: DB.companyInfo
+      partsStock: DB.partsStock, partsSpecs: DB.partsSpecs, partsUnit: DB.partsUnit, partsCategory: DB.partsCategory, partsSupplier: DB.partsSupplier, partsMinStock: DB.partsMinStock, partsPurchaseLog: DB.partsPurchaseLog, consumableOrders: DB.consumableOrders, orderMarks: DB.orderMarks, improvements: DB.improvements, suppliesCatalog: DB.suppliesCatalog, suppliesStock: DB.suppliesStock, vehicleTypes: DB.vehicleTypes, vehicleSuggestEnabled: DB.vehicleSuggestEnabled, genSizeDisplayEnabled: DB.genSizeDisplayEnabled, modelColors: DB.modelColors, notices: DB.notices, calendarEvents: DB.calendarEvents, genColorOverrides: DB.genColorOverrides, suppliesSizes: DB.suppliesSizes, suppliesSpecs: DB.suppliesSpecs, suppliesCategories: DB.suppliesCategories, customerNotes: DB.customerNotes, companyInfo: DB.companyInfo
     }
   };
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json;charset=utf-8;'});
@@ -2490,6 +2621,7 @@ function handleRestoreFile(input){
       DB.suppliesSizes = d.suppliesSizes || {};
       DB.suppliesSpecs = d.suppliesSpecs || {};
       DB.suppliesCategories = d.suppliesCategories || {};
+      DB.customerNotes = d.customerNotes || {};
       DB.companyInfo = (d.companyInfo && d.companyInfo.name) ? d.companyInfo : DB.companyInfo;
       await saveGens();
       await saveRentals();
@@ -2929,15 +3061,16 @@ function renderManualTab(){
 
     ${manualSection('⏳','출고 대기', false,
       '출고하기를 누르면 발전기가 먼저 여기 "출고 대기"로 등록됩니다. 실제로 상차·출발해야 진짜 "출고중"이 됩니다.', [
-      ['인수증', '거래처에 보여줄 인수증 미리보기를 엽니다. "🖨 인쇄하기"로 바로 인쇄하거나, 파일로 다운로드·공유할 수 있습니다. 공급자용에는 연료 요청량과 실제주입량이 함께 표시되고, 공급받는자용에는 요청량만 표시됩니다.'],
+      ['인수증', '거래처에 보여줄 인수증 미리보기를 엽니다. 연료를 넣기로 되어 있는 건은 인수증을 열기 전에 "연료 OOL 주유하시기 바랍니다" 알림이 먼저 뜨고, 확인해야 인수증이 열립니다 (상차 나가기 직전에 놓치지 않도록). "🖨 인쇄하기"로 바로 인쇄하거나, 파일로 다운로드·공유할 수 있습니다. 공급자용에는 연료 요청량과 실제주입량이 함께 표시되고, 공급받는자용에는 요청량만 표시됩니다.'],
       ['내용보기/수정', '상차대기 상태인 항목의 세부 내용을 확인하거나 고칩니다.'],
-      ['상차완료', '실제로 발전기를 싣고 출발했을 때 누르면 정식으로 [출고중] 상태가 됩니다.'],
+      ['상차완료', '실제로 발전기를 싣고 출발했을 때 누르면 정식으로 [출고중] 상태가 됩니다. 연료 요청·주입 기록이 있는 건은 "연료를 실제로 넣었습니다" 체크박스를 눌러야만 완료 처리가 되어, 연료 안 넣고 그냥 상차하는 실수를 막아줍니다. 목록의 연료량도 크고 굵게 표시됩니다.'],
       ['출고하기', '상차대기가 아닌 일반 예약 건을 실제 출고 처리합니다.'],
       ['출고 취소 / 예약 취소', '해당 건을 취소하고 목록에서 제거합니다.'],
       ['입금 확인', '🚨 미입금 출고로 등록된 건에서, 입금이 확인되면 눌러서 표시를 해제합니다.'],
-      ['전압변경 표시', '출고 전압이 발전기 기존 전압과 다르면 빨간 글씨로 뜹니다. 클릭하면 그 모델의 전압 설정 방법(사진)을 볼 수 있습니다.'],
-      ['부자재확인', '출고시 선택한 부자재 목록을 리스트로 보여줍니다. 팝업 안 "수정하기" 버튼으로 바로 수정 화면으로 이동할 수 있습니다. 부자재가 없으면 "부자재없음"으로 표시됩니다.'],
-      ['비고확인', '출고하기에서 비고란에 내용을 적어두면 부자재 칸 아래에 빨간 글씨로 "비고확인"이 뜹니다. 클릭하면 내용을 바로 확인·수정할 수 있고, 비고가 없으면 표시되지 않습니다.']
+      ['전압변경 표시', '출고 전압이 발전기 기존 전압과 다르면 빨간 글씨로 뜹니다. 클릭하면 그 모델의 전압 설정 방법 목록이 뜨고, "220V (2장)"처럼 나오는 글자를 클릭하면 사진을 크게 볼 수 있습니다.'],
+      ['부자재확인', '출고시 선택한 부자재 목록만 간단히 팝업으로 보여줍니다 (비고확인과 같은 형식 — 내용만 표시, 닫기 버튼만 있음). 부자재가 없으면 "부자재없음"으로 표시됩니다.'],
+      ['비고확인', '출고하기에서 비고란에 내용을 적어두면 부자재확인 버튼 바로 아래에 파란색 버튼으로 "비고확인"이 뜹니다 (부자재확인과 같은 크기·모양). 클릭하면 비고 내용만 바로 보여줍니다. 비고가 없으면 표시되지 않습니다.'],
+      ['🚚 상차 예정 안내 팝업', '하루 중 처음 접속할 때, 오늘 상차할 목록과 내일 상차할 목록을 팝업으로 보여줍니다. 또한 다른 사람이 출고하기에서 상차대기 건을 새로 등록하면, 약 2분 이내에 등록한 사람을 제외한 나머지 팀원들에게 이 팝업이 자동으로 뜹니다 (등록한 사람 본인에게는 뜨지 않습니다). 팝업 안 내용은 [출고대기] 탭과 동일하며 누구나 볼 수 있습니다.']
     ])}
 
     ${manualSection('📤','출고중', false,
@@ -2964,9 +3097,9 @@ function renderManualTab(){
 
     ${manualSection('🧰','자재 관리', false,
       '모델별로 필요한 소모품(엔진오일·필터 등)을 등록하고, 부품 재고와 발주를 관리합니다.', [
-      ['소요자재입력', '모델별로 필요한 소모품(엔진오일, 오일필터, 연료필터, 에어필터, 팬벨트 등)을 등록합니다. "+ 소모품 직접 추가"를 누르면 맨 위에 새 줄이 생기고, 품명 → 구분 → 규격 → 수량 순서로 한 줄에 입력합니다. 등록된 부품명을 입력하면 그 부품에 [부품 재고]에 저장된 구분·규격이 자동으로 채워집니다. 여기 등록한 품명은 [부품 재고]의 재고와 그대로 연동되어, 정비 등록시 해당 부품을 체크하면 재고가 자동으로 차감됩니다.'],
+      ['소요자재입력', '모델별로 필요한 소모품(엔진오일, 오일필터, 연료필터, 에어필터, 팬벨트 등)을 등록합니다. "+ 소모품 직접 추가"를 누르면 맨 위에 새 줄이 생기고, 구분 → 품명 → 규격 → 수량 순서로 한 줄에 입력합니다. 구분을 먼저 입력·선택하면 어떤 발전기 용량용인지 필터처럼 빠르게 구분할 수 있습니다. 등록된 부품명을 입력하면 그 부품에 [부품 재고]에 저장된 구분·규격이 자동으로 채워집니다. 여기 등록한 품명은 [부품 재고]의 재고와 그대로 연동되어, 정비 등록시 해당 부품을 체크하면 재고가 자동으로 차감됩니다.'],
       ['📋 발주 리스트 생성', '최소재고 밑으로 떨어진 부품을 공급업체별로 모아서 보여줍니다. 품명·구분·규격·현재고/최소·발주수량이 가로로 나란히 정렬되어 한눈에 보기 편합니다. 항목별 "구입완료" 버튼을 누르면 누가 언제 샀는지 기록되며, 🖨 인쇄로 인쇄용 파일을 만들 수 있습니다.'],
-      ['부품(자재) 추가', '품명·구분(예: 발전기전체사용, 120K용)·규격/사이즈·수량으로 등록합니다. 품명을 똑같이 입력하고 규격/사이즈만 다르게(예: 품명 "오일필터" + 규격 "소형"·"중형") 여러 번 등록하면 서로 다른 항목으로 각각 저장됩니다. 엔진오일·부동액 등 액체류는 단위가 자동으로 "리터"로 설정되고, 필터 등 나머지는 단위 없이 개수로 관리됩니다. 재고 목록에서 같은 구분끼리 묶여서 나오고, 액체류 구분이 맨 위에, 숫자가 포함된 구분(예: 120K용, 400K용)은 숫자 순서로 정렬되어 발전기별 소요자재 입력시 쉽게 찾을 수 있습니다.'],
+      ['부품(자재) 추가', '품명·구분(예: 발전기전체사용, 120K용)·규격/사이즈·수량으로 등록합니다. 품명을 똑같이 입력하고 규격/사이즈만 다르게(예: 품명 "오일필터" + 규격 "소형"·"중형") 여러 번 등록하면 서로 다른 항목으로 각각 저장되며, 재고 목록의 품명 칸에는 규격이 겹쳐 보이지 않고 품명만 깔끔하게 표시됩니다(규격은 옆 칸에 따로 표시). 엔진오일·부동액 등 액체류는 단위가 자동으로 "리터"로 설정되고, 필터 등 나머지는 단위 없이 개수로 관리됩니다. 재고 목록에서 같은 구분끼리 묶여서 나오고, 액체류 구분이 맨 위에, 숫자가 포함된 구분(예: 120K용, 400K용)은 숫자 순서로 정렬되어 발전기별 소요자재 입력시 쉽게 찾을 수 있습니다.'],
       ['입고(재고 추가)', '부품을 실제로 구매해 재고를 늘릴 때 사용합니다. "입고(구매) 추가"칸에 숫자를 입력하고 엔터를 치거나 다른 곳을 클릭하면 바로 현재고에 자동으로 더해집니다 (예: 현재고 20에서 20을 추가하면 40으로 바로 반영). 엔진오일 등은 리터 단위를 그대로 입력하면 됩니다. 현재고 숫자를 클릭하면 직접 수정할 수도 있습니다. 최근 입고 내역은 최근 10건만 보여주며, 잘못 입력한 항목은 "삭제"로 지울 수 있고 삭제하면 재고에서도 그만큼 다시 차감됩니다.'],
       ['최소재고', '이 숫자 이하로 재고가 떨어지면 빨간색으로 표시되고 발주 리스트에 뜹니다.'],
       ['공급업체 / 규격', '부품별로 입력해두면 발주 리스트에서 업체별로 묶여서 보이고, 정비 등록시 규격도 같이 보입니다.'],
@@ -2975,13 +3108,14 @@ function renderManualTab(){
     ])}
 
     ${manualSection('📜','이력 조회', false,
-      '발전기 하나를 선택해서 그 발전기의 임대·정비 이력을 전부 확인합니다.', [
-      ['발전기 선택', '상단 드롭다운에서 번호를 고르면 아래에 상세 정보가 뜹니다.'],
+      '상단에서 "발전기별 이력"과 "거래처별 이력" 중 골라서 볼 수 있습니다.', [
+      ['발전기별 이력', '발전기 하나를 선택해서 그 발전기의 임대·정비 이력을 전부 확인합니다. 드롭다운에서 번호를 고르면 아래에 상세 정보가 뜹니다.'],
       ['정보 수정', '모델, 년식, 사용률 등 기본 정보를 고칩니다.'],
       ['고장 등록 / 수리 완료 처리', '고장이 났을 때 등록하고, 수리가 끝나면 완료 처리합니다.'],
       ['CSV 내보내기', '임대 이력·정비 이력을 엑셀에서 열 수 있는 파일로 내려받습니다.'],
       ['🚨 과다사용 배지', '하루 평균 10시간을 초과해서 사용된 임대 건에 자동으로 표시됩니다.'],
-      ['삭제', '잘못 입력된 임대/정비 기록을 지웁니다(부품 재고는 자동 복원됩니다).']
+      ['삭제', '잘못 입력된 임대/정비 기록을 지웁니다(부품 재고는 자동 복원됩니다).'],
+      ['거래처별 이력 · 주의사항', '지금까지 거래한 모든 업체 목록과 임대 건수를 보여줍니다. 업체를 클릭하면 "입금 문제", "장비 관리 불량", "회수일자 지연" 같은 주의 태그를 선택하고 메모를 남길 수 있습니다. 태그·메모가 있는 업체는 목록에서 빨간색으로 표시됩니다. 이렇게 설정해두면, 나중에 출고하기 화면에서 그 거래처명을 입력할 때 주의사항이 자동으로 빨간 박스로 함께 뜹니다.']
     ])}
 
     ${manualSection('📊','가동률 통계', false,
@@ -3044,6 +3178,7 @@ function renderManualTab(){
       ['입고 목록 연료 "초기화" 버튼', '입고 목록의 연료 칸에 뜬 값 옆 "초기화" 버튼은, 실제로 탱크의 기름을 기준점까지 다시 빼낸 뒤 눌러주는 용도입니다. 누르면 화면에 표시되던 지난 연료량이 사라지고(이력 기록 자체는 그대로 남습니다) 다음 출고를 위한 준비가 끝났다는 뜻이 됩니다.'],
       ['🕐 마지막 수정 시각 표시', '누적 사용시간을 수정(누적시간 수정 · 정보 직접 수정)하면, 다음에 그 화면을 다시 열 때 "마지막 수정: 날짜 시간 (수정한 사람)"이 노란 알림으로 표시되어 언제 누가 마지막으로 고쳤는지 바로 알 수 있습니다.'],
       ['⚡ 전압변경 자동 정비기록', '[입고] 목록의 전압 클릭 수정, [출고중 → 정보 수정], 입고 처리시 전압 확인 화면 — 이 세 곳 중 어디서든 발전기의 전압 값이 실제로 바뀌면 "전압을 실제로 변경하셨습니까?" 확인창이 뜹니다. "예"를 누르면 정비 기록에 몇 볼트에서 몇 볼트로, 누가, 언제 바꿨는지 자동으로 기록되고, "아니오"를 누르면 기록되지 않습니다.'],
+      ['🕐 최근 입고 처리한 발전기', '[입고] 탭 맨 위에 최근 입고 처리한 발전기 5대가 번호·모델·처리시각·전압·처리자와 함께 표시됩니다. 방금 전압을 바꿨는지 기억이 안 날 때 여기서 바로 확인할 수 있고, 전압을 클릭하면 곧바로 수정할 수도 있습니다.'],
       ['🟢 온라인 상태 배지', '화면 상단 오른쪽에 🟢 온라인 / 🟡 로컬 임시저장 배지가 표시됩니다. 인터넷이 안 되는 상황에서도 입력이 막히지 않고 이 기기에 임시 저장되며, 다시 연결되면 정상 저장됩니다.'],
       ['🗑 발전기 등록 실수 바로잡기', '[설정 → 발전기 모델 설정]의 "관리" 버튼으로 번호(ID)를 수정하거나, 잘못 등록한 발전기를 완전히 삭제할 수 있습니다. 완전 삭제는 사용 이력이 있으면 경고가 뜨며, 이력이 있는 발전기는 삭제 대신 폐기/매각 처리를 권장합니다.'],
       ['📅 상단 실시간 날짜·시간 표시', '화면 맨 위 "전체저장" 버튼 아래에 오늘 날짜와 현재 시각이 1초마다 갱신되며 표시됩니다.']
@@ -3348,6 +3483,52 @@ async function removeCalendarEvent(id, dateStr){
   openCalendarDayModal(dateStr);
   renderCalendar();
   flash('일정이 삭제되었습니다');
+}
+function tomorrowStr(){
+  const d = new Date(todayStr()+'T00:00:00');
+  d.setDate(d.getDate()+1);
+  return toLocalDateStr(d);
+}
+function loadingListPopupHtml(){
+  const today = todayStr(), tomorrow = tomorrowStr();
+  const pending = (DB.reservations||[]).filter(r=>r.pendingLoad);
+  const dateOf = r => r.loadDate || r.outDate;
+  const todayList = pending.filter(r=>dateOf(r)===today).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
+  const tomorrowList = pending.filter(r=>dateOf(r)===tomorrow).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
+  const rowHtml = r=>{
+    const g = findGen(r.genId);
+    return `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+      <b>${escR(r.genId)}</b> ${g? displayModel(g):''} — ${escR(r.customer||'-')} <span class="muted">(${escR(r.address||'-')})</span>
+    </div>`;
+  };
+  const section = (title,list)=> `<div style="margin-bottom:12px;">
+    <div style="font-weight:700;font-size:13.5px;margin-bottom:4px;">${title} <span class="muted" style="font-weight:400;">(${list.length}건)</span></div>
+    ${list.length===0? `<div class="muted" style="font-size:12.5px;">없음</div>` : list.map(rowHtml).join('')}
+  </div>`;
+  return section(`🚚 오늘(${dow(today)}) 상차`, todayList) + section(`📅 내일(${dow(tomorrow)}) 상차`, tomorrowList);
+}
+function showLoadingListPopup(isNewNotice){
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>🚚 상차 예정 안내${isNewNotice? ' <span class="pill" style="font-size:11px;background:var(--primary-tint);color:var(--primary-dark);">새 등록</span>':''}</h3>
+      <div class="modal-sub">전체 목록은 [출고대기] 탭에서 확인할 수 있습니다.</div>
+      ${loadingListPopupHtml()}
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">닫기</button>
+        <button class="btn primary" onclick="closeModal();switchTab('reserve');">출고대기 보기</button>
+      </div>
+    </div>
+  </div>`;
+}
+function maybeShowDailyLoadingPopup(){
+  try{
+    const key = 'gen-loading-popup-lastshown';
+    const last = localStorage.getItem(key);
+    if(last === todayStr()) return;
+    localStorage.setItem(key, todayStr());
+  }catch(e){}
+  showLoadingListPopup(false);
 }
 function showNewPostPopup(newNotices, newEvents){
   const noticeCnt = newNotices.length;
@@ -4100,23 +4281,26 @@ function voltageGuideGalleryHtml(model){
     const photos = voltageGuidePhotos(m, kind);
     if(photos.length===0) return '';
     const label = VOLTAGE_GUIDE_LABELS[kind];
-    const thumbs = photos.map((p,idx)=>`<img src="${p}" alt="${label}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--border-strong);cursor:pointer;margin-right:4px;" onclick="viewVoltageGuidePhoto('${escM}','${kind}',${idx})">`).join('');
-    return `<div style="margin-top:6px;"><div class="muted" style="font-size:11px;margin-bottom:2px;">${label}</div><div>${thumbs}</div></div>`;
+    return `<button type="button" class="btn sm" style="margin:3px 4px 3px 0;color:var(--primary-dark);border-color:var(--primary);" onclick="viewVoltageGuidePhoto('${escM}','${kind}',0)">${label} (${photos.length}장)</button>`;
   }).join('');
   if(!blocks) return `<div class="hint" style="margin-top:8px;">등록된 전압 설정 방법 사진이 없습니다. (설정 → 연료탱크 규격 · 전압 설정 방법에서 등록할 수 있습니다)</div>`;
-  return `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;"><div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:4px;">🔧 전압 설정 방법 (모델: ${escR(model)})</div>${blocks}</div>`;
+  return `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+    <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:4px;">🔧 전압 설정 방법 (모델: ${escR(model)})</div>
+    <div class="hint" style="margin:0 0 6px;">사진을 보시려면 글자 클릭</div>
+    <div>${blocks}</div>
+  </div>`;
 }
 function openVoltageGuidePicker(model){
   if(!model){ showInfoModal('모델 정보가 없습니다.'); return; }
   const m = DB.materials[model] || {};
+  const escM = model.replace(/'/g,"\\'");
   const rows = VOLTAGE_GUIDE_KINDS.map(kind=>{
     const label = VOLTAGE_GUIDE_LABELS[kind];
     const photos = voltageGuidePhotos(m, kind);
     return `<div style="padding:8px 0;border-bottom:1px solid var(--border);">
-      <div style="font-weight:700;font-size:13.5px;margin-bottom:6px;">${label}</div>
       ${photos.length===0
-        ? `<span class="muted" style="font-size:12.5px;">등록된 사진 없음</span>`
-        : `<div>${photos.map((p,idx)=>`<img src="${p}" alt="${label}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--border-strong);cursor:pointer;margin-right:6px;" onclick="viewVoltageGuidePhoto('${model.replace(/'/g,"\\'")}','${kind}',${idx})">`).join('')}</div>`}
+        ? `<div style="font-weight:700;font-size:13.5px;">${label}</div><span class="muted" style="font-size:12.5px;">등록된 사진 없음</span>`
+        : `<button type="button" class="btn sm" style="color:var(--primary-dark);border-color:var(--primary);" onclick="viewVoltageGuidePhoto('${escM}','${kind}',0)">${label} (${photos.length}장)</button>`}
     </div>`;
   }).join('');
   document.getElementById('modal-root').innerHTML = `
@@ -4124,6 +4308,7 @@ function openVoltageGuidePicker(model){
     <div class="modal" style="max-width:460px;">
       <h3>전압 설정 방법</h3>
       <div class="modal-sub">${escR(model)}</div>
+      <div class="hint" style="margin:0 0 6px;">사진을 보시려면 글자 클릭</div>
       <div>${rows}</div>
       <div class="hint" style="margin-top:8px;">사진 등록·수정·삭제는 [설정 → 연료탱크 규격 · 전압 설정 방법]에서 할 수 있습니다.</div>
       <div class="modal-actions">
@@ -4141,7 +4326,7 @@ function viewVoltageGuidePhoto(model, kind, idx){
   const escM = model.replace(/'/g,"\\'");
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:520px;">
+    <div class="modal" style="max-width:820px;">
       <h3>${VOLTAGE_GUIDE_LABELS[kind]||'전압 설정'}</h3>
       <div class="modal-sub">${escR(model)}${photos.length>1? ` (${idx+1}/${photos.length})`:''}</div>
       <img src="${photo}" alt="" style="width:100%;border-radius:10px;border:1px solid var(--border-strong);margin-bottom:10px;">
@@ -4413,7 +4598,8 @@ function neededOrderParts(){
     const unit = partUnitOf(n);
     const supplier = (DB.partsSupplier && DB.partsSupplier[n]) || UNASSIGNED_SUPPLIER;
     const mark = (DB.orderMarks && DB.orderMarks[n]) || null;
-    return {name:n, stock, minQty, orderQty, spec, category, unit, supplier, mark};
+    const baseName = (spec && n.endsWith(' '+spec)) ? n.slice(0, n.length - spec.length - 1) : n;
+    return {name:baseName, fullKey:n, stock, minQty, orderQty, spec, category, unit, supplier, mark};
   }).filter(Boolean);
 }
 function groupBySupplier(needed){
@@ -4459,7 +4645,7 @@ function openPartsOrderListModal(){
             <th style="text-align:right;padding:7px 8px;font-size:11.5px;color:var(--ink-soft);font-weight:700;width:18%;"></th>
           </tr></thead>
           <tbody>${groups[sup].map(p=>{
-            const escN = p.name.replace(/'/g,"\\'");
+            const escN = p.fullKey.replace(/'/g,"\\'");
             const actionCell = p.mark
               ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
                    <span class="pill ok" style="white-space:nowrap;">✅ 구매완료</span>
@@ -5006,8 +5192,9 @@ function renderPartsStockTable(){
     const safeN = safeIdFrag(n);
     const isLow = minQty && qty<=Number(minQty);
     const qtyColor = qty<=0 ? 'var(--danger)' : 'var(--primary-dark)';
+    const baseName = (spec && n.endsWith(' '+spec)) ? n.slice(0, n.length - spec.length - 1) : n;
     return `<tr${isLow? ` style="background:var(--danger-tint);"`:''}>
-      <td class="wrap-ok">${escR(n)}</td>
+      <td class="wrap-ok">${escR(baseName)}</td>
       <td><input type="text" value="${escR(category)}" list="parts-category-datalist" placeholder="-" onchange="updatePartCategory('${escN}', this.value)"></td>
       <td><input type="text" value="${spec.replace(/"/g,'&quot;')}" placeholder="예: 15W-40" onchange="updatePartSpec('${escN}', this.value)"></td>
       <td>
@@ -5258,19 +5445,15 @@ function openMaterialsModal(model){
 function renderConsumableRows(){
   const wrap = document.getElementById('mm-consumables-rows');
   if(!wrap) return;
-  wrap.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:8px;">${materialsModalState.consumables.map((c,i)=>`
-    <div style="border:1px solid var(--border);border-radius:8px;padding:8px;">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
-        <input type="text" list="known-parts-list" value="${(c.name||'').replace(/"/g,'&quot;')}" placeholder="품명 (목록에서 선택 가능)" style="flex:1;" oninput="updateConsumableField(${i},'name',this.value)" onchange="autoFillConsumableFields(${i}, this.value)">
-        <button type="button" class="btn sm danger" style="flex:none;white-space:nowrap;" onclick="removeConsumableRow(${i})">삭제</button>
-      </div>
-      <div style="display:flex;align-items:center;gap:5px;">
-        <input type="text" value="${(c.category||'').replace(/"/g,'&quot;')}" list="mm-category-list" placeholder="구분" style="flex:1;min-width:0;" oninput="updateConsumableField(${i},'category',this.value)">
-        <input type="text" value="${(c.spec||'').replace(/"/g,'&quot;')}" placeholder="규격" style="flex:1;min-width:0;" oninput="updateConsumableField(${i},'spec',this.value)">
-        <input type="number" class="qty" min="0" value="${c.qty||1}" style="width:56px;flex:none;" oninput="updateConsumableField(${i},'qty',this.value)">
-      </div>
+  wrap.innerHTML = materialsModalState.consumables.map((c,i)=>`
+    <div class="consumable-row" style="flex-wrap:nowrap;align-items:center;">
+      <input type="text" value="${(c.category||'').replace(/"/g,'&quot;')}" list="mm-category-list" placeholder="구분 (예: 120K용)" style="width:110px;flex:none;" oninput="updateConsumableField(${i},'category',this.value)">
+      <input type="text" list="known-parts-list" value="${(c.name||'').replace(/"/g,'&quot;')}" placeholder="품명 (목록에서 선택 가능)" style="flex:1;min-width:120px;" oninput="updateConsumableField(${i},'name',this.value)" onchange="autoFillConsumableFields(${i}, this.value)">
+      <input type="text" value="${(c.spec||'').replace(/"/g,'&quot;')}" placeholder="규격" style="width:110px;flex:none;" oninput="updateConsumableField(${i},'spec',this.value)">
+      <input type="number" class="qty" min="0" value="${c.qty||1}" style="width:60px;flex:none;" oninput="updateConsumableField(${i},'qty',this.value)">
+      <button type="button" class="btn sm danger" style="flex:none;white-space:nowrap;margin-left:4px;" onclick="removeConsumableRow(${i})">삭제</button>
     </div>
-  `).join('')}</div>`;
+  `).join('');
 }
 function autoFillConsumableFields(i, name){
   if(!materialsModalState.consumables[i]) return;
@@ -5335,7 +5518,7 @@ function renderReserveTab(){
     const suppliesCell = r.supplies
       ? `<button class="btn sm" style="color:var(--danger);font-weight:700;border-color:var(--danger);" onclick="showSuppliesModal('${r.id}')">부자재확인</button>`
       : `<span class="muted">부자재없음</span>`;
-    const noteMarker = (r.note && r.note.trim()) ? `<div style="color:var(--danger);font-weight:700;font-size:11.5px;margin-top:3px;cursor:pointer;text-decoration:underline;" onclick="processReservation('${r.id}')" title="${escR(r.note).replace(/"/g,'&quot;')}">비고확인</div>` : '';
+    const noteMarker = (r.note && r.note.trim()) ? `<button class="btn sm" style="color:var(--primary-dark);font-weight:700;border-color:var(--primary);text-align:center;margin-top:4px;" onclick="showNoteModal('${r.id}')">비고확인</button>` : '';
     return `<tr${isDelayed? ` style="background:var(--danger-tint);"`:''}>
       <td class="gid">${r.genId}</td>
       <td class="wrap-ok" style="max-width:130px;">${g? displayModel(g): '-'}</td>
@@ -5353,8 +5536,8 @@ function renderReserveTab(){
       <td class="muted">${r.arriveTime||'-'}</td>
       <td class="muted">${r.freightBearer||'-'}</td>
       <td>${voltageCell}</td>
-      <td class="muted">${fuelForList!=null? fuelForList+'L' : '-'}</td>
-      <td>${suppliesCell}${noteMarker}</td>
+      <td class="muted">${fuelForList!=null? `<span style="font-size:16px;font-weight:800;color:var(--primary-dark);">${fuelForList}L</span>` : '-'}</td>
+      <td><div style="display:flex;flex-direction:column;align-items:center;gap:2px;">${suppliesCell}${noteMarker}</div></td>
       <td class="muted">${r.usageDays? r.usageDays+'일' : '-'}</td>
       <td><div class="btn-row" style="flex-wrap:nowrap;">
         <button class="btn sm" onclick="printReceiptForReservation('${r.id}')">인수증</button>
@@ -5382,12 +5565,26 @@ function showSuppliesModal(resId){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>부자재 내역</h3>
+      <h3>📦 부자재 내역</h3>
       <div class="modal-sub">${escR(r.genId)}</div>
-      <div class="field">${suppliesListHtml(r.suppliesItems, r.suppliesCustom, r.supplies)}</div>
+      <div style="font-size:14px;line-height:1.6;border:1px solid var(--border);border-radius:8px;padding:12px;">${suppliesListHtml(r.suppliesItems, r.suppliesCustom, r.supplies)}</div>
       <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">닫기</button>
-        <button class="btn primary" onclick="processReservation('${resId}')">수정하기</button>
+        <button class="btn primary" onclick="closeModal()">닫기</button>
+      </div>
+    </div>
+  </div>`;
+}
+function showNoteModal(resId){
+  const r = DB.reservations.find(x=>x.id===resId);
+  if(!r) return;
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>📝 비고</h3>
+      <div class="modal-sub">${escR(r.genId)}</div>
+      <div style="font-size:14px;white-space:pre-wrap;line-height:1.6;border:1px solid var(--border);border-radius:8px;padding:12px;">${escR(r.note||'')}</div>
+      <div class="modal-actions">
+        <button class="btn primary" onclick="closeModal()">닫기</button>
       </div>
     </div>
   </div>`;
@@ -5437,7 +5634,40 @@ function processReservation(resId){
   openOutModal(r.genId, resId);
 }
 function confirmLoadPrompt(resId){
+  const r = DB.reservations.find(x=>x.id===resId);
+  if(r && (r.fuelRequested!=null || r.fuelActual!=null)){
+    const fuelForList = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+    document.getElementById('modal-root').innerHTML = `
+    <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+      <div class="modal">
+        <h3>🚚 상차 완료 확인</h3>
+        <div class="modal-sub">${escR(r.genId)}</div>
+        <div style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:12px;margin-bottom:6px;">
+          <div style="font-size:14px;color:var(--primary-dark);font-weight:800;margin-bottom:8px;">⛽ 이 출고는 연료 ${fuelForList}L를 넣어드리기로 되어 있습니다.</div>
+          <div class="field chk" style="margin:0;">
+            <input type="checkbox" id="f-loadconfirm-fuel">
+            <label for="f-loadconfirm-fuel">연료를 실제로 넣었습니다</label>
+          </div>
+        </div>
+        <div id="f-loadconfirm-err" class="err" style="display:none;"></div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal()">취소</button>
+          <button class="btn primary" onclick="submitConfirmLoadWithFuelCheck('${resId}')">상차 완료</button>
+        </div>
+      </div>
+    </div>`;
+    return;
+  }
   openConfirmModal('제품 상차를 완료하시겠습니까?', function(){ confirmLoad(resId); }, '예', '아니오');
+}
+function submitConfirmLoadWithFuelCheck(resId){
+  const chk = document.getElementById('f-loadconfirm-fuel');
+  const errEl = document.getElementById('f-loadconfirm-err');
+  if(!chk || !chk.checked){
+    if(errEl){ errEl.textContent = '연료 주입 확인 체크를 해야 상차 완료할 수 있습니다.'; errEl.style.display = 'block'; }
+    return;
+  }
+  confirmLoad(resId);
 }
 async function confirmLoad(resId){
   const r = DB.reservations.find(x=>x.id===resId);
@@ -5577,6 +5807,8 @@ function onCustomerNameInput(){
   const el = document.getElementById('f-site');
   if(!el) return;
   const val = el.value.trim();
+  const warnEl = document.getElementById('f-site-warning');
+  if(warnEl) warnEl.innerHTML = customerWarningHtml(val);
   if(!val) return;
   const records = knownCustomerRecords();
   const match = records.find(r=>r.customer===val);
@@ -5639,6 +5871,7 @@ function openOutInfoEditModal(id){
       <div class="field"><label>거래처명</label>
         <input type="text" id="f-oie-site" list="customer-datalist" value="${(rt.site||rt.customer||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" onchange="onCustomerNameInputOie()">
         <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
+        <div id="f-oie-site-warning">${customerWarningHtml(rt.site||rt.customer||'')}</div>
       </div>
       <div class="field-row">
         <div class="field"><label>사용일수(일)</label>
@@ -5693,6 +5926,8 @@ function onCustomerNameInputOie(){
   const el = document.getElementById('f-oie-site');
   if(!el) return;
   const val = el.value.trim();
+  const warnEl = document.getElementById('f-oie-site-warning');
+  if(warnEl) warnEl.innerHTML = customerWarningHtml(val);
   if(!val) return;
   const records = knownCustomerRecords();
   const match = records.find(r=>r.customer===val);
@@ -5878,6 +6113,7 @@ function openOutModal(id, reservationId){
         <input type="text" id="f-site" list="customer-datalist" value="${(res&&(res.site||res.customer)||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" onchange="onCustomerNameInput()">
         <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
         <div class="hint">이전에 거래한 업체명을 선택하면 담당자·연락처·주소가 자동으로 채워집니다.</div>
+        <div id="f-site-warning">${customerWarningHtml((res&&(res.site||res.customer))||'')}</div>
       </div>
       <div class="field-row">
         <div class="field"><label>사용일수(일)</label>
@@ -6530,6 +6766,32 @@ function printReceiptForReservation(resId){
   if(!r){ return; }
   const g = findGen(r.genId);
   if(!g){ showInfoModal('해당 발전기를 찾을 수 없습니다.'); return; }
+  if(r.fuelRequested!=null || r.fuelActual!=null){
+    const fuelAmt = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+    document.getElementById('modal-root').innerHTML = `
+    <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+      <div class="modal">
+        <h3>⛽ 연료 안내</h3>
+        <div class="modal-sub">${escR(r.genId)}</div>
+        <div style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:16px;text-align:center;">
+          <div style="font-size:17px;font-weight:800;color:var(--primary-dark);">연료 ${fuelAmt}L 주유하시기 바랍니다</div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal()">취소</button>
+          <button class="btn primary" onclick="printReceiptForReservationConfirmed('${resId}')">확인, 인수증 보기</button>
+        </div>
+      </div>
+    </div>`;
+    return;
+  }
+  printReceipt(g.id, rentalFromReservation(r));
+}
+function printReceiptForReservationConfirmed(resId){
+  const r = DB.reservations.find(x=>x.id===resId);
+  if(!r) return;
+  const g = findGen(r.genId);
+  if(!g) return;
+  closeModal();
   printReceipt(g.id, rentalFromReservation(r));
 }
 function receiptItemLabel(g){
@@ -6659,7 +6921,7 @@ function receiptPrintCss(){
     .print-hint button{margin-left:8px;font-size:13px;font-weight:700;padding:6px 14px;border-radius:6px;border:none;background:#2C4A66;color:#fff;cursor:pointer;}
     .print-page{display:flex;flex-direction:column;gap:8mm;height:265mm;max-width:170mm;margin:0 auto;padding:0;}
     .r-copy{flex:1;display:flex;flex-direction:column;justify-content:space-between;border:2px solid #222;border-radius:4px;padding:5mm 7mm;position:relative;overflow:hidden;}
-    .r-watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-24deg);font-size:78px;font-weight:900;letter-spacing:14px;color:rgba(60,60,60,0.08);white-space:nowrap;pointer-events:none;z-index:5;user-select:none;}
+    .r-watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-24deg);font-size:78px;font-weight:900;letter-spacing:14px;color:rgba(60,60,60,0.22);white-space:nowrap;pointer-events:none;z-index:5;user-select:none;}
     .r-title{text-align:center;font-size:30px;font-weight:900;letter-spacing:8px;}
     .r-title .r-copy-tag{display:block;text-align:center;font-size:14px;font-weight:500;letter-spacing:2px;color:#999;margin-top:2px;}
     .r-row{display:flex;gap:16px;font-size:15px;}
@@ -6987,6 +7249,7 @@ function openInModal(id){
       </div>
       <div class="field"><label>반납된 부자재 확인</label>
         <div class="muted" style="font-size:12.5px;margin-bottom:8px;">출고시 나간 부자재${suppliesListHtml(rt.suppliesItems, rt.suppliesCustom, rt.supplies)}</div>
+        ${rt.note? `<div class="hint" style="color:var(--danger);font-weight:700;margin-top:-4px;margin-bottom:8px;">📝 출고시 비고: ${escR(rt.note)}</div>`:''}
         <input type="hidden" id="f-sup-recovered" value="${rt.supplies? '' : 'yes'}">
         <div id="f-sup-buttons-wrap"></div>
         <div id="f-supplies-note-wrap" style="display:none;margin-top:8px;">
@@ -7095,7 +7358,7 @@ async function submitIn(id){
     site: rt.site, address: rt.address, supplies: rt.supplies, suppliesItems: rt.suppliesItems||[], suppliesCustom: rt.suppliesCustom||'', suppliesRecovered, suppliesNote, fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: rt.note,
     outDate: rt.outDate, inDate, startHours: rt.startHours, endHours,
     usedHours: endHours - rt.startHours, longTerm: rt.longTerm, estDaily: rt.estDaily,
-    voltage, outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null,
+    voltage, outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null, inProcessedAt: nowDateTimeStr(),
     measuredFuelHeightCm, remainingFuelLiters,
     paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null
   });
@@ -7405,6 +7668,7 @@ async function init(){
     ['suppliesSizes', 'gen-supplies-sizes-v1', {}, true],
     ['suppliesSpecs', 'gen-supplies-specs-v1', {}, true],
     ['suppliesCategories', 'gen-supplies-categories-v1', {}, true],
+    ['customerNotes', 'gen-customer-notes-v1', {}, true],
     ['palletDefaultRemoved', 'gen-pallet-default-removed-v1', false, true],
     ['companyInfo', 'gen-company-info-v1', {name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}, true],
     ['currentUserName', 'gen-user-name-v1', '', false]
@@ -7456,6 +7720,7 @@ async function init(){
   DB.suppliesSizes = results.suppliesSizes;
   DB.suppliesSpecs = results.suppliesSpecs;
   DB.suppliesCategories = results.suppliesCategories || {};
+  DB.customerNotes = results.customerNotes || {};
   DB.companyInfo = results.companyInfo && results.companyInfo.name ? results.companyInfo : {name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'};
   if(!results.palletDefaultRemoved && (DB.suppliesCatalog||[]).includes('깔판')){
     DB.suppliesCatalog = DB.suppliesCatalog.filter(n=>n!=='깔판');
@@ -7470,6 +7735,7 @@ async function init(){
   }
   seenNoticeIds = new Set((DB.notices||[]).map(n=>n.id));
   seenEventIds = new Set((DB.calendarEvents||[]).map(e=>e.id));
+  seenReservationIds = new Set((DB.reservations||[]).filter(r=>r.pendingLoad).map(r=>r.id));
   DB.currentUserName = results.currentUserName;
   const phoneMigrationChanged = migratePhoneFieldsInPlace();
   applyCompanyBranding();
@@ -7539,6 +7805,7 @@ async function submitUserName(nameArg){
     DB.teamMembers = [...(DB.teamMembers||[]), name];
     saveWithRetry(saveTeamMembers);
   }
+  maybeShowDailyLoadingPopup();
 }
 function changeUserName(){
   openUserNameGate();
@@ -7558,7 +7825,7 @@ async function syncFromStorage(){
   if(shouldSkipSync()) return;
   syncInFlight = true;
   try{
-    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, overuseDailyLimit, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, vehicleTypes, vehicleSuggestEnabled, genSizeDisplayEnabled, modelColors, notices, calendarEvents, genColorOverrides, suppliesSizes, suppliesSpecs, suppliesCategories, companyInfo, lastBackupDate] = await Promise.all([
+    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, overuseDailyLimit, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, vehicleTypes, vehicleSuggestEnabled, genSizeDisplayEnabled, modelColors, notices, calendarEvents, genColorOverrides, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, companyInfo, lastBackupDate] = await Promise.all([
       peekStorage('gen-fleet-v2', DB.gens),
       peekStorage('gen-rentals-v2', DB.rentals),
       peekStorage('gen-maintenance-v2', DB.maint),
@@ -7590,25 +7857,29 @@ async function syncFromStorage(){
       peekStorage('gen-supplies-sizes-v1', DB.suppliesSizes),
       peekStorage('gen-supplies-specs-v1', DB.suppliesSpecs),
       peekStorage('gen-supplies-categories-v1', DB.suppliesCategories),
+      peekStorage('gen-customer-notes-v1', DB.customerNotes),
       peekStorage('gen-company-info-v1', DB.companyInfo),
       peekStorage('gen-last-backup-date-v1', DB.lastBackupDate)
     ]);
-    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,overuseDailyLimit:DB.overuseDailyLimit,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,vehicleTypes:DB.vehicleTypes,vehicleSuggestEnabled:DB.vehicleSuggestEnabled,genSizeDisplayEnabled:DB.genSizeDisplayEnabled,modelColors:DB.modelColors,notices:DB.notices,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
-    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,overuseDailyLimit,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,vehicleTypes,vehicleSuggestEnabled,genSizeDisplayEnabled,modelColors,notices,calendarEvents,genColorOverrides,suppliesSizes,suppliesSpecs,suppliesCategories,companyInfo,lastBackupDate});
+    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,overuseDailyLimit:DB.overuseDailyLimit,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,vehicleTypes:DB.vehicleTypes,vehicleSuggestEnabled:DB.vehicleSuggestEnabled,genSizeDisplayEnabled:DB.genSizeDisplayEnabled,modelColors:DB.modelColors,notices:DB.notices,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
+    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,overuseDailyLimit,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,vehicleTypes,vehicleSuggestEnabled,genSizeDisplayEnabled,modelColors,notices,calendarEvents,genColorOverrides,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,companyInfo,lastBackupDate});
     if(before !== after){
       const newNotices = (notices||[]).filter(n=>n && !seenNoticeIds.has(n.id) && n.authorBy!==DB.currentUserName);
       const newEvents = (calendarEvents||[]).filter(e=>e && !seenEventIds.has(e.id) && e.authorBy!==DB.currentUserName);
+      const newReservations = (reservations||[]).filter(r=>r && r.pendingLoad && !seenReservationIds.has(r.id) && r.outProcessedBy!==DB.currentUserName);
       seenNoticeIds = new Set((notices||[]).map(n=>n.id));
       seenEventIds = new Set((calendarEvents||[]).map(e=>e.id));
+      seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad).map(r=>r.id));
       DB.gens = gens; DB.rentals = rentals; DB.maint = maint; DB.reservations = reservations;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold; DB.overuseDailyLimit = overuseDailyLimit;
-      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
+      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
       applyCompanyBranding();
       if(!shouldSkipSync()){
         renderTabbar();
         renderContent();
         renderUserBadge();
-        if(newNotices.length>0 || newEvents.length>0) showNewPostPopup(newNotices, newEvents);
+        if(newReservations.length>0) showLoadingListPopup(true);
+        else if(newNotices.length>0 || newEvents.length>0) showNewPostPopup(newNotices, newEvents);
       }
     }
   }catch(e){
