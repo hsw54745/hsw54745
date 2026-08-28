@@ -527,44 +527,78 @@ async function removeAppPassword(){
     flash('비밀번호 보호가 해제되었습니다');
   }, '해제');
 }
-let pendingDangerAction = null;
-async function promptDangerPassword(onSuccess){
-  const stored = await getStoredPassword();
-  if(!stored){ onSuccess(); return; }
-  pendingDangerAction = onSuccess;
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
-      <h3>🔒 비밀번호 확인</h3>
-      <div class="modal-sub">위험한 작업입니다. 계속하려면 접속 비밀번호(로그인 비밀번호)를 입력해주세요.</div>
-      <div class="field">
-        <input type="password" id="f-danger-pw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')confirmDangerPassword()">
-      </div>
-      <div id="f-danger-pw-err" class="err" style="display:none;"></div>
-      <div class="modal-actions">
-        <button class="btn" onclick="pendingDangerAction=null;closeModal();">취소</button>
-        <button class="btn danger" onclick="confirmDangerPassword()">확인</button>
-      </div>
-    </div>
-  </div>`;
-  setTimeout(function(){ const el=document.getElementById('f-danger-pw'); if(el) el.focus(); }, 50);
+// ---------- 관리자 모드 (업체 정보 · 위험 구역을 한 번에 잠금/해제, 일정시간 후 자동 재잠금) ----------
+// 관리자 모드 전용 고정 비밀번호 (사이트 접속 비밀번호와는 별개이며, 코드 안에 고정되어 화면에서 변경할 수 없습니다)
+const ADMIN_MODE_PASSWORD_HASH = 'c585d6bd58c558d93a6340d107873d7b0f24002ad383e2af665ed9517253031d';
+let adminModeUnlockedUntil = 0;
+const ADMIN_MODE_DURATION_MS = 5*60*1000; // 5분
+let adminModeRelockTimer = null;
+function isAdminModeUnlocked(){ return Date.now() < adminModeUnlockedUntil; }
+function scheduleAdminModeRelock(){
+  if(adminModeRelockTimer) clearTimeout(adminModeRelockTimer);
+  const remain = adminModeUnlockedUntil - Date.now();
+  if(remain<=0) return;
+  adminModeRelockTimer = setTimeout(function(){
+    if(currentTab==='settings') renderContent();
+  }, remain + 200);
 }
-async function confirmDangerPassword(){
-  const el = document.getElementById('f-danger-pw');
-  const errEl = document.getElementById('f-danger-pw-err');
-  const stored = await getStoredPassword();
-  if(!stored){ const action=pendingDangerAction; pendingDangerAction=null; closeModal(); if(action) action(); return; }
-  const hash = await sha256Hex(el.value||'');
-  if(hash!==stored.hash){
-    errEl.textContent = '비밀번호가 올바르지 않습니다.';
-    errEl.style.display = 'block';
-    el.value=''; el.focus();
+async function submitAdminModeUnlock(){
+  const el = document.getElementById('f-admin-pw');
+  const errEl = document.getElementById('f-admin-pw-err');
+  const hash = await sha256Hex((el&&el.value)||'');
+  if(hash!==ADMIN_MODE_PASSWORD_HASH){
+    if(errEl){ errEl.textContent = '관리자 비밀번호가 올바르지 않습니다.'; errEl.style.display = 'block'; }
+    if(el){ el.value=''; el.focus(); }
     return;
   }
-  const action = pendingDangerAction;
-  pendingDangerAction = null;
-  closeModal();
-  if(action) action();
+  adminModeUnlockedUntil = Date.now() + ADMIN_MODE_DURATION_MS;
+  scheduleAdminModeRelock();
+  renderContent();
+  flash(`관리자 모드가 열렸습니다 (${Math.round(ADMIN_MODE_DURATION_MS/60000)}분 후 자동으로 다시 잠깁니다)`);
+}
+function lockAdminModeNow(){
+  adminModeUnlockedUntil = 0;
+  if(adminModeRelockTimer) clearTimeout(adminModeRelockTimer);
+  renderContent();
+}
+function adminModeSectionHtml(){
+  if(!isAdminModeUnlocked()){
+    return `
+    <div class="material-card" style="margin-top:20px;">
+      <div class="section-title" style="margin-top:0;">🔐 관리자 모드</div>
+      <p class="muted" style="font-size:13px;margin-top:-4px;">업체 정보 수정, 위험 구역(초기화) 작업은 관리자 모드에서만 할 수 있습니다. 사이트 접속 비밀번호와는 별개인 전용 관리자 비밀번호를 입력하면 ${Math.round(ADMIN_MODE_DURATION_MS/60000)}분 동안 열리고, 시간이 지나면 자동으로 다시 잠깁니다.</p>
+      <div class="field" style="max-width:320px;">
+        <input type="password" id="f-admin-pw" placeholder="관리자 비밀번호" onkeydown="if(event.key==='Enter')submitAdminModeUnlock()">
+        <div id="f-admin-pw-err" class="err" style="display:none;"></div>
+      </div>
+      <button class="btn primary" onclick="submitAdminModeUnlock()">관리자 모드 열기</button>
+    </div>`;
+  }
+  const remainMin = Math.max(1, Math.ceil((adminModeUnlockedUntil - Date.now())/60000));
+  return `
+    <div class="material-card" style="margin-top:20px;border-color:var(--primary);">
+      <div class="section-title" style="margin-top:0;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <span>🔓 관리자 모드 열림</span>
+        <span style="font-size:12px;font-weight:400;" class="muted">약 ${remainMin}분 후 자동 잠금 · <button type="button" class="btn sm" onclick="lockAdminModeNow()">지금 잠그기</button></span>
+      </div>
+    </div>
+    <div class="material-card" style="margin-top:12px;">
+      <div class="section-title" style="margin-top:0;">🏢 업체 정보</div>
+      <p class="muted" style="font-size:13px;margin-top:-4px;">업체명·주소·전화번호·휴대폰 번호를 관리합니다.</p>
+      <div id="company-contact-wrap"></div>
+    </div>
+    <div style="border:1px solid var(--danger);border-radius:var(--radius);padding:14px 16px;margin-top:20px;background:var(--danger-tint);">
+      <div class="section-title" style="margin-top:0;color:var(--danger);">위험 구역</div>
+      <p class="muted" style="font-size:13px;margin:0 0 10px;">아래 작업들은 모두 되돌릴 수 없습니다. 실행 전 먼저 백업을 받아두시길 권장합니다. 각 버튼에 마우스를 올리면 무엇이 지워지는지 설명이 나옵니다.</p>
+      <div class="btn-row" style="flex-wrap:wrap;">
+        <button class="btn danger" onclick="resetAllToIn()" title="현재 출고중인 발전기를 포함해 전체 발전기를 입고 상태로 되돌립니다. 임대 정보·출고 대기는 사라지고, 임대·정비 이력 자체는 남습니다.">입고로 초기화</button>
+        <button class="btn danger" onclick="resetAllToOut()" title="전체 발전기를 거래처 정보 없이 출고 상태로 되돌립니다. 임대·정비 이력은 남습니다.">출고로 초기화</button>
+        <button class="btn danger" onclick="resetMaintHistory()" title="모든 발전기의 정비 등록 기록을 삭제하고, 누적 사용시간을 확인할 수 없음 상태로 되돌립니다.">정비내역 초기화</button>
+        <button class="btn danger" onclick="resetPartsStock()" title="등록된 모든 부품의 재고 수량을 삭제합니다. 모델별 자재 등록 항목(오일필터명 등)은 남습니다.">부품재고 초기화</button>
+        <button class="btn danger" onclick="resetCustomerInfo()" title="출고시 입력하는 거래처명·담당자·연락처·현장주소·부자재·연료 등 고객정보와 임대·예약 이력을 모두 삭제합니다. 발전기 번호·모델·상태는 유지됩니다.">고객정보 초기화</button>
+        <button class="btn danger" style="background:#7a0d0d;border-color:#7a0d0d;" onclick="resetEverything()" title="입력했던 모든 정보(모델·이력·자재·부품재고·공지사항·일정표 등)를 처음 상태로 완전히 초기화합니다. 발전기 번호만 남습니다.">⚠ 전체 초기화</button>
+      </div>
+    </div>`;
 }
 // ---------- 업체 정보 (비밀번호 없이 누구나 수정 가능) ----------
 async function saveCompanyInfo(){ await storageSetChecked('gen-company-info-v1', JSON.stringify(DB.companyInfo), true); }
@@ -669,6 +703,95 @@ async function storageSetChecked(key, value, shared){
   } finally {
     endSaving();
   }
+}
+// ---------- 공용 양식 · 문서 (엑셀 견적서, 관리문서 등 — 필요할 때만 따로 불러옴, 전체 로딩 속도에 영향 없음) ----------
+const DOC_TEMPLATE_STORAGE_KEY = 'gen-doc-templates-v1';
+const DOC_TEMPLATE_MAX_FILE_BYTES = 5*1024*1024; // 파일 1개당 5MB 제한
+let docTemplatesCache = null; // null=아직 안 불러옴, 배열=불러온 상태
+async function loadDocTemplates(force){
+  if(docTemplatesCache!==null && !force) return docTemplatesCache;
+  try{
+    const r = await window.storage.get(DOC_TEMPLATE_STORAGE_KEY, true);
+    docTemplatesCache = r ? JSON.parse(r.value) : [];
+  }catch(e){ docTemplatesCache = []; }
+  return docTemplatesCache;
+}
+async function saveDocTemplates(){
+  await storageSetChecked(DOC_TEMPLATE_STORAGE_KEY, JSON.stringify(docTemplatesCache), true);
+}
+function fileToDataUrl(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function uploadDocTemplate(){
+  const input = document.getElementById('f-doctpl-file');
+  const file = input && input.files && input.files[0];
+  if(!file) return;
+  if(file.size > DOC_TEMPLATE_MAX_FILE_BYTES){
+    showInfoModal(`파일이 너무 큽니다 (${(file.size/1024/1024).toFixed(1)}MB). 5MB 이하 파일만 올릴 수 있습니다.`);
+    input.value = '';
+    return;
+  }
+  const dataUrl = await fileToDataUrl(file);
+  const list = await loadDocTemplates();
+  list.push({
+    id: uid(), fileName: file.name, dataUrl, sizeKB: Math.round(file.size/1024),
+    uploadedBy: DB.currentUserName||'이름미상', uploadedDate: todayStr()
+  });
+  await saveDocTemplates();
+  input.value = '';
+  renderDocTemplatesWrap();
+  flash('양식 파일이 저장되었습니다');
+}
+function downloadDocTemplate(id){
+  const item = (docTemplatesCache||[]).find(t=>t.id===id);
+  if(!item) return;
+  const a = document.createElement('a');
+  a.href = item.dataUrl;
+  a.download = item.fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+async function removeDocTemplate(id){
+  const item = (docTemplatesCache||[]).find(t=>t.id===id);
+  if(!item) return;
+  openConfirmModal(`"${item.fileName}" 파일을 삭제할까요?`, async function(){
+    docTemplatesCache = (docTemplatesCache||[]).filter(t=>t.id!==id);
+    await saveDocTemplates();
+    closeModal();
+    renderDocTemplatesWrap();
+    flash('삭제되었습니다');
+  }, '삭제');
+}
+async function renderDocTemplatesWrap(force){
+  const wrap = document.getElementById('doc-templates-wrap');
+  if(!wrap) return;
+  wrap.innerHTML = `<p class="muted" style="font-size:12.5px;">불러오는 중…</p>`;
+  const list = await loadDocTemplates(force);
+  const wrapNow = document.getElementById('doc-templates-wrap');
+  if(!wrapNow) return; // 그 사이 화면을 벗어난 경우
+  const totalKB = list.reduce((s,t)=>s+(t.sizeKB||0), 0);
+  const rows = list.length===0 ? `<div class="empty">등록된 양식이 없습니다.</div>` : list.map(t=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+      <div style="flex:1;min-width:140px;">
+        <div style="font-weight:700;font-size:13px;">${escR(t.fileName)}</div>
+        <div class="muted" style="font-size:11.5px;">${t.sizeKB}KB · ${escR(t.uploadedDate||'-')} · ${escR(t.uploadedBy||'-')}</div>
+      </div>
+      <button class="btn sm primary" onclick="downloadDocTemplate('${t.id}')">다운로드</button>
+      <button class="btn sm danger" onclick="removeDocTemplate('${t.id}')">삭제</button>
+    </div>`).join('');
+  wrapNow.innerHTML = `
+    <p class="muted" style="font-size:12.5px;margin-top:-2px;">견적서·관리문서 등 자주 쓰는 엑셀/문서 양식을 올려두면, 팀원 누구나 다운로드해서 쓸 수 있습니다. 파일 1개당 최대 5MB까지 올릴 수 있습니다. (총 ${list.length}개 · ${(totalKB/1024).toFixed(1)}MB) <button type="button" class="btn sm" onclick="renderDocTemplatesWrap(true)">🔄 목록 새로고침</button></p>
+    <div class="consumable-row" style="margin-bottom:10px;">
+      <input type="file" id="f-doctpl-file" accept=".xlsx,.xls,.doc,.docx,.pdf,.hwp,.ppt,.pptx" onchange="uploadDocTemplate()">
+    </div>
+    ${rows}
+  `;
 }
 function updateDateTimeIndicator(){
   const el = document.getElementById('datetime-indicator');
@@ -1357,7 +1480,7 @@ function renderContent(){
   if(currentTab==='materials') { renderPartsStockTable(); renderSuppliesCatalogTable(); }
   if(currentTab==='consumable-order') renderConsumableOrderTable();
   if(currentTab==='improvements') renderImprovementsList();
-  if(currentTab==='settings'){ renderTeamMembersTable(); renderVehicleTypesTable(); renderGenColorOverrideList(); renderCompanyContactSection(); }
+  if(currentTab==='settings'){ renderTeamMembersTable(); renderVehicleTypesTable(); renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); }
   if(currentTab==='dashboard') renderRecentMaint();
   if(currentTab==='notice'){ renderNoticeList(); renderCalendar(); }
   restoreFocusState(_focus);
@@ -1397,6 +1520,7 @@ function regionOf(address){
   return '기타';
 }
 function backupReminderBannerHtml(){
+  if(autoBackupFolderActive) return '';
   const dow0 = new Date(todayStr()+'T00:00:00').getDay(); // 0=일,1=월,...4=목
   const isBackupDay = (dow0===1 || dow0===4);
   if(!isBackupDay) return '';
@@ -2630,24 +2754,22 @@ function downloadCsv(filename, rows){
 }
 function resetAllToIn(){
   openConfirmModal('모든 발전기를 입고 상태로 초기화할까요?\n\n현재 출고중인 발전기의 임대 정보와 출고 대기(상차대기 포함)가 모두 사라지고, 전체 발전기가 입고 상태가 됩니다. 임대·정비 이력은 그대로 남지만 이 작업 자체는 되돌릴 수 없습니다.', function(){
-    promptDangerPassword(function(){
-      DB.gens.forEach(g=>{
-        if(!g.retired){
-          g.status = 'in';
-          g.rental = null;
-        }
-      });
-      DB.reservations = [];
-      renderContent();
-      flash('전체 발전기가 입고 상태로 초기화되었습니다');
-      saveWithRetry(saveGens);
-      saveWithRetry(saveReservations);
+    DB.gens.forEach(g=>{
+      if(!g.retired){
+        g.status = 'in';
+        g.rental = null;
+      }
     });
+    DB.reservations = [];
+    renderContent();
+    flash('전체 발전기가 입고 상태로 초기화되었습니다');
+    saveWithRetry(saveGens);
+    saveWithRetry(saveReservations);
   }, '초기화');
 }
 function resetAllToOut(){
   openConfirmModal('모든 발전기를 출고 상태로 초기화할까요?\n\n전체 발전기가 거래처 정보 없이 "출고중" 상태가 됩니다. 이후 실제로 발전기가 들어올 때마다 [출고중] 탭에서 "입고 처리"를 눌러 실제 데이터를 입력하시면 됩니다. 임대·정비 이력은 그대로 남지만 이 작업 자체는 되돌릴 수 없습니다.', function(){
-    promptDangerPassword(function(){
+    
       DB.gens.forEach(g=>{
         if(!g.retired){
           g.status = 'out';
@@ -2665,12 +2787,12 @@ function resetAllToOut(){
       flash('전체 발전기가 출고 상태로 초기화되었습니다');
       saveWithRetry(saveGens);
       saveWithRetry(saveReservations);
-    });
+    
   }, '초기화');
 }
 function resetMaintHistory(){
   openConfirmModal('정비 내역을 전부 초기화할까요?\n\n모든 발전기의 정비 등록 기록이 삭제되고, 누적 사용시간이 "누적시간 확인할 수 없음" 상태로 초기화됩니다. 부품 재고 차감 내역은 복원되지 않습니다. 되돌릴 수 없는 작업이니 먼저 백업을 받아두시길 권장합니다.', function(){
-    promptDangerPassword(function(){
+    
       DB.maint = [];
       DB.gens.forEach(g=>{
         if(!g.retired){
@@ -2683,22 +2805,22 @@ function resetMaintHistory(){
       flash('정비 내역이 초기화되었습니다 (누적시간: 확인할 수 없음)');
       saveWithRetry(saveMaint);
       saveWithRetry(saveGens);
-    });
+    
   }, '초기화');
 }
 function resetPartsStock(){
   openConfirmModal('부품 재고를 전부 초기화할까요?\n\n등록된 모든 부품의 재고 수량이 삭제됩니다. 모델별 자재 정보(오일필터명 등)는 그대로 남습니다. 되돌릴 수 없는 작업이니 먼저 백업을 받아두시길 권장합니다.', function(){
-    promptDangerPassword(function(){
+    
       DB.partsStock = {};
       renderContent();
       flash('부품 재고가 초기화되었습니다');
       saveWithRetry(savePartsStock);
-    });
+    
   }, '초기화');
 }
 function resetCustomerInfo(){
   openConfirmModal('고객정보를 전부 초기화할까요?\n\n출고시 입력하는 거래처명·담당자·연락처·현장주소·부자재·연료·비고 등 모든 임대 이력과 출고 대기(예약) 정보가 삭제됩니다. 현재 출고중인 발전기는 번호·모델·전압·누적시간·출고 상태는 그대로 유지되지만, 거래처 관련 정보만 비워집니다. 되돌릴 수 없는 작업이니 먼저 위에서 백업을 받아두시길 권장합니다.', function(){
-    promptDangerPassword(function(){
+    
       DB.gens.forEach(g=>{
         if(g.rental){
           g.rental.customer = ''; g.rental.manager = ''; g.rental.phone = '';
@@ -2716,12 +2838,12 @@ function resetCustomerInfo(){
       saveWithRetry(saveGens);
       saveWithRetry(saveRentals);
       saveWithRetry(saveReservations);
-    });
+    
   }, '초기화');
 }
 function resetEverything(){
   openConfirmModal('정말로 전체 초기화를 진행할까요?\n\n발전기 번호를 제외한 모든 정보(모델·년식·사용시간·임대이력·정비이력·자재정보·부품재고·소모품주문·보완요청·공지사항·일정표·모델색상·차량종류·팀원목록 등)가 처음 상태로 완전히 사라집니다. 발전기 번호(S-1, L-1 등) 자체는 남고 전부 "입고, 미설정" 상태로 초기화됩니다.\n\n절대 되돌릴 수 없는 작업입니다. 반드시 먼저 위에서 전체 백업을 받아두세요.', function(){
-    promptDangerPassword(function(){
+    
       DB.gens = DB.gens.map(g=>({ id: g.id, model: '', hours: 0, lastMaintHours: 0, hoursKnown: false, status: 'in', rental: null }));
       DB.rentals = [];
       DB.maint = [];
@@ -2780,11 +2902,11 @@ function resetEverything(){
       saveWithRetry(saveNotices);
       saveWithRetry(saveCalendarEvents);
       saveWithRetry(saveLastBackupDate);
-    });
+    
   }, '전체 초기화');
 }
-function downloadFullBackup(){
-  const backup = {
+function buildFullBackupObject(){
+  return {
     backupType: 'gen-fleet-full-backup',
     backupVersion: 1,
     backupDate: todayStr(),
@@ -2794,6 +2916,9 @@ function downloadFullBackup(){
       partsStock: DB.partsStock, partsSpecs: DB.partsSpecs, partsUnit: DB.partsUnit, partsCategory: DB.partsCategory, partsSupplier: DB.partsSupplier, partsMinStock: DB.partsMinStock, partsPurchaseLog: DB.partsPurchaseLog, consumableOrders: DB.consumableOrders, orderMarks: DB.orderMarks, improvements: DB.improvements, suppliesCatalog: DB.suppliesCatalog, suppliesStock: DB.suppliesStock, vehicleTypes: DB.vehicleTypes, vehicleSuggestEnabled: DB.vehicleSuggestEnabled, genSizeDisplayEnabled: DB.genSizeDisplayEnabled, modelColors: DB.modelColors, notices: DB.notices, calendarEvents: DB.calendarEvents, genColorOverrides: DB.genColorOverrides, suppliesSizes: DB.suppliesSizes, suppliesSpecs: DB.suppliesSpecs, suppliesCategories: DB.suppliesCategories, customerNotes: DB.customerNotes, readMarkers: DB.readMarkers, companyInfo: DB.companyInfo
     }
   };
+}
+function downloadFullBackup(){
+  const backup = buildFullBackupObject();
   const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json;charset=utf-8;'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -2806,6 +2931,133 @@ function downloadFullBackup(){
   saveLastBackupDate();
   renderContent();
   flash('백업 파일이 다운로드되었습니다');
+}
+// ---------- 폴더 자동 저장 (File System Access API, 크롬/엣지 전용) ----------
+function idbOpen(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open('gen-app-fsapi', 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore('handles'); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbGetHandle(key){
+  try{
+    const db = await idbOpen();
+    return await new Promise((resolve,reject)=>{
+      const tx = db.transaction('handles','readonly');
+      const req = tx.objectStore('handles').get(key);
+      req.onsuccess = ()=> resolve(req.result||null);
+      req.onerror = ()=> reject(req.error);
+    });
+  }catch(e){ return null; }
+}
+async function idbSetHandle(key, value){
+  try{
+    const db = await idbOpen();
+    return await new Promise((resolve,reject)=>{
+      const tx = db.transaction('handles','readwrite');
+      tx.objectStore('handles').put(value, key);
+      tx.oncomplete = ()=> resolve(true);
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }catch(e){ return false; }
+}
+function supportsAutoBackupFolder(){ return typeof window.showDirectoryPicker === 'function'; }
+async function setupAutoBackupFolder(){
+  if(!supportsAutoBackupFolder()){
+    showInfoModal('이 브라우저는 폴더 자동 저장 기능을 지원하지 않습니다. 크롬(Chrome)·엣지(Edge)·네이버 웨일 같은 브라우저로 접속해서 다시 시도해주세요.');
+    return;
+  }
+  try{
+    const dirHandle = await window.showDirectoryPicker();
+    const perm = await dirHandle.requestPermission({mode:'readwrite'});
+    if(perm!=='granted'){ showInfoModal('폴더 쓰기 권한이 허용되지 않았습니다.'); return; }
+    if((DB.gens||[]).length===0){
+      showInfoModal('발전기 데이터가 아직 불러와지지 않은 상태입니다. 화면을 새로고침해서 데이터가 다 보이는 걸 확인한 뒤 다시 시도해주세요.');
+      return;
+    }
+    await idbSetHandle('backupDir', dirHandle);
+    await writeBackupToHandle(dirHandle);
+    localStorage.setItem('gen-auto-backup-last-date', todayStr());
+    localStorage.setItem('gen-auto-backup-last-gencount', String((DB.gens||[]).length));
+    flash('자동 백업 폴더가 설정되었습니다. 앱을 열 때마다 이 폴더에 최신 백업이 자동으로 저장됩니다.');
+    renderContent();
+  }catch(e){
+    if(e && e.name==='AbortError') return; // 사용자가 폴더 선택을 취소함
+    if(e && /cross origin/i.test(e.message||'')){
+      showInfoModal('이 화면이 다른 페이지 안에 끼워진(iframe) 상태라 폴더 선택창을 열 수 없습니다.\n\n브라우저 주소창에 이 앱 주소를 직접 입력해서 새 탭으로 열어주세요. (다른 곳에 임베드되거나 미리보기 형태로 열려 있으면 이 기능을 쓸 수 없습니다)');
+      return;
+    }
+    showInfoModal('폴더를 설정하지 못했습니다: ' + (e&&e.message||e));
+  }
+}
+let autoBackupFolderActive = false;
+async function writeBackupToHandle(dirHandle){
+  const backup = buildFullBackupObject();
+  const fileHandle = await dirHandle.getFileHandle(`발전기관리_자동백업_${todayStr()}.json`, {create:true});
+  const writable = await fileHandle.createWritable();
+  await writable.write(JSON.stringify(backup, null, 2));
+  await writable.close();
+}
+async function tryAutoBackupToFolder(){
+  if(!supportsAutoBackupFolder()) return;
+  const dirHandle = await idbGetHandle('backupDir');
+  if(!dirHandle) return;
+  try{
+    const perm = await dirHandle.queryPermission({mode:'readwrite'});
+    if(perm!=='granted') return; // 권한이 사라졌으면 조용히 건너뜀 (설정 화면에서 다시 지정하도록 안내)
+    autoBackupFolderActive = true;
+    if(currentTab==='dashboard') renderContent(); // 백업 리마인더 배너를 즉시 감추기 위해
+    if(localStorage.getItem('gen-auto-backup-last-date')===todayStr()) return;
+    // 안전장치: 새로고침 도중 일부 데이터를 못 불러와 비정상적으로 적은 상태로
+    // 자동저장이 실행되어 정상 백업을 덮어쓰는 사고를 막습니다.
+    const genCount = (DB.gens||[]).length;
+    const lastKnownGood = Number(localStorage.getItem('gen-auto-backup-last-gencount')||0);
+    if(genCount===0 || (lastKnownGood>0 && genCount < lastKnownGood*0.5)){
+      console.warn(`자동저장 건너뜀: 발전기 수(${genCount})가 이전 저장 시점(${lastKnownGood})보다 비정상적으로 적어 데이터 로딩이 덜 된 것으로 보입니다. 다음 접속시 다시 시도합니다.`);
+      return;
+    }
+    await writeBackupToHandle(dirHandle);
+    localStorage.setItem('gen-auto-backup-last-date', todayStr());
+    localStorage.setItem('gen-auto-backup-last-gencount', String(genCount));
+    flash(`"${dirHandle.name}" 폴더에 자동저장되었습니다`);
+  }catch(e){ /* 조용히 무시, 다음 접속시 재시도 */ }
+}
+async function turnOffAutoBackupFolder(){
+  await idbSetHandle('backupDir', null);
+  localStorage.removeItem('gen-auto-backup-last-date');
+  autoBackupFolderActive = false;
+  flash('폴더 자동 저장이 꺼졌습니다');
+  renderContent();
+}
+function autoBackupFolderStatusHtml(){
+  const wrap = document.getElementById('auto-backup-folder-wrap');
+  if(!wrap) return;
+  if(!supportsAutoBackupFolder()){
+    wrap.innerHTML = `<p class="muted" style="font-size:12.5px;">이 브라우저(사파리·파이어폭스 등)는 폴더 자동 저장을 지원하지 않습니다. 크롬·엣지·네이버 웨일 같은 브라우저에서 이용해주세요.</p>`;
+    return;
+  }
+  idbGetHandle('backupDir').then(async (dirHandle)=>{
+    if(!dirHandle){
+      autoBackupFolderActive = false;
+      wrap.innerHTML = `
+        <p class="muted" style="font-size:12.5px;margin-top:-2px;">폴더를 한 번 지정해두면, 앱을 열 때마다 다운로드 팝업 없이 그 폴더에 최신 백업 파일이 자동으로 저장됩니다 (이 컴퓨터·이 브라우저 한정).</p>
+        <button class="btn primary" onclick="setupAutoBackupFolder()">자동 백업 폴더 설정</button>`;
+      return;
+    }
+    const perm = await dirHandle.queryPermission({mode:'readwrite'});
+    autoBackupFolderActive = perm==='granted';
+    const lastDate = localStorage.getItem('gen-auto-backup-last-date') || '아직 없음';
+    wrap.innerHTML = `
+      <p style="font-size:13px;margin:0 0 4px;"><b>📁 ${escR(dirHandle.name)}</b> 폴더에 자동 저장 중 ${perm==='granted'? '<span class="pill ok">정상</span>' : '<span class="pill danger">권한 필요</span>'}</p>
+      <p class="muted" style="font-size:12px;margin:0 0 4px;">저장 위치: 이 컴퓨터에서 위 폴더로 지정한 "${escR(dirHandle.name)}" 폴더 안</p>
+      <p class="muted" style="font-size:12px;margin:0 0 4px;">파일 이름: 발전기관리_자동백업_YYYY-MM-DD.json (예: 발전기관리_자동백업_${todayStr()}.json) — 매일 새 파일로 저장되어 예전 날짜 백업도 폴더 안에 계속 남아있습니다.</p>
+      <p class="muted" style="font-size:12px;margin:0 0 8px;">마지막 자동 저장일: ${escR(lastDate)}</p>
+      ${perm!=='granted'? `<button class="btn sm primary" onclick="setupAutoBackupFolder()">권한 다시 허용하기</button>`:''}
+      <button class="btn sm" onclick="setupAutoBackupFolder()">폴더 변경</button>
+      <button class="btn sm danger" onclick="turnOffAutoBackupFolder()">자동 저장 끄기</button>`;
+  });
 }
 function handleRestoreFile(input){
   const file = input.files && input.files[0];
@@ -3307,7 +3559,8 @@ function renderManualTab(){
     ${manualSection('⏳','출고 대기', false,
       '출고하기를 누르면 발전기가 먼저 여기 "출고 대기"로 등록됩니다. 실제로 상차·출발해야 진짜 "출고중"이 됩니다.', [
       ['인수증', '거래처에 보여줄 인수증 미리보기를 엽니다. 연료를 넣기로 되어 있는 건은 인수증을 열기 전에 "연료 OOL 주유하시기 바랍니다" 알림이 먼저 뜨고, 확인해야 인수증이 열립니다 (상차 나가기 직전에 놓치지 않도록). "🖨 인쇄하기"로 바로 인쇄하거나, 파일로 다운로드·공유할 수 있습니다. 공급자용에는 연료 요청량과 실제주입량이 함께 표시되고, 공급받는자용에는 요청량만 표시됩니다.'],
-      ['인수증 공유 · 📱 문자로 보내기', '인수증 미리보기의 "공유" 버튼을 누르면 뜨는 화면입니다. 받는 사람 번호를 콤마로 여러 개 넣으면(예: 01012345678, 01087654321) "📱 문자로 보내기"를 눌렀을 때 휴대폰 문자 앱이 단체문자로 열리면서 인수증 내용이 자동으로 채워집니다. 별도 문자 발송 서비스 가입이나 비용 없이, 사용 중인 휴대폰 문자 앱을 그대로 이용하는 방식입니다. PC에는 문자 앱이 없어 동작하지 않고, 받는 사람이 많거나 내용이 길면 기기에 따라 일부만 채워질 수 있어 그럴 땐 "복사하기"로 붙여넣어 사용하면 됩니다.'],
+      ['인수증 공유 · 📱 문자로 보내기', '"📱 문자로 보내기" 버튼은 인수증 미리보기 상단 툴바(공유하기 버튼 바로 왼쪽)와, "공유하기"를 눌러서 뜨는 화면 둘 다에 있습니다. 공유 화면에서 받는 사람 번호를 콤마로 여러 개 넣으면(예: 01012345678, 01087654321) 눌렀을 때 휴대폰 문자 앱이 단체문자로 열리면서 인수증 내용이 자동으로 채워집니다. 상단 툴바 버튼은 번호 입력 없이 바로 눌러서, 문자 앱이 열린 뒤 받는 사람을 직접 골라도 됩니다. 별도 문자 발송 서비스 가입이나 비용 없이, 사용 중인 휴대폰 문자 앱을 그대로 이용하는 방식입니다. PC에는 문자 앱이 없어 동작하지 않고, 받는 사람이 많거나 내용이 길면 기기에 따라 일부만 채워질 수 있어 그럴 땐 "복사하기"로 붙여넣어 사용하면 됩니다.'],
+      ['📇 연락처 저장', '인수증 미리보기 상단과 공유 화면에 있는 버튼입니다. 누르면 연락처 파일(.vcf)이 다운로드되고, 스마트폰에서 그 파일을 열면 이번 출고 건의 거래처명·담당자·전화번호·현장주소가 담긴 "연락처 추가" 화면이 바로 뜹니다. 방문 전 담당자 연락처를 폰에 저장해두고 싶을 때 쓰면 편리합니다.'],
       ['내용보기/수정', '상차대기 상태인 항목의 세부 내용을 확인하거나 고칩니다.'],
       ['상차완료', '실제로 발전기를 싣고 출발했을 때 누르면 정식으로 [출고중] 상태가 됩니다. 연료 요청·주입 기록이 있는 건은 "연료를 실제로 넣었습니다" 체크박스를 눌러야만 완료 처리가 되어, 연료 안 넣고 그냥 상차하는 실수를 막아줍니다. 목록의 연료량도 크고 굵게 표시됩니다.'],
       ['출고하기', '상차대기가 아닌 일반 예약 건을 실제 출고 처리합니다.'],
@@ -3316,7 +3569,7 @@ function renderManualTab(){
       ['전압변경 표시', '출고 전압이 발전기 기존 전압과 다르면 빨간 글씨로 뜹니다. 클릭하면 그 모델의 전압 설정 방법 목록이 뜨고, "220V (2장)"처럼 나오는 글자를 클릭하면 사진을 크게 볼 수 있습니다.'],
       ['부자재확인', '출고시 선택한 부자재 목록만 간단히 팝업으로 보여줍니다 (비고확인과 같은 형식 — 내용만 표시, 닫기 버튼만 있음). 부자재가 없으면 "부자재없음"으로 표시됩니다.'],
       ['비고확인', '출고하기에서 비고란에 내용을 적어두면 부자재확인 버튼 바로 아래에 파란색 버튼으로 "비고확인"이 뜹니다 (부자재확인과 같은 크기·모양). 클릭하면 비고 내용만 바로 보여줍니다. 비고가 없으면 표시되지 않습니다.'],
-      ['🚚 발전기 상차·입고 안내 팝업', '이름을 선택해 접속(로그인)할 때마다 오늘/내일 상차할 목록과 오늘/내일 입고예정 목록을 함께 팝업으로 보여줍니다 (모든 사용자, 접속할 때마다 매번). 오늘·내일 상차·입고가 전부 없으면 팝업 자체가 뜨지 않습니다. 또한 다른 사람이 출고하기에서 상차대기 건을 새로 등록하면, 약 2분 이내에 등록한 사람을 제외한 나머지 팀원들에게 이 팝업이 자동으로 뜹니다 (등록한 사람 본인에게는 뜨지 않습니다). 팝업 안 상차 내용은 [출고대기] 탭, 입고예정 내용은 [출고중] 탭과 동일하며 누구나 볼 수 있습니다.']
+      ['📥 상차·입고 예정 안내 팝업', '이름을 선택해 접속(로그인)할 때마다 오늘/내일 상차할 목록과 오늘/내일 입고예정 목록을 함께 팝업으로 보여줍니다 (모든 사용자, 접속할 때마다 매번). 오늘·내일 상차·입고가 전부 없으면 팝업 자체가 뜨지 않습니다. 또한 다른 사람이 출고하기에서 상차대기 건을 새로 등록하면, 약 2분 이내에 등록한 사람을 제외한 나머지 팀원들에게 이 팝업이 자동으로 뜹니다 (등록한 사람 본인에게는 뜨지 않습니다). 팝업 안 상차 내용은 [출고대기] 탭, 입고예정 내용은 [출고중] 탭과 동일하며 누구나 볼 수 있습니다.']
     ])}
 
     ${manualSection('📤','출고중', false,
@@ -3361,7 +3614,7 @@ function renderManualTab(){
       ['CSV 내보내기', '임대 이력·정비 이력을 엑셀에서 열 수 있는 파일로 내려받습니다.'],
       ['🚨 과다사용 배지', '하루 평균 10시간을 초과해서 사용된 임대 건에 자동으로 표시됩니다.'],
       ['삭제', '잘못 입력된 임대/정비 기록을 지웁니다(부품 재고는 자동 복원됩니다).'],
-      ['거래처별 이력 · 주의사항', '지금까지 거래한 모든 업체 목록과 임대 건수를 보여줍니다. 업체를 클릭하면 "입금 문제", "장비 관리 불량", "회수일자 지연", "과다사용" 같은 주의 태그를 선택하고, 목록에 없는 태그는 직접 입력해서 추가할 수도 있습니다. 메모도 자유롭게 남길 수 있습니다. 태그·메모가 있는 업체는 목록에서 빨간색으로 표시됩니다. 이렇게 설정해두면, 나중에 출고하기 화면에서 그 거래처명을 입력할 때 주의사항이 자동으로 빨간 박스로 함께 뜹니다. 아래 임대 이력에는 완료·진행중·예약/상차대기 상태와 함께 발전기 번호·모델, 임대기간과 사용시간, 담당자·연락처, 현장주소, 전압·부자재·연료·비고까지 출고시 입력된 내용이 카드 형태로 전부 표시되고, 과다사용 기준을 넘긴 완료 건은 빨간 테두리로 "🚨 과다사용" 표시가 뜹니다. "🖨 인쇄" 버튼으로 이 거래처의 주의 태그·메모와 임대 이력 전체를 인쇄용 파일로 받을 수 있습니다.']
+      ['거래처별 이력 · 주의사항', '지금까지 거래한 모든 업체 목록과 임대 건수를 보여줍니다 (임대 건수가 많은 순으로 정렬됩니다). 업체를 클릭하면 "입금 문제", "장비 관리 불량", "회수일자 지연", "과다사용" 같은 주의 태그를 선택하고, 목록에 없는 태그는 직접 입력해서 추가할 수도 있습니다. 메모도 자유롭게 남길 수 있습니다. 태그·메모가 있는 업체는 목록에서 빨간색으로 표시됩니다. 이렇게 설정해두면, 나중에 출고하기 화면에서 그 거래처명을 입력할 때 주의사항이 자동으로 빨간 박스로 함께 뜹니다. 아래 임대 이력에는 완료·진행중·예약/상차대기 상태와 함께 발전기 번호·모델, 임대기간과 사용시간, 담당자·연락처, 현장주소, 전압·부자재·연료·비고까지 출고시 입력된 내용이 카드 형태로 전부 표시되고, 과다사용 기준을 넘긴 완료 건은 빨간 테두리로 "🚨 과다사용" 표시가 뜹니다. "🖨 인쇄" 버튼으로 이 거래처의 주의 태그·메모와 임대 이력 전체를 인쇄용 파일로 받을 수 있습니다.']
     ])}
 
     ${manualSection('📊','가동률 통계', false,
@@ -3382,10 +3635,11 @@ function renderManualTab(){
 
     ${manualSection('⚙️','설정', false,
       '앱 전체에 적용되는 값과 데이터 관리 기능이 모여있습니다.', [
-      ['🔒 접속 비밀번호', '팀 공통 비밀번호를 설정·변경·해제합니다. 이 비밀번호는 아래 "위험 구역" 작업을 실행할 때 확인용으로도 그대로 쓰입니다.'],
-      ['🏢 업체 정보', '업체명·주소·전화번호·휴대폰 번호를 관리합니다. 비밀번호 없이 누구나 바로 수정할 수 있습니다. 업체명은 화면 상단 이름과 인수증 하단 문구에, 전화번호·휴대폰은 인수증 하단에 자동으로 반영됩니다.'],
-      ['전체 백업 다운로드 / 복원', '발전기·임대·정비·예약·자재·부품재고·부자재·차량종류·색상설정·팀원목록 등 모든 데이터를 파일 하나로 저장하거나, 백업 파일로 되돌립니다. (접속 비밀번호는 보안상 백업 대상에서 제외됩니다)'],
-      ['위험 구역', '입고로 초기화·출고로 초기화·정비내역 초기화·부품재고 초기화·고객정보 초기화·전체 초기화 버튼이 한 줄로 모여 있습니다. 고객정보 초기화는 출고시 입력하는 거래처·담당자·연락처 등만 지우고, 전체 초기화는 발전기 번호만 남기고 입력했던 모든 정보를 처음 상태로 되돌립니다. 접속 비밀번호가 설정되어 있으면 실행할 때마다 비밀번호 확인을 거칩니다. 되돌릴 수 없으니 먼저 백업을 받아두세요.'],
+      ['🔒 접속 비밀번호', '팀 공통 비밀번호를 설정·변경·해제합니다. 이 화면 자체를 여는 용도이며, 아래 "관리자 모드"는 이것과 별개인 전용 비밀번호를 사용합니다.'],
+      ['📄 공용 양식 · 문서', '견적서·관리문서 같은 엑셀/워드/PDF/한글 파일을 올려두면, 팀원 누구나 다운로드해서 바로 쓸 수 있습니다. 파일 1개당 최대 5MB까지 올릴 수 있고, 이 목록은 [설정] 화면을 열 때만 따로 불러와서 앱 전체 로딩 속도에는 영향을 주지 않습니다. 다른 사람이 방금 새로 올린 파일은 자동으로 안 보일 수 있어 "🔄 목록 새로고침"으로 최신 목록을 다시 받아올 수 있습니다.'],
+      ['전체 백업 다운로드 / 복원', '발전기·임대·정비·예약·자재·부품재고·부자재·차량종류·색상설정·팀원목록 등 모든 데이터를 파일 하나로 저장하거나, 백업 파일로 되돌립니다. (접속 비밀번호는 보안상 백업 대상에서 제외됩니다) 비밀번호 없이 누구나 바로 이용할 수 있습니다.'],
+      ['📁 폴더 자동 저장', '"자동 백업 폴더 설정" 버튼으로 컴퓨터의 폴더를 한 번 지정해두면, 그 다음부터는 다운로드 버튼을 안 눌러도 앱을 열 때마다 그 폴더에 최신 백업 파일이 자동으로 저장되고, 저장되면 "OO 폴더에 자동저장되었습니다" 메시지가 잠깐 뜹니다. 파일은 지정한 그 폴더 안에 "발전기관리_자동백업_YYYY-MM-DD.json" 이름으로 날짜별로 쌓여서 저장되어, 예전 날짜 백업도 폴더 안에 그대로 남아있습니다. 자동 저장이 켜져 있으면 [전체현황]에 뜨던 "정기 백업을 아직 안 하셨어요" 리마인더 배너는 더 이상 뜨지 않습니다. 새로고침 도중 네트워크 문제로 발전기 데이터를 다 못 불러온 비정상적인 상태에서는 자동저장을 건너뛰어, 불완전한 상태로 오늘자 백업이 덮어써지는 사고를 방지합니다(다음 접속시 정상 상태면 다시 저장됩니다). 크롬·엣지·네이버 웨일 같은 크로미움 기반 브라우저에서만 되고, 사파리·파이어폭스는 지원하지 않습니다. 이 설정은 지정한 그 컴퓨터·그 브라우저에만 적용되며(다른 팀원 화면에는 영향 없음), 하루에 한 번만 저장하고, "폴더 변경"·"자동 저장 끄기"로 언제든 바꿀 수 있습니다.'],
+      ['🔐 관리자 모드 (업체 정보 · 위험 구역)', '업체 정보 수정과 위험 구역(초기화) 작업은 관리자 모드 안에 있습니다. 사이트 접속 비밀번호와는 별개인 전용 관리자 비밀번호를 입력해야 열리며, 이 비밀번호는 화면에서 바꿀 수 없게 고정되어 있습니다. 열리면 5분 동안 유지되고, "지금 잠그기"를 누르거나 5분이 지나면 자동으로 다시 잠깁니다. 열린 동안에는 업체명·주소·전화번호·휴대폰 번호를 수정할 수 있고, 입고로 초기화·출고로 초기화·정비내역 초기화·부품재고 초기화·고객정보 초기화·전체 초기화 버튼도 다시 잠글 때까지 계속 이용할 수 있습니다. 되돌릴 수 없는 작업들이니 실행 전 먼저 백업을 받아두세요.'],
       ['정비 임박 경고 기준 / 과다사용 기준', '잔여시간이 얼마 이하면 "임박"으로 표시할지, 하루 몇 시간 초과 사용을 "과다사용"으로 볼지 각각 숫자로 직접 설정할 수 있습니다. 기본값은 각각 50h, 10h입니다.'],
       ['팀원 목록', '사용자 선택 화면에 뜨는 이름 목록을 관리합니다.'],
       ['정비사 목록', '정비 등록시 선택할 정비사 이름을 최대 3명까지 등록합니다. 여기 등록된 이름과 접속시 선택한 이름이 같아야만 전압 변경, 정비 등록·수정·삭제, 소요자재입력, 부품 재고 등록·수정·삭제 같은 작업을 할 수 있습니다. 등록 안 된 이름으로 시도하면 "정비사로 등록된 사람만 할 수 있습니다" 안내가 뜨고 저장되지 않습니다.'],
@@ -3403,7 +3657,7 @@ function renderManualTab(){
       '화면에 버튼은 없지만 뒤에서 자동으로 동작하거나, 알아두면 편한 기능들을 모았습니다.', [
       ['🔔 새 소식 자동 알림', '다른 팀원이 새 공지사항이나 새 일정을 올리면, 앱을 켜둔 모든 사람 화면에 자동으로 팝업이 뜹니다. "내용 확인"을 누르면 해당 내용으로 바로 이동합니다. 본인이 쓴 글로는 본인에게 팝업이 뜨지 않습니다.'],
       ['✅ 출고하기 2단계 확인', "[입고] 탭에서 출고하기를 누르고 정보를 다 입력한 뒤 '출고하기'를 다시 누르면, 바로 저장되지 않고 인수증 모양의 확인 화면이 한 번 더 뜹니다. 입력한 내용이 맞는지 확인하고 '✅ 확인, 출고 등록'을 눌러야 실제로 등록됩니다. '✏️ 돌아가서 수정'을 누르면 방금 입력한 값이 그대로 복원됩니다."],
-      ['🔒 위험 구역은 비밀번호로 보호됨', '[설정 → 위험 구역]의 초기화 버튼들은 [설정 → 🔒 접속 비밀번호]에 저장된 비밀번호를 한 번 더 입력해야 실행됩니다. 비밀번호를 바꾸면 이 확인창의 비밀번호도 자동으로 같이 바뀝니다. 비밀번호를 아예 설정 안 해두면 확인 절차 없이 바로 실행되니, 실수로 인한 초기화가 걱정되면 비밀번호부터 설정해두세요.'],
+      ['🔒 관리자 모드는 별도 고정 비밀번호로 보호됨', '[설정 → 🔐 관리자 모드]는 접속 비밀번호와는 별개인 전용 관리자 비밀번호로만 열립니다. 이 비밀번호는 화면 어디에서도 바꿀 수 없게 고정되어 있습니다. 한 번 열면 업체 정보 수정과 위험 구역 작업을 5분 동안 자유롭게 할 수 있고, 5분이 지나거나 "지금 잠그기"를 누르면 자동으로 다시 잠깁니다.'],
       ['🎨 발전기별 색상 고정', '[설정 → 발전기별 색상 고정]에 번호를 등록해두면, 그 발전기는 모델이 바뀌든 모델 색상이 바뀌든 항상 지정한 색으로만 표시됩니다. 특정 발전기를 한눈에 구분하고 싶을 때 씁니다.'],
       ...(DB.vehicleSuggestEnabled===false? [] : [['🚚 차량 추천 (여러 대 동시 적재 포함)', '[설정]에서 발전기 크기와 차량 적재함 크기를 등록해두면, 출고하기 화면에서 이 발전기를 실을 수 있는 차량을 자동으로 추천해줍니다. "수량"을 2대 이상으로 입력하면, 한 차량에 여러 대를 함께 실을 수 있는지까지 계산해서 적재함 위에서 본 배치 그림과 함께 추천해줍니다. 지게차 포크 구멍이 발전기 긴 변에 있어 차량 옆에서만 실을 수 있다는 점을 반영해서, 발전기를 90도로 돌려 싣는 경우는 계산하지 않습니다 (짧은 변이 항상 적재함 가로, 긴 변이 세로 방향). 배치 그림에는 위쪽이 "▲ 차량 앞부분", 아래쪽이 "▼ 차량 뒷부분"으로 빨간 글씨로 표시되어 어느 방향으로 실어야 하는지 헷갈리지 않습니다.']]),
       ...(DB.genSizeDisplayEnabled? [['🚛 발전기 크기만 표시', '[설정 → 차량 종류 · 적재함 크기]에서 "발전기 크기만 표시"를 켜두면, 출고하기 화면에서 차량 매칭 없이 이 발전기의 가로×세로×높이만 참고용으로 보여줍니다. 차량 추천 기능과는 별개로 켜고 끌 수 있어, 둘 다 켜면 차량 추천이 우선 표시됩니다.']] : []),
@@ -3411,7 +3665,7 @@ function renderManualTab(){
       ['🔧 정비 부품 자동 선택', '정비 등록에서 "필터 교체" 같은 정비 내용을 체크하면, 그 모델에 등록해둔 해당 부품이 자동으로 같이 선택되고 재고가 차감됩니다.'],
       ['🖨 출고 리스트는 자동으로 가로 인쇄', '[출고중 → 🖨 출고 리스트 인쇄]는 세로가 아니라 가로(landscape)로 자동 인쇄됩니다. 장기임대 페이지 맨 아래에는 준비할 부품 수량이 자동으로 합산되어 나옵니다.'],
       ['🔄 데이터는 2분마다 자동으로 새로고침', '다른 팀원이 입력한 내용은 화면을 새로고침하지 않아도 2분 안에 자동으로 반영됩니다. 급하게 최신 내용을 봐야 하면 우측 상단 "🔄 새로고침" 버튼을 눌러 바로 받아올 수 있습니다.'],
-      ['❓ 마우스를 올리면 나오는 설명', '[설정 → 위험 구역]의 각 초기화 버튼에 마우스를 올리면(모바일은 길게 누르면) 정확히 무엇이 지워지는지 설명이 뜹니다. 누르기 전에 꼭 한 번 읽어보세요.'],
+      ['❓ 마우스를 올리면 나오는 설명', '[설정 → 관리자 모드 → 위험 구역]의 각 초기화 버튼에 마우스를 올리면(모바일은 길게 누르면) 정확히 무엇이 지워지는지 설명이 뜹니다. 누르기 전에 꼭 한 번 읽어보세요.'],
       ['📊 전체현황 숫자 카드는 버튼입니다', '[전체현황] 맨 위의 "전체 발전기·입고·출고중·정비 필요·고장/수리중·미입금 출고·출고 대기" 숫자 카드를 누르면, 그냥 숫자가 아니라 해당 목록 탭으로 바로 이동합니다.'],
       ['🚨 미입금 강제출고 추적', '출고하기에서 "입금 확인 전 강제 출고"를 체크하면 사유를 입력하게 되고, 이 발전기는 입금 확인 전까지 [전체현황]에 빨간 카드로, [출고중] 목록에는 빨간 배경과 "🚨 미입금 출고" 표시로 계속 남습니다. 입금되면 "입금 확인" 버튼으로 해제합니다.'],
       ['🚨 과다사용 자동 감지', '임대 기간 동안 하루 평균 [설정]에서 정한 시간(기본 10시간)을 초과해서 쓴 건은 이력에 자동으로 "🚨 과다사용" 표시가 붙습니다. (출고시-입고시 누적시간 차이 ÷ 사용일수로 자동 계산) 단, 해당 발전기의 입출고 기록이 3건 미만이면 아직 판단하지 않고 표시하지 않습니다. [가동률 통계] 탭에서 전체 목록을 모아볼 수 있고, 과다사용이 잦으면 정비 주기가 앞당겨질 수 있다는 힌트도 같이 뜹니다.'],
@@ -3420,7 +3674,7 @@ function renderManualTab(){
       ['📅 사용일수 ↔ 반납예정일 자동 계산', '출고하기에서 사용일수를 입력하면 반납예정일이 자동으로 계산되고, 반대로 반납예정일을 먼저 정하면 사용일수가 자동으로 채워집니다. 둘 중 편한 쪽만 입력하면 됩니다. 계산된 반납(입고)예정일이 3일 이내로 다가오면 [출고중] 목록의 모델명 옆에 "📅 입고3일전 / 입고2일전 / 입고임박" 배지가 색깔과 함께 자동으로 뜨고, 지나면 "(지연)"으로 표시됩니다.'],
       ['🚫 고장난 발전기는 출고 자체가 막힘', '[입고] 탭에서 "고장 등록"을 해둔 발전기는 출고하기를 시도해도 "고장 수리 중이라 출고할 수 없습니다"라는 안내와 함께 막힙니다. "수리 완료 처리"를 눌러야 다시 출고할 수 있습니다.'],
       ['🔧 부품 최소재고 자동 발주 알림', '[자재 관리 → 부품 재고]에서 부품마다 "최소재고"를 정해두면, 실제 재고가 그 아래로 떨어질 때 전체현황 상단에 빨간 배너로 자동 표시됩니다. 배너를 누르면 부족한 부품 목록으로 이동하고, 거기서 🖨 인쇄로 발주서를 뽑을 수 있습니다.'],
-      ['📦 오늘 백업 안 하면 자동 리마인더', '오늘 아직 전체 백업을 한 번도 안 받았으면 [전체현황] 맨 위에 "정기 백업을 아직 안 하셨어요" 배너가 자동으로 뜹니다. 그날 한 번이라도 백업을 받으면 그날은 다시 안 뜹니다.'],
+      ['📦 오늘 백업 안 하면 자동 리마인더', '월요일·목요일 중 아직 전체 백업을 한 번도 안 받았으면 [전체현황] 맨 위에 "정기 백업을 아직 안 하셨어요" 배너가 자동으로 뜹니다. 그날 한 번이라도 백업을 받으면 그날은 다시 안 뜹니다. [설정 → 폴더 자동 저장]이 켜져 있으면 이미 자동으로 백업되고 있다는 뜻이라 이 배너 자체가 뜨지 않습니다.'],
       ['⛽ 연료통 기준높이 자동 반영', '탱크가 완전히 비어도 항상 남아있어서 절대 빼서 쓸 수 없는 기름 높이(발전기마다 다름)를 모델 기본값은 [발전기 모델 설정 → 연료탱크 규격]에서, 개별 발전기는 [설정 → 발전기별 탱크 규격 · 기준높이]에서 번호로 찾아 등록해두면, 입고 처리시 그 기준높이 위로 올라온 높이만 재서 입력해도 됩니다. 계산되는 "남은 연료량"은 이 기준높이 부분(항상 남아있어 고객이 실제로 쓸 수 없는 양)을 자동으로 빼고, 측정한 높이만큼만 반영합니다.'],
       ['⛽ 연료 체크 필요 표시 · 사용량 자동 계산', '출고할 때 "⛽ 연료넣고 출고하기" 체크박스를 켜야 고객요청/실제주입 입력칸이 나타납니다. 체크한 발전기에만 [출고중] 목록에 "⛽ 기름체크 필요" 표시가 뜨고, 입고 처리 화면에도 연료 높이 측정칸이 나타납니다. 체크하지 않은 출고는 확인이 필요 없다는 안내만 뜨고 측정칸 자체가 생략됩니다. 입고 처리시 연료 높이를 재서 입력하면, 임대 이력에 "OOL 중 OOL 남아서 반납 → 사용량 약 OOL"이 자동으로 기록됩니다.'],
       ['입고 목록 연료 "초기화" 버튼', '입고 목록의 연료 칸에 뜬 값 옆 "초기화" 버튼은, 실제로 탱크의 기름을 기준점까지 다시 빼낸 뒤 눌러주는 용도입니다. 누르면 화면에 표시되던 지난 연료량이 사라지고(이력 기록 자체는 그대로 남습니다) 다음 출고를 위한 준비가 끝났다는 뜻이 됩니다.'],
@@ -3864,9 +4118,8 @@ function renderSettingsTab(){
     </div>
 
     <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">🏢 업체 정보</div>
-      <p class="muted" style="font-size:13px;margin-top:-4px;">업체명·주소·전화번호·휴대폰 번호를 관리합니다. 비밀번호 없이 누구나 바로 수정할 수 있습니다.</p>
-      <div id="company-contact-wrap"></div>
+      <div class="section-title" style="margin-top:0;">📄 공용 양식 · 문서</div>
+      <div id="doc-templates-wrap"></div>
     </div>
 
     <div class="material-card" style="margin-top:20px;">
@@ -3877,20 +4130,13 @@ function renderSettingsTab(){
         <button class="btn" onclick="document.getElementById('f-restore-file').click()">백업 파일 복원</button>
         <input type="file" id="f-restore-file" accept="application/json" style="display:none;" onchange="handleRestoreFile(this)">
       </div>
-    </div>
-
-    <div style="border:1px solid var(--danger);border-radius:var(--radius);padding:14px 16px;margin-top:20px;background:var(--danger-tint);">
-      <div class="section-title" style="margin-top:0;color:var(--danger);">위험 구역</div>
-      <p class="muted" style="font-size:13px;margin:0 0 10px;">아래 작업들은 모두 되돌릴 수 없습니다. 실행 전 먼저 위에서 전체 백업을 받아두시길 권장하며, 접속 비밀번호가 설정되어 있으면 실행 시 비밀번호 확인을 거칩니다. 각 버튼에 마우스를 올리면 무엇이 지워지는지 설명이 나옵니다.</p>
-      <div class="btn-row" style="flex-wrap:wrap;">
-        <button class="btn danger" onclick="resetAllToIn()" title="현재 출고중인 발전기를 포함해 전체 발전기를 입고 상태로 되돌립니다. 임대 정보·출고 대기는 사라지고, 임대·정비 이력 자체는 남습니다.">입고로 초기화</button>
-        <button class="btn danger" onclick="resetAllToOut()" title="전체 발전기를 거래처 정보 없이 출고 상태로 되돌립니다. 임대·정비 이력은 남습니다.">출고로 초기화</button>
-        <button class="btn danger" onclick="resetMaintHistory()" title="모든 발전기의 정비 등록 기록을 삭제하고, 누적 사용시간을 확인할 수 없음 상태로 되돌립니다.">정비내역 초기화</button>
-        <button class="btn danger" onclick="resetPartsStock()" title="등록된 모든 부품의 재고 수량을 삭제합니다. 모델별 자재 등록 항목(오일필터명 등)은 남습니다.">부품재고 초기화</button>
-        <button class="btn danger" onclick="resetCustomerInfo()" title="출고시 입력하는 거래처명·담당자·연락처·현장주소·부자재·연료 등 고객정보와 임대·예약 이력을 모두 삭제합니다. 발전기 번호·모델·상태는 유지됩니다.">고객정보 초기화</button>
-        <button class="btn danger" style="background:#7a0d0d;border-color:#7a0d0d;" onclick="resetEverything()" title="입력했던 모든 정보(모델·이력·자재·부품재고·공지사항·일정표 등)를 처음 상태로 완전히 초기화합니다. 발전기 번호만 남습니다.">⚠ 전체 초기화</button>
+      <div style="border-top:1px solid var(--border);margin-top:14px;padding-top:14px;">
+        <div class="section-title" style="margin-top:0;font-size:14px;">📁 폴더 자동 저장 (이 컴퓨터·이 브라우저 한정)</div>
+        <div id="auto-backup-folder-wrap"></div>
       </div>
     </div>
+
+    ${adminModeSectionHtml()}
 
     <div class="material-card" style="margin-top:20px;">
       <div class="util-two-col" style="align-items:flex-start;">
@@ -7432,6 +7678,7 @@ function printReceipt(id, rtOverride){
             <button class="btn sm primary" onclick="printReceiptNow('${g.id}')">🖨 인쇄하기</button>
             <button class="btn sm" onclick="downloadReceiptFile('${g.id}')">인쇄용 파일 다운로드</button>
             <button class="btn sm" onclick="sendShareSms('${g.id}')">📱 문자로 보내기</button>
+            <button class="btn sm" onclick="downloadCustomerVCard('${g.id}')">📇 연락처 저장</button>
             <button class="btn sm" onclick="openShareModal('${g.id}')">공유하기</button>
             <button class="btn sm" onclick="closeReceipt()">닫기</button>
           </div>
@@ -7483,10 +7730,35 @@ function openShareModal(id){
       <div class="modal-actions" style="flex-wrap:wrap;">
         <button class="btn primary" onclick="copyShareText()">복사하기</button>
         <button class="btn" style="white-space:nowrap;" onclick="sendShareSms('${g.id}')">📱 문자로 보내기</button>
+        <button class="btn" style="white-space:nowrap;" onclick="downloadCustomerVCard('${g.id}')">📇 연락처 저장</button>
         <button class="btn" onclick="closeModal()">닫기</button>
       </div>
     </div>
   </div>`;
+}
+function downloadCustomerVCard(id){
+  const g = findGen(id);
+  if(!g) return;
+  const rt = receiptOverrideRT || g.rental;
+  if(!rt) return;
+  const customer = (rt.customer||'').trim();
+  const manager = (rt.manager||'').trim();
+  const fn = (customer && manager) ? `${customer} ${manager}` : (customer || manager || '거래처');
+  const lines = ['BEGIN:VCARD','VERSION:3.0', `FN:${fn}`];
+  if(customer) lines.push(`ORG:${customer}`);
+  if(rt.phone) lines.push(`TEL;TYPE=CELL:${rt.phone}`);
+  if(rt.address) lines.push(`ADR;TYPE=WORK:;;${rt.address};;;;`);
+  lines.push('END:VCARD');
+  const vcf = lines.join('\r\n');
+  const blob = new Blob([vcf], {type:'text/vcard;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${fn.replace(/[\\/:*?"<>|]/g,'')}.vcf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  flash('연락처 파일이 다운로드되었습니다. 파일을 열면 연락처 추가 화면이 뜹니다.');
 }
 function sendShareSms(id){
   const g = findGen(id);
@@ -8208,6 +8480,7 @@ async function init(){
   renderContent();
   renderUserBadge();
   openUserNameGate();
+  tryAutoBackupToFolder();
   if(phoneMigrationChanged.gens || phoneMigrationChanged.rentals || phoneMigrationChanged.reservations || phoneMigrationChanged.companyInfo){
     persistPhoneMigration(phoneMigrationChanged);
   }
