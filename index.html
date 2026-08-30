@@ -1916,7 +1916,7 @@ function computeFuelLiters(g, heightCm){
   if(heightCm==null || !(w>0 && d>0)) return null;
   const baseline = fuelBaselineOf(g);
   const maxUsableHeight = h>0 ? Math.max(h - baseline, 0) : null;
-  const clampedHeight = maxUsableHeight>0 ? Math.min(heightCm, maxUsableHeight) : heightCm;
+  const clampedHeight = (maxUsableHeight>0 && heightCm>0) ? Math.min(heightCm, maxUsableHeight) : heightCm;
   return Math.round(w*d*clampedHeight/1000*10)/10;
 }
 let inCapacityFilter = null; // 숫자(kW) 또는 null
@@ -7864,8 +7864,9 @@ function calcRemainingFuel(id){
   const heightEl = document.getElementById('f-fuel-height');
   const resultEl = document.getElementById('f-fuel-calc-result');
   if(!g || !heightEl || !resultEl) return;
+  if(heightEl.value===''){ resultEl.style.display='none'; return; }
   const height = Number(heightEl.value);
-  if(!height || height<=0){ resultEl.style.display='none'; return; }
+  if(isNaN(height) || height < -5){ resultEl.style.display='none'; return; }
   const {width:w, depth:d, height:h} = tankDimsOf(g);
   const baseline = fuelBaselineOf(g);
   if(!(w>0 && d>0)){
@@ -7874,11 +7875,20 @@ function calcRemainingFuel(id){
     return;
   }
   const maxUsableHeight = h>0 ? Math.max(h - baseline, 0) : null;
-  const clampedHeight = maxUsableHeight>0 ? Math.min(height, maxUsableHeight) : height;
+  const clampedHeight = (maxUsableHeight>0 && height>0) ? Math.min(height, maxUsableHeight) : height;
   const liters = Math.round(w*d*clampedHeight/1000*10)/10;
   const overTank = maxUsableHeight>0 && height>maxUsableHeight;
+  const underBaseline = height<0;
+  let mainLine;
+  if(liters>0){
+    mainLine = `<div style="font-size:13px;">남은 연료량 약 <b style="font-size:16px;color:var(--primary-dark);">${liters.toLocaleString()}L</b></div>`;
+  } else if(liters===0){
+    mainLine = `<div style="font-size:13px;font-weight:700;color:var(--primary-dark);">출고시 연료 모두 소진되어 입고</div>`;
+  } else {
+    mainLine = `<div style="font-size:13px;"><b style="font-size:16px;color:var(--danger);">${liters.toLocaleString()}L</b> 더 사용</div>`;
+  }
   resultEl.style.display = 'block';
-  resultEl.innerHTML = `<div style="font-size:13px;">남은 연료량 약 <b style="font-size:16px;color:var(--primary-dark);">${liters.toLocaleString()}L</b></div>${baseline>0? `<div class="muted" style="font-size:11px;">기준높이 ${baseline}cm는 항상 남는 부분이라 계산에서 제외, 측정높이 ${height}cm만 반영</div>`:''}${overTank? `<div class="muted" style="font-size:11px;color:var(--danger);">측정높이가 기준높이 위로 잴 수 있는 최대 높이(${maxUsableHeight}cm)를 초과해 그 높이 기준으로 계산했습니다.</div>` : ''}`;
+  resultEl.innerHTML = `${mainLine}${baseline>0? `<div class="muted" style="font-size:11px;">기준높이 ${baseline}cm는 항상 남는 부분이라 계산에서 제외, 측정높이 ${height}cm만 반영</div>`:''}${underBaseline? `<div class="muted" style="font-size:11px;color:var(--danger);">기준높이보다 ${Math.abs(height)}cm 낮게 측정되었습니다.</div>` : ''}${overTank? `<div class="muted" style="font-size:11px;color:var(--danger);">측정높이가 기준높이 위로 잴 수 있는 최대 높이(${maxUsableHeight}cm)를 초과해 그 높이 기준으로 계산했습니다.</div>` : ''}`;
 }
 function openInModal(id){
   const g = findGen(id);
@@ -7935,7 +7945,7 @@ function openInModal(id){
         ${(rt.fuelRequested!=null || rt.fuelActual!=null) ? `
         <div class="field"><label>⛽ 측정한 연료 높이(cm)${baselineForModal>0? ` <span class="muted" style="font-weight:400;">(바닥 기준높이 ${baselineForModal}cm 위로 올라온 높이만 재서 입력)</span>`:''}</label>
           <div class="hint" style="color:var(--primary-dark);font-weight:700;margin-top:0;">출고시 연료를 넣어드린 발전기입니다. 요청 ${rt.fuelRequested!=null?rt.fuelRequested:'-'}L / 주입 ${rt.fuelActual!=null?rt.fuelActual:'-'}L — 반납된 연료를 재서 사용량을 확인해주세요.</div>
-          <input type="number" id="f-fuel-height" min="0" step="0.5" placeholder="예: 32" oninput="calcRemainingFuel('${g.id}')">
+          <input type="number" id="f-fuel-height" min="-5" step="0.5" placeholder="예: 32" oninput="calcRemainingFuel('${g.id}')">
           ${(tankDims.width>0 && tankDims.depth>0)
             ? `<div class="hint">탱크 규격 기준 자동 환산${baselineForModal>0? ` (기준높이 ${baselineForModal}cm는 항상 남는 부분이라 계산에서 제외)`:''}</div>`
             : `<div class="hint" style="color:var(--warn);">탱크 규격 미등록 (측정 높이만 기록)</div>`}
@@ -8057,16 +8067,18 @@ async function submitIn(id){
     errEl.style.display='block'; return;
   }
   const fuelHeightEl = document.getElementById('f-fuel-height');
-  const measuredFuelHeightCm = fuelHeightEl ? (Number(fuelHeightEl.value)||null) : null;
+  const measuredFuelHeightCm = (fuelHeightEl && fuelHeightEl.value!=='') ? Number(fuelHeightEl.value) : null;
   let remainingFuelLiters = null;
   if(measuredFuelHeightCm!=null){
     remainingFuelLiters = computeFuelLiters(g, measuredFuelHeightCm);
   }
+  const fuelExhaustNote = (remainingFuelLiters===0) ? '출고시 연료 모두 소진되어 입고' : '';
   const rt = g.rental;
+  const combinedNote = [rt.note, fuelExhaustNote].filter(Boolean).join(' / ');
   const newRentalId = uid();
   DB.rentals.push({
     id: newRentalId, genId: g.id, customer: rt.customer, manager: rt.manager, phone: rt.phone,
-    site: rt.site, address: rt.address, supplies: rt.supplies, suppliesItems: rt.suppliesItems||[], suppliesCustom: rt.suppliesCustom||'', suppliesRecovered, suppliesNote, fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: rt.note,
+    site: rt.site, address: rt.address, supplies: rt.supplies, suppliesItems: rt.suppliesItems||[], suppliesCustom: rt.suppliesCustom||'', suppliesRecovered, suppliesNote, fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: combinedNote,
     outDate: rt.outDate, inDate, startHours: rt.startHours, endHours,
     usedHours: endHours - rt.startHours, longTerm: rt.longTerm, estDaily: rt.estDaily,
     voltage, outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null, inProcessedAt: nowDateTimeStr(),
