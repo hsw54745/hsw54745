@@ -226,6 +226,7 @@
     <div class="brand-name" id="brand-name-text">해성발전기</div>
     <span id="conn-status-badge" style="font-size:11px;margin-left:auto;"></span>
     <span id="last-saved-indicator" style="font-size:11px;color:rgba(255,255,255,.6);"></span>
+    <button id="qr-scan-btn" onclick="openQrScanModal()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:inherit;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:700;">📷 QR 스캔</button>
     <button id="hard-refresh-btn" onclick="hardRefresh()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:inherit;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:700;">🔄 새로고침</button>
     <button id="save-all-btn" onclick="saveAllNow()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:inherit;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:700;">💾 전체 저장</button>
     <button id="user-badge" onclick="changeUserName()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:inherit;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;">이름 선택</button>
@@ -244,6 +245,8 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <script>
 // ===== Firebase 익명 로그인 (보안 규칙을 "로그인한 사용자만" 으로 걸기 위함) =====
 // 사용자는 아무것도 입력하지 않아도 앱이 열리자마자 자동으로 조용히 로그인됩니다.
@@ -4119,6 +4122,15 @@ function renderSettingsTab(){
     </div>
 
     <div class="material-card" style="margin-top:20px;">
+      <div class="section-title" style="margin-top:0;">📱 QR 코드 관리</div>
+      <p class="muted" style="font-size:13px;margin-top:-4px;">발전기마다 QR코드를 뽑아서 본체에 붙여두면, 현장에서 헤더의 "📷 QR 스캔" 버튼으로 QR을 찍는 것만으로 그 발전기가 바로 열립니다. 이미 사무실에서 거래처 정보를 입력해 [출고 대기]에 등록해둔 발전기는 상차자가 QR만 찍으면 내용을 확인하고 "상차완료"만 누르면 되고, 출고중인 발전기는 QR을 찍으면 바로 입고 처리 화면(현재 사용시간 입력 + 출고시 나갔던 정보 확인)이 열립니다.</p>
+      <div class="btn-row">
+        <button class="btn primary" onclick="generateAllGenQrPrintFile()">🖨 전체 발전기 QR 인쇄 파일 만들기</button>
+      </div>
+      <div class="hint" style="margin-top:8px;">발전기 번호별 QR을 낱장으로 다시 보려면 [발전기 모델 설정] 목록에서 "관리" 버튼을 눌러 확인할 수 있습니다.</div>
+    </div>
+
+    <div class="material-card" style="margin-top:20px;">
       <div class="section-title" style="margin-top:0;">📄 공용 양식 · 문서</div>
       <div id="doc-templates-wrap"></div>
     </div>
@@ -4537,6 +4549,7 @@ function openGenManageModal(id){
       <h3>발전기 관리</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
       <div class="btn-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+        <button class="btn" onclick="showGenQrModal('${g.id}')">📱 QR코드 보기</button>
         <button class="btn" onclick="openRenameGenModal('${g.id}')">✏️ 번호(ID) 수정</button>
         <button class="btn warn" onclick="closeModal();retireGen('${g.id}','매각')">💰 매각 처리</button>
         <button class="btn danger" onclick="closeModal();retireGen('${g.id}','폐기')">🗑 폐기 처리</button>
@@ -8576,6 +8589,7 @@ async function submitUserName(nameArg){
     saveWithRetry(saveTeamMembers);
   }
   showLoadingPopupOnLogin();
+  checkQrUrlParamOnLoad();
 }
 function changeUserName(){
   openUserNameGate();
@@ -8660,6 +8674,177 @@ async function syncFromStorage(){
   }
 }
 setInterval(syncFromStorage, 120000);
+
+// ===== QR 코드 스캔 (출고/입고) =====
+let qrScannerInstance = null;
+function openQrScanModal(){
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeQrScanModal)">
+    <div class="modal">
+      <h3>📷 QR 스캔</h3>
+      <div class="modal-sub">발전기에 붙어있는 QR코드를 카메라에 비춰주세요.</div>
+      <div id="qr-reader" style="width:100%;border-radius:8px;overflow:hidden;background:#000;"></div>
+      <div id="qr-scan-msg" class="hint" style="margin-top:10px;"></div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeQrScanModal()">취소</button>
+      </div>
+    </div>
+  </div>`;
+  startQrScanner();
+}
+function startQrScanner(){
+  const msg = document.getElementById('qr-scan-msg');
+  if(typeof Html5Qrcode === 'undefined'){
+    if(msg){ msg.textContent = 'QR 스캔 기능을 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침 해주세요.'; msg.style.color = 'var(--danger)'; }
+    return;
+  }
+  qrScannerInstance = new Html5Qrcode('qr-reader');
+  qrScannerInstance.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 240, height: 240 } },
+    (decodedText)=>{ handleQrScanResult(decodedText); },
+    ()=>{ /* 인식 실패시 계속 스캔 시도, 조용히 무시 */ }
+  ).catch(()=>{
+    if(msg){ msg.textContent = '카메라를 열 수 없습니다. 카메라 권한을 허용했는지 확인해주세요.'; msg.style.color = 'var(--danger)'; }
+  });
+}
+function stopQrScanner(){
+  if(qrScannerInstance){
+    const inst = qrScannerInstance;
+    qrScannerInstance = null;
+    inst.stop().then(()=>inst.clear()).catch(()=>{});
+  }
+}
+function closeQrScanModal(){
+  stopQrScanner();
+  closeModal();
+}
+function genQrUrl(id){
+  return location.origin + location.pathname + '?gen=' + encodeURIComponent(id);
+}
+function extractGenIdFromScan(decodedText){
+  const raw = (decodedText||'').trim();
+  try{
+    const u = new URL(raw);
+    const q = u.searchParams.get('gen');
+    if(q) return q.trim();
+  }catch(e){ /* URL이 아니면 무시하고 아래에서 처리 */ }
+  const m = raw.match(/^GEN:(.+)$/i);
+  return (m? m[1] : raw).trim();
+}
+function routeGenQrAction(id){
+  const g = findGen(id);
+  if(!g){
+    showInfoModal(`"${escR(id)}" 발전기를 찾을 수 없습니다. QR코드가 이 발전기 목록에 등록된 번호인지 확인해주세요.`);
+    return;
+  }
+  if(g.retired){
+    showInfoModal(`${g.id}은(는) 폐기(또는 매각) 처리된 발전기입니다.`);
+    return;
+  }
+  const pendingRes = DB.reservations.find(r=>r.genId===g.id);
+  if(g.status!=='out' && pendingRes){
+    // 이미 사무실에서 거래처 등 정보를 입력해 출고 대기(상차대기)로 등록된 발전기
+    // → 필드에서는 내용만 확인하고 상차완료만 누르면 됨
+    confirmLoadPrompt(pendingRes.id);
+    return;
+  }
+  if(g.status==='out'){
+    // 입고: 현재 사용시간과 출고시 나갔던 정보만 확인하면 되도록 이미 구성된 입고 처리 화면 사용
+    openInModal(g.id);
+    return;
+  }
+  // 사전 등록된 출고 대기 정보가 없는 상태에서 바로 출고하는 경우 → 신규 출고 정보 입력
+  openOutModal(g.id);
+}
+function handleQrScanResult(decodedText){
+  stopQrScanner();
+  closeModal();
+  const id = extractGenIdFromScan(decodedText);
+  routeGenQrAction(id);
+}
+function checkQrUrlParamOnLoad(){
+  const params = new URLSearchParams(location.search);
+  const id = params.get('gen');
+  if(!id) return;
+  params.delete('gen');
+  const newQuery = params.toString();
+  const newUrl = location.pathname + (newQuery? '?'+newQuery : '') + location.hash;
+  history.replaceState(null, '', newUrl);
+  routeGenQrAction(id.trim());
+}
+function buildQrDataUrl(text, size){
+  return new Promise((resolve)=>{
+    if(typeof QRCode === 'undefined'){ resolve(''); return; }
+    const holder = document.createElement('div');
+    holder.style.display = 'none';
+    document.body.appendChild(holder);
+    new QRCode(holder, { text: text, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
+    setTimeout(()=>{
+      const img = holder.querySelector('img');
+      const canvas = holder.querySelector('canvas');
+      let url = '';
+      if(canvas) url = canvas.toDataURL('image/png');
+      else if(img) url = img.src;
+      document.body.removeChild(holder);
+      resolve(url);
+    }, 60);
+  });
+}
+async function generateAllGenQrPrintFile(){
+  const list = activeGens().sort(sortByIdNatural);
+  if(list.length===0){ showInfoModal('등록된 발전기가 없습니다.'); return; }
+  flash('QR코드를 생성하는 중입니다...');
+  const cards = [];
+  for(const g of list){
+    const url = await buildQrDataUrl(genQrUrl(g.id), 180);
+    cards.push(`<div class="qr-card">
+      <img src="${url}" width="140" height="140">
+      <div class="qr-id">${escR(g.id)}</div>
+    </div>`);
+  }
+  const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>발전기 QR코드 - ${todayStr()}</title>
+<style>
+  body{font-family:'Noto Sans KR',-apple-system,sans-serif;margin:0;padding:14mm;}
+  .print-hint{background:#FBEDDB;border:1px solid #C97A1E;padding:8px 12px;margin-bottom:14px;font-size:13px;border-radius:6px;}
+  .qr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10mm 6mm;}
+  .qr-card{border:1px dashed #999;border-radius:6px;padding:8px 4px;text-align:center;break-inside:avoid;}
+  .qr-card img{display:block;margin:0 auto 6px;}
+  .qr-id{font-weight:800;font-size:22px;margin-top:2px;}
+  @page{ size:A4 portrait; margin:10mm; }
+</style>
+</head><body>
+<div class="print-hint">이 파일을 열면 인쇄 대화상자가 자동으로 뜹니다. 열리지 않으면 <b>Ctrl+P</b>(맥은 ⌘+P)를 눌러주세요. 인쇄 후 오려서 발전기 본체에 붙여주세요. <button onclick="window.print()">인쇄</button></div>
+<div class="qr-grid">${cards.join('')}</div>
+<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>
+</body></html>`;
+  const blob = new Blob([doc], {type:'text/html;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${todayStr()}_발전기QR코드.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  flash('QR코드 인쇄용 파일이 다운로드되었습니다.');
+}
+async function showGenQrModal(id){
+  const g = findGen(id);
+  if(!g) return;
+  const url = await buildQrDataUrl(genQrUrl(g.id), 220);
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal" style="text-align:center;">
+      <h3>${g.id} QR코드</h3>
+      <img src="${url}" width="200" height="200" style="margin:10px auto;display:block;">
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">닫기</button>
+        <button class="btn primary" onclick="generateAllGenQrPrintFile()">전체 인쇄 파일로 받기</button>
+      </div>
+    </div>
+  </div>`;
+}
 initPasswordGate();
 </script>
 </body>
