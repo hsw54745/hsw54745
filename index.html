@@ -1104,6 +1104,17 @@ function inDateLabel(dateStr){
   if(diff<0) return `${dow(dateStr)} (지연)`;
   return dow(dateStr);
 }
+// 상태문구(입고임박 등)와 날짜를 한 줄로 합쳐서 보여줄 때 사용
+function inDateLabelFull(dateStr){
+  const diff = daysFromToday(dateStr);
+  const dateTxt = dow(dateStr);
+  if(diff===0) return `오늘입고 · ${dateTxt}`;
+  if(diff===1) return `입고임박 · ${dateTxt}`;
+  if(diff===2) return `입고2일전 · ${dateTxt}`;
+  if(diff===3) return `입고3일전 · ${dateTxt}`;
+  if(diff<0) return `${dateTxt} (지연)`;
+  return dateTxt;
+}
 // 하루 최대 사용시간 기준 (이 시간을 초과해서 사용된 임대 건을 "과다사용"으로 표시합니다)
 const OVERUSE_DAILY_LIMIT_DEFAULT = 10;
 function overuseLimit(){ return (DB.overuseDailyLimit && DB.overuseDailyLimit>0) ? DB.overuseDailyLimit : OVERUSE_DAILY_LIMIT_DEFAULT; }
@@ -2144,7 +2155,7 @@ function renderOutList(){
     return `<tr${rt.forcedOut? ` style="background:var(--danger-tint);"`:''}>
       <td><input type="checkbox" class="bulk-in-chk" data-gid="${g.id}" ${bulkInSelection.has(g.id)?'checked':''} onchange="toggleBulkInSelect('${g.id}', this.checked)"></td>
       <td class="gid">${g.id}</td>
-      <td class="wrap-ok">${displayModel(g)}${usableCapacityHtml(g)}${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${expIn? (()=>{ const diff = daysFromToday(expIn); const isLate = diff!=null && diff<0; const cls = isLate?'danger':(diff<=1?'danger':(diff<=3?'warn':'gray')); return `<div style="margin-top:3px;"><span class="pill ${cls}">📅 ${inDateLabel(expIn)}</span><div class="muted" style="font-size:11px;">입고예정일: ${dow(expIn)}</div></div>`; })() : ''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
+      <td class="wrap-ok">${displayModel(g)}${usableCapacityHtml(g)}${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${expIn? (()=>{ const diff = daysFromToday(expIn); const isLate = diff!=null && diff<0; const cls = isLate?'danger':(diff<=1?'danger':(diff<=3?'warn':'gray')); return `<div style="margin-top:3px;"><span class="pill ${cls}">📅 ${inDateLabelFull(expIn)}</span></div>`; })() : ''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
       <td class="muted" style="font-size:11px;">${rt.outProcessedBy? escR(rt.outProcessedBy) : '-'}</td>
       <td>${(()=>{ const v=g.voltage||rt.voltage; const c=voltageColor(v); return v? `<span style="${c?`color:${c};font-weight:700;`:''}">${escR(v)}</span>` : '<span class="muted">-</span>'; })()}</td>
       <td class="wrap-ok">
@@ -3664,7 +3675,7 @@ function renderManualTab(){
       ['🔒 접속 비밀번호', '팀 공통 비밀번호를 설정·변경·해제합니다. 이 화면 자체를 여는 용도이며, 아래 "관리자 모드"는 이것과 별개인 전용 비밀번호를 사용합니다.'],
       ['📄 공용 양식 · 문서', '견적서·관리문서 같은 엑셀/워드/PDF/한글 파일을 올려두면, 팀원 누구나 다운로드해서 바로 쓸 수 있습니다. 파일 1개당 최대 5MB까지 올릴 수 있고, 이 목록은 [설정] 화면을 열 때만 따로 불러와서 앱 전체 로딩 속도에는 영향을 주지 않습니다. 다른 사람이 방금 새로 올린 파일은 자동으로 안 보일 수 있어 "🔄 목록 새로고침"으로 최신 목록을 다시 받아올 수 있습니다.'],
       ['📱 QR 코드 관리', '발전기마다 붙일 QR코드를 만드는 곳입니다. "🖨 신규 발전기 QR 인쇄 파일 만들기"는 아직 QR을 뽑은 적 없는 발전기만 골라서 인쇄용 파일을 만들어주고, 한번 뽑은 발전기는 번호가 그대로면 다음에 새 발전기를 추가로 등록해도 다시 뽑히지 않아 이미 붙여둔 QR과 계속 같은 채로 유지됩니다. 지금 몇 대가 신규 발급 대상인지도 화면에 숫자로 보여줍니다. QR을 분실·훼손해서 이미 뽑은 것까지 포함해 전부 다시 뽑아야 할 때는 "🔁 전체 다시 인쇄" 버튼을 따로 이용합니다(확인 문구가 한 번 뜹니다). 발전기 한 대씩 QR을 다시 보고 싶으면 [발전기 모델 설정] 목록의 "관리" 버튼 안 "📱 QR코드 보기"에서도 확인할 수 있습니다.'],
-      ['📥 엑셀로 불러오기', '[설정 → 관리자 모드] 안에 있는 기능입니다. 다른 곳에서 엑셀로 관리하던 데이터를 정해진 양식(시트 6개: 임대이력·정비이력·자재목록·부자재목록·정비사명단·사용자명단)에 맞춰 작성해서 올리면 한 번에 옮겨옵니다. [임대이력]에서 목록에 없는 발전기번호는 새 발전기로 자동 등록되고, 입고일까지 채워진 완료 건은 [이력 조회]에, 입고일을 비워둔(아직 반납 안 된) 건은 [출고중] 목록에 들어갑니다. [정비이력]은 부품:수량 형식으로 사용부품까지 정비이력에 반영되고, [자재목록]·[부자재목록]은 재고·규격·카테고리까지, [정비사명단]은 최대 3명, [사용자명단]은 팀원 목록에 추가됩니다. 필요 없는 시트는 비워두면 됩니다. 업로드하면 시트별로 몇 건씩 들어가는지, 형식이 안 맞아 건너뛴 행은 몇 번째 줄이고 왜 건너뛰었는지까지 먼저 보여주고 "가져오기 실행"을 눌러야 실제로 반영됩니다.'],
+      ['📥 엑셀로 불러오기', '[설정 → 관리자 모드] 안에 있는 기능입니다. "📋 엑셀 양식 다운로드" 버튼을 누르면 정해진 양식(시트 6개: 임대이력·정비이력·자재목록·부자재목록·정비사명단·사용자명단) 파일이 바로 받아지고, 그 양식에 맞춰 다른 곳에서 관리하던 데이터를 작성해서 올리면 한 번에 옮겨옵니다. [임대이력]에서 목록에 없는 발전기번호는 새 발전기로 자동 등록되고, 입고일까지 채워진 완료 건은 [이력 조회]에, 입고일을 비워둔(아직 반납 안 된) 건은 [출고중] 목록에 들어갑니다. [정비이력]은 부품:수량 형식으로 사용부품까지 정비이력에 반영되고, [자재목록]·[부자재목록]은 재고·규격·카테고리까지, [정비사명단]은 최대 3명, [사용자명단]은 팀원 목록에 추가됩니다. 필요 없는 시트는 비워두면 됩니다. 업로드하면 시트별로 몇 건씩 들어가는지, 형식이 안 맞아 건너뛴 행은 몇 번째 줄이고 왜 건너뛰었는지까지 먼저 보여주고 "가져오기 실행"을 눌러야 실제로 반영됩니다.'],
       ['전체 백업 다운로드 / 복원', '발전기·임대·정비·예약·자재·부품재고·부자재·차량종류·색상설정·팀원목록 등 모든 데이터를 파일 하나로 저장하거나, 백업 파일로 되돌립니다. (접속 비밀번호는 보안상 백업 대상에서 제외됩니다) 비밀번호 없이 누구나 바로 이용할 수 있습니다.'],
       ['📁 폴더 자동 저장', '"자동 백업 폴더 설정" 버튼으로 컴퓨터의 폴더를 한 번 지정해두면, 그 다음부터는 다운로드 버튼을 안 눌러도 앱을 열 때마다 그 폴더에 최신 백업 파일이 자동으로 저장되고, 저장되면 "OO 폴더에 자동저장되었습니다" 메시지가 잠깐 뜹니다. 파일은 지정한 그 폴더 안에 "발전기관리_자동백업_YYYY-MM-DD.json" 이름으로 날짜별로 쌓여서 저장되어, 예전 날짜 백업도 폴더 안에 그대로 남아있습니다. 자동 저장이 켜져 있으면 [전체현황]에 뜨던 "정기 백업을 아직 안 하셨어요" 리마인더 배너는 더 이상 뜨지 않습니다. 새로고침 도중 네트워크 문제로 발전기 데이터를 다 못 불러온 비정상적인 상태에서는 자동저장을 건너뛰어, 불완전한 상태로 오늘자 백업이 덮어써지는 사고를 방지합니다(다음 접속시 정상 상태면 다시 저장됩니다). 크롬·엣지·네이버 웨일 같은 크로미움 기반 브라우저에서만 되고, 사파리·파이어폭스는 지원하지 않습니다. 이 설정은 지정한 그 컴퓨터·그 브라우저에만 적용되며(다른 팀원 화면에는 영향 없음), 하루에 한 번만 저장하고, "폴더 변경"·"자동 저장 끄기"로 언제든 바꿀 수 있습니다.'],
       ['🔐 관리자 모드 (업체 정보 · 위험 구역)', '업체 정보 수정과 위험 구역(초기화) 작업은 관리자 모드 안에 있습니다. 사이트 접속 비밀번호와는 별개인 전용 관리자 비밀번호를 입력해야 열리며, 이 비밀번호는 화면에서 바꿀 수 없게 고정되어 있습니다. 열리면 5분 동안 유지되고, "지금 잠그기"를 누르거나 5분이 지나면 자동으로 다시 잠깁니다. 열린 동안에는 업체명·주소·전화번호·휴대폰 번호를 수정할 수 있고, 입고로 초기화·출고로 초기화·정비내역 초기화·부품재고 초기화·고객정보 초기화·전체 초기화 버튼도 다시 잠글 때까지 계속 이용할 수 있습니다. 되돌릴 수 없는 작업들이니 실행 전 먼저 백업을 받아두세요.'],
