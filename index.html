@@ -390,7 +390,7 @@ const TABS = [
   {id:'settings', label:'⚙️ 설정', color:'#555B6E'},
   {id:'manual', label:'📖 사용설명서', color:'#0F766E'}
 ];
-let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, customerNotes:{}, readMarkers:{}, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
+let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, customerNotes:{}, readMarkers:{}, qrIssued:{}, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
 let currentTab = 'dashboard';
 let seenNoticeIds = new Set();
 let seenEventIds = new Set();
@@ -878,6 +878,7 @@ async function saveModelColors(){ await storageSetChecked('gen-model-colors-v1',
 async function saveNotices(){ await storageSetChecked('gen-notices-v1', JSON.stringify(DB.notices), true); }
 async function saveCalendarEvents(){ await storageSetChecked('gen-calendar-events-v1', JSON.stringify(DB.calendarEvents), true); }
 async function saveGenColorOverrides(){ await storageSetChecked('gen-gen-color-overrides-v1', JSON.stringify(DB.genColorOverrides), true); }
+async function saveQrIssued(){ await storageSetChecked('gen-qr-issued-v1', JSON.stringify(DB.qrIssued), true); }
 async function saveSuppliesSizes(){ await storageSetChecked('gen-supplies-sizes-v1', JSON.stringify(DB.suppliesSizes), true); }
 async function saveSuppliesSpecs(){ await storageSetChecked('gen-supplies-specs-v1', JSON.stringify(DB.suppliesSpecs), true); }
 async function saveSuppliesCategories(){ await storageSetChecked('gen-supplies-categories-v1', JSON.stringify(DB.suppliesCategories), true); }
@@ -3533,6 +3534,15 @@ function renderManualTab(){
       ['🔴 안 읽은 글 숫자 표시', '누군가 새 공지사항·보완요청·소모품주문을 올리면, 아직 그 탭을 안 열어본 사람에게는 상단 탭 이름 옆에 빨간 숫자 배지(예: "보완요청 ①")가 뜹니다. 사람마다 따로 기록되어서, 그 탭에 들어가서 읽으면 본인 화면에서만 배지가 사라지고, 아직 안 읽은 다른 팀원 화면에는 계속 남아있습니다.']
     ])}
 
+    ${manualSection('📷','QR 스캔 (출고·입고 빠르게 처리)', true,
+      '발전기 본체에 QR코드를 붙여두면, 그 QR을 찍는 것만으로 그 발전기의 출고·입고 화면이 바로 열립니다. 화면 상단 어디서나 보이는 "📷 QR 스캔" 버튼으로 카메라를 열어 찍거나, 스마트폰 기본 카메라 앱으로 QR을 찍어 뜨는 링크를 눌러도 똑같이 동작합니다(링크를 눌러 들어오면 이름 선택 후 바로 해당 화면으로 이동합니다).', [
+      ['QR 만들기', '[설정 → QR 코드 관리]에서 만듭니다. 자세한 내용은 아래 [설정] 항목의 "📱 QR 코드 관리"를 참고해주세요.'],
+      ['출고 대기(상차대기)로 등록된 발전기를 스캔', '사무실에서 이미 입력해둔 거래처명·담당자·연락처·현장주소·전압·부자재·연료 안내가 화면에 바로 나오고, 확인 후 "상차 완료" 버튼만 누르면 됩니다. 새로 입력할 내용은 없습니다.'],
+      ['출고중인 발전기를 스캔', '입고 처리 화면이 바로 열립니다. 출고시 나갔던 부자재·전압·연료 내역이 위쪽에 요약되어 보이고, 입고일·현재 누적 사용시간·연료 측정·부자재 회수 확인만 하면 됩니다. 기존 [출고중 → 입고 처리]와 완전히 같은 화면입니다.'],
+      ['출고 대기 등록 없이 창고에 있는 발전기를 스캔', '아직 거래처 등 정보가 하나도 없는 상태라, 새로 정보를 입력하는 기존 "출고하기" 화면이 열립니다.'],
+      ['폐기·매각된 발전기를 스캔', '처리된 발전기라는 안내만 뜨고 아무 화면도 열리지 않습니다.']
+    ])}
+
     ${manualSection('🏠','전체현황', false,
       '접속하면 처음 보이는 화면으로, 전체 발전기 상태를 한눈에 요약해서 보여줍니다.', [
       ['상단 카드', '전체/입고/출고중·출고율/정비 필요/고장·수리중/미입금 출고/출고 대기 숫자. 카드를 누르면 해당 메뉴로 바로 이동합니다.'],
@@ -3641,6 +3651,7 @@ function renderManualTab(){
       '앱 전체에 적용되는 값과 데이터 관리 기능이 모여있습니다.', [
       ['🔒 접속 비밀번호', '팀 공통 비밀번호를 설정·변경·해제합니다. 이 화면 자체를 여는 용도이며, 아래 "관리자 모드"는 이것과 별개인 전용 비밀번호를 사용합니다.'],
       ['📄 공용 양식 · 문서', '견적서·관리문서 같은 엑셀/워드/PDF/한글 파일을 올려두면, 팀원 누구나 다운로드해서 바로 쓸 수 있습니다. 파일 1개당 최대 5MB까지 올릴 수 있고, 이 목록은 [설정] 화면을 열 때만 따로 불러와서 앱 전체 로딩 속도에는 영향을 주지 않습니다. 다른 사람이 방금 새로 올린 파일은 자동으로 안 보일 수 있어 "🔄 목록 새로고침"으로 최신 목록을 다시 받아올 수 있습니다.'],
+      ['📱 QR 코드 관리', '발전기마다 붙일 QR코드를 만드는 곳입니다. "🖨 신규 발전기 QR 인쇄 파일 만들기"는 아직 QR을 뽑은 적 없는 발전기만 골라서 인쇄용 파일을 만들어주고, 한번 뽑은 발전기는 번호가 그대로면 다음에 새 발전기를 추가로 등록해도 다시 뽑히지 않아 이미 붙여둔 QR과 계속 같은 채로 유지됩니다. 지금 몇 대가 신규 발급 대상인지도 화면에 숫자로 보여줍니다. QR을 분실·훼손해서 이미 뽑은 것까지 포함해 전부 다시 뽑아야 할 때는 "🔁 전체 다시 인쇄" 버튼을 따로 이용합니다(확인 문구가 한 번 뜹니다). 발전기 한 대씩 QR을 다시 보고 싶으면 [발전기 모델 설정] 목록의 "관리" 버튼 안 "📱 QR코드 보기"에서도 확인할 수 있습니다.'],
       ['전체 백업 다운로드 / 복원', '발전기·임대·정비·예약·자재·부품재고·부자재·차량종류·색상설정·팀원목록 등 모든 데이터를 파일 하나로 저장하거나, 백업 파일로 되돌립니다. (접속 비밀번호는 보안상 백업 대상에서 제외됩니다) 비밀번호 없이 누구나 바로 이용할 수 있습니다.'],
       ['📁 폴더 자동 저장', '"자동 백업 폴더 설정" 버튼으로 컴퓨터의 폴더를 한 번 지정해두면, 그 다음부터는 다운로드 버튼을 안 눌러도 앱을 열 때마다 그 폴더에 최신 백업 파일이 자동으로 저장되고, 저장되면 "OO 폴더에 자동저장되었습니다" 메시지가 잠깐 뜹니다. 파일은 지정한 그 폴더 안에 "발전기관리_자동백업_YYYY-MM-DD.json" 이름으로 날짜별로 쌓여서 저장되어, 예전 날짜 백업도 폴더 안에 그대로 남아있습니다. 자동 저장이 켜져 있으면 [전체현황]에 뜨던 "정기 백업을 아직 안 하셨어요" 리마인더 배너는 더 이상 뜨지 않습니다. 새로고침 도중 네트워크 문제로 발전기 데이터를 다 못 불러온 비정상적인 상태에서는 자동저장을 건너뛰어, 불완전한 상태로 오늘자 백업이 덮어써지는 사고를 방지합니다(다음 접속시 정상 상태면 다시 저장됩니다). 크롬·엣지·네이버 웨일 같은 크로미움 기반 브라우저에서만 되고, 사파리·파이어폭스는 지원하지 않습니다. 이 설정은 지정한 그 컴퓨터·그 브라우저에만 적용되며(다른 팀원 화면에는 영향 없음), 하루에 한 번만 저장하고, "폴더 변경"·"자동 저장 끄기"로 언제든 바꿀 수 있습니다.'],
       ['🔐 관리자 모드 (업체 정보 · 위험 구역)', '업체 정보 수정과 위험 구역(초기화) 작업은 관리자 모드 안에 있습니다. 사이트 접속 비밀번호와는 별개인 전용 관리자 비밀번호를 입력해야 열리며, 이 비밀번호는 화면에서 바꿀 수 없게 고정되어 있습니다. 열리면 5분 동안 유지되고, "지금 잠그기"를 누르거나 5분이 지나면 자동으로 다시 잠깁니다. 열린 동안에는 업체명·주소·전화번호·휴대폰 번호를 수정할 수 있고, 입고로 초기화·출고로 초기화·정비내역 초기화·부품재고 초기화·고객정보 초기화·전체 초기화 버튼도 다시 잠글 때까지 계속 이용할 수 있습니다. 되돌릴 수 없는 작업들이니 실행 전 먼저 백업을 받아두세요.'],
@@ -4124,8 +4135,10 @@ function renderSettingsTab(){
     <div class="material-card" style="margin-top:20px;">
       <div class="section-title" style="margin-top:0;">📱 QR 코드 관리</div>
       <p class="muted" style="font-size:13px;margin-top:-4px;">발전기마다 QR코드를 뽑아서 본체에 붙여두면, 현장에서 헤더의 "📷 QR 스캔" 버튼으로 QR을 찍는 것만으로 그 발전기가 바로 열립니다. 이미 사무실에서 거래처 정보를 입력해 [출고 대기]에 등록해둔 발전기는 상차자가 QR만 찍으면 내용을 확인하고 "상차완료"만 누르면 되고, 출고중인 발전기는 QR을 찍으면 바로 입고 처리 화면(현재 사용시간 입력 + 출고시 나갔던 정보 확인)이 열립니다.</p>
+      <p class="muted" style="font-size:13px;margin-top:8px;">"전체 인쇄"는 <b>아직 QR을 뽑은 적 없는 발전기만</b> 대상으로 합니다. 이미 QR을 뽑아서 본체에 붙여둔 발전기는 번호가 그대로면 QR도 계속 그대로라 다시 뽑을 필요가 없고, 새로 발전기를 등록했을 때 그 발전기만 새로 인쇄됩니다. (현재 신규 발급 대상: <b>${activeList.filter(g=>!(DB.qrIssued||{})[g.id]).length}대</b>)</p>
       <div class="btn-row">
-        <button class="btn primary" onclick="generateAllGenQrPrintFile()">🖨 전체 발전기 QR 인쇄 파일 만들기</button>
+        <button class="btn primary" onclick="generateAllGenQrPrintFile()">🖨 신규 발전기 QR 인쇄 파일 만들기</button>
+        <button class="btn" onclick="confirmReprintAllGenQr()">🔁 전체 다시 인쇄 (분실·훼손시)</button>
       </div>
       <div class="hint" style="margin-top:8px;">발전기 번호별 QR을 낱장으로 다시 보려면 [발전기 모델 설정] 목록에서 "관리" 버튼을 눌러 확인할 수 있습니다.</div>
     </div>
@@ -8463,6 +8476,7 @@ async function init(){
     ['notices', 'gen-notices-v1', [], true],
     ['calendarEvents', 'gen-calendar-events-v1', [], true],
     ['genColorOverrides', 'gen-gen-color-overrides-v1', {'S-14':'#808080'}, true],
+    ['qrIssued', 'gen-qr-issued-v1', {}, true],
     ['suppliesSizes', 'gen-supplies-sizes-v1', {}, true],
     ['suppliesSpecs', 'gen-supplies-specs-v1', {}, true],
     ['suppliesCategories', 'gen-supplies-categories-v1', {}, true],
@@ -8516,6 +8530,7 @@ async function init(){
   DB.notices = results.notices;
   DB.calendarEvents = results.calendarEvents;
   DB.genColorOverrides = results.genColorOverrides;
+  DB.qrIssued = results.qrIssued || {};
   DB.suppliesSizes = results.suppliesSizes;
   DB.suppliesSpecs = results.suppliesSpecs;
   DB.suppliesCategories = results.suppliesCategories || {};
@@ -8628,7 +8643,7 @@ async function syncFromStorage(){
   if(shouldSkipSync()) return;
   syncInFlight = true;
   try{
-    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, overuseDailyLimit, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, vehicleTypes, vehicleSuggestEnabled, genSizeDisplayEnabled, modelColors, notices, calendarEvents, genColorOverrides, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
+    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, overuseDailyLimit, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, vehicleTypes, vehicleSuggestEnabled, genSizeDisplayEnabled, modelColors, notices, calendarEvents, genColorOverrides, qrIssued, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
       peekStorage('gen-fleet-v2', DB.gens),
       peekStorage('gen-rentals-v2', DB.rentals),
       peekStorage('gen-maintenance-v2', DB.maint),
@@ -8657,6 +8672,7 @@ async function syncFromStorage(){
       peekStorage('gen-notices-v1', DB.notices),
       peekStorage('gen-calendar-events-v1', DB.calendarEvents),
       peekStorage('gen-gen-color-overrides-v1', DB.genColorOverrides),
+      peekStorage('gen-qr-issued-v1', DB.qrIssued),
       peekStorage('gen-supplies-sizes-v1', DB.suppliesSizes),
       peekStorage('gen-supplies-specs-v1', DB.suppliesSpecs),
       peekStorage('gen-supplies-categories-v1', DB.suppliesCategories),
@@ -8676,7 +8692,7 @@ async function syncFromStorage(){
       seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad).map(r=>r.id));
       DB.gens = gens; DB.rentals = rentals; DB.maint = maint; DB.reservations = reservations;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold; DB.overuseDailyLimit = overuseDailyLimit;
-      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
+      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.qrIssued = qrIssued || {}; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
       applyCompanyBranding();
       if(!shouldSkipSync()){
         renderTabbar();
@@ -8810,9 +8826,13 @@ function buildQrDataUrl(text, size){
     }, 60);
   });
 }
-async function generateAllGenQrPrintFile(){
-  const list = activeGens().sort(sortByIdNatural);
-  if(list.length===0){ showInfoModal('등록된 발전기가 없습니다.'); return; }
+async function generateAllGenQrPrintFile(forceAll){
+  const all = activeGens().sort(sortByIdNatural);
+  const list = forceAll ? all : all.filter(g=>!(DB.qrIssued||{})[g.id]);
+  if(list.length===0){
+    showInfoModal(forceAll? '등록된 발전기가 없습니다.' : '새로 QR을 뽑을 발전기가 없습니다. 이미 등록된 발전기는 전부 QR을 발급했습니다.\n\n기존 발전기 QR을 다시 인쇄해야 하면 (분실·훼손 등) [설정 → QR 코드 관리]의 "전체 다시 인쇄" 버튼을 이용해주세요.');
+    return;
+  }
   flash('QR코드를 생성하는 중입니다...');
   const cards = [];
   for(const g of list){
@@ -8825,33 +8845,50 @@ async function generateAllGenQrPrintFile(){
   const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <title>발전기 QR코드 - ${todayStr()}</title>
 <style>
-  body{font-family:'Noto Sans KR',-apple-system,sans-serif;margin:0;padding:14mm;}
+  *{box-sizing:border-box;}
+  body{font-family:'Noto Sans KR',-apple-system,sans-serif;margin:0;padding:0;}
+  .page-pad{padding:15mm;}
   .print-hint{background:#FBEDDB;border:1px solid #C97A1E;padding:8px 12px;margin-bottom:14px;font-size:13px;border-radius:6px;}
-  .qr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10mm 6mm;}
-  .qr-card{border:1px dashed #999;border-radius:6px;padding:8px 4px;text-align:center;break-inside:avoid;}
+  .qr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8mm;justify-items:center;}
+  .qr-card{width:100%;border:1px dashed #999;border-radius:6px;padding:8px 4px;text-align:center;break-inside:avoid;}
   .qr-card img{display:block;margin:0 auto 6px;}
   .qr-id{font-weight:800;font-size:22px;margin-top:2px;}
-  @page{ size:A4 portrait; margin:10mm; }
+  @page{ size:A4 portrait; margin:15mm; }
+  @media print{ .print-hint{ display:none; } .page-pad{ padding:0; } }
 </style>
 </head><body>
-<div class="print-hint">이 파일을 열면 인쇄 대화상자가 자동으로 뜹니다. 열리지 않으면 <b>Ctrl+P</b>(맥은 ⌘+P)를 눌러주세요. 인쇄 후 오려서 발전기 본체에 붙여주세요. <button onclick="window.print()">인쇄</button></div>
+<div class="page-pad">
+<div class="print-hint no-print">이 파일을 열면 인쇄 대화상자가 자동으로 뜹니다. 열리지 않으면 <b>Ctrl+P</b>(맥은 ⌘+P)를 눌러주세요. 인쇄창에서 "추가 설정 &gt; 머리글과 바닥글"을 꺼주시면 여백에 주소/날짜가 안 찍힙니다. 인쇄 후 오려서 발전기 본체에 붙여주세요. <button onclick="window.print()">인쇄</button></div>
 <div class="qr-grid">${cards.join('')}</div>
+</div>
 <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>
 </body></html>`;
   const blob = new Blob([doc], {type:'text/html;charset=utf-8;'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${todayStr()}_발전기QR코드.html`;
+  a.download = `${todayStr()}_발전기QR코드${forceAll? '_전체':'_신규'}.html`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
-  flash('QR코드 인쇄용 파일이 다운로드되었습니다.');
+  DB.qrIssued = DB.qrIssued || {};
+  list.forEach(g=>{ DB.qrIssued[g.id] = true; });
+  saveWithRetry(saveQrIssued);
+  renderContent();
+  flash(`QR코드 인쇄용 파일이 다운로드되었습니다. (${list.length}대)`);
+}
+function confirmReprintAllGenQr(){
+  openConfirmModal('이미 발급된 QR을 포함해 전체 발전기 QR을 다시 만들까요?\n\n발전기 번호가 그대로면 QR 내용은 똑같지만, 이미 본체에 붙어있는 QR이 있다면 새로 인쇄한 걸로 교체하실 필요는 없습니다. 분실·훼손된 QR만 다시 뽑고 싶다면 취소 후 [설정 → 발전기 모델 설정 → 관리]에서 그 발전기만 개별로 확인해주세요.', function(){ closeModal(); generateAllGenQrPrintFile(true); }, '전체 다시 인쇄', '취소');
 }
 async function showGenQrModal(id){
   const g = findGen(id);
   if(!g) return;
   const url = await buildQrDataUrl(genQrUrl(g.id), 220);
+  if(!(DB.qrIssued||{})[g.id]){
+    DB.qrIssued = DB.qrIssued || {};
+    DB.qrIssued[g.id] = true;
+    saveWithRetry(saveQrIssued);
+  }
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal" style="text-align:center;">
@@ -8859,7 +8896,7 @@ async function showGenQrModal(id){
       <img src="${url}" width="200" height="200" style="margin:10px auto;display:block;">
       <div class="modal-actions">
         <button class="btn" onclick="closeModal()">닫기</button>
-        <button class="btn primary" onclick="generateAllGenQrPrintFile()">전체 인쇄 파일로 받기</button>
+        <button class="btn primary" onclick="generateAllGenQrPrintFile(true)">전체 다시 인쇄 파일로 받기</button>
       </div>
     </div>
   </div>`;
