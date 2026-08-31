@@ -7966,7 +7966,7 @@ function openInModal(id){
   const baselineForModal = fuelBaselineOf(g);
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
+    <div class="modal" style="max-width:640px;">
       <h3>입고 처리</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)} · ${g.rental.customer||'-'}</div>
       ${outInfoRows.length>0? `<div class="detail-card" style="margin-bottom:14px;padding:12px 14px;">
@@ -7987,23 +7987,23 @@ function openInModal(id){
           <div class="hint" style="color:var(--danger);">고장으로 입고 처리하면 수리 완료 처리 전까지 이 발전기는 출고할 수 없습니다.</div>
         </div>
       </div>
-      <div class="field-row">
-        <div class="field"><label>입고일</label>
+      <div class="field-row" style="flex-wrap:wrap;">
+        <div class="field" style="min-width:150px;"><label>입고일</label>
           <input type="date" id="f-indate" value="${todayStr()}">
           ${dateQuickButtonsPastHtml('setInDate')}
         </div>
-        <div class="field"><label>입고시(반납) 누적 사용시간(h)</label>
-          <input type="number" id="f-endhours" value="${suggested}" min="${g.rental.startHours}">
+        <div class="field" style="min-width:180px;"><label>입고시(반납) 누적 사용시간(h)</label>
+          <input type="number" id="f-endhours" placeholder="예: ${suggested}" min="${g.rental.startHours}">
           <div class="hint">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
         </div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>전압</label>
+        <div class="field" style="min-width:150px;"><label>전압</label>
           <input type="text" id="f-in-voltage" value="${g.rental.voltage||g.voltage||''}" placeholder="예: 380V">
           ${voltageButtonsHtml('f-in-voltage')}
           <div class="hint">입고 처리시 확인·기록해두면 입고중에도 계속 표시됩니다.</div>
           ${voltageGuideGalleryHtml(g.model)}
         </div>
+      </div>
+      <div class="field-row">
         ${(rt.fuelRequested!=null || rt.fuelActual!=null) ? `
         <div class="field"><label>⛽ 측정한 연료 높이(cm)${baselineForModal>0? ` <span class="muted" style="font-weight:400;">(바닥 기준높이 ${baselineForModal}cm 위로 올라온 높이만 재서 입력)</span>`:''}</label>
           <div class="hint" style="color:var(--primary-dark);font-weight:700;margin-top:0;">출고시 연료를 넣어드린 발전기입니다. 요청 ${rt.fuelRequested!=null?rt.fuelRequested:'-'}L / 주입 ${rt.fuelActual!=null?rt.fuelActual:'-'}L — 반납된 연료를 재서 사용량을 확인해주세요.</div>
