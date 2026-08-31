@@ -390,7 +390,7 @@ const TABS = [
   {id:'settings', label:'⚙️ 설정', color:'#555B6E'},
   {id:'manual', label:'📖 사용설명서', color:'#0F766E'}
 ];
-let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, customerNotes:{}, readMarkers:{}, qrIssued:{}, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
+let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, customerNotes:{}, customerExcluded:{}, readMarkers:{}, qrIssued:{}, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
 let currentTab = 'dashboard';
 let seenNoticeIds = new Set();
 let seenEventIds = new Set();
@@ -883,6 +883,7 @@ async function saveSuppliesSizes(){ await storageSetChecked('gen-supplies-sizes-
 async function saveSuppliesSpecs(){ await storageSetChecked('gen-supplies-specs-v1', JSON.stringify(DB.suppliesSpecs), true); }
 async function saveSuppliesCategories(){ await storageSetChecked('gen-supplies-categories-v1', JSON.stringify(DB.suppliesCategories), true); }
 async function saveCustomerNotes(){ await storageSetChecked('gen-customer-notes-v1', JSON.stringify(DB.customerNotes), true); }
+async function saveCustomerExcluded(){ await storageSetChecked('gen-customer-excluded-v1', JSON.stringify(DB.customerExcluded), true); }
 async function saveReadMarkers(){ await storageSetChecked('gen-read-markers-v1', JSON.stringify(DB.readMarkers), true); }
 async function saveWarnThreshold(){ await storageSetChecked('gen-warn-threshold-v1', JSON.stringify(DB.warnThreshold), true); }
 async function saveOveruseDailyLimit(){ await storageSetChecked('gen-overuse-daily-limit-v1', JSON.stringify(DB.overuseDailyLimit), true); }
@@ -1491,7 +1492,7 @@ function renderContent(){
   if(currentTab==='materials') { renderPartsStockTable(); renderSuppliesCatalogTable(); }
   if(currentTab==='consumable-order') renderConsumableOrderTable();
   if(currentTab==='improvements') renderImprovementsList();
-  if(currentTab==='settings'){ renderTeamMembersTable(); renderVehicleTypesTable(); renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); }
+  if(currentTab==='settings'){ renderTeamMembersTable(); renderVehicleTypesTable(); renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); renderCustomerAutofillWrap(); }
   if(currentTab==='dashboard') renderRecentMaint();
   if(currentTab==='notice'){ renderNoticeList(); renderCalendar(); }
   restoreFocusState(_focus);
@@ -3652,6 +3653,7 @@ function renderManualTab(){
       ['🔒 접속 비밀번호', '팀 공통 비밀번호를 설정·변경·해제합니다. 이 화면 자체를 여는 용도이며, 아래 "관리자 모드"는 이것과 별개인 전용 비밀번호를 사용합니다.'],
       ['📄 공용 양식 · 문서', '견적서·관리문서 같은 엑셀/워드/PDF/한글 파일을 올려두면, 팀원 누구나 다운로드해서 바로 쓸 수 있습니다. 파일 1개당 최대 5MB까지 올릴 수 있고, 이 목록은 [설정] 화면을 열 때만 따로 불러와서 앱 전체 로딩 속도에는 영향을 주지 않습니다. 다른 사람이 방금 새로 올린 파일은 자동으로 안 보일 수 있어 "🔄 목록 새로고침"으로 최신 목록을 다시 받아올 수 있습니다.'],
       ['📱 QR 코드 관리', '발전기마다 붙일 QR코드를 만드는 곳입니다. "🖨 신규 발전기 QR 인쇄 파일 만들기"는 아직 QR을 뽑은 적 없는 발전기만 골라서 인쇄용 파일을 만들어주고, 한번 뽑은 발전기는 번호가 그대로면 다음에 새 발전기를 추가로 등록해도 다시 뽑히지 않아 이미 붙여둔 QR과 계속 같은 채로 유지됩니다. 지금 몇 대가 신규 발급 대상인지도 화면에 숫자로 보여줍니다. QR을 분실·훼손해서 이미 뽑은 것까지 포함해 전부 다시 뽑아야 할 때는 "🔁 전체 다시 인쇄" 버튼을 따로 이용합니다(확인 문구가 한 번 뜹니다). 발전기 한 대씩 QR을 다시 보고 싶으면 [발전기 모델 설정] 목록의 "관리" 버튼 안 "📱 QR코드 보기"에서도 확인할 수 있습니다.'],
+      ['🏢 거래처 자동입력 관리', '"출고하기"에서 거래처명을 입력할 때 담당자·연락처·주소가 자동으로 채워지는 대상 목록을 보여줍니다. "삭제"를 누르면 그 거래처는 자동입력 대상에서만 빠지고(지난 출고 이력 자체는 지워지지 않음), 밑에 "자동입력에서 뺀 거래처" 목록에서 "복구"를 누르면 다시 자동입력되게 되돌릴 수 있습니다.'],
       ['전체 백업 다운로드 / 복원', '발전기·임대·정비·예약·자재·부품재고·부자재·차량종류·색상설정·팀원목록 등 모든 데이터를 파일 하나로 저장하거나, 백업 파일로 되돌립니다. (접속 비밀번호는 보안상 백업 대상에서 제외됩니다) 비밀번호 없이 누구나 바로 이용할 수 있습니다.'],
       ['📁 폴더 자동 저장', '"자동 백업 폴더 설정" 버튼으로 컴퓨터의 폴더를 한 번 지정해두면, 그 다음부터는 다운로드 버튼을 안 눌러도 앱을 열 때마다 그 폴더에 최신 백업 파일이 자동으로 저장되고, 저장되면 "OO 폴더에 자동저장되었습니다" 메시지가 잠깐 뜹니다. 파일은 지정한 그 폴더 안에 "발전기관리_자동백업_YYYY-MM-DD.json" 이름으로 날짜별로 쌓여서 저장되어, 예전 날짜 백업도 폴더 안에 그대로 남아있습니다. 자동 저장이 켜져 있으면 [전체현황]에 뜨던 "정기 백업을 아직 안 하셨어요" 리마인더 배너는 더 이상 뜨지 않습니다. 새로고침 도중 네트워크 문제로 발전기 데이터를 다 못 불러온 비정상적인 상태에서는 자동저장을 건너뛰어, 불완전한 상태로 오늘자 백업이 덮어써지는 사고를 방지합니다(다음 접속시 정상 상태면 다시 저장됩니다). 크롬·엣지·네이버 웨일 같은 크로미움 기반 브라우저에서만 되고, 사파리·파이어폭스는 지원하지 않습니다. 이 설정은 지정한 그 컴퓨터·그 브라우저에만 적용되며(다른 팀원 화면에는 영향 없음), 하루에 한 번만 저장하고, "폴더 변경"·"자동 저장 끄기"로 언제든 바꿀 수 있습니다.'],
       ['🔐 관리자 모드 (업체 정보 · 위험 구역)', '업체 정보 수정과 위험 구역(초기화) 작업은 관리자 모드 안에 있습니다. 사이트 접속 비밀번호와는 별개인 전용 관리자 비밀번호를 입력해야 열리며, 이 비밀번호는 화면에서 바꿀 수 없게 고정되어 있습니다. 열리면 5분 동안 유지되고, "지금 잠그기"를 누르거나 5분이 지나면 자동으로 다시 잠깁니다. 열린 동안에는 업체명·주소·전화번호·휴대폰 번호를 수정할 수 있고, 입고로 초기화·출고로 초기화·정비내역 초기화·부품재고 초기화·고객정보 초기화·전체 초기화 버튼도 다시 잠글 때까지 계속 이용할 수 있습니다. 되돌릴 수 없는 작업들이니 실행 전 먼저 백업을 받아두세요.'],
@@ -4141,6 +4143,12 @@ function renderSettingsTab(){
         <button class="btn" onclick="confirmReprintAllGenQr()">🔁 전체 다시 인쇄 (분실·훼손시)</button>
       </div>
       <div class="hint" style="margin-top:8px;">발전기 번호별 QR을 낱장으로 다시 보려면 [발전기 모델 설정] 목록에서 "관리" 버튼을 눌러 확인할 수 있습니다.</div>
+    </div>
+
+    <div class="material-card" style="margin-top:20px;">
+      <div class="section-title" style="margin-top:0;">🏢 거래처 자동입력 관리</div>
+      <p class="muted" style="font-size:13px;margin-top:-4px;">"출고하기"에서 거래처명을 입력하면 예전에 거래한 담당자·연락처·주소가 자동으로 채워지는데, 그 자동입력 대상 목록입니다. 지난 출고 이력 자체를 지우는 게 아니라, 자동입력에서만 빼는(또는 다시 넣는) 기능입니다.</p>
+      <div id="customer-autofill-wrap"></div>
     </div>
 
     <div class="material-card" style="margin-top:20px;">
@@ -6395,6 +6403,7 @@ function knownCustomerRecords(){
     if(!rec || !rec.customer) return;
     const key = rec.customer.trim();
     if(!key) return;
+    if(DB.customerExcluded && DB.customerExcluded[key]) return;
     const dateKey = rec.outDate || rec.plannedOutDate || rec.createdAt || '';
     if(!map[key] || (dateKey && dateKey > (map[key].outDate||''))){
       map[key] = {customer: key, manager: rec.manager||'', phone: rec.phone||'', address: rec.address||'', site: rec.site||'', outDate: dateKey};
@@ -6404,6 +6413,49 @@ function knownCustomerRecords(){
   DB.reservations.forEach(consider);
   DB.gens.forEach(g=>{ if(g.rental) consider(g.rental); });
   return Object.values(map).sort((a,b)=>a.customer.localeCompare(b.customer,'ko'));
+}
+async function excludeCustomerAutofill(customer){
+  DB.customerExcluded = DB.customerExcluded || {};
+  DB.customerExcluded[customer] = {excludedBy: DB.currentUserName||null, excludedAt: todayStr()};
+  await saveWithRetry(saveCustomerExcluded);
+  renderContent();
+  flash(`"${customer}" 정보를 자동입력 목록에서 뺐습니다. (지난 출고 이력 자체는 그대로 남아있습니다)`);
+}
+async function restoreCustomerAutofill(customer){
+  if(DB.customerExcluded) delete DB.customerExcluded[customer];
+  await saveWithRetry(saveCustomerExcluded);
+  renderContent();
+  flash(`"${customer}" 정보를 자동입력 목록에 다시 포함했습니다.`);
+}
+function renderCustomerAutofillWrap(){
+  const wrap = document.getElementById('customer-autofill-wrap');
+  if(!wrap) return;
+  const active = knownCustomerRecords();
+  const excludedNames = Object.keys(DB.customerExcluded||{}).sort((a,b)=>a.localeCompare(b,'ko'));
+  if(active.length===0 && excludedNames.length===0){
+    wrap.innerHTML = `<div class="empty">아직 출고 이력이 없습니다.</div>`;
+    return;
+  }
+  const rows = active.map(r=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:13.5px;">${escR(r.customer)}</div>
+        <div class="muted" style="font-size:11.5px;">${escR(r.manager||'-')} · ${escR(r.phone||'-')} · ${escR(r.address||r.site||'-')}</div>
+      </div>
+      <button class="btn sm" onclick="if(confirm('\\'${r.customer.replace(/'/g,"\\'")}\\' 정보를 자동입력 대상에서 뺄까요?\\n\\n(지난 출고 이력 자체는 지워지지 않습니다)')) excludeCustomerAutofill('${r.customer.replace(/'/g,"\\'")}')">삭제</button>
+    </div>`).join('');
+  const excludedHtml = excludedNames.length>0 ? `
+    <div class="muted" style="font-size:11.5px;font-weight:700;margin:14px 0 6px;">자동입력에서 뺀 거래처</div>
+    ${excludedNames.map(name=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+      <div style="flex:1;min-width:0;font-size:13px;">${escR(name)}</div>
+      <button class="btn sm" onclick="restoreCustomerAutofill('${name.replace(/'/g,"\\'")}')">복구</button>
+    </div>`).join('')}` : '';
+  wrap.innerHTML = `
+    <div class="detail-card" style="max-height:320px;overflow-y:auto;padding:10px 14px;">
+      ${rows || '<div class="muted" style="font-size:12.5px;">자동입력 대상 거래처가 없습니다.</div>'}
+    </div>
+    ${excludedHtml}`;
 }
 function onCustomerNameInput(){
   const el = document.getElementById('f-site');
@@ -6471,7 +6523,7 @@ function openOutInfoEditModal(id){
         </select></div>
       </div>
       <div class="field"><label>거래처명</label>
-        <input type="text" id="f-oie-site" list="customer-datalist" value="${(rt.site||rt.customer||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" onchange="onCustomerNameInputOie()">
+        <input type="text" id="f-oie-site" list="customer-datalist" value="${(rt.site||rt.customer||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onCustomerNameInputOie()">
         <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
         <div id="f-oie-site-warning">${customerWarningHtml(rt.site||rt.customer||'')}</div>
       </div>
@@ -6723,7 +6775,7 @@ function openOutModal(id, reservationId){
         </select></div>
       </div>
       <div class="field"><label>거래처명</label>
-        <input type="text" id="f-site" list="customer-datalist" value="${(res&&(res.site||res.customer)||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" onchange="onCustomerNameInput()">
+        <input type="text" id="f-site" list="customer-datalist" value="${(res&&(res.site||res.customer)||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onCustomerNameInput()">
         <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
         <div class="hint">이전에 거래한 업체명을 선택하면 담당자·연락처·주소가 자동으로 채워집니다.</div>
         <div id="f-site-warning">${customerWarningHtml((res&&(res.site||res.customer))||'')}</div>
@@ -7099,7 +7151,7 @@ function openBulkOutModal(){
         </select></div>
       </div>
       <div class="field"><label>거래처명</label>
-        <input type="text" id="fb-site" list="customer-datalist" placeholder="예: 00건설" onchange="onBulkCustomerNameInput()">
+        <input type="text" id="fb-site" list="customer-datalist" placeholder="예: 00건설" oninput="onBulkCustomerNameInput()">
         <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
         <div class="hint">이전에 거래한 업체명을 선택하면 담당자·연락처·주소가 자동으로 채워집니다.</div>
       </div>
@@ -8553,6 +8605,7 @@ async function init(){
     ['suppliesSpecs', 'gen-supplies-specs-v1', {}, true],
     ['suppliesCategories', 'gen-supplies-categories-v1', {}, true],
     ['customerNotes', 'gen-customer-notes-v1', {}, true],
+    ['customerExcluded', 'gen-customer-excluded-v1', {}, true],
     ['readMarkers', 'gen-read-markers-v1', {}, true],
     ['palletDefaultRemoved', 'gen-pallet-default-removed-v1', false, true],
     ['companyInfo', 'gen-company-info-v1', {name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}, true],
@@ -8607,6 +8660,7 @@ async function init(){
   DB.suppliesSpecs = results.suppliesSpecs;
   DB.suppliesCategories = results.suppliesCategories || {};
   DB.customerNotes = results.customerNotes || {};
+  DB.customerExcluded = results.customerExcluded || {};
   DB.readMarkers = results.readMarkers || {};
   DB.companyInfo = results.companyInfo && results.companyInfo.name ? results.companyInfo : {name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'};
   if(!results.palletDefaultRemoved && (DB.suppliesCatalog||[]).includes('깔판')){
@@ -8715,7 +8769,7 @@ async function syncFromStorage(){
   if(shouldSkipSync()) return;
   syncInFlight = true;
   try{
-    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, overuseDailyLimit, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, vehicleTypes, vehicleSuggestEnabled, genSizeDisplayEnabled, modelColors, notices, calendarEvents, genColorOverrides, qrIssued, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
+    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, overuseDailyLimit, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, vehicleTypes, vehicleSuggestEnabled, genSizeDisplayEnabled, modelColors, notices, calendarEvents, genColorOverrides, qrIssued, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, customerExcluded, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
       peekStorage('gen-fleet-v2', DB.gens),
       peekStorage('gen-rentals-v2', DB.rentals),
       peekStorage('gen-maintenance-v2', DB.maint),
@@ -8749,12 +8803,13 @@ async function syncFromStorage(){
       peekStorage('gen-supplies-specs-v1', DB.suppliesSpecs),
       peekStorage('gen-supplies-categories-v1', DB.suppliesCategories),
       peekStorage('gen-customer-notes-v1', DB.customerNotes),
+      peekStorage('gen-customer-excluded-v1', DB.customerExcluded),
       peekStorage('gen-read-markers-v1', DB.readMarkers),
       peekStorage('gen-company-info-v1', DB.companyInfo),
       peekStorage('gen-last-backup-date-v1', DB.lastBackupDate)
     ]);
-    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,overuseDailyLimit:DB.overuseDailyLimit,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,vehicleTypes:DB.vehicleTypes,vehicleSuggestEnabled:DB.vehicleSuggestEnabled,genSizeDisplayEnabled:DB.genSizeDisplayEnabled,modelColors:DB.modelColors,notices:DB.notices,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
-    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,overuseDailyLimit,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,vehicleTypes,vehicleSuggestEnabled,genSizeDisplayEnabled,modelColors,notices,calendarEvents,genColorOverrides,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate});
+    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,overuseDailyLimit:DB.overuseDailyLimit,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,vehicleTypes:DB.vehicleTypes,vehicleSuggestEnabled:DB.vehicleSuggestEnabled,genSizeDisplayEnabled:DB.genSizeDisplayEnabled,modelColors:DB.modelColors,notices:DB.notices,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,customerExcluded:DB.customerExcluded,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
+    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,overuseDailyLimit,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,vehicleTypes,vehicleSuggestEnabled,genSizeDisplayEnabled,modelColors,notices,calendarEvents,genColorOverrides,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,customerExcluded,readMarkers,companyInfo,lastBackupDate});
     if(before !== after){
       const newNotices = (notices||[]).filter(n=>n && !seenNoticeIds.has(n.id) && n.authorBy!==DB.currentUserName);
       const newEvents = (calendarEvents||[]).filter(e=>e && !seenEventIds.has(e.id) && e.authorBy!==DB.currentUserName);
@@ -8764,7 +8819,7 @@ async function syncFromStorage(){
       seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad).map(r=>r.id));
       DB.gens = gens; DB.rentals = rentals; DB.maint = maint; DB.reservations = reservations;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold; DB.overuseDailyLimit = overuseDailyLimit;
-      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.qrIssued = qrIssued || {}; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
+      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.qrIssued = qrIssued || {}; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.customerExcluded = customerExcluded || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
       applyCompanyBranding();
       if(!shouldSkipSync()){
         renderTabbar();
