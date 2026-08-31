@@ -940,6 +940,12 @@ function endSaving(){
 }
 
 function findGen(id){ return DB.gens.find(g=>g.id===id); }
+// 누적시간 상태: 'known'(확인됨) / 'na'(해당없음 - 구형이라 계기 자체가 없음) / 'unknown'(미확인 - 아직 값 미입력)
+function hoursStatus(g){
+  if(g.hoursKnown) return 'known';
+  if(g.hoursNA) return 'na';
+  return 'unknown';
+}
 function modelColorDot(model){
   const c = model && DB.modelColors ? DB.modelColors[model] : null;
   if(!c) return '';
@@ -1613,7 +1619,7 @@ function renderDashboard(){
   const recentIn = [...DB.rentals].filter(r=>r.inDate).sort((a,b)=>((b.inProcessedAt||b.inDate||'')).localeCompare((a.inProcessedAt||a.inDate||''))).slice(0,5);
   const recentInRows = recentIn.map(r=>{
     const g = findGen(r.genId);
-    const given = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+    const given = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     let fuelCell = '<span class="muted">-</span>';
     if(given!=null){
       if(r.measuredFuelHeightCm==null){
@@ -1767,7 +1773,7 @@ function renderDashboard(){
     </div>
     ${recentIn.length===0? `<div class="empty">최근 입고 처리한 발전기가 없습니다.</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th>입고 처리 시각</th><th>현재전압</th><th>처리자</th><th>거래처</th><th>지역</th><th>연료체크</th></tr></thead>
+      <thead><tr><th>번호</th><th>모델</th><th>입고 처리 시각</th><th>셋팅전압</th><th>처리자</th><th>거래처</th><th>지역</th><th>연료체크</th></tr></thead>
       <tbody>${recentInRows}</tbody>
     </table></div>`}
 
@@ -1963,11 +1969,11 @@ function renderInList(){
       <td class="wrap-ok">${displayModel(g)}${isPendingOut? ` <span class="pill warn">출고대기</span>`:''}${isBroken? `<div class="muted" style="font-size:11px;color:var(--danger);font-weight:700;">⚠ 고장: ${escR(g.repairNote||'-')}${g.repairPhoto? ` <img src="${g.repairPhoto}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;cursor:pointer;" onclick="openImageViewModal('${g.repairPhoto}','고장 사진')">`:''}</div>`:''}</td>
       <td>${voltagePillHtml(g.id, g.voltage)}</td>
       <td>${usableCapacityCell(g)}</td>
-      <td class="muted"><span style="cursor:pointer;text-decoration:underline dotted;" onclick="openCheckHoursModal('${g.id}')" title="클릭해서 누적시간 수정">${g.hoursKnown? (g.hours||0).toLocaleString()+'h' : (g.hoursNA? '해당없음' : '미확인')} ✏️</span></td>
+      <td class="muted">${hoursStatus(g)==='known'? `${(g.hours||0).toLocaleString()}h <span style="font-size:11px;">(정비: ${(g.lastMaintHours||0).toLocaleString()}h)</span>` : (hoursStatus(g)==='na'? '해당없음' : '미확인')}</td>
       <td class="muted" style="font-size:11px;">${fuelRec && fuelRec.inProcessedBy? escR(fuelRec.inProcessedBy) : '-'}</td>
       <td style="font-size:12.5px;">${fuelCell}</td>
       <td>${g.hoursKnown? gaugeHtml(el,r,getCycle(g)) : '<span class="muted" style="font-size:12px;">누적시간 확인할 수 없음</span>'}</td>
-      <td>${isBroken? '<span class="pill danger">수리중</span> ' : ''}${g.hoursKnown? pillHtml(maintStatus(r)) : (g.hoursNA? '<span class="pill gray">해당없음</span>' : `<button class="btn sm" onclick="openCheckHoursModal('${g.id}')">확인 필요</button>`)}</td>
+      <td>${isBroken? '<span class="pill danger">수리중</span> ' : ''}${hoursStatus(g)==='known'? pillHtml(maintStatus(r)) : (hoursStatus(g)==='na'? '<span class="pill gray">해당없음</span>' : '<span class="pill gray">확인 필요 (정비관리에서 입력)</span>')}</td>
       <td><div class="btn-row" style="flex-wrap:nowrap;">
         ${isBroken
           ? `<button class="btn sm danger" onclick="openMaintModal('${g.id}', null, true)" style="white-space:nowrap;">수리 완료 처리</button>`
@@ -2005,7 +2011,7 @@ function renderInList(){
     <div id="bulk-out-bar">${bulkOutBarHtml()}</div>
     ${list.length===0? `<div class="empty">${inCapacityFilter!=null? `${inCapacityFilter}kW 용량의 입고중인 발전기가 없습니다.` : '입고중인 발전기가 없습니다.'}</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th style="width:30px;"><input type="checkbox" onchange="toggleSelectAllBulkOut(this)" title="전체 선택"></th><th>번호</th><th>모델</th><th>현재전압</th><th>사용가능 용량</th><th>누적시간</th><th>입고처리</th><th>남은연료</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
+      <thead><tr><th style="width:30px;"><input type="checkbox" onchange="toggleSelectAllBulkOut(this)" title="전체 선택"></th><th>번호</th><th>모델</th><th>셋팅전압</th><th>사용가능 용량</th><th>누적시간</th><th>입고처리</th><th>남은연료</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`}
   `;
@@ -2362,6 +2368,7 @@ function openAdjustModal(id){
       <div class="modal-sub">${g.id} · 오류 수정, 임의 조정 등에 사용하세요.</div>
       ${g.hoursUpdatedAt? `<div class="hint" style="background:var(--warn-tint);border:1px solid var(--warn);border-radius:8px;padding:8px 10px;margin-bottom:12px;color:var(--warn);font-weight:700;">⏱ 마지막 수정: ${escR(g.hoursUpdatedAt)}${g.hoursUpdatedBy? ` (${escR(g.hoursUpdatedBy)})`:''}</div>` : ''}
       <div class="field"><label>모델</label><input type="text" id="f-adj-model" value="${(g.model||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field"><label>셋팅 전압</label><input type="text" id="f-adj-voltage" value="${(g.voltage||'').replace(/"/g,'&quot;')}" placeholder="예: 380V">${voltageButtonsHtml('f-adj-voltage')}</div>
       <div class="field chk"><input type="checkbox" id="f-adj-unknown" ${g.hoursKnown? '' : 'checked'} onchange="toggleAdjUnknown()"><label for="f-adj-unknown">누적시간 확인할 수 없음 (남은 정비시간·정비도래일이 화면에 표시되지 않습니다)</label></div>
       <div id="f-adj-fields" style="${g.hoursKnown? '' : 'display:none;'}">
         <div class="field-row">
@@ -2389,10 +2396,13 @@ function toggleAdjUnknown(){
 async function submitAdjust(id){
   const g = findGen(id);
   const model = document.getElementById('f-adj-model').value.trim();
+  const oldVoltage = g.voltage||'';
+  const voltage = document.getElementById('f-adj-voltage').value.trim();
   const unknown = document.getElementById('f-adj-unknown').checked;
   const fuelBaselineHeight = Number(document.getElementById('f-adj-fuelbaseline').value)||null;
   const errEl = document.getElementById('f-err');
   g.model = model;
+  g.voltage = voltage;
   g.fuelBaselineHeight = fuelBaselineHeight;
   if(unknown){
     g.hoursKnown = false;
@@ -2404,6 +2414,9 @@ async function submitAdjust(id){
     if(isNaN(hours) || hours<0 || isNaN(lastMaint) || lastMaint<0){
       errEl.textContent='숫자를 정확히 입력해주세요.'; errEl.style.display='block'; return;
     }
+    if(lastMaint>hours){
+      errEl.textContent='마지막 정비시 누적시간은 현재 누적시간보다 클 수 없습니다.'; errEl.style.display='block'; return;
+    }
     g.hours = hours;
     g.lastMaintHours = lastMaint;
     g.lastMaintDate = lastMaintDate;
@@ -2412,6 +2425,11 @@ async function submitAdjust(id){
   }
   g.hoursUpdatedAt = nowDateTimeStr();
   g.hoursUpdatedBy = DB.currentUserName || null;
+  if(voltage !== oldVoltage.trim()){
+    g.voltageUpdatedAt = nowDateTimeStr();
+    g.voltageUpdatedAtMs = Date.now();
+    g.voltageUpdatedBy = DB.currentUserName || null;
+  }
   await saveGens();
   closeModal();
   renderContent();
@@ -2458,6 +2476,8 @@ function recomputeLastMaint(genId){
   g.lastMaintHours = maxHours;
   if((g.hours||0) < maxHours) g.hours = maxHours;
   g.hoursKnown = true;
+  g.hoursUpdatedAt = nowDateTimeStr();
+  g.hoursUpdatedBy = DB.currentUserName || null;
   const atMax = recs.filter(r=>(r.hours||0)===maxHours).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   if(atMax.length>0 && atMax[0].date) g.lastMaintDate = atMax[0].date;
 }
@@ -2535,7 +2555,7 @@ function openCustomerNotesModal(customer){
   };
   const cardHtml = r=>{
     const g = findGen(r.genId);
-    const fuel = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+    const fuel = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     const overuse = r.status==='완료' && isRentalOveruse(r);
     const period = r.status==='완료'
       ? `${dow(r.outDate)||'-'} ~ ${dow(r.inDate)||'-'} (${rentalDays(r)||'-'}일, 사용 ${(r.usedHours||0).toLocaleString()}h)`
@@ -2633,7 +2653,7 @@ function downloadCustomerHistoryPrintFile(customer){
   if(rentals.length===0){ showInfoModal('인쇄할 임대 이력이 없습니다.'); return; }
   const cards = rentals.map(r=>{
     const g = findGen(r.genId);
-    const fuel = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+    const fuel = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     const overuse = r.status==='완료' && isRentalOveruse(r);
     const period = r.status==='완료'
       ? `${dow(r.outDate)||'-'} ~ ${dow(r.inDate)||'-'} (${rentalDays(r)||'-'}일, 사용 ${(r.usedHours||0).toLocaleString()}h)`
@@ -3213,7 +3233,7 @@ function renderGenHistory(){
         </div>
       </div>
       <div class="detail-grid">
-        <div class="item"><div class="k">누적 사용시간</div><div class="v">${g.hoursKnown? (g.hours||0).toLocaleString()+'h' : '미확인'}</div></div>
+        <div class="item"><div class="k">누적 사용시간</div><div class="v">${hoursStatus(g)==='known'? (g.hours||0).toLocaleString()+'h' : (hoursStatus(g)==='na'? '해당없음' : '미확인')}</div></div>
         <div class="item"><div class="k">마지막 정비시점</div><div class="v">${g.hoursKnown? (g.lastMaintHours||0).toLocaleString()+'h' : '-'}</div></div>
         <div class="item"><div class="k">정비 후 경과</div><div class="v">${el!==null? Math.round(el).toLocaleString()+'h' : '확인불가'}</div></div>
         <div class="item"><div class="k">정비 주기</div><div class="v" style="${getCycle(g)!==DEFAULT_CYCLE? 'color:var(--danger);':''}">${getCycle(g).toLocaleString()}h${getCycle(g)!==DEFAULT_CYCLE? ` <span style="font-size:11px;font-weight:400;">(기본값 ${DEFAULT_CYCLE}h 아님)</span>`:''}</div></div>
@@ -3230,7 +3250,7 @@ function renderGenHistory(){
         <td>${dow(r.outDate)||'-'}</td>
         <td>${dow(r.inDate)||'-'}</td>
         <td class="wrap-ok">${r.customer||'-'}${(r.manager||r.phone)? `<div class="muted" style="font-size:11px;">${[r.manager,r.phone].filter(Boolean).join(' · ')}</div>`:''}</td>
-        <td class="wrap-ok">${[r.site,r.address].filter(Boolean).join(' · ')||'-'}${r.supplies? `<div class="muted" style="font-size:11px;">부자재(출고): ${r.supplies}</div>`:''}${r.supplies? `<div class="muted" style="font-size:11px;">부자재 회수: ${r.suppliesRecovered? '<span class="pill ok">회수됨</span>' : `<span class="pill danger">회수안됨</span>${r.suppliesNote? ` - ${r.suppliesNote}`:''}`}</div>`:''}${r.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${r.fuelRequested}L${r.fuelActual && r.fuelActual!==r.fuelRequested? ` (실제주입 ${r.fuelActual}L)`:''}</div>`:''}${r.measuredFuelHeightCm!=null? `<div class="muted" style="font-size:11px;">반납시 연료: ${(()=>{ const L=computeFuelLiters(g, r.measuredFuelHeightCm); return L!=null? `약 ${L}L ` : ''; })()}(측정높이 ${r.measuredFuelHeightCm}cm)</div>`:''}${(()=>{ const given = r.fuelActual!=null? r.fuelActual : r.fuelRequested; const remain = r.measuredFuelHeightCm!=null? computeFuelLiters(g, r.measuredFuelHeightCm) : null; if(given==null || remain==null) return ''; const used = Math.round((given-remain)*10)/10; return `<div class="muted" style="font-size:11px;font-weight:700;color:var(--primary-dark);">⛽ ${given}L 중 ${remain}L 남아서 반납 → 사용량 약 ${used}L</div>`; })()}${(r.loadDate||r.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(r.loadDate),r.arriveTime].filter(Boolean).join(' · ')}</div>`:''}${r.freightBearer? `<div class="muted" style="font-size:11px;">운임료: ${r.freightBearer}</div>`:''}${r.note? `<div class="muted" style="font-size:11px;">비고: ${r.note}</div>`:''}${(r.outProcessedBy||r.inProcessedBy)? `<div class="muted" style="font-size:11px;">${[r.outProcessedBy? `출고: ${escR(r.outProcessedBy)}`:null, r.inProcessedBy? `입고: ${escR(r.inProcessedBy)}`:null].filter(Boolean).join(' · ')}</div>`:''}</td>
+        <td class="wrap-ok">${[r.site,r.address].filter(Boolean).join(' · ')||'-'}${r.supplies? `<div class="muted" style="font-size:11px;">부자재(출고): ${r.supplies}</div>`:''}${r.supplies? `<div class="muted" style="font-size:11px;">부자재 회수: ${r.suppliesRecovered? '<span class="pill ok">회수됨</span>' : `<span class="pill danger">회수안됨</span>${r.suppliesNote? ` - ${r.suppliesNote}`:''}`}</div>`:''}${r.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${r.fuelRequested}L${r.fuelActual && r.fuelActual!==r.fuelRequested? ` (실제주입 ${r.fuelActual}L)`:''}</div>`:''}${r.measuredFuelHeightCm!=null? `<div class="muted" style="font-size:11px;">반납시 연료: ${(()=>{ const L=computeFuelLiters(g, r.measuredFuelHeightCm); return L!=null? `약 ${L}L ` : ''; })()}(측정높이 ${r.measuredFuelHeightCm}cm)</div>`:''}${(()=>{ const given = r.fuelRequested!=null? r.fuelRequested : r.fuelActual; const remain = r.measuredFuelHeightCm!=null? computeFuelLiters(g, r.measuredFuelHeightCm) : null; if(given==null || remain==null) return ''; const used = Math.round((given-remain)*10)/10; return `<div class="muted" style="font-size:11px;font-weight:700;color:var(--primary-dark);">⛽ ${given}L 중 ${remain}L 남아서 반납 → 사용량 약 ${used}L</div>`; })()}${(r.loadDate||r.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(r.loadDate),r.arriveTime].filter(Boolean).join(' · ')}</div>`:''}${r.freightBearer? `<div class="muted" style="font-size:11px;">운임료: ${r.freightBearer}</div>`:''}${r.note? `<div class="muted" style="font-size:11px;">비고: ${r.note}</div>`:''}${(r.outProcessedBy||r.inProcessedBy)? `<div class="muted" style="font-size:11px;">${[r.outProcessedBy? `출고: ${escR(r.outProcessedBy)}`:null, r.inProcessedBy? `입고: ${escR(r.inProcessedBy)}`:null].filter(Boolean).join(' · ')}</div>`:''}</td>
         <td class="muted">${(r.usedHours||0).toLocaleString()}h${isRentalOveruse(r)? `<div><span class="pill danger" title="일평균 ${rentalAvgDaily(r).toFixed(1)}h/일 (하루 ${overuseLimit()}시간 초과)">🚨 과다사용</span></div>`:''}</td>
         <td>${r.longTerm?'<span class="pill gray">장기</span>':'<span class="pill gray">단기</span>'}</td>
         <td><button class="btn sm danger" onclick="deleteRental('${r.id}','${id}')">삭제</button></td>
@@ -3546,8 +3566,7 @@ function renderManualTab(){
 
     ${manualSection('📥','입고', false,
       '현재 창고에 있는(입고 상태) 발전기 목록입니다.', [
-      ['확인 필요', '누적 사용시간이 아직 등록 안 된 발전기에 표시되는 버튼입니다. 눌러서 최초 시간을 입력하세요. 정말 모르는 발전기는 창 위쪽의 "누적시간 확인할 수 없음" 체크박스를 눌러두면, "확인 필요" 버튼 대신 "해당없음"으로 표시되고 남은 정비시간·정비도래일도 화면에 나오지 않습니다. 체크를 다시 해제하고 값을 입력하면 정상적으로 되돌아옵니다.'],
-      ['누적시간 수정', '목록의 "누적시간" 칸(✏️ 표시)을 클릭하면 바로 수정 모달이 뜹니다. 이미 값이 있어도 클릭해서 언제든 고칠 수 있습니다. 마지막 정비시 누적시간을 현재 누적시간과 같은 값으로 입력해두면 "과다사용/정비필요"로 잘못 표시되지 않습니다.'],
+      ['누적시간 표시 (보기 전용)', '목록에 "누적시간(정비: OOh)" 형태로 표시만 됩니다. 값을 아직 등록 안 했으면 "미확인", 구형이라 계기 자체가 없으면 "해당없음"으로 표시됩니다. 이 화면에서는 수정할 수 없고, 값을 입력·수정하려면 [정비 관리 → 직접수정]을 이용해주세요.'],
       ['🖨 인쇄', '"입고 발전기" 제목 옆 인쇄 버튼으로, 현재 필터된 입고 목록(번호·모델·전압·누적시간·정비상태)을 가로(landscape) 방향 인쇄용 파일로 받을 수 있습니다.'],
       ['용량별 보기', '목록 위에 자동으로 생기는 용량(kW) 버튼을 누르면 그 용량의 발전기만 걸러서 봅니다. "전체" 버튼으로 다시 전체 목록으로 돌아갑니다.'],
       ['출고하기', '이 발전기를 바로 출고 처리합니다(거래처·현장 정보 입력). 맨 위에서 출고시 누적 사용시간을 먼저 입력합니다.'],
@@ -3567,7 +3586,7 @@ function renderManualTab(){
       ['출고하기', '상차대기가 아닌 일반 예약 건을 실제 출고 처리합니다.'],
       ['출고 취소 / 예약 취소', '해당 건을 취소하고 목록에서 제거합니다.'],
       ['입금 확인', '🚨 미입금 출고로 등록된 건에서, 입금이 확인되면 눌러서 표시를 해제합니다.'],
-      ['전압변경 표시', '출고 전압이 발전기 기존 전압과 다르면 빨간 글씨로 뜹니다. 클릭하면 그 모델의 전압 설정 방법 목록이 뜨고, "220V (2장)"처럼 나오는 글자를 클릭하면 사진을 크게 볼 수 있습니다.'],
+      ['전압변경 표시', '출고 전압이 발전기 기존 셋팅전압과 다르면 빨간 글씨로 뜹니다. 글씨를 클릭하면 그 모델의 전압 설정 방법 사진을 볼 수 있고, 그 아래 "✓ 설정완료" 버튼을 누르면 발전기에서 실제로 전압을 바꾸셨는지 확인한 뒤 셋팅전압이 업데이트되고 정비이력에도 자동으로 기록됩니다.'],
       ['부자재확인', '출고시 선택한 부자재 목록만 간단히 팝업으로 보여줍니다 (비고확인과 같은 형식 — 내용만 표시, 닫기 버튼만 있음). 부자재가 없으면 "부자재없음"으로 표시됩니다.'],
       ['비고확인', '출고하기에서 비고란에 내용을 적어두면 부자재확인 버튼 바로 아래에 파란색 버튼으로 "비고확인"이 뜹니다 (부자재확인과 같은 크기·모양). 클릭하면 비고 내용만 바로 보여줍니다. 비고가 없으면 표시되지 않습니다.'],
       ['📥 상차·입고 예정 안내 팝업', '이름을 선택해 접속(로그인)할 때마다 오늘/내일 상차할 목록과 오늘/내일 입고예정 목록을 함께 팝업으로 보여줍니다 (모든 사용자, 접속할 때마다 매번). 오늘·내일 상차·입고가 전부 없으면 팝업 자체가 뜨지 않습니다. 또한 다른 사람이 출고하기에서 상차대기 건을 새로 등록하면, 약 2분 이내에 등록한 사람을 제외한 나머지 팀원들에게 이 팝업이 자동으로 뜹니다 (등록한 사람 본인에게는 뜨지 않습니다). 팝업 안 상차 내용은 [출고대기] 탭, 입고예정 내용은 [출고중] 탭과 동일하며 누구나 볼 수 있습니다.']
@@ -3589,7 +3608,7 @@ function renderManualTab(){
       '정비 이력 등록·조회와 정비 주기 현황을 관리합니다.', [
       ['정비 등록', '사용 부품을 체크만 하면 정비 등록시 그 부품 재고가 자동으로 차감됩니다. "정비 내용"에서 필터 교체를 체크하면 해당 부품이 자동으로 같이 선택됩니다. 팬벨트교체·출력단자체결상태·누전차단기볼트교체·배터리터미널조임상태·팬청소 항목도 체크할 수 있습니다. 사진은 파일 선택창에서 여러 장을 한 번에 골라 최대 5장까지 등록할 수 있고, 미리보기에서 사진별로 삭제(✕)도 가능합니다.'],
       ['이력조회', '해당 발전기의 [이력 조회] 탭으로 이동합니다.'],
-      ['직접수정', '누적시간, 마지막 정비시점 등을 직접 조정합니다.'],
+      ['직접수정', '모델·셋팅 전압·누적시간·마지막 정비시점·마지막 정비일자·연료통 기준높이를 직접 입력·조정하는 곳입니다. 발전기를 처음 등록할 때도 여기서 초기값을 넣고, 데이터 오류 수정도 여기서 합니다. 마지막 정비시 누적시간이 현재 누적시간보다 크면 저장되지 않습니다. 여기서 값을 고치면 정비이력에는 남기지 않고 조용히 반영됩니다 — 실제 현장에서 전압을 바꾼 경우는 [입고] 목록 전압 클릭이나 출고/입고 처리 화면을 이용하면 정비이력에 자동으로 기록됩니다.'],
       ['정비주기', '기본 350시간인 정비 주기를 발전기 개별로 다르게 설정합니다.'],
       ['모델별 정비 이력', '모델을 선택하면 그 모델을 쓴 발전기들의 정비 기록만 모아서 봅니다.'],
       ['장기임대 정비 준비 리스트', '장기임대 발전기를 정비 임박 순으로 모아, 거래처·현장과 함께 방문시 챙길 자재(엔진오일량·필터 품명/규격)까지 보여줍니다. 🖨 인쇄 버튼으로 체크리스트를 뽑을 수 있습니다.']
@@ -3677,7 +3696,7 @@ function renderManualTab(){
       ['🔧 부품 최소재고 자동 발주 알림', '[자재 관리 → 부품 재고]에서 부품마다 "최소재고"를 정해두면, 실제 재고가 그 아래로 떨어질 때 전체현황 상단에 빨간 배너로 자동 표시됩니다. 배너를 누르면 부족한 부품 목록으로 이동하고, 거기서 🖨 인쇄로 발주서를 뽑을 수 있습니다.'],
       ['📦 오늘 백업 안 하면 자동 리마인더', '월요일·목요일 중 아직 전체 백업을 한 번도 안 받았으면 [전체현황] 맨 위에 "정기 백업을 아직 안 하셨어요" 배너가 자동으로 뜹니다. 그날 한 번이라도 백업을 받으면 그날은 다시 안 뜹니다. [설정 → 폴더 자동 저장]이 켜져 있으면 이미 자동으로 백업되고 있다는 뜻이라 이 배너 자체가 뜨지 않습니다.'],
       ['⛽ 연료통 기준높이 자동 반영', '탱크가 완전히 비어도 항상 남아있어서 절대 빼서 쓸 수 없는 기름 높이(발전기마다 다름)를 모델 기본값은 [발전기 모델 설정 → 연료탱크 규격]에서, 개별 발전기는 [설정 → 발전기별 탱크 규격 · 기준높이]에서 번호로 찾아 등록해두면, 입고 처리시 그 기준높이 위로 올라온 높이만 재서 입력해도 됩니다. 계산되는 "남은 연료량"은 이 기준높이 부분(항상 남아있어 고객이 실제로 쓸 수 없는 양)을 자동으로 빼고, 측정한 높이만큼만 반영합니다.'],
-      ['⛽ 연료 체크 필요 표시 · 사용량 자동 계산', '출고할 때 "⛽ 연료넣고 출고하기" 체크박스를 켜야 고객요청/실제주입 입력칸이 나타납니다. 체크한 발전기에만 [출고중] 목록에 "⛽ 기름체크 필요" 표시가 뜨고, 입고 처리 화면에도 연료 높이 측정칸이 나타납니다. 체크하지 않은 출고는 확인이 필요 없다는 안내만 뜨고 측정칸 자체가 생략됩니다. 입고 처리시 연료 높이를 재서 입력하면, 임대 이력에 "OOL 중 OOL 남아서 반납 → 사용량 약 OOL"이 자동으로 기록됩니다.'],
+      ['⛽ 연료 체크 필요 표시 · 사용량 자동 계산', '출고할 때 "⛽ 연료넣고 출고하기" 체크박스를 켜야 고객요청/실제주입 입력칸이 나타납니다. 체크한 발전기에만 [출고중] 목록에 "⛽ 기름체크 필요" 표시가 뜨고, 입고 처리 화면에도 연료 높이 측정칸이 나타납니다. 높이를 입력하는 즉시 그 자리에서 남은 연료량이 계산되어 표시되고, 임대 이력에는 "OOL 중 OOL 남아서 반납 → 사용량 약 OOL"이 자동으로 기록됩니다. 이 계산은 고객요청량이 있으면 항상 고객요청량을 기준으로 합니다(예: 요청 40L·실제주입 30L이어도 계산은 40L 기준). 측정 높이에 0을 입력하면 "출고시 연료 모두 소진되어 입고"로 표시되고 비고에도 자동으로 남으며, 기준높이보다 낮게(최대 -5cm까지) 측정되면 "-OL 더 사용"으로 초과사용량이 표시됩니다. 확인이 끝난 뒤 [입고] 목록에서 "초기화" 버튼을 누르면 화면 표시만 초기화되어 다음 출고 준비 완료 상태가 되고, 측정 기록 자체는 이력에 그대로 남습니다.'],
       ['입고 목록 연료 "초기화" 버튼', '입고 목록의 연료 칸에 뜬 값 옆 "초기화" 버튼은, 실제로 탱크의 기름을 기준점까지 다시 빼낸 뒤 눌러주는 용도입니다. 누르면 화면에 표시되던 지난 연료량이 사라지고(이력 기록 자체는 그대로 남습니다) 다음 출고를 위한 준비가 끝났다는 뜻이 됩니다.'],
       ['🕐 마지막 수정 시각 표시', '누적 사용시간을 수정(누적시간 수정 · 정보 직접 수정)하면, 다음에 그 화면을 다시 열 때 "마지막 수정: 날짜 시간 (수정한 사람)"이 노란 알림으로 표시되어 언제 누가 마지막으로 고쳤는지 바로 알 수 있습니다.'],
       ['전압 수정 팝업 개선', '[입고] 목록에서 전압을 클릭하면 뜨는 팝업에 "셋팅 전압" 라벨 옆으로 마지막으로 수정한 날짜·시간·수정자가 함께 표시됩니다. 24시간 이내에 이미 전압을 바꾼 발전기를 또 바꾸려고 하면 "이미 변경했는데 다시 변경하시겠습니까?" 확인창이 한 번 더 뜹니다. 220V/380V/440V/480V 버튼은 세로로 크게 배치되어 색상과 함께 누르기 편합니다.'],
@@ -4014,7 +4033,7 @@ function loadingListPopupHtml(){
   const {today, tomorrow, todayLoad, tomorrowLoad, todayIn, tomorrowIn} = loadingPopupData();
   const loadRowHtml = r=>{
     const g = findGen(r.genId);
-    const fuel = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+    const fuel = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     const extra = [r.supplies? `부자재: ${escR(r.supplies)}` : '', r.note? `비고: ${escR(r.note)}` : ''].filter(Boolean).join(' · ');
     return `<div style="padding:13px 0;border-bottom:1px solid var(--border);font-size:18px;">
       <div><b>${escR(r.genId)}</b> ${g? escR(g.model||''):''}</div>
@@ -4966,6 +4985,18 @@ function maybeLogVoltageChange(genId, oldVoltage, newVoltage){
     logVoltageChangeMaint(genId, ov, nv);
   }, '예, 변경했습니다', '아니오');
 }
+function confirmReservationVoltageChange(reservationId){
+  const r = DB.reservations.find(x=>x.id===reservationId);
+  if(!r) return;
+  const g = findGen(r.genId);
+  if(!g) return;
+  const oldVoltage = g.voltage||'';
+  const newVoltage = r.voltage||'';
+  if(!newVoltage || oldVoltage===newVoltage) return;
+  updateVoltage(g.id, newVoltage).then(()=>{
+    maybeLogVoltageChange(g.id, oldVoltage, newVoltage);
+  });
+}
 async function logVoltageChangeMaint(genId, oldVoltage, newVoltage){
   const g = findGen(genId);
   const dateStr = todayStr();
@@ -5007,7 +5038,11 @@ async function submitVoltageEdit(id){
   const oldVoltage = g ? (g.voltage||'') : '';
   const value = document.getElementById('f-volt-edit').value;
   const changed = value.trim() !== oldVoltage.trim();
-  if(changed && g && g.voltageUpdatedAtMs && (Date.now()-g.voltageUpdatedAtMs) < 24*60*60*1000){
+  if(!changed){
+    closeModal();
+    return;
+  }
+  if(g && g.voltageUpdatedAtMs && (Date.now()-g.voltageUpdatedAtMs) < 24*60*60*1000){
     openConfirmModal(`이 발전기는 24시간 이내(${g.voltageUpdatedAt||''})에 이미 전압을 변경했습니다. 그래도 다시 변경하시겠습니까?`, async function(){
       closeModal();
       await updateVoltage(id, value);
@@ -5238,7 +5273,7 @@ function downloadInGensPrintFile(){
   const rows = list.map(g=>{
     const rem = estRemaining(g);
     const status = g.underRepair ? '수리중' : (g.hoursKnown? {ok:'정상',warn:'임박',danger:'정비필요'}[maintStatus(rem)] : '누적시간 확인할 수 없음');
-    return `<tr><td class="name">${escR(g.id)}</td><td class="name">${escR(g.model||'모델 미등록')}</td><td>${escR(g.voltage||'-')}</td><td>${g.hoursKnown? (g.hours||0).toLocaleString()+'h' : '미확인'}</td><td>${status}</td></tr>`;
+    return `<tr><td class="name">${escR(g.id)}</td><td class="name">${escR(g.model||'모델 미등록')}</td><td>${escR(g.voltage||'-')}</td><td>${hoursStatus(g)==='known'? (g.hours||0).toLocaleString()+'h' : (hoursStatus(g)==='na'? '해당없음' : '미확인')}</td><td>${status}</td></tr>`;
   }).join('');
   const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <title>입고 발전기 목록 - ${todayStr()}</title>
@@ -6048,11 +6083,12 @@ function renderReserveTab(){
     const g = findGen(r.genId);
     const d = dateOf(r);
     const isDelayed = d && daysFromToday(d)<0;
-    const fuelForList = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+    const fuelForList = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     const voltageChanged = g && g.voltage && r.voltage && g.voltage!==r.voltage;
     const vColor = voltageColor(r.voltage);
     const voltageCell = voltageChanged
-      ? `<span style="color:var(--danger);font-weight:700;cursor:pointer;text-decoration:underline;" onclick="openVoltageGuidePicker('${(g.model||'').replace(/'/g,"\\'")}')" title="클릭하면 전압 설정 방법을 볼 수 있습니다">전압변경<br>${escR(g.voltage)}→${escR(r.voltage)}</span>`
+      ? `<span style="color:var(--danger);font-weight:700;cursor:pointer;text-decoration:underline;" onclick="openVoltageGuidePicker('${(g.model||'').replace(/'/g,"\\'")}')" title="클릭하면 전압 설정 방법을 볼 수 있습니다">전압변경<br>${escR(g.voltage)}→${escR(r.voltage)}</span>
+         <button class="btn sm" style="margin-top:3px;padding:2px 6px;font-size:10.5px;" onclick="confirmReservationVoltageChange('${r.id}')">✓ 설정완료</button>`
       : (r.voltage? `<span style="${vColor?`color:${vColor};font-weight:700;`:''}">${escR(r.voltage)}</span>` : '-');
     const suppliesCell = r.supplies
       ? `<button class="btn sm" style="color:var(--danger);font-weight:700;border-color:var(--danger);" onclick="showSuppliesModal('${r.id}')">부자재확인</button>`
@@ -6176,7 +6212,7 @@ function processReservation(resId){
 function confirmLoadPrompt(resId){
   const r = DB.reservations.find(x=>x.id===resId);
   if(r && (r.fuelRequested!=null || r.fuelActual!=null)){
-    const fuelForList = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+    const fuelForList = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     document.getElementById('modal-root').innerHTML = `
     <div class="overlay" onclick="backdropClick(this,event,closeModal)">
       <div class="modal">
@@ -7314,7 +7350,7 @@ function printReceiptForReservation(resId){
   const g = findGen(r.genId);
   if(!g){ showInfoModal('해당 발전기를 찾을 수 없습니다.'); return; }
   if(r.fuelRequested!=null || r.fuelActual!=null){
-    const fuelAmt = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+    const fuelAmt = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     document.getElementById('modal-root').innerHTML = `
     <div class="overlay" onclick="backdropClick(this,event,closeModal)">
       <div class="modal">
