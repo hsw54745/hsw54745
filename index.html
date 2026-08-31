@@ -6873,7 +6873,7 @@ async function submitOut(id, reservationId){
   }
   const existing = reservationId ? DB.reservations.find(r=>r.id===reservationId) : null;
   const pendingData = {
-    id: reservationId || uid(), genId: id, pendingLoad: true,
+    id: reservationId || uid(), genId: id, pendingLoad: true, batchId: (existing && existing.batchId) || null,
     customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty,
     fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentConfirmed, forcedOut, forceReason, forcedBy: forcedOut ? (DB.currentUserName||null) : null, note,
     outDate, startHours, longTerm, estDaily: longTerm? estDaily: null,
@@ -6918,13 +6918,32 @@ async function confirmOutSubmit(){
   try{
     if(idx>=0) DB.reservations[idx] = pendingData;
     else DB.reservations.push(pendingData);
+    let siblingCount = 0;
+    if(pendingData.batchId){
+      DB.reservations.forEach(r=>{
+        if(r.batchId===pendingData.batchId && r.id!==pendingData.id){
+          siblingCount++;
+          r.customer = pendingData.customer; r.manager = pendingData.manager; r.phone = pendingData.phone;
+          r.site = pendingData.site; r.address = pendingData.address; r.supplies = pendingData.supplies;
+          r.suppliesItems = pendingData.suppliesItems; r.suppliesCustom = pendingData.suppliesCustom;
+          r.voltage = pendingData.voltage; r.qty = pendingData.qty;
+          r.fuelRequested = pendingData.fuelRequested; r.fuelActual = pendingData.fuelActual;
+          r.usageDays = pendingData.usageDays; r.loadDate = pendingData.loadDate; r.arriveTime = pendingData.arriveTime;
+          r.freightBearer = pendingData.freightBearer; r.paymentConfirmed = pendingData.paymentConfirmed;
+          r.forcedOut = pendingData.forcedOut; r.forceReason = pendingData.forceReason; r.forcedBy = pendingData.forcedBy;
+          r.note = pendingData.note; r.outDate = pendingData.outDate; r.longTerm = pendingData.longTerm; r.estDaily = pendingData.estDaily;
+        }
+      });
+    }
     await saveReservations();
     pendingOutSubmitCtx = null;
     closeModal();
     currentTab = 'reserve';
     renderTabbar();
     renderContent();
-    flash(wasPending ? '상차대기 내용이 수정되었습니다.' : '출고 대기(상차대기)에 등록되었습니다. 상차완료를 눌러야 출고됩니다.');
+    flash(wasPending
+      ? (siblingCount>0? `상차대기 내용이 수정되었습니다. (같이 묶인 ${siblingCount}대에도 함께 적용됨)` : '상차대기 내용이 수정되었습니다.')
+      : '출고 대기(상차대기)에 등록되었습니다. 상차완료를 눌러야 출고됩니다.');
   }catch(err){
     if(idx>=0) DB.reservations[idx] = existing; else DB.reservations = DB.reservations.filter(r=>r!==pendingData);
     const errEl = document.getElementById('f-preview-err');
