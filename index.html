@@ -6205,30 +6205,49 @@ function processReservation(resId){
 }
 function confirmLoadPrompt(resId){
   const r = DB.reservations.find(x=>x.id===resId);
-  if(r && (r.fuelRequested!=null || r.fuelActual!=null)){
-    const fuelForList = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
-    document.getElementById('modal-root').innerHTML = `
-    <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-      <div class="modal">
-        <h3>🚚 상차 완료 확인</h3>
-        <div class="modal-sub">${escR(r.genId)}</div>
-        <div style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:12px;margin-bottom:6px;">
-          <div style="font-size:14px;color:var(--primary-dark);font-weight:800;margin-bottom:8px;">⛽ 이 출고는 연료 ${fuelForList}L를 넣어드리기로 되어 있습니다.</div>
-          <div class="field chk" style="margin:0;">
-            <input type="checkbox" id="f-loadconfirm-fuel">
-            <label for="f-loadconfirm-fuel">연료를 실제로 넣었습니다</label>
-          </div>
+  if(!r) return;
+  const g = findGen(r.genId);
+  const needFuel = (r.fuelRequested!=null || r.fuelActual!=null);
+  const fuelAmt = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
+  const infoRows = [
+    ['거래처', r.customer||r.site||''],
+    ['담당자', r.manager||''],
+    ['연락처', r.phone||''],
+    ['현장 주소', r.address||''],
+    ['전압', r.voltage||'']
+  ].filter(([k,v])=>v).map(([k,v])=>`<div class="k">${k}</div><div class="v" style="font-size:13px;font-weight:400;">${escR(v)}</div>`).join('');
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>🚚 상차 완료 확인</h3>
+      <div class="modal-sub">${escR(r.genId)}${g? ` · ${escR(g.model||'')}`:''}</div>
+      <div class="detail-card" style="margin-bottom:14px;padding:12px 14px;">
+        <div class="muted" style="font-size:11px;font-weight:700;margin-bottom:6px;">출고 등록된 내용</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px;">
+          ${infoRows || '<div class="muted" style="grid-column:1/3;">등록된 거래처 정보가 없습니다.</div>'}
         </div>
-        <div id="f-loadconfirm-err" class="err" style="display:none;"></div>
-        <div class="modal-actions">
-          <button class="btn" onclick="closeModal()">취소</button>
-          <button class="btn primary" onclick="submitConfirmLoadWithFuelCheck('${resId}')">상차 완료</button>
+        <div style="margin-top:10px;">
+          <div class="muted" style="font-size:11px;font-weight:700;margin-bottom:4px;">부자재</div>
+          ${suppliesListHtml(r.suppliesItems, r.suppliesCustom, r.supplies)}
+        </div>
+        ${r.note? `<div class="hint" style="color:var(--danger);font-weight:700;margin-top:8px;">📝 비고: ${escR(r.note)}</div>`:''}
+      </div>
+      ${needFuel? `
+      <div style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:12px;margin-bottom:6px;">
+        <div style="font-size:14px;color:var(--primary-dark);font-weight:800;margin-bottom:8px;">⛽ 연료 ${fuelAmt}L를 넣어드리기로 되어 있습니다.</div>
+        <div class="field chk" style="margin:0;">
+          <input type="checkbox" id="f-loadconfirm-fuel">
+          <label for="f-loadconfirm-fuel">연료를 실제로 넣었습니다</label>
         </div>
       </div>
-    </div>`;
-    return;
-  }
-  openConfirmModal('제품 상차를 완료하시겠습니까?', function(){ confirmLoad(resId); }, '예', '아니오');
+      <div id="f-loadconfirm-err" class="err" style="display:none;"></div>
+      ` : ''}
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">취소</button>
+        <button class="btn primary" onclick="${needFuel? `submitConfirmLoadWithFuelCheck('${resId}')` : `confirmLoad('${resId}')`}">상차 완료</button>
+      </div>
+    </div>
+  </div>`;
 }
 function submitConfirmLoadWithFuelCheck(resId){
   const chk = document.getElementById('f-loadconfirm-fuel');
