@@ -1104,16 +1104,16 @@ function inDateLabel(dateStr){
   if(diff<0) return `${dow(dateStr)} (지연)`;
   return dow(dateStr);
 }
-// 상태문구(입고임박 등)와 날짜를 한 줄로 합쳐서 보여줄 때 사용
+// 날짜와 임박 상태를 한 줄로 합쳐서 보여줄 때 사용 (열 헤더가 "입고예정일"이므로 여기선 접두어 없이 날짜+상태만 표기)
 function inDateLabelFull(dateStr){
   const diff = daysFromToday(dateStr);
   const dateTxt = dow(dateStr);
-  if(diff===0) return `입고예정일: ${dateTxt} (오늘)`;
-  if(diff===1) return `입고예정일: ${dateTxt} (임박)`;
-  if(diff===2) return `입고예정일: ${dateTxt} (2일전)`;
-  if(diff===3) return `입고예정일: ${dateTxt} (3일전)`;
-  if(diff<0) return `입고예정일: ${dateTxt} (지연)`;
-  return `입고예정일: ${dateTxt}`;
+  if(diff===0) return `${dateTxt} (오늘)`;
+  if(diff===1) return `${dateTxt} (임박)`;
+  if(diff===2) return `${dateTxt} (2일전)`;
+  if(diff===3) return `${dateTxt} (3일전)`;
+  if(diff<0) return `${dateTxt} (지연)`;
+  return dateTxt;
 }
 // 하루 최대 사용시간 기준 (이 시간을 초과해서 사용된 임대 건을 "과다사용"으로 표시합니다)
 const OVERUSE_DAILY_LIMIT_DEFAULT = 10;
@@ -2155,7 +2155,7 @@ function renderOutList(){
     return `<tr${rt.forcedOut? ` style="background:var(--danger-tint);"`:''}>
       <td><input type="checkbox" class="bulk-in-chk" data-gid="${g.id}" ${bulkInSelection.has(g.id)?'checked':''} onchange="toggleBulkInSelect('${g.id}', this.checked)"></td>
       <td class="gid">${g.id}</td>
-      <td class="wrap-ok">${displayModel(g)}${usableCapacityHtml(g)}${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${expIn? (()=>{ const diff = daysFromToday(expIn); const isLate = diff!=null && diff<0; const cls = isLate?'danger':(diff<=1?'danger':(diff<=3?'warn':'gray')); return `<div style="margin-top:3px;"><span class="pill ${cls}">📅 ${inDateLabelFull(expIn)}</span></div>`; })() : ''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
+      <td class="wrap-ok">${displayModel(g)}${usableCapacityHtml(g)}${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
       <td class="muted" style="font-size:11px;">${rt.outProcessedBy? escR(rt.outProcessedBy) : '-'}</td>
       <td>${(()=>{ const v=g.voltage||rt.voltage; const c=voltageColor(v); return v? `<span style="${c?`color:${c};font-weight:700;`:''}">${escR(v)}</span>` : '<span class="muted">-</span>'; })()}</td>
       <td class="wrap-ok">
@@ -2171,6 +2171,7 @@ function renderOutList(){
       <td class="muted">${dow(rt.outDate)||'-'}</td>
       <td>${isLT? gaugeHtml(el,rem,getCycle(g)) : '<span class="muted" style="font-size:12px;">반납 시 확인</span>'}</td>
       <td style="font-size:12px;">${predTxt}</td>
+      <td style="font-size:12px;">${expIn? (()=>{ const diff = daysFromToday(expIn); const isLate = diff!=null && diff<0; const cls = isLate?'danger':(diff<=1?'danger':(diff<=3?'warn':'gray')); return `<span class="pill ${cls}">📅 ${inDateLabelFull(expIn)}</span>`; })() : '<span class="muted">-</span>'}</td>
       <td>
         <div class="btn-row" style="flex-wrap:wrap;row-gap:4px;">
           ${rt.forcedOut? `<button class="btn sm primary" onclick="confirmOutPayment('${g.id}')" style="white-space:nowrap;">입금 확인</button>`:''}
@@ -2189,7 +2190,7 @@ function renderOutList(){
   const longList = list.filter(g=>g.rental.longTerm);
   const shortRows = shortList.map(rowHtml).join('');
   const longRows = longList.map(rowHtml).join('');
-  const theadHtml = `<thead><tr><th style="width:30px;"><input type="checkbox" onchange="toggleSelectAllBulkIn(this)" title="전체 선택"></th><th>번호</th><th>모델</th><th>출고완료</th><th>전압</th><th>거래처/현장</th><th>도착일</th><th>정비 주기(추정)</th><th>정비 예상시점</th><th></th></tr></thead>`;
+  const theadHtml = `<thead><tr><th style="width:30px;"><input type="checkbox" onchange="toggleSelectAllBulkIn(this)" title="전체 선택"></th><th>번호</th><th>모델</th><th>출고완료</th><th>전압</th><th>거래처/현장</th><th>도착일</th><th>정비 주기(추정)</th><th>정비 예상시점</th><th>입고예정일</th><th></th></tr></thead>`;
 
   return `
     <div class="section-title">출고중 발전기 <span class="cnt">${list.length}대</span>${outRegionFilter? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">지역: ${escR(outRegionFilter)} <button onclick="clearOutRegionFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''} <button type="button" class="btn sm" onclick="downloadOutFieldListFile()">🖨 출고 리스트 인쇄(단기/장기)</button></div>
