@@ -2401,6 +2401,19 @@ async function submitAdjust(id){
   const unknown = document.getElementById('f-adj-unknown').checked;
   const fuelBaselineHeight = Number(document.getElementById('f-adj-fuelbaseline').value)||null;
   const errEl = document.getElementById('f-err');
+  let hours, lastMaint, lastMaintDate;
+  if(!unknown){
+    hours = Number(document.getElementById('f-adj-hours').value);
+    lastMaint = Number(document.getElementById('f-adj-lastmaint').value);
+    lastMaintDate = document.getElementById('f-adj-lastmaintdate').value || null;
+    if(isNaN(hours) || hours<0 || isNaN(lastMaint) || lastMaint<0){
+      errEl.textContent='숫자를 정확히 입력해주세요.'; errEl.style.display='block'; return;
+    }
+    if(lastMaint>hours){
+      errEl.textContent='마지막 정비시 누적시간은 현재 누적시간보다 클 수 없습니다.'; errEl.style.display='block'; return;
+    }
+  }
+  // 검증을 모두 통과한 뒤에만 실제 값 반영 (검증 실패시 메모리상 값이 먼저 바뀌어버리는 것 방지)
   g.model = model;
   g.voltage = voltage;
   g.fuelBaselineHeight = fuelBaselineHeight;
@@ -2408,15 +2421,6 @@ async function submitAdjust(id){
     g.hoursKnown = false;
     g.hoursNA = true;
   } else {
-    const hours = Number(document.getElementById('f-adj-hours').value);
-    const lastMaint = Number(document.getElementById('f-adj-lastmaint').value);
-    const lastMaintDate = document.getElementById('f-adj-lastmaintdate').value || null;
-    if(isNaN(hours) || hours<0 || isNaN(lastMaint) || lastMaint<0){
-      errEl.textContent='숫자를 정확히 입력해주세요.'; errEl.style.display='block'; return;
-    }
-    if(lastMaint>hours){
-      errEl.textContent='마지막 정비시 누적시간은 현재 누적시간보다 클 수 없습니다.'; errEl.style.display='block'; return;
-    }
     g.hours = hours;
     g.lastMaintHours = lastMaint;
     g.lastMaintDate = lastMaintDate;
@@ -3185,27 +3189,6 @@ function exportMaintCsv(id){
   maints.forEach(m=>rows.push([m.date,m.hours||0,m.type||'정기정비',m.technician,(m.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(' / '),m.content]));
   downloadCsv(`${id}_정비이력.csv`, rows);
 }
-function usageGraphSvg(maints){
-  const sorted = [...maints].sort((a,b)=>(a.hours||0)-(b.hours||0));
-  if(sorted.length<2) return `<div class="muted" style="font-size:12px;">정비 기록이 2건 이상일 때 사용 이력 그래프가 표시됩니다.</div>`;
-  const intervals = [];
-  for(let i=1;i<sorted.length;i++){
-    intervals.push({label: sorted[i].date, val: Math.max(0,(sorted[i].hours||0)-(sorted[i-1].hours||0))});
-  }
-  const w = 640, barGap = 10, barW = Math.max(18, Math.min(48, Math.floor((w-20)/intervals.length)-barGap));
-  const maxV = Math.max(...intervals.map(x=>x.val), 1);
-  const chartH = 140;
-  let x = 10;
-  const bars = intervals.map(it=>{
-    const h = Math.round((it.val/maxV)*chartH);
-    const rect = `<rect x="${x}" y="${chartH-h+20}" width="${barW}" height="${h}" fill="#2C4A66" rx="3"></rect>`;
-    const txt = `<text x="${x+barW/2}" y="${chartH+34}" font-size="10" fill="#6B6E76" text-anchor="middle">${it.label.slice(5)}</text>`;
-    const vtxt = `<text x="${x+barW/2}" y="${chartH-h+14}" font-size="10" fill="#22242A" text-anchor="middle">${Math.round(it.val)}h</text>`;
-    x += barW + barGap;
-    return rect+txt+vtxt;
-  }).join('');
-  return `<svg viewBox="0 0 ${x+10} ${chartH+44}" style="width:100%;max-width:${w}px;height:auto;">${bars}</svg>`;
-}
 function renderGenHistory(){
   const sel = document.getElementById('hist-select');
   if(!sel) return;
@@ -3274,8 +3257,6 @@ function renderGenHistory(){
         </div></td>
       </tr>`).join('')}</tbody>
     </table></div>
-    <div class="section-title" style="font-size:13px;">사용 이력 그래프 (정비 간 간격)</div>
-    <div class="detail-card">${usageGraphSvg(maints)}</div>
     `}
   `;
 }
@@ -7973,7 +7954,7 @@ function openInModal(id){
       </div>
       <div class="field-row">
         <div class="field"><label>전압</label>
-          <input type="text" id="f-in-voltage" value="${g.voltage||g.rental.voltage||''}" placeholder="예: 380V">
+          <input type="text" id="f-in-voltage" value="${g.rental.voltage||g.voltage||''}" placeholder="예: 380V">
           ${voltageButtonsHtml('f-in-voltage')}
           <div class="hint">입고 처리시 확인·기록해두면 입고중에도 계속 표시됩니다.</div>
           ${voltageGuideGalleryHtml(g.model)}
@@ -8083,7 +8064,8 @@ async function submitIn(id){
     errEl.style.display='block'; return;
   }
   // 하루 24시간을 초과하는 물리적으로 불가능한 사용시간 감지 (데이터 입력 실수 방지)
-  if(g.rental.outDate && inDate){
+  // 단, 출고 당시 누적시간을 몰랐던(미확인) 발전기는 이번이 첫 실측이라 정상적으로 큰 값이 나올 수 있으므로 제외
+  if(g.rental.outDate && inDate && g.hoursKnown){
     const usedH = endHours - g.rental.startHours;
     const outD = new Date(g.rental.outDate+'T00:00:00');
     const inD = new Date(inDate+'T00:00:00');
