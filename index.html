@@ -247,6 +247,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ===== Firebase 익명 로그인 (보안 규칙을 "로그인한 사용자만" 으로 걸기 위함) =====
 // 사용자는 아무것도 입력하지 않아도 앱이 열리자마자 자동으로 조용히 로그인됩니다.
@@ -390,7 +391,7 @@ const TABS = [
   {id:'settings', label:'⚙️ 설정', color:'#555B6E'},
   {id:'manual', label:'📖 사용설명서', color:'#0F766E'}
 ];
-let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, customerNotes:{}, customerExcluded:{}, readMarkers:{}, qrIssued:{}, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
+let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, customerNotes:{}, readMarkers:{}, qrIssued:{}, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
 let currentTab = 'dashboard';
 let seenNoticeIds = new Set();
 let seenEventIds = new Set();
@@ -589,6 +590,17 @@ function adminModeSectionHtml(){
       <div class="section-title" style="margin-top:0;">🏢 업체 정보</div>
       <p class="muted" style="font-size:13px;margin-top:-4px;">업체명·주소·전화번호·휴대폰 번호를 관리합니다.</p>
       <div id="company-contact-wrap"></div>
+    </div>
+    <div class="material-card" style="margin-top:12px;">
+      <div class="section-title" style="margin-top:0;">📥 엑셀로 불러오기</div>
+      <p class="muted" style="font-size:13px;margin-top:-4px;">다른 곳에서 엑셀로 관리하던 데이터를 한 번에 옮겨올 수 있습니다. 정해진 양식(시트 6개: 임대이력·정비이력·자재목록·부자재목록·정비사명단·사용자명단)에 맞춰 작성한 뒤 업로드하면, 목록에 없는 발전기번호는 새 발전기로 자동 등록되고 완료된 임대 이력은 [이력 조회]에, 아직 반납 안 된 건은 [출고중] 목록에 들어갑니다. 필요 없는 시트는 비워두면 그 시트는 그냥 건너뜁니다. 실수로 잘못 올리면 데이터가 섞일 수 있어 관리자 모드에서만 열립니다.</p>
+      <div class="btn-row">
+        <button class="btn" onclick="downloadExcelImportTemplate()">📋 엑셀 양식 다운로드</button>
+        <label class="btn primary" style="cursor:pointer;">📤 엑셀 파일 선택
+          <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleExcelImportFile(event)">
+        </label>
+      </div>
+      <div class="hint" style="margin-top:8px;">양식에 맞지 않은 파일은 열리긴 하지만 원하는대로 안 채워질 수 있으니, 먼저 "엑셀 양식 다운로드"로 받은 파일 그대로 채워서 올려주세요. 업로드해도 바로 반영되지 않고, 몇 대·몇 건이 어떻게 들어가는지 먼저 보여준 뒤 "가져오기 실행"을 눌러야 저장됩니다.</div>
     </div>
     <div style="border:1px solid var(--danger);border-radius:var(--radius);padding:14px 16px;margin-top:20px;background:var(--danger-tint);">
       <div class="section-title" style="margin-top:0;color:var(--danger);">위험 구역</div>
@@ -883,7 +895,6 @@ async function saveSuppliesSizes(){ await storageSetChecked('gen-supplies-sizes-
 async function saveSuppliesSpecs(){ await storageSetChecked('gen-supplies-specs-v1', JSON.stringify(DB.suppliesSpecs), true); }
 async function saveSuppliesCategories(){ await storageSetChecked('gen-supplies-categories-v1', JSON.stringify(DB.suppliesCategories), true); }
 async function saveCustomerNotes(){ await storageSetChecked('gen-customer-notes-v1', JSON.stringify(DB.customerNotes), true); }
-async function saveCustomerExcluded(){ await storageSetChecked('gen-customer-excluded-v1', JSON.stringify(DB.customerExcluded), true); }
 async function saveReadMarkers(){ await storageSetChecked('gen-read-markers-v1', JSON.stringify(DB.readMarkers), true); }
 async function saveWarnThreshold(){ await storageSetChecked('gen-warn-threshold-v1', JSON.stringify(DB.warnThreshold), true); }
 async function saveOveruseDailyLimit(){ await storageSetChecked('gen-overuse-daily-limit-v1', JSON.stringify(DB.overuseDailyLimit), true); }
@@ -1492,7 +1503,7 @@ function renderContent(){
   if(currentTab==='materials') { renderPartsStockTable(); renderSuppliesCatalogTable(); }
   if(currentTab==='consumable-order') renderConsumableOrderTable();
   if(currentTab==='improvements') renderImprovementsList();
-  if(currentTab==='settings'){ renderTeamMembersTable(); renderVehicleTypesTable(); renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); renderCustomerAutofillWrap(); }
+  if(currentTab==='settings'){ renderTeamMembersTable(); renderVehicleTypesTable(); renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); }
   if(currentTab==='dashboard') renderRecentMaint();
   if(currentTab==='notice'){ renderNoticeList(); renderCalendar(); }
   restoreFocusState(_focus);
@@ -3653,7 +3664,7 @@ function renderManualTab(){
       ['🔒 접속 비밀번호', '팀 공통 비밀번호를 설정·변경·해제합니다. 이 화면 자체를 여는 용도이며, 아래 "관리자 모드"는 이것과 별개인 전용 비밀번호를 사용합니다.'],
       ['📄 공용 양식 · 문서', '견적서·관리문서 같은 엑셀/워드/PDF/한글 파일을 올려두면, 팀원 누구나 다운로드해서 바로 쓸 수 있습니다. 파일 1개당 최대 5MB까지 올릴 수 있고, 이 목록은 [설정] 화면을 열 때만 따로 불러와서 앱 전체 로딩 속도에는 영향을 주지 않습니다. 다른 사람이 방금 새로 올린 파일은 자동으로 안 보일 수 있어 "🔄 목록 새로고침"으로 최신 목록을 다시 받아올 수 있습니다.'],
       ['📱 QR 코드 관리', '발전기마다 붙일 QR코드를 만드는 곳입니다. "🖨 신규 발전기 QR 인쇄 파일 만들기"는 아직 QR을 뽑은 적 없는 발전기만 골라서 인쇄용 파일을 만들어주고, 한번 뽑은 발전기는 번호가 그대로면 다음에 새 발전기를 추가로 등록해도 다시 뽑히지 않아 이미 붙여둔 QR과 계속 같은 채로 유지됩니다. 지금 몇 대가 신규 발급 대상인지도 화면에 숫자로 보여줍니다. QR을 분실·훼손해서 이미 뽑은 것까지 포함해 전부 다시 뽑아야 할 때는 "🔁 전체 다시 인쇄" 버튼을 따로 이용합니다(확인 문구가 한 번 뜹니다). 발전기 한 대씩 QR을 다시 보고 싶으면 [발전기 모델 설정] 목록의 "관리" 버튼 안 "📱 QR코드 보기"에서도 확인할 수 있습니다.'],
-      ['🏢 거래처 자동입력 관리', '"출고하기"에서 거래처명을 입력할 때 담당자·연락처·주소가 자동으로 채워지는 대상 목록을 보여줍니다. "삭제"를 누르면 그 거래처는 자동입력 대상에서만 빠지고(지난 출고 이력 자체는 지워지지 않음), 밑에 "자동입력에서 뺀 거래처" 목록에서 "복구"를 누르면 다시 자동입력되게 되돌릴 수 있습니다.'],
+      ['📥 엑셀로 불러오기', '[설정 → 관리자 모드] 안에 있는 기능입니다. 다른 곳에서 엑셀로 관리하던 데이터를 정해진 양식(시트 6개: 임대이력·정비이력·자재목록·부자재목록·정비사명단·사용자명단)에 맞춰 작성해서 올리면 한 번에 옮겨옵니다. [임대이력]에서 목록에 없는 발전기번호는 새 발전기로 자동 등록되고, 입고일까지 채워진 완료 건은 [이력 조회]에, 입고일을 비워둔(아직 반납 안 된) 건은 [출고중] 목록에 들어갑니다. [정비이력]은 부품:수량 형식으로 사용부품까지 정비이력에 반영되고, [자재목록]·[부자재목록]은 재고·규격·카테고리까지, [정비사명단]은 최대 3명, [사용자명단]은 팀원 목록에 추가됩니다. 필요 없는 시트는 비워두면 됩니다. 업로드하면 시트별로 몇 건씩 들어가는지, 형식이 안 맞아 건너뛴 행은 몇 번째 줄이고 왜 건너뛰었는지까지 먼저 보여주고 "가져오기 실행"을 눌러야 실제로 반영됩니다.'],
       ['전체 백업 다운로드 / 복원', '발전기·임대·정비·예약·자재·부품재고·부자재·차량종류·색상설정·팀원목록 등 모든 데이터를 파일 하나로 저장하거나, 백업 파일로 되돌립니다. (접속 비밀번호는 보안상 백업 대상에서 제외됩니다) 비밀번호 없이 누구나 바로 이용할 수 있습니다.'],
       ['📁 폴더 자동 저장', '"자동 백업 폴더 설정" 버튼으로 컴퓨터의 폴더를 한 번 지정해두면, 그 다음부터는 다운로드 버튼을 안 눌러도 앱을 열 때마다 그 폴더에 최신 백업 파일이 자동으로 저장되고, 저장되면 "OO 폴더에 자동저장되었습니다" 메시지가 잠깐 뜹니다. 파일은 지정한 그 폴더 안에 "발전기관리_자동백업_YYYY-MM-DD.json" 이름으로 날짜별로 쌓여서 저장되어, 예전 날짜 백업도 폴더 안에 그대로 남아있습니다. 자동 저장이 켜져 있으면 [전체현황]에 뜨던 "정기 백업을 아직 안 하셨어요" 리마인더 배너는 더 이상 뜨지 않습니다. 새로고침 도중 네트워크 문제로 발전기 데이터를 다 못 불러온 비정상적인 상태에서는 자동저장을 건너뛰어, 불완전한 상태로 오늘자 백업이 덮어써지는 사고를 방지합니다(다음 접속시 정상 상태면 다시 저장됩니다). 크롬·엣지·네이버 웨일 같은 크로미움 기반 브라우저에서만 되고, 사파리·파이어폭스는 지원하지 않습니다. 이 설정은 지정한 그 컴퓨터·그 브라우저에만 적용되며(다른 팀원 화면에는 영향 없음), 하루에 한 번만 저장하고, "폴더 변경"·"자동 저장 끄기"로 언제든 바꿀 수 있습니다.'],
       ['🔐 관리자 모드 (업체 정보 · 위험 구역)', '업체 정보 수정과 위험 구역(초기화) 작업은 관리자 모드 안에 있습니다. 사이트 접속 비밀번호와는 별개인 전용 관리자 비밀번호를 입력해야 열리며, 이 비밀번호는 화면에서 바꿀 수 없게 고정되어 있습니다. 열리면 5분 동안 유지되고, "지금 잠그기"를 누르거나 5분이 지나면 자동으로 다시 잠깁니다. 열린 동안에는 업체명·주소·전화번호·휴대폰 번호를 수정할 수 있고, 입고로 초기화·출고로 초기화·정비내역 초기화·부품재고 초기화·고객정보 초기화·전체 초기화 버튼도 다시 잠글 때까지 계속 이용할 수 있습니다. 되돌릴 수 없는 작업들이니 실행 전 먼저 백업을 받아두세요.'],
@@ -4143,12 +4154,6 @@ function renderSettingsTab(){
         <button class="btn" onclick="confirmReprintAllGenQr()">🔁 전체 다시 인쇄 (분실·훼손시)</button>
       </div>
       <div class="hint" style="margin-top:8px;">발전기 번호별 QR을 낱장으로 다시 보려면 [발전기 모델 설정] 목록에서 "관리" 버튼을 눌러 확인할 수 있습니다.</div>
-    </div>
-
-    <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">🏢 거래처 자동입력 관리</div>
-      <p class="muted" style="font-size:13px;margin-top:-4px;">"출고하기"에서 거래처명을 입력하면 예전에 거래한 담당자·연락처·주소가 자동으로 채워지는데, 그 자동입력 대상 목록입니다. 지난 출고 이력 자체를 지우는 게 아니라, 자동입력에서만 빼는(또는 다시 넣는) 기능입니다.</p>
-      <div id="customer-autofill-wrap"></div>
     </div>
 
     <div class="material-card" style="margin-top:20px;">
@@ -6403,7 +6408,6 @@ function knownCustomerRecords(){
     if(!rec || !rec.customer) return;
     const key = rec.customer.trim();
     if(!key) return;
-    if(DB.customerExcluded && DB.customerExcluded[key]) return;
     const dateKey = rec.outDate || rec.plannedOutDate || rec.createdAt || '';
     if(!map[key] || (dateKey && dateKey > (map[key].outDate||''))){
       map[key] = {customer: key, manager: rec.manager||'', phone: rec.phone||'', address: rec.address||'', site: rec.site||'', outDate: dateKey};
@@ -6413,49 +6417,6 @@ function knownCustomerRecords(){
   DB.reservations.forEach(consider);
   DB.gens.forEach(g=>{ if(g.rental) consider(g.rental); });
   return Object.values(map).sort((a,b)=>a.customer.localeCompare(b.customer,'ko'));
-}
-async function excludeCustomerAutofill(customer){
-  DB.customerExcluded = DB.customerExcluded || {};
-  DB.customerExcluded[customer] = {excludedBy: DB.currentUserName||null, excludedAt: todayStr()};
-  await saveWithRetry(saveCustomerExcluded);
-  renderContent();
-  flash(`"${customer}" 정보를 자동입력 목록에서 뺐습니다. (지난 출고 이력 자체는 그대로 남아있습니다)`);
-}
-async function restoreCustomerAutofill(customer){
-  if(DB.customerExcluded) delete DB.customerExcluded[customer];
-  await saveWithRetry(saveCustomerExcluded);
-  renderContent();
-  flash(`"${customer}" 정보를 자동입력 목록에 다시 포함했습니다.`);
-}
-function renderCustomerAutofillWrap(){
-  const wrap = document.getElementById('customer-autofill-wrap');
-  if(!wrap) return;
-  const active = knownCustomerRecords();
-  const excludedNames = Object.keys(DB.customerExcluded||{}).sort((a,b)=>a.localeCompare(b,'ko'));
-  if(active.length===0 && excludedNames.length===0){
-    wrap.innerHTML = `<div class="empty">아직 출고 이력이 없습니다.</div>`;
-    return;
-  }
-  const rows = active.map(r=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
-      <div style="flex:1;min-width:0;">
-        <div style="font-weight:700;font-size:13.5px;">${escR(r.customer)}</div>
-        <div class="muted" style="font-size:11.5px;">${escR(r.manager||'-')} · ${escR(r.phone||'-')} · ${escR(r.address||r.site||'-')}</div>
-      </div>
-      <button class="btn sm" onclick="if(confirm('\\'${r.customer.replace(/'/g,"\\'")}\\' 정보를 자동입력 대상에서 뺄까요?\\n\\n(지난 출고 이력 자체는 지워지지 않습니다)')) excludeCustomerAutofill('${r.customer.replace(/'/g,"\\'")}')">삭제</button>
-    </div>`).join('');
-  const excludedHtml = excludedNames.length>0 ? `
-    <div class="muted" style="font-size:11.5px;font-weight:700;margin:14px 0 6px;">자동입력에서 뺀 거래처</div>
-    ${excludedNames.map(name=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
-      <div style="flex:1;min-width:0;font-size:13px;">${escR(name)}</div>
-      <button class="btn sm" onclick="restoreCustomerAutofill('${name.replace(/'/g,"\\'")}')">복구</button>
-    </div>`).join('')}` : '';
-  wrap.innerHTML = `
-    <div class="detail-card" style="max-height:320px;overflow-y:auto;padding:10px 14px;">
-      ${rows || '<div class="muted" style="font-size:12.5px;">자동입력 대상 거래처가 없습니다.</div>'}
-    </div>
-    ${excludedHtml}`;
 }
 function onCustomerNameInput(){
   const el = document.getElementById('f-site');
@@ -8605,7 +8566,6 @@ async function init(){
     ['suppliesSpecs', 'gen-supplies-specs-v1', {}, true],
     ['suppliesCategories', 'gen-supplies-categories-v1', {}, true],
     ['customerNotes', 'gen-customer-notes-v1', {}, true],
-    ['customerExcluded', 'gen-customer-excluded-v1', {}, true],
     ['readMarkers', 'gen-read-markers-v1', {}, true],
     ['palletDefaultRemoved', 'gen-pallet-default-removed-v1', false, true],
     ['companyInfo', 'gen-company-info-v1', {name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}, true],
@@ -8660,7 +8620,6 @@ async function init(){
   DB.suppliesSpecs = results.suppliesSpecs;
   DB.suppliesCategories = results.suppliesCategories || {};
   DB.customerNotes = results.customerNotes || {};
-  DB.customerExcluded = results.customerExcluded || {};
   DB.readMarkers = results.readMarkers || {};
   DB.companyInfo = results.companyInfo && results.companyInfo.name ? results.companyInfo : {name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'};
   if(!results.palletDefaultRemoved && (DB.suppliesCatalog||[]).includes('깔판')){
@@ -8769,7 +8728,7 @@ async function syncFromStorage(){
   if(shouldSkipSync()) return;
   syncInFlight = true;
   try{
-    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, overuseDailyLimit, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, vehicleTypes, vehicleSuggestEnabled, genSizeDisplayEnabled, modelColors, notices, calendarEvents, genColorOverrides, qrIssued, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, customerExcluded, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
+    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, overuseDailyLimit, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, vehicleTypes, vehicleSuggestEnabled, genSizeDisplayEnabled, modelColors, notices, calendarEvents, genColorOverrides, qrIssued, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
       peekStorage('gen-fleet-v2', DB.gens),
       peekStorage('gen-rentals-v2', DB.rentals),
       peekStorage('gen-maintenance-v2', DB.maint),
@@ -8803,13 +8762,12 @@ async function syncFromStorage(){
       peekStorage('gen-supplies-specs-v1', DB.suppliesSpecs),
       peekStorage('gen-supplies-categories-v1', DB.suppliesCategories),
       peekStorage('gen-customer-notes-v1', DB.customerNotes),
-      peekStorage('gen-customer-excluded-v1', DB.customerExcluded),
       peekStorage('gen-read-markers-v1', DB.readMarkers),
       peekStorage('gen-company-info-v1', DB.companyInfo),
       peekStorage('gen-last-backup-date-v1', DB.lastBackupDate)
     ]);
-    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,overuseDailyLimit:DB.overuseDailyLimit,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,vehicleTypes:DB.vehicleTypes,vehicleSuggestEnabled:DB.vehicleSuggestEnabled,genSizeDisplayEnabled:DB.genSizeDisplayEnabled,modelColors:DB.modelColors,notices:DB.notices,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,customerExcluded:DB.customerExcluded,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
-    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,overuseDailyLimit,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,vehicleTypes,vehicleSuggestEnabled,genSizeDisplayEnabled,modelColors,notices,calendarEvents,genColorOverrides,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,customerExcluded,readMarkers,companyInfo,lastBackupDate});
+    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,overuseDailyLimit:DB.overuseDailyLimit,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,vehicleTypes:DB.vehicleTypes,vehicleSuggestEnabled:DB.vehicleSuggestEnabled,genSizeDisplayEnabled:DB.genSizeDisplayEnabled,modelColors:DB.modelColors,notices:DB.notices,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
+    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,overuseDailyLimit,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,vehicleTypes,vehicleSuggestEnabled,genSizeDisplayEnabled,modelColors,notices,calendarEvents,genColorOverrides,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate});
     if(before !== after){
       const newNotices = (notices||[]).filter(n=>n && !seenNoticeIds.has(n.id) && n.authorBy!==DB.currentUserName);
       const newEvents = (calendarEvents||[]).filter(e=>e && !seenEventIds.has(e.id) && e.authorBy!==DB.currentUserName);
@@ -8819,7 +8777,7 @@ async function syncFromStorage(){
       seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad).map(r=>r.id));
       DB.gens = gens; DB.rentals = rentals; DB.maint = maint; DB.reservations = reservations;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold; DB.overuseDailyLimit = overuseDailyLimit;
-      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.qrIssued = qrIssued || {}; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.customerExcluded = customerExcluded || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
+      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.qrIssued = qrIssued || {}; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
       applyCompanyBranding();
       if(!shouldSkipSync()){
         renderTabbar();
@@ -9028,7 +8986,430 @@ async function showGenQrModal(id){
     </div>
   </div>`;
 }
+// ===== 엑셀로 불러오기 (관리자 모드 전용, 여러 시트) =====
+const EXCEL_IMPORT_TEMPLATE_B64 = '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';
+function downloadExcelImportTemplate(){
+  const bin = atob(EXCEL_IMPORT_TEMPLATE_B64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  const blob = new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '발전기_전체데이터_불러오기_양식.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  flash('엑셀 양식 파일이 다운로드되었습니다.');
+}
+let pendingExcelImport = null;
+function excelDateToStr(v){
+  if(v===null || v===undefined || v==='') return '';
+  if(v instanceof Date){
+    if(isNaN(v.getTime())) return '';
+    return toLocalDateStr(v);
+  }
+  const s = String(v).trim();
+  const m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if(m){
+    const mm = Number(m[2]), dd = Number(m[3]);
+    if(mm<1||mm>12||dd<1||dd>31) return '';
+    return `${m[1]}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+  }
+  return '';
+}
+function isBlankExcelRow(r){
+  return Object.values(r).every(v=> v===null || v===undefined || String(v).trim()==='');
+}
+function excelBoolYN(v){
+  const s = String(v||'').trim().toLowerCase();
+  return s==='y' || s==='yes' || s==='예' || s==='네' || s==='true' || s==='o';
+}
+function sheetRowsOf(wb, name){
+  if(!wb.SheetNames.includes(name)) return [];
+  const ws = wb.Sheets[name];
+  const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+  return rows.map((r,i)=>({r, rowNum:i+2})).filter(x=>!isBlankExcelRow(x.r));
+}
+
+// ---- 임대이력 ----
+function parseRentalRow(r, rowNum){
+  const genId = String(r['발전기번호']||'').trim();
+  let model = String(r['모델명']||'').trim();
+  const capacityRaw = r['용량(kW)'];
+  const capacity = (capacityRaw!==''&&capacityRaw!=null&&!isNaN(Number(capacityRaw))) ? Number(capacityRaw) : null;
+  if(capacity && !/kw/i.test(model)) model = model? `${model} ${capacity}kW` : `${capacity}kW`;
+  const customer = String(r['거래처명']||'').trim();
+  const manager = String(r['담당자']||'').trim();
+  const phone = String(r['연락처']||'').trim();
+  const address = String(r['현장주소']||'').trim();
+  const voltage = String(r['전압']||'').trim();
+  const qtyRaw = r['수량'];
+  const qty = (qtyRaw!==''&&qtyRaw!=null&&!isNaN(Number(qtyRaw))) ? Number(qtyRaw) : 1;
+  const supplies = String(r['부자재']||'').trim();
+  const fuelReqRaw = r['연료요청(L)'];
+  const fuelRequested = (fuelReqRaw!==''&&fuelReqRaw!=null&&!isNaN(Number(fuelReqRaw))) ? Number(fuelReqRaw) : null;
+  const fuelActRaw = r['연료실제(L)'];
+  const fuelActual = (fuelActRaw!==''&&fuelActRaw!=null&&!isNaN(Number(fuelActRaw))) ? Number(fuelActRaw) : fuelRequested;
+  const usageDaysRaw = r['사용일수'];
+  const usageDays = (usageDaysRaw!==''&&usageDaysRaw!=null&&!isNaN(Number(usageDaysRaw))) ? Number(usageDaysRaw) : null;
+  const loadDate = excelDateToStr(r['상차일']) || null;
+  const arriveTime = String(r['도착시간']||'').trim() || null;
+  const freightBearer = String(r['운임부담']||'').trim()==='고객부담' ? '고객부담' : '우리부담';
+  const paymentConfirmed = excelBoolYN(r['입금확인']);
+  const forcedOut = excelBoolYN(r['강제출고']);
+  const forceReason = String(r['강제출고사유']||'').trim();
+  const note = String(r['비고']||'').trim();
+  const outDateRaw = r['출고일'];
+  const inDateRaw = r['입고일'];
+  const outDate = excelDateToStr(outDateRaw);
+  const inDate = excelDateToStr(inDateRaw);
+  const startHoursRaw = r['출고시누적시간(h)'];
+  const startHours = (startHoursRaw!==''&&startHoursRaw!=null) ? Number(startHoursRaw) : NaN;
+  const endHoursRaw = r['입고시누적시간(h)'];
+  const endHours = (endHoursRaw!==''&&endHoursRaw!=null&&!isNaN(Number(endHoursRaw))) ? Number(endHoursRaw) : null;
+  const suppliesRecoveredRaw = r['부자재회수'];
+  const suppliesRecovered = suppliesRecoveredRaw==='' ? true : excelBoolYN(suppliesRecoveredRaw);
+  const suppliesNote = String(r['부자재미회수비고']||'').trim();
+
+  const reasons = [];
+  if(!genId) reasons.push('발전기번호 없음');
+  if(!customer) reasons.push('거래처명 없음');
+  if(outDateRaw && !outDate) reasons.push('출고일 형식을 못 읽음 (YYYY-MM-DD)');
+  if(!outDateRaw) reasons.push('출고일 없음');
+  if(startHoursRaw==='' || startHoursRaw==null) reasons.push('출고시누적시간(h) 없음');
+  else if(isNaN(startHours)) reasons.push('출고시누적시간(h)이 숫자가 아님');
+  if(inDateRaw && !inDate) reasons.push('입고일 형식을 못 읽음 (YYYY-MM-DD)');
+  if(endHoursRaw!=='' && endHoursRaw!=null && isNaN(Number(endHoursRaw))) reasons.push('입고시누적시간(h)이 숫자가 아님');
+  if(endHours!=null && !isNaN(startHours) && endHours < startHours) reasons.push('입고시누적시간이 출고시누적시간보다 작음');
+  if((inDate && endHours==null) || (!inDate && endHours!=null)) reasons.push('입고일과 입고시누적시간(h)은 둘 다 채우거나 둘 다 비워야 함');
+  if(forcedOut && !paymentConfirmed && !forceReason) reasons.push('강제출고인데 강제출고사유가 없음');
+
+  if(reasons.length>0) return {ok:false, kind:'rental', rowNum, label: genId||'(번호 없음)', reasons};
+  const completed = !!(inDate && endHours!=null);
+  return {ok:true, kind:'rental', rowNum, genId, model, customer, manager, phone, address, voltage, qty,
+    supplies, fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentConfirmed,
+    forcedOut, forceReason, note, outDate, inDate, startHours, endHours, suppliesRecovered, suppliesNote, completed};
+}
+
+// ---- 정비이력 ----
+function parsePartsUsedText(s){
+  return String(s||'').split(',').map(x=>x.trim()).filter(Boolean).map(entry=>{
+    const [name, qtyStr] = entry.split(':').map(x=>(x||'').trim());
+    const qty = Number(qtyStr);
+    return {partName: name, qty: (qtyStr && !isNaN(qty)) ? qty : 1};
+  }).filter(p=>p.partName);
+}
+function parseMaintRow(r, rowNum){
+  const genId = String(r['발전기번호']||'').trim();
+  const dateRaw = r['정비일자'];
+  const date = excelDateToStr(dateRaw);
+  const hoursRaw = r['정비시누적시간(h)'];
+  const hours = (hoursRaw!==''&&hoursRaw!=null) ? Number(hoursRaw) : NaN;
+  let type = String(r['정비유형']||'').trim();
+  if(!['정기정비','고장수리','기타'].includes(type)) type = type || '기타';
+  const content = String(r['정비내용']||'').trim();
+  const partsUsed = parsePartsUsedText(r['사용부품']);
+  const technician = String(r['정비사']||'').trim();
+  const note = String(r['비고']||'').trim();
+
+  const reasons = [];
+  if(!genId) reasons.push('발전기번호 없음');
+  if(dateRaw && !date) reasons.push('정비일자 형식을 못 읽음 (YYYY-MM-DD)');
+  if(!dateRaw) reasons.push('정비일자 없음');
+  if(hoursRaw==='' || hoursRaw==null) reasons.push('정비시누적시간(h) 없음');
+  else if(isNaN(hours)) reasons.push('정비시누적시간(h)이 숫자가 아님');
+
+  if(reasons.length>0) return {ok:false, kind:'maint', rowNum, label: genId||'(번호 없음)', reasons};
+  return {ok:true, kind:'maint', rowNum, genId, date, hours, type, content, partsUsed, technician, note};
+}
+
+// ---- 자재목록 / 부자재목록 ----
+function parsePartRow(r, rowNum){
+  const name = String(r['부품명']||'').trim();
+  if(!name) return {ok:false, kind:'part', rowNum, label:'(부품명 없음)', reasons:['부품명 없음']};
+  const spec = String(r['규격']||'').trim();
+  const unit = String(r['단위']||'').trim();
+  const category = String(r['카테고리']||'').trim();
+  const supplier = String(r['공급처']||'').trim();
+  const stockRaw = r['현재재고'];
+  const stock = (stockRaw!==''&&stockRaw!=null&&!isNaN(Number(stockRaw))) ? Number(stockRaw) : null;
+  const minRaw = r['최소재고'];
+  const minStock = (minRaw!==''&&minRaw!=null&&!isNaN(Number(minRaw))) ? Number(minRaw) : null;
+  return {ok:true, kind:'part', rowNum, name, spec, unit, category, supplier, stock, minStock};
+}
+function parseSupplyRow(r, rowNum){
+  const name = String(r['부자재명']||'').trim();
+  if(!name) return {ok:false, kind:'supply', rowNum, label:'(부자재명 없음)', reasons:['부자재명 없음']};
+  const spec = String(r['규격']||'').trim();
+  const category = String(r['카테고리']||'').trim();
+  const stockRaw = r['현재재고'];
+  const stock = (stockRaw!==''&&stockRaw!=null&&!isNaN(Number(stockRaw))) ? Number(stockRaw) : null;
+  return {ok:true, kind:'supply', rowNum, name, spec, category, stock};
+}
+function parseNameRow(r, rowNum, colName, kind){
+  const name = String(r[colName]||'').trim();
+  if(!name) return {ok:false, kind, rowNum, label:'(이름 없음)', reasons:['이름 없음']};
+  return {ok:true, kind, rowNum, name};
+}
+
+async function handleExcelImportFile(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  if(!isAdminModeUnlocked()){
+    showInfoModal('관리자 모드가 잠겨있습니다. 먼저 관리자 모드를 열어주세요.');
+    event.target.value = '';
+    return;
+  }
+  if(file.size > 8*1024*1024){
+    showInfoModal('파일이 너무 큽니다 (8MB 이하만 가능). 양식 그대로 쓰셨는지 확인해주세요.');
+    event.target.value = '';
+    return;
+  }
+  if(typeof XLSX === 'undefined'){
+    showInfoModal('엑셀 처리 기능을 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침 해주세요.');
+    event.target.value = '';
+    return;
+  }
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellDates:true});
+    if(!wb.SheetNames || wb.SheetNames.length===0){
+      showInfoModal('엑셀 파일 안에 시트를 찾지 못했습니다.');
+      event.target.value = '';
+      return;
+    }
+    const rentalRows = sheetRowsOf(wb, '임대이력').map(x=>parseRentalRow(x.r, x.rowNum));
+    const maintRows = sheetRowsOf(wb, '정비이력').map(x=>parseMaintRow(x.r, x.rowNum));
+    const partRows = sheetRowsOf(wb, '자재목록').map(x=>parsePartRow(x.r, x.rowNum));
+    const supplyRows = sheetRowsOf(wb, '부자재목록').map(x=>parseSupplyRow(x.r, x.rowNum));
+    const techRows = sheetRowsOf(wb, '정비사명단').map(x=>parseNameRow(x.r, x.rowNum, '이름', 'tech'));
+    const userRows = sheetRowsOf(wb, '사용자명단').map(x=>parseNameRow(x.r, x.rowNum, '이름', 'user'));
+
+    const allParsed = [...rentalRows, ...maintRows, ...partRows, ...supplyRows, ...techRows, ...userRows];
+    const valid = allParsed.filter(p=>p.ok);
+    const invalid = allParsed.filter(p=>!p.ok);
+    if(allParsed.length===0){
+      showInfoModal('시트에서 채워진 행을 하나도 찾지 못했습니다. 양식 그대로 쓰셨는지, 시트 이름이 [임대이력]/[정비이력]/[자재목록]/[부자재목록]/[정비사명단]/[사용자명단]과 같은지 확인해주세요.');
+      event.target.value = '';
+      return;
+    }
+    if(valid.length===0){
+      const sample = invalid.slice(0,8).map(p=>`${p.kind} ${p.rowNum}행 (${p.label}): ${p.reasons.join(', ')}`).join('\n');
+      showInfoModal(`가져올 수 있는 행이 없습니다.\n\n${sample}${invalid.length>8? `\n외 ${invalid.length-8}건 더`:''}`);
+      event.target.value = '';
+      return;
+    }
+    showExcelImportPreview({
+      rentals: valid.filter(p=>p.kind==='rental'),
+      maint: valid.filter(p=>p.kind==='maint'),
+      parts: valid.filter(p=>p.kind==='part'),
+      supplies: valid.filter(p=>p.kind==='supply'),
+      techs: valid.filter(p=>p.kind==='tech'),
+      users: valid.filter(p=>p.kind==='user'),
+    }, invalid);
+  }catch(err){
+    showInfoModal('엑셀 파일을 읽는 중 오류가 발생했습니다: ' + (err&&err.message?err.message:err) + '\n\n파일이 손상되지 않았는지, .xlsx 형식이 맞는지 확인해주세요.');
+  }
+  event.target.value = '';
+}
+function showExcelImportPreview(data, invalidRows){
+  pendingExcelImport = data;
+  const rows = data.rentals;
+  const seenGenIds = new Set();
+  let newGenCount = 0, completedCount = 0, ongoingCount = 0;
+  const ongoingGenIds = new Set();
+  const dupOngoing = new Set();
+  rows.forEach(row=>{
+    if(!findGen(row.genId) && !seenGenIds.has(row.genId)){ newGenCount++; }
+    seenGenIds.add(row.genId);
+    if(row.completed){ completedCount++; }
+    else {
+      if(ongoingGenIds.has(row.genId)) dupOngoing.add(row.genId);
+      ongoingGenIds.add(row.genId);
+      ongoingCount++;
+    }
+  });
+  data.maint.forEach(row=>{ if(!findGen(row.genId) && !seenGenIds.has(row.genId)){ newGenCount++; seenGenIds.add(row.genId); } });
+  const alreadyOutConflict = [...ongoingGenIds].filter(id=>{ const g=findGen(id); return g && g.status==='out'; });
+  const maintUnknownGen = data.maint.filter(row=>!findGen(row.genId) && !rows.some(r=>r.genId===row.genId));
+  const techOverflow = Math.max(0, data.techs.length - 3);
+
+  const invalidHtml = (invalidRows && invalidRows.length>0) ? `
+    <div class="hint" style="color:var(--warn);font-weight:700;margin-top:10px;">⚠️ 건너뛴 행 ${invalidRows.length}개</div>
+    <div class="detail-card" style="padding:8px 12px;max-height:140px;overflow-y:auto;font-size:12px;">
+      ${invalidRows.slice(0,20).map(p=>`<div>[${escR(p.kind)}] ${p.rowNum}행 (${escR(p.label)}): ${escR(p.reasons.join(', '))}</div>`).join('')}
+      ${invalidRows.length>20? `<div class="muted">외 ${invalidRows.length-20}건 더</div>`:''}
+    </div>` : '';
+  const warnHtml = [
+    dupOngoing.size>0? `<div class="hint" style="color:var(--danger);">같은 발전기번호가 "임대중"으로 [임대이력]에 여러 번 있습니다 (${[...dupOngoing].join(', ')}) — 마지막 줄 내용으로만 등록됩니다.</div>`:'',
+    alreadyOutConflict.length>0? `<div class="hint" style="color:var(--danger);">이미 [출고중]인 발전기가 "임대중" 건에 포함되어 있습니다 (${alreadyOutConflict.join(', ')}) — 기존 출고 정보를 새 내용으로 덮어씁니다.</div>`:'',
+    maintUnknownGen.length>0? `<div class="hint" style="color:var(--warn);">[정비이력]에 [임대이력]/기존 목록에는 없는 발전기번호가 있습니다 (${[...new Set(maintUnknownGen.map(r=>r.genId))].join(', ')}) — 새 발전기로 자동 등록 후 정비이력만 추가됩니다.</div>`:'',
+    techOverflow>0? `<div class="hint" style="color:var(--warn);">[정비사명단]이 ${data.techs.length}명인데 앱에는 3명까지만 등록 가능해서 앞 3명만 반영됩니다.</div>`:''
+  ].filter(Boolean).join('');
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,cancelExcelImport)">
+    <div class="modal">
+      <h3>엑셀 가져오기 확인</h3>
+      <div class="modal-sub">시트별로 가져올 내용을 확인해주세요.</div>
+      <div class="detail-card" style="padding:12px 14px;margin-bottom:10px;">
+        <div class="k">새로 등록될 발전기</div><div class="v">${newGenCount}대</div>
+        <div class="k">임대이력 - 완료 (이력 조회에 추가)</div><div class="v">${completedCount}건</div>
+        <div class="k">임대이력 - 임대중 (출고중에 추가)</div><div class="v">${ongoingCount}건</div>
+        <div class="k">정비이력</div><div class="v">${data.maint.length}건</div>
+        <div class="k">자재목록</div><div class="v">${data.parts.length}종</div>
+        <div class="k">부자재목록</div><div class="v">${data.supplies.length}종</div>
+        <div class="k">정비사명단</div><div class="v">${data.techs.length}명${techOverflow>0? ` (3명만 반영)`:''}</div>
+        <div class="k">사용자명단</div><div class="v">${data.users.length}명</div>
+      </div>
+      ${warnHtml}
+      ${invalidHtml}
+      <div class="modal-actions">
+        <button class="btn" onclick="cancelExcelImport()">취소</button>
+        <button class="btn primary" onclick="commitExcelImport()">가져오기 실행</button>
+      </div>
+    </div>
+  </div>`;
+}
+function cancelExcelImport(){
+  pendingExcelImport = null;
+  closeModal();
+}
+async function commitExcelImport(){
+  if(!isAdminModeUnlocked()){
+    showInfoModal('관리자 모드 시간이 만료되었습니다. 다시 열고 처음부터 진행해주세요.');
+    pendingExcelImport = null;
+    closeModal();
+    return;
+  }
+  const data = pendingExcelImport;
+  if(!data){ closeModal(); return; }
+  let newGens=0, completedCount=0, ongoingCount=0, maintCount=0, partCount=0, supplyCount=0, techCount=0, userCount=0;
+  try{
+    // 1. 임대이력
+    for(const row of data.rentals){
+      let g = findGen(row.genId);
+      if(!g){
+        g = {id: row.genId, model: row.model||'', manufactureDate:'', voltage: row.voltage||'', hours:0, lastMaintHours:0, hoursKnown:true, status:'in', rental:null};
+        DB.gens.push(g);
+        newGens++;
+      }
+      if(row.completed){
+        DB.rentals.push({
+          id: uid(), genId: g.id, customer: row.customer, manager: row.manager, phone: row.phone,
+          site: row.customer, address: row.address, supplies: row.supplies, suppliesItems: [], suppliesCustom: '',
+          suppliesRecovered: row.suppliesRecovered, suppliesNote: row.suppliesNote, fuelRequested: row.fuelRequested, fuelActual: row.fuelActual,
+          usageDays: row.usageDays, loadDate: row.loadDate || row.outDate, arriveTime: row.arriveTime, freightBearer: row.freightBearer, note: row.note,
+          outDate: row.outDate, inDate: row.inDate, startHours: row.startHours, endHours: row.endHours,
+          usedHours: row.endHours - row.startHours, longTerm: false, estDaily: null,
+          voltage: row.voltage || g.voltage || '', outProcessedBy: null, loadConfirmedBy: null,
+          inProcessedBy: DB.currentUserName || null, inProcessedAt: nowDateTimeStr(),
+          measuredFuelHeightCm: null, remainingFuelLiters: null,
+          paymentConfirmed: row.paymentConfirmed, forcedOut: row.forcedOut, forceReason: row.forceReason, forcedBy: row.forcedOut ? (DB.currentUserName||null) : null, importedFromExcel: true
+        });
+        if((g.hours||0) < row.endHours){ g.hours = row.endHours; }
+        g.hoursKnown = true;
+        completedCount++;
+      } else {
+        g.status = 'out';
+        g.hours = row.startHours;
+        g.hoursKnown = true;
+        if(row.voltage) g.voltage = row.voltage;
+        g.rental = {
+          customer: row.customer, manager: row.manager, phone: row.phone, site: row.customer, address: row.address,
+          supplies: row.supplies, suppliesItems: [], suppliesCustom: '', voltage: row.voltage||'', qty: row.qty||1,
+          fuelRequested: row.fuelRequested, fuelActual: row.fuelActual, usageDays: row.usageDays, loadDate: row.loadDate || row.outDate, arriveTime: row.arriveTime,
+          freightBearer: row.freightBearer, paymentConfirmed: row.paymentConfirmed, forcedOut: row.forcedOut, forceReason: row.forceReason, forcedBy: row.forcedOut ? (DB.currentUserName||null) : null, note: row.note,
+          outDate: row.outDate, startHours: row.startHours, longTerm: false, estDaily: null,
+          outProcessedBy: null, loadConfirmedBy: DB.currentUserName || null
+        };
+        ongoingCount++;
+      }
+    }
+    // 2. 정비이력
+    for(const row of data.maint){
+      let g = findGen(row.genId);
+      if(!g){
+        g = {id: row.genId, model: '', manufactureDate:'', voltage:'', hours: row.hours||0, lastMaintHours:0, hoursKnown:true, status:'in', rental:null};
+        DB.gens.push(g);
+        newGens++;
+      }
+      DB.maint.push({
+        id: uid(), genId: g.id, model: g.model||'', date: row.date, hours: row.hours,
+        content: row.content, contentItems: [], contentEtc: row.content, technician: row.technician,
+        partsUsed: row.partsUsed, type: row.type, photos: [], importedFromExcel: true
+      });
+      maintCount++;
+    }
+    // 3. 자재목록
+    for(const row of data.parts){
+      DB.partsStock = DB.partsStock || {};
+      DB.partsSpecs = DB.partsSpecs || {};
+      DB.partsUnit = DB.partsUnit || {};
+      DB.partsCategory = DB.partsCategory || {};
+      DB.partsSupplier = DB.partsSupplier || {};
+      DB.partsMinStock = DB.partsMinStock || {};
+      if(row.stock!=null) DB.partsStock[row.name] = row.stock;
+      else if(DB.partsStock[row.name]===undefined) DB.partsStock[row.name] = 0;
+      if(row.spec) DB.partsSpecs[row.name] = row.spec;
+      if(row.unit) DB.partsUnit[row.name] = row.unit;
+      if(row.category) DB.partsCategory[row.name] = row.category;
+      if(row.supplier) DB.partsSupplier[row.name] = row.supplier;
+      if(row.minStock!=null) DB.partsMinStock[row.name] = row.minStock;
+      partCount++;
+    }
+    // 4. 부자재목록
+    for(const row of data.supplies){
+      DB.suppliesCatalog = DB.suppliesCatalog || [];
+      DB.suppliesStock = DB.suppliesStock || {};
+      DB.suppliesSizes = DB.suppliesSizes || {};
+      DB.suppliesCategories = DB.suppliesCategories || {};
+      if(!DB.suppliesCatalog.includes(row.name)) DB.suppliesCatalog.push(row.name);
+      if(row.stock!=null) DB.suppliesStock[row.name] = row.stock;
+      else if(DB.suppliesStock[row.name]===undefined) DB.suppliesStock[row.name] = 0;
+      if(row.spec) DB.suppliesSizes[row.name] = row.spec;
+      if(row.category) DB.suppliesCategories[row.name] = row.category;
+      supplyCount++;
+    }
+    // 5. 정비사명단 (최대 3명)
+    data.techs.slice(0,3).forEach((row, i)=>{
+      DB.technicians[i] = row.name;
+      techCount++;
+    });
+    // 6. 사용자명단
+    DB.teamMembers = DB.teamMembers || [];
+    for(const row of data.users){
+      if(!DB.teamMembers.includes(row.name)){ DB.teamMembers.push(row.name); userCount++; }
+    }
+    await saveGens();
+    await saveRentals();
+    if(data.maint.length>0) await saveWithRetry(saveMaint);
+    if(data.parts.length>0){
+      await saveWithRetry(savePartsStock);
+      await saveWithRetry(savePartsSpecs);
+      await saveWithRetry(async()=>{ await storageSetChecked('gen-parts-unit-v1', JSON.stringify(DB.partsUnit), true); });
+      await saveWithRetry(savePartsCategory);
+      await saveWithRetry(savePartsSupplier);
+      await saveWithRetry(savePartsMinStock);
+    }
+    if(data.supplies.length>0){
+      await saveWithRetry(saveSuppliesCatalog);
+      await saveWithRetry(saveSuppliesStock);
+      await saveWithRetry(saveSuppliesSizes);
+      await saveWithRetry(saveSuppliesCategories);
+    }
+    if(data.techs.length>0) await saveWithRetry(saveTechnicians);
+    if(data.users.length>0) await saveWithRetry(saveTeamMembers);
+    pendingExcelImport = null;
+    closeModal();
+    renderContent();
+    flash(`엑셀 가져오기 완료 — 새 발전기 ${newGens}대, 임대이력 ${completedCount+ongoingCount}건, 정비이력 ${maintCount}건, 자재 ${partCount}종, 부자재 ${supplyCount}종, 정비사 ${techCount}명, 사용자 ${userCount}명 추가`);
+  }catch(err){
+    showInfoModal('가져오기 중 오류가 발생해 일부만 저장됐을 수 있습니다: ' + (err&&err.message?err.message:err) + '\n\n[설정 → 전체 데이터 백업]에서 백업을 받아 상태를 확인해주세요.');
+  }
+}
 initPasswordGate();
+
 </script>
 </body>
 </html>
