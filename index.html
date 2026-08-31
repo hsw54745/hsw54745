@@ -1108,12 +1108,12 @@ function inDateLabel(dateStr){
 function inDateLabelFull(dateStr){
   const diff = daysFromToday(dateStr);
   const dateTxt = dow(dateStr);
-  if(diff===0) return `오늘입고 · ${dateTxt}`;
-  if(diff===1) return `입고임박 · ${dateTxt}`;
-  if(diff===2) return `입고2일전 · ${dateTxt}`;
-  if(diff===3) return `입고3일전 · ${dateTxt}`;
-  if(diff<0) return `${dateTxt} (지연)`;
-  return dateTxt;
+  if(diff===0) return `입고예정일: ${dateTxt} (오늘)`;
+  if(diff===1) return `입고예정일: ${dateTxt} (임박)`;
+  if(diff===2) return `입고예정일: ${dateTxt} (2일전)`;
+  if(diff===3) return `입고예정일: ${dateTxt} (3일전)`;
+  if(diff<0) return `입고예정일: ${dateTxt} (지연)`;
+  return `입고예정일: ${dateTxt}`;
 }
 // 하루 최대 사용시간 기준 (이 시간을 초과해서 사용된 임대 건을 "과다사용"으로 표시합니다)
 const OVERUSE_DAILY_LIMIT_DEFAULT = 10;
