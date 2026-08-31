@@ -3575,7 +3575,7 @@ function renderManualTab(){
       ['인수증', '거래처에 보여줄 인수증 미리보기를 엽니다. 연료를 넣기로 되어 있는 건은 인수증을 열기 전에 "연료 OOL 주유하시기 바랍니다" 알림이 먼저 뜨고, 확인해야 인수증이 열립니다 (상차 나가기 직전에 놓치지 않도록). "🖨 인쇄하기"로 바로 인쇄하거나, 파일로 다운로드·공유할 수 있습니다. 공급자용에는 연료 요청량과 실제주입량이 함께 표시되고, 공급받는자용에는 요청량만 표시됩니다.'],
       ['인수증 공유 · 📱 문자로 보내기', '"📱 문자로 보내기" 버튼은 인수증 미리보기 상단 툴바(공유하기 버튼 바로 왼쪽)와, "공유하기"를 눌러서 뜨는 화면 둘 다에 있습니다. 공유 화면에서 받는 사람 번호를 콤마로 여러 개 넣으면(예: 01012345678, 01087654321) 눌렀을 때 휴대폰 문자 앱이 단체문자로 열리면서 인수증 내용이 자동으로 채워집니다. 상단 툴바 버튼은 번호 입력 없이 바로 눌러서, 문자 앱이 열린 뒤 받는 사람을 직접 골라도 됩니다. 별도 문자 발송 서비스 가입이나 비용 없이, 사용 중인 휴대폰 문자 앱을 그대로 이용하는 방식입니다. PC에는 문자 앱이 없어 동작하지 않고, 받는 사람이 많거나 내용이 길면 기기에 따라 일부만 채워질 수 있어 그럴 땐 "복사하기"로 붙여넣어 사용하면 됩니다.'],
       ['📇 연락처 저장', '인수증 미리보기 상단과 공유 화면에 있는 버튼입니다. 누르면 연락처 파일(.vcf)이 다운로드되고, 스마트폰에서 그 파일을 열면 이번 출고 건의 거래처명·담당자·전화번호·현장주소가 담긴 "연락처 추가" 화면이 바로 뜹니다. 방문 전 담당자 연락처를 폰에 저장해두고 싶을 때 쓰면 편리합니다.'],
-      ['내용보기/수정', '상차대기 상태인 항목의 세부 내용을 확인하거나 고칩니다.'],
+      ['내용보기/수정', '상차대기 상태인 항목의 세부 내용을 확인하거나 고칩니다. 맨 위 "발전기 번호 (변경 가능)" 드롭다운으로 다른 발전기로 바꿀 수도 있는데, 지금 입고 상태이고 다른 곳에 예약되지 않은 발전기만 고를 수 있고 바꾸면 "출고시 누적 사용시간"이 그 발전기의 현재 누적시간으로 자동으로 채워집니다.'],
       ['상차완료', '실제로 발전기를 싣고 출발했을 때 누르면 정식으로 [출고중] 상태가 됩니다. 연료 요청·주입 기록이 있는 건은 "연료를 실제로 넣었습니다" 체크박스를 눌러야만 완료 처리가 되어, 연료 안 넣고 그냥 상차하는 실수를 막아줍니다. 목록의 연료량도 크고 굵게 표시됩니다.'],
       ['출고하기', '상차대기가 아닌 일반 예약 건을 실제 출고 처리합니다.'],
       ['출고 취소 / 예약 취소', '해당 건을 취소하고 목록에서 제거합니다.'],
@@ -6671,14 +6671,25 @@ function openOutModal(id, reservationId){
   }
   const prefillSuppliesItems = (res && res.suppliesItems) || [];
   const prefillSuppliesCustom = res ? (res.suppliesItems ? (res.suppliesCustom||'') : (res.supplies||'')) : '';
+  const targetGenOptionsHtml = (()=>{
+    if(!isEditingPending) return '';
+    const reservedElsewhere = new Set(DB.reservations.filter(r=>r.id!==reservationId).map(r=>r.genId));
+    const candidates = activeGens().filter(x=>x.id===g.id || (x.status==='in' && !x.underRepair && !reservedElsewhere.has(x.id))).sort(sortByIdNatural);
+    return candidates.map(x=>`<option value="${x.id}" ${x.id===g.id?'selected':''}>${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
+  })();
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
       <h3>${isEditingPending? '상차대기 내용 수정' : '출고하기'}</h3>
-      <div class="modal-sub">${g.id} · [${displayModel(g)}]</div>
+      <div class="modal-sub" id="out-modal-sub">${g.id} · [${displayModel(g)}]</div>
+      ${isEditingPending? `<div class="field">
+        <label>발전기 번호 (변경 가능)</label>
+        <select id="f-target-gen" onchange="onTargetGenChange()">${targetGenOptionsHtml}</select>
+        <div class="hint">다른 발전기로 바꾸면 아래 "출고시 누적 사용시간"이 그 발전기의 현재 누적시간으로 자동으로 바뀝니다. 이미 입고중이고 다른 곳에 예약되지 않은 발전기만 고를 수 있습니다.</div>
+      </div>` : ''}
       <div id="vehicle-suggest-wrap">${vehicleSuggestionHtml(g.model, (res&&res.qty)||1, g.id)}</div>
       ${isEditingPending? `<div class="hint" style="margin-bottom:10px;">이 발전기는 이미 [출고 대기]에 상차대기로 등록되어 있습니다. 여기서 수정하면 상차대기 내용이 갱신됩니다.</div>` : ''}
-      <div class="field"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}"><div class="hint">현재 누적시간: ${(g.hours||0).toLocaleString()}h</div></div>
+      <div class="field"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}"><div class="hint" id="starthours-hint">현재 누적시간: ${(g.hours||0).toLocaleString()}h</div></div>
       <div class="field-row">
         <div class="field"><label>도착일</label>
           <input type="date" id="f-outdate" value="${(res&&(res.outDate||res.plannedOutDate))||todayStr()}" onchange="syncReturnDateToUsageDays()">
@@ -6803,6 +6814,21 @@ function toggleForceOutField(){
     if(reasonWrap) reasonWrap.style.display = 'none';
   }
 }
+function onTargetGenChange(){
+  const sel = document.getElementById('f-target-gen');
+  if(!sel) return;
+  const g = findGen(sel.value);
+  if(!g) return;
+  const subEl = document.getElementById('out-modal-sub');
+  if(subEl) subEl.textContent = `${g.id} · [${g.model||'미설정'}]`;
+  const hoursEl = document.getElementById('f-starthours');
+  if(hoursEl){ hoursEl.value = g.hours||0; hoursEl.min = g.hours||0; }
+  const hintEl = document.getElementById('starthours-hint');
+  if(hintEl) hintEl.textContent = `현재 누적시간: ${(g.hours||0).toLocaleString()}h`;
+  const qtyEl = document.getElementById('f-qty');
+  const vsWrap = document.getElementById('vehicle-suggest-wrap');
+  if(vsWrap) vsWrap.innerHTML = vehicleSuggestionHtml(g.model, (qtyEl&&Number(qtyEl.value))||1, g.id);
+}
 function toggleForceOutReason(){
   const on = document.getElementById('f-force-out').checked;
   const wrap = document.getElementById('f-force-reason-wrap');
@@ -6812,9 +6838,29 @@ function toggleLongtermField(){
   const on = document.getElementById('f-longterm').checked;
   document.getElementById('f-estdaily-wrap').style.display = on ? 'block' : 'none';
 }
-async function submitOut(id, reservationId){
+async function submitOut(idParam, reservationId){
+  const targetSelEl = document.getElementById('f-target-gen');
+  const id = targetSelEl ? targetSelEl.value : idParam;
   const g = findGen(id);
   const errElGuard = document.getElementById('f-err');
+  if(!g){
+    if(errElGuard){ errElGuard.textContent = '선택한 발전기를 찾을 수 없습니다.'; errElGuard.style.display='block'; }
+    return;
+  }
+  if(targetSelEl && id!==idParam){
+    if(g.status!=='in'){
+      if(errElGuard){ errElGuard.textContent = `${g.id}은(는) 지금 입고 상태가 아니라 선택할 수 없습니다.`; errElGuard.style.display='block'; }
+      return;
+    }
+    if(g.underRepair){
+      if(errElGuard){ errElGuard.textContent = `${g.id}은(는) 고장 수리 중이라 선택할 수 없습니다.`; errElGuard.style.display='block'; }
+      return;
+    }
+    if(DB.reservations.some(r=>r.genId===id && r.id!==reservationId)){
+      if(errElGuard){ errElGuard.textContent = `${g.id}은(는) 이미 다른 출고 대기에 등록되어 있어 선택할 수 없습니다.`; errElGuard.style.display='block'; }
+      return;
+    }
+  }
   if(g.status==='out' && !(reservationId && DB.reservations.find(r=>r.id===reservationId && r.pendingLoad))){
     if(errElGuard){ errElGuard.textContent = '입고 처리가 완료되지 않은 발전기는 출고할 수 없습니다.'; errElGuard.style.display='block'; }
     return;
