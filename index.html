@@ -8935,9 +8935,9 @@ async function generateAllGenQrPrintFile(forceAll){
   for(let i=0;i<list.length;i++){
     const g = list[i];
     if(i>0 && i%12===0) cards.push('<div class="qr-page-break"></div>');
-    const url = await buildQrDataUrl(genQrUrl(g.id), 240);
+    const url = await buildQrDataUrl(genQrUrl(g.id), 260);
     cards.push(`<div class="qr-card">
-      <img src="${url}" width="180" height="180">
+      <img src="${url}">
       <div class="qr-id">${escR(g.id)}</div>
     </div>`);
   }
@@ -8949,9 +8949,9 @@ async function generateAllGenQrPrintFile(forceAll){
   .page-pad{padding:15mm;}
   .print-hint{background:#FBEDDB;border:1px solid #C97A1E;padding:8px 12px;margin-bottom:14px;font-size:13px;border-radius:6px;}
   .qr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8mm 6mm;justify-items:center;}
-  .qr-card{width:100%;border:1px dashed #999;border-radius:6px;padding:8px 4px;text-align:center;break-inside:avoid;}
-  .qr-card img{display:block;margin:0 auto 5px;}
-  .qr-id{font-weight:800;font-size:22px;margin-top:2px;}
+  .qr-card{width:100%;height:56mm;border:1px dashed #999;border-radius:6px;padding:3mm;text-align:center;break-inside:avoid;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .qr-card img{display:block;width:38mm;height:38mm;margin:0 auto 2mm;}
+  .qr-id{font-weight:800;font-size:16px;line-height:1.1;}
   .qr-page-break{grid-column:1/-1;height:0;break-before:page;}
   @page{ size:A4 portrait; margin:15mm; }
   @media print{ .print-hint{ display:none; } .page-pad{ padding:0; } }
