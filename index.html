@@ -3234,7 +3234,7 @@ function renderGenHistory(){
       </div>
       <div class="detail-grid">
         <div class="item"><div class="k">누적 사용시간</div><div class="v">${hoursStatus(g)==='known'? (g.hours||0).toLocaleString()+'h' : (hoursStatus(g)==='na'? '해당없음' : '미확인')}</div></div>
-        <div class="item"><div class="k">마지막 정비시점</div><div class="v">${g.hoursKnown? (g.lastMaintHours||0).toLocaleString()+'h' : '-'}</div></div>
+        <div class="item"><div class="k">마지막 정비시점</div><div class="v">${g.hoursKnown? (g.lastMaintHours||0).toLocaleString()+'h' : '-'}${g.lastMaintDate? `<div class="muted" style="font-size:11px;font-weight:400;">${dow(g.lastMaintDate)}</div>`:''}</div></div>
         <div class="item"><div class="k">정비 후 경과</div><div class="v">${el!==null? Math.round(el).toLocaleString()+'h' : '확인불가'}</div></div>
         <div class="item"><div class="k">정비 주기</div><div class="v" style="${getCycle(g)!==DEFAULT_CYCLE? 'color:var(--danger);':''}">${getCycle(g).toLocaleString()}h${getCycle(g)!==DEFAULT_CYCLE? ` <span style="font-size:11px;font-weight:400;">(기본값 ${DEFAULT_CYCLE}h 아님)</span>`:''}</div></div>
         <div class="item"><div class="k">누적 임대 사용시간</div><div class="v">${totalRentedHours.toLocaleString()}h</div></div>
