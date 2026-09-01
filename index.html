@@ -3974,7 +3974,7 @@ function renderCalendar(){
     const isToday = dateStr===todayS;
     const dowIdx = idx % 7;
     const evs = (DB.calendarEvents||[]).filter(e=>e.date===dateStr);
-    const evHtml = evs.slice(0,4).map(e=>`<div style="color:var(--primary-dark);font-weight:600;font-size:11.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escR(e.text)}</div>`).join('');
+    const evHtml = evs.slice(0,4).map(e=>`<div style="color:var(--primary-dark);font-weight:600;font-size:11.5px;margin-top:3px;word-break:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escR(e.text)}</div>`).join('');
     const moreTxt = evs.length>4? `<div class="muted" style="font-size:10.5px;margin-top:1px;">+${evs.length-4}건 더</div>` : '';
     return `<div style="min-height:88px;border:1px solid var(--border);border-radius:6px;padding:5px;cursor:pointer;${isToday?'background:var(--warn-tint);border-color:var(--warn);':''}" onclick="openCalendarDayModal('${dateStr}')">
       <div style="font-size:13px;font-weight:${isToday?'800':'600'};color:${dowIdx===0?'var(--danger)':dowIdx===6?'var(--primary-dark)':'var(--ink)'};">${d}</div>
