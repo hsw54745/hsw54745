@@ -3596,7 +3596,7 @@ function renderManualTab(){
 
     ${manualSection('⏳','출고 대기', false,
       '출고하기를 누르면 발전기가 먼저 여기 "출고 대기"로 등록됩니다. 실제로 상차·출발해야 진짜 "출고중"이 됩니다.', [
-      ['인수증', '거래처에 보여줄 인수증 미리보기를 엽니다. 연료를 넣기로 되어 있는 건은 인수증을 열기 전에 "연료 OOL 주유하시기 바랍니다" 알림이 먼저 뜨고, 확인해야 인수증이 열립니다 (상차 나가기 직전에 놓치지 않도록). "🖨 인쇄하기"로 바로 인쇄하거나, 파일로 다운로드·공유할 수 있습니다. 공급자용에는 연료 요청량과 실제주입량이 함께 표시되고, 공급받는자용에는 요청량만 표시됩니다.'],
+      ['인수증', '거래처에 보여줄 인수증 미리보기를 엽니다. 연료를 넣기로 되어 있는 건은 인수증을 열기 전에 연료 안내 알림이 먼저 뜨고, 확인해야 인수증이 열립니다 (상차 나가기 직전에 놓치지 않도록). 고객요청량과 실제주입량이 다르면 "고객요청 OOL (실제주입 OOL) 주유하시기 바랍니다"처럼 둘 다 함께 표시되고, 같으면 요청량만 표시됩니다. "🖨 인쇄하기"로 바로 인쇄하거나, 파일로 다운로드·공유할 수 있습니다. 공급자용에는 연료 요청량과 실제주입량이 함께 표시되고, 공급받는자용에는 요청량만 표시됩니다.'],
       ['인수증 공유 · 📱 문자로 보내기', '"📱 문자로 보내기" 버튼은 인수증 미리보기 상단 툴바(공유하기 버튼 바로 왼쪽)와, "공유하기"를 눌러서 뜨는 화면 둘 다에 있습니다. 공유 화면에서 받는 사람 번호를 콤마로 여러 개 넣으면(예: 01012345678, 01087654321) 눌렀을 때 휴대폰 문자 앱이 단체문자로 열리면서 인수증 내용이 자동으로 채워집니다. 상단 툴바 버튼은 번호 입력 없이 바로 눌러서, 문자 앱이 열린 뒤 받는 사람을 직접 골라도 됩니다. 별도 문자 발송 서비스 가입이나 비용 없이, 사용 중인 휴대폰 문자 앱을 그대로 이용하는 방식입니다. PC에는 문자 앱이 없어 동작하지 않고, 받는 사람이 많거나 내용이 길면 기기에 따라 일부만 채워질 수 있어 그럴 땐 "복사하기"로 붙여넣어 사용하면 됩니다.'],
       ['📇 연락처 저장', '인수증 미리보기 상단과 공유 화면에 있는 버튼입니다. 누르면 연락처 파일(.vcf)이 다운로드되고, 스마트폰에서 그 파일을 열면 이번 출고 건의 거래처명·담당자·전화번호·현장주소가 담긴 "연락처 추가" 화면이 바로 뜹니다. 방문 전 담당자 연락처를 폰에 저장해두고 싶을 때 쓰면 편리합니다.'],
       ['내용보기/수정', '상차대기 상태인 항목의 세부 내용을 확인하거나 고칩니다. 맨 위 "발전기 번호 (변경 가능)" 드롭다운으로 다른 발전기로 바꿀 수도 있는데, 지금 입고 상태이고 다른 곳에 예약되지 않은 발전기만 고를 수 있고 바꾸면 "출고시 누적 사용시간"이 그 발전기의 현재 누적시간으로 자동으로 채워집니다.'],
@@ -7473,14 +7473,19 @@ function printReceiptForReservation(resId){
   const g = findGen(r.genId);
   if(!g){ showInfoModal('해당 발전기를 찾을 수 없습니다.'); return; }
   if(r.fuelRequested!=null || r.fuelActual!=null){
-    const fuelAmt = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
+    const hasActualDiff = r.fuelActual!=null && r.fuelRequested!=null && r.fuelActual!==r.fuelRequested;
+    const fuelLine = r.fuelRequested!=null
+      ? `고객요청 ${r.fuelRequested}L${hasActualDiff? ` (실제주입 ${r.fuelActual}L)` : ''} 주유하시기 바랍니다`
+      : `실제주입 ${r.fuelActual}L 주유하시기 바랍니다`;
+    const len = fuelLine.length;
+    const fuelFontSize = len > 30 ? 12.5 : len > 24 ? 14 : len > 18 ? 15.5 : 17;
     document.getElementById('modal-root').innerHTML = `
     <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-      <div class="modal">
+      <div class="modal" style="max-width:${len > 20 ? 480 : 420}px;">
         <h3>⛽ 연료 안내</h3>
         <div class="modal-sub">${escR(r.genId)}</div>
-        <div style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:16px;text-align:center;">
-          <div style="font-size:17px;font-weight:800;color:var(--primary-dark);">연료 ${fuelAmt}L 주유하시기 바랍니다</div>
+        <div style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:16px 10px;text-align:center;">
+          <div style="font-size:${fuelFontSize}px;font-weight:800;color:var(--primary-dark);white-space:nowrap;">${fuelLine}</div>
         </div>
         <div class="modal-actions">
           <button class="btn" onclick="closeModal()">취소</button>
