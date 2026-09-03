@@ -1200,7 +1200,7 @@ function gaugeHtml(elapsed, remaining, cycle){
   const st = maintStatus(remaining);
   const color = st==='danger'?'var(--danger)':st==='warn'?'var(--warn)':'var(--ok)';
   const txt = remaining<0 ? (Math.abs(Math.round(remaining))+'h 초과') : (Math.round(remaining)+'h 남음');
-  return `<div class="gauge-wrap"><div class="gauge"><div class="gauge-fill" style="width:${pct}%;background:${color}"></div></div><span class="gauge-txt" style="color:${color}">${txt}</span></div>`;
+  return `<div class="gauge-wrap"><div class="gauge"><div class="gauge-fill" style="width:${pct}%;background:${color}"></div></div><span class="gauge-txt" style="color:${color}">${txt}</span></div><div class="muted" style="font-size:11px;margin-top:2px;">마지막 정비 후 ${Math.round(elapsed).toLocaleString()}시간 사용</div>`;
 }
 function pillHtml(status){
   const map={ok:['정상','ok'],warn:['임박','warn'],danger:['정비필요','danger']};
@@ -1649,7 +1649,9 @@ function renderDashboard(){
     const given = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     let fuelCell = '<span class="muted">-</span>';
     if(given!=null){
-      if(r.measuredFuelHeightCm==null){
+      if(r.fuelNotUsed){
+        fuelCell = '<span class="pill gray">연료사용안함</span>';
+      } else if(r.measuredFuelHeightCm==null){
         fuelCell = '<span class="pill danger">연료 미확인</span>';
       } else {
         const remain = g ? computeFuelLiters(g, r.measuredFuelHeightCm) : null;
@@ -1906,7 +1908,7 @@ function sortByIdNatural(a, b){
 }
 function lastFuelInfo(genId){
   const g = findGen(genId);
-  const recs = DB.rentals.filter(r=>r.genId===genId && r.measuredFuelHeightCm!=null).sort((a,b)=>(b.inDate||'').localeCompare(a.inDate||''));
+  const recs = DB.rentals.filter(r=>r.genId===genId && (r.measuredFuelHeightCm!=null || r.fuelNotUsed)).sort((a,b)=>(b.inDate||'').localeCompare(a.inDate||''));
   if(recs.length===0) return null;
   const latest = recs[0];
   if(g && g.fuelResetAt && g.fuelResetAt >= (latest.inDate||'')) return null;
@@ -1983,9 +1985,11 @@ function renderInList(){
     const fuelRec = lastFuelInfo(g.id);
     const liveLiters = fuelRec ? computeFuelLiters(g, fuelRec.measuredFuelHeightCm) : null;
     const fuelCell = fuelRec
-      ? (liveLiters!=null
-          ? `<span title="측정일: ${fuelRec.inDate||'-'} · 측정높이 ${fuelRec.measuredFuelHeightCm}cm">약 ${liveLiters}L</span><button class="btn sm" style="margin-left:4px;padding:2px 6px;font-size:10.5px;" onclick="resetFuelReading('${g.id}')" title="기준점까지 다시 뺀 뒤 눌러주세요. 다음 출고 준비 완료 상태로 초기화됩니다.">초기화</button>`
-          : `<span class="muted" title="측정일: ${fuelRec.inDate||'-'}">높이 ${fuelRec.measuredFuelHeightCm}cm (규격 미등록)</span>`)
+      ? (fuelRec.fuelNotUsed
+          ? `<span class="pill gray" title="입고일: ${fuelRec.inDate||'-'}">연료사용안함</span><button class="btn sm" style="margin-left:4px;padding:2px 6px;font-size:10.5px;" onclick="resetFuelReading('${g.id}')" title="다음 출고 준비 완료 상태로 초기화됩니다.">초기화</button>`
+          : (liveLiters!=null
+              ? `<span title="측정일: ${fuelRec.inDate||'-'} · 측정높이 ${fuelRec.measuredFuelHeightCm}cm">약 ${liveLiters}L</span><button class="btn sm" style="margin-left:4px;padding:2px 6px;font-size:10.5px;" onclick="resetFuelReading('${g.id}')" title="기준점까지 다시 뺀 뒤 눌러주세요. 다음 출고 준비 완료 상태로 초기화됩니다.">초기화</button>`
+              : `<span class="muted" title="측정일: ${fuelRec.inDate||'-'}">높이 ${fuelRec.measuredFuelHeightCm}cm (규격 미등록)</span>`))
       : '<span class="muted">-</span>';
     const isPendingOut = pendingGenIds.has(g.id);
     const isBroken = !!g.underRepair;
@@ -3336,7 +3340,7 @@ function renderGenHistory(){
         <td>${dow(r.outDate)||'-'}</td>
         <td>${dow(r.inDate)||'-'}</td>
         <td class="wrap-ok">${r.customer||'-'}${(r.manager||r.phone)? `<div class="muted" style="font-size:11px;">${[r.manager,r.phone].filter(Boolean).join(' · ')}</div>`:''}</td>
-        <td class="wrap-ok">${[r.site,r.address].filter(Boolean).join(' · ')||'-'}${r.supplies? `<div class="muted" style="font-size:11px;">부자재(출고): ${r.supplies}</div>`:''}${r.supplies? `<div class="muted" style="font-size:11px;">부자재 회수: ${r.suppliesRecovered? '<span class="pill ok">회수됨</span>' : `<span class="pill danger">회수안됨</span>${r.suppliesNote? ` - ${r.suppliesNote}`:''}`}</div>`:''}${r.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${r.fuelRequested}L${r.fuelActual && r.fuelActual!==r.fuelRequested? ` (실제주입 ${r.fuelActual}L)`:''}</div>`:''}${r.measuredFuelHeightCm!=null? `<div class="muted" style="font-size:11px;">반납시 연료: ${(()=>{ const L=computeFuelLiters(g, r.measuredFuelHeightCm); return L!=null? `약 ${L}L ` : ''; })()}(측정높이 ${r.measuredFuelHeightCm}cm)</div>`:''}${(()=>{ const given = r.fuelRequested!=null? r.fuelRequested : r.fuelActual; const remain = r.measuredFuelHeightCm!=null? computeFuelLiters(g, r.measuredFuelHeightCm) : null; if(given==null || remain==null) return ''; const used = Math.round((given-remain)*10)/10; return `<div class="muted" style="font-size:11px;font-weight:700;color:var(--primary-dark);">⛽ ${given}L 중 ${remain}L 남아서 반납 → 사용량 약 ${used}L</div>`; })()}${(r.loadDate||r.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(r.loadDate),r.arriveTime].filter(Boolean).join(' · ')}</div>`:''}${r.freightBearer? `<div class="muted" style="font-size:11px;">운임료: ${r.freightBearer}</div>`:''}${r.note? `<div class="muted" style="font-size:11px;">비고: ${r.note}</div>`:''}${(r.outProcessedBy||r.inProcessedBy)? `<div class="muted" style="font-size:11px;">${[r.outProcessedBy? `출고: ${escR(r.outProcessedBy)}`:null, r.inProcessedBy? `입고: ${escR(r.inProcessedBy)}`:null].filter(Boolean).join(' · ')}</div>`:''}</td>
+        <td class="wrap-ok">${[r.site,r.address].filter(Boolean).join(' · ')||'-'}${r.supplies? `<div class="muted" style="font-size:11px;">부자재(출고): ${r.supplies}</div>`:''}${r.supplies? `<div class="muted" style="font-size:11px;">부자재 회수: ${r.suppliesRecovered? '<span class="pill ok">회수됨</span>' : `<span class="pill danger">회수안됨</span>${r.suppliesNote? ` - ${r.suppliesNote}`:''}`}</div>`:''}${r.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${r.fuelRequested}L${r.fuelActual && r.fuelActual!==r.fuelRequested? ` (실제주입 ${r.fuelActual}L)`:''}</div>`:''}${r.fuelNotUsed? `<div class="muted" style="font-size:11px;">반납시 연료: <span class="pill gray">연료사용안함</span></div>`:''}${(!r.fuelNotUsed && r.measuredFuelHeightCm!=null)? `<div class="muted" style="font-size:11px;">반납시 연료: ${(()=>{ const L=computeFuelLiters(g, r.measuredFuelHeightCm); return L!=null? `약 ${L}L ` : ''; })()}(측정높이 ${r.measuredFuelHeightCm}cm)</div>`:''}${(()=>{ const given = r.fuelRequested!=null? r.fuelRequested : r.fuelActual; const remain = r.measuredFuelHeightCm!=null? computeFuelLiters(g, r.measuredFuelHeightCm) : null; if(given==null || remain==null) return ''; const used = Math.round((given-remain)*10)/10; return `<div class="muted" style="font-size:11px;font-weight:700;color:var(--primary-dark);">⛽ ${given}L 중 ${remain}L 남아서 반납 → 사용량 약 ${used}L</div>`; })()}${(r.loadDate||r.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(r.loadDate),r.arriveTime].filter(Boolean).join(' · ')}</div>`:''}${r.freightBearer? `<div class="muted" style="font-size:11px;">운임료: ${r.freightBearer}</div>`:''}${r.note? `<div class="muted" style="font-size:11px;">비고: ${r.note}</div>`:''}${(r.outProcessedBy||r.inProcessedBy)? `<div class="muted" style="font-size:11px;">${[r.outProcessedBy? `출고: ${escR(r.outProcessedBy)}`:null, r.inProcessedBy? `입고: ${escR(r.inProcessedBy)}`:null].filter(Boolean).join(' · ')}</div>`:''}</td>
         <td class="muted">${(r.usedHours||0).toLocaleString()}h${isRentalOveruse(r)? `<div><span class="pill danger" title="일평균 ${rentalAvgDaily(r).toFixed(1)}h/일 (하루 ${overuseLimit()}시간 초과)">🚨 과다사용</span></div>`:''}</td>
         <td>${r.longTerm?'<span class="pill gray">장기</span>':'<span class="pill gray">단기</span>'}</td>
         <td><button class="btn sm danger" onclick="deleteRental('${r.id}','${id}')">삭제</button></td>
@@ -3690,7 +3694,7 @@ function renderManualTab(){
       '현재 현장에 나가있는(출고중) 발전기 목록입니다. 단기임대/장기임대로 나뉘어 표시됩니다.', [
       ['정보 수정', '이미 출고중인 발전기의 거래처·현장·날짜·사용기간 등을 입고 처리 없이 바로 고칩니다. 맨 위에서 출고시 누적 사용시간을 먼저 확인·수정합니다.'],
       ['인수증 미리보기', '실제 출고 처리 없이 인수증만 미리 보기 · 🖨 인쇄하기로 바로 인쇄 · 파일 다운로드 · 공유'],
-      ['입고 처리', '반납받을 때 눌러서 입고 처리합니다(누적시간, 연료 측정 등 입력).'],
+      ['입고 처리', '반납받을 때 눌러서 입고 처리합니다(누적시간, 연료 측정 등 입력). 연료를 넣어드린 발전기인데 실제로 손도 안 대고 그대로 반납된 경우는 "⛽ 연료사용안함" 버튼을 누르면 높이 측정 없이 그렇게 기록되고, [입고] 목록의 "남은연료" 칸에도 "연료사용안함"으로 표시됩니다(다른 측정값처럼 "초기화" 버튼으로 지울 수 있습니다).'],
       ['⚡ 정보없이 강제입고', '누적시간·연료·부자재 등 아무 정보도 입력하지 않고 바로 [입고] 상태로 전환합니다. 잘못 출고 처리한 발전기를 빠르게 되돌릴 때 사용하며, 이번 출고 이력은 남기지 않습니다.'],
       ['한번에 입고', '왼쪽 체크박스로 여러 대를 선택하면 뜨는 "한번에 입고" 버튼으로, 여러 대를 한 번에 정상입고 처리합니다. 발전기별 입고시 누적 사용시간을 대별로 각각 입력합니다. (고장 등록이 필요하거나 연료 높이 측정이 필요한 경우는 개별 "입고 처리"를 이용해주세요)'],
       ['장기→단기 / 단기→장기', '임대 구분을 전환합니다. 장기임대는 예상 사용시간을 입력해 정비 시점을 추정합니다.'],
@@ -8102,6 +8106,25 @@ async function copyShareText(){
   if(ok) flash('복사되었습니다');
 }
 
+function toggleFuelNotUsed(){
+  const flagEl = document.getElementById('f-fuel-not-used');
+  const heightWrap = document.getElementById('f-fuel-height-wrap');
+  const heightEl = document.getElementById('f-fuel-height');
+  const resultEl = document.getElementById('f-fuel-calc-result');
+  const btn = document.getElementById('f-fuel-not-used-btn');
+  if(!flagEl || !btn) return;
+  const nowOn = flagEl.value !== 'yes';
+  flagEl.value = nowOn ? 'yes' : '';
+  btn.classList.toggle('primary', nowOn);
+  btn.textContent = nowOn ? '⛽ 연료사용안함 (선택됨) — 취소하려면 다시 클릭' : '⛽ 연료사용안함';
+  if(heightWrap) heightWrap.style.display = nowOn ? 'none' : 'block';
+  if(nowOn){
+    if(heightEl) heightEl.value = '';
+    if(resultEl){ resultEl.style.display='block'; resultEl.innerHTML = `<div style="font-size:13px;font-weight:700;color:var(--primary-dark);">연료를 사용하지 않고 그대로 반납된 것으로 기록됩니다.</div>`; }
+  } else {
+    if(resultEl) resultEl.style.display = 'none';
+  }
+}
 function calcRemainingFuel(id){
   const g = findGen(id);
   const heightEl = document.getElementById('f-fuel-height');
@@ -8140,8 +8163,7 @@ function openInModal(id){
   const outInfoRows = [
     rt.supplies? `<div class="k">부자재</div><div class="v" style="font-size:13px;font-weight:400;">${escR(rt.supplies)}</div>` : null,
     rt.voltage? `<div class="k">출고시 전압</div><div class="v" style="font-size:13px;font-weight:400;">${escR(rt.voltage)}</div>` : null,
-    (rt.fuelRequested!=null||rt.fuelActual!=null)? `<div class="k">연료</div><div class="v" style="font-size:13px;font-weight:400;">요청 ${rt.fuelRequested!=null?rt.fuelRequested:'-'}L / 주입 ${rt.fuelActual!=null?rt.fuelActual:'-'}L</div>` : null,
-    rt.note? `<div class="k">비고</div><div class="v" style="font-size:13px;font-weight:400;">${escR(rt.note)}</div>` : null
+    (rt.fuelRequested!=null||rt.fuelActual!=null)? `<div class="k">연료</div><div class="v" style="font-size:13px;font-weight:400;">요청 ${rt.fuelRequested!=null?rt.fuelRequested:'-'}L / 주입 ${rt.fuelActual!=null?rt.fuelActual:'-'}L</div>` : null
   ].filter(Boolean);
   const tankDims = tankDimsOf(g);
   const baselineForModal = fuelBaselineOf(g);
@@ -8197,11 +8219,15 @@ function openInModal(id){
         ${(rt.fuelRequested!=null || rt.fuelActual!=null) ? `
         <div class="field"><label>⛽ 측정한 연료 높이(cm)${baselineForModal>0? ` <span class="muted" style="font-weight:400;">(바닥 기준높이 ${baselineForModal}cm 위로 올라온 높이만 재서 입력)</span>`:''}</label>
           <div class="hint" style="color:var(--primary-dark);font-weight:700;margin-top:0;">출고시 연료를 넣어드린 발전기입니다. 요청 ${rt.fuelRequested!=null?rt.fuelRequested:'-'}L / 주입 ${rt.fuelActual!=null?rt.fuelActual:'-'}L — 반납된 연료를 재서 사용량을 확인해주세요.</div>
-          <input type="number" id="f-fuel-height" min="-5" step="0.5" placeholder="예: 32" oninput="calcRemainingFuel('${g.id}')">
-          ${(tankDims.width>0 && tankDims.depth>0)
-            ? `<div class="hint">탱크 규격 기준 자동 환산${baselineForModal>0? ` (기준높이 ${baselineForModal}cm는 항상 남는 부분이라 계산에서 제외)`:''}</div>`
-            : `<div class="hint" style="color:var(--warn);">탱크 규격 미등록 (측정 높이만 기록)</div>`}
+          <input type="hidden" id="f-fuel-not-used" value="">
+          <div id="f-fuel-height-wrap">
+            <input type="number" id="f-fuel-height" min="-5" step="0.5" placeholder="예: 32" oninput="calcRemainingFuel('${g.id}')">
+            ${(tankDims.width>0 && tankDims.depth>0)
+              ? `<div class="hint">탱크 규격 기준 자동 환산${baselineForModal>0? ` (기준높이 ${baselineForModal}cm는 항상 남는 부분이라 계산에서 제외)`:''}</div>`
+              : `<div class="hint" style="color:var(--warn);">탱크 규격 미등록 (측정 높이만 기록)</div>`}
+          </div>
           <div id="f-fuel-calc-result" class="detail-card" style="margin-top:8px;padding:10px 12px;display:none;"></div>
+          <button type="button" class="btn sm" id="f-fuel-not-used-btn" style="margin-top:8px;" onclick="toggleFuelNotUsed()">⛽ 연료사용안함</button>
         </div>` : `
         <div class="field"><label class="muted">연료</label>
           <div class="hint" style="margin-top:0;">이 출고는 연료 요청·주입 기록이 없어 연료 확인이 필요 없습니다.</div>
@@ -8209,7 +8235,15 @@ function openInModal(id){
       </div>
       <div class="field"><label>반납된 부자재 확인</label>
         <div class="muted" style="font-size:12.5px;margin-bottom:8px;">출고시 나간 부자재${suppliesListHtml(rt.suppliesItems, rt.suppliesCustom, rt.supplies)}</div>
-        ${rt.note? `<div class="hint" style="color:var(--danger);font-weight:700;margin-top:-4px;margin-bottom:8px;">📝 출고시 비고: ${escR(rt.note)}</div>`:''}
+        ${rt.note? `<div style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+          <div style="font-size:12px;font-weight:700;color:var(--danger);margin-bottom:4px;">📝 출고시 비고</div>
+          <div style="font-size:17px;font-weight:800;color:var(--danger);line-height:1.35;">${escR(rt.note)}</div>
+          <div class="field chk" style="margin-top:10px;margin-bottom:0;">
+            <input type="checkbox" id="f-note-ack" onchange="onNoteAckCheck(this.checked)">
+            <label for="f-note-ack">네, 위 비고 내용을 확인했습니다.</label>
+          </div>
+          <div id="f-note-ack-err" class="err" style="display:none;">체크해야 입고 처리를 진행할 수 있습니다.</div>
+        </div>`:''}
         <input type="hidden" id="f-sup-recovered" value="${rt.supplies? '' : 'yes'}">
         <div id="f-sup-buttons-wrap"></div>
         <div id="f-supplies-note-wrap" style="display:none;margin-top:8px;">
@@ -8263,6 +8297,10 @@ function setInCondition(val){
   if(brokenBtn) brokenBtn.classList.toggle('primary', val==='broken');
   const wrap = document.getElementById('f-in-repairnote-wrap');
   if(wrap) wrap.style.display = val==='broken' ? 'block' : 'none';
+}
+function onNoteAckCheck(checked){
+  const err = document.getElementById('f-note-ack-err');
+  if(checked && err) err.style.display = 'none';
 }
 function renderSuppliesButtons(){
   const wrap = document.getElementById('f-sup-buttons-wrap');
@@ -8323,6 +8361,13 @@ async function submitIn(id){
     errEl.textContent = '부자재 회수 여부(회수됨/회수안됨)를 선택해주세요.';
     errEl.style.display='block'; return;
   }
+  const noteAckEl = document.getElementById('f-note-ack');
+  if(g.rental.note && noteAckEl && !noteAckEl.checked){
+    const noteErrEl = document.getElementById('f-note-ack-err');
+    if(noteErrEl) noteErrEl.style.display = 'block';
+    errEl.textContent = '출고시 비고 내용을 확인했다는 체크를 해야 입고 처리할 수 있습니다.';
+    errEl.style.display='block'; return;
+  }
   if(!inDate || isNaN(endHours) || endHours < g.rental.startHours){
     errEl.textContent = '입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다)';
     errEl.style.display='block'; return;
@@ -8348,8 +8393,10 @@ async function submitIn(id){
     errEl.textContent = '고장 내용을 입력해주세요.';
     errEl.style.display='block'; return;
   }
+  const fuelNotUsedEl = document.getElementById('f-fuel-not-used');
+  const fuelNotUsed = fuelNotUsedEl && fuelNotUsedEl.value==='yes';
   const fuelHeightEl = document.getElementById('f-fuel-height');
-  const measuredFuelHeightCm = (fuelHeightEl && fuelHeightEl.value!=='') ? Number(fuelHeightEl.value) : null;
+  const measuredFuelHeightCm = (!fuelNotUsed && fuelHeightEl && fuelHeightEl.value!=='') ? Number(fuelHeightEl.value) : null;
   let remainingFuelLiters = null;
   if(measuredFuelHeightCm!=null){
     remainingFuelLiters = computeFuelLiters(g, measuredFuelHeightCm);
@@ -8364,7 +8411,7 @@ async function submitIn(id){
     outDate: rt.outDate, inDate, startHours: rt.startHours, endHours,
     usedHours: endHours - rt.startHours, longTerm: rt.longTerm, estDaily: rt.estDaily,
     voltage, outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null, inProcessedAt: nowDateTimeStr(),
-    measuredFuelHeightCm, remainingFuelLiters,
+    measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
     paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null
   });
   g.hours = endHours;
