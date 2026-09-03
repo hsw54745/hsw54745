@@ -2382,6 +2382,7 @@ function renderMaintList(){
     return ra-rb;
   });
   if(wrapCnt) wrapCnt.textContent = `${sorted.length}대`;
+  maintBulkTargetIds = sorted.map(g=>g.id);
 
   const capacityCounts = {};
   allGens.forEach(g=>{
@@ -2394,6 +2395,7 @@ function renderMaintList(){
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
       <button class="btn sm${maintCapacityFilter==null?' primary':''}" onclick="clearMaintCapacityFilter()">전체</button>
       ${capacityEntries.map(([cap,cnt])=>`<button class="btn sm${maintCapacityFilter===cap?' primary':''}" onclick="viewCapacityMaintList(${cap})">${cap}kW <span class="muted" style="font-size:11px;">(${cnt})</span></button>`).join('')}
+      <button class="btn sm" style="margin-left:6px;color:var(--primary-dark);border-color:var(--primary);" onclick="openBulkCycleModal()">⚙️ 정비주기 일괄변경${sorted.length>0? ` (${sorted.length}대)`:''}</button>
     </div>`;
 
   let rows = sorted.map(g=>{
@@ -2523,6 +2525,58 @@ async function submitAdjust(id){
   flash('수정되었습니다');
 }
 
+let maintBulkTargetIds = [];
+function openBulkCycleModal(){
+  const ids = maintBulkTargetIds;
+  if(ids.length===0){ showInfoModal('일괄변경할 발전기가 없습니다.'); return; }
+  const label = maintCapacityFilter!=null ? `${maintCapacityFilter}kW` : '전체';
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>정비 주기 일괄변경</h3>
+      <div class="modal-sub">${escR(label)} · ${ids.length}대에 한 번에 적용됩니다</div>
+      <div class="field"><label>정비 주기(h)</label><input type="number" id="f-bulk-cycle" min="1" step="1" placeholder="예: 400">
+        <div class="btn-row" style="margin-top:8px;" id="bulk-cycle-quick-buttons">
+          ${[350,400,450,500].map(h=>`<button type="button" class="btn sm" data-cycle-h="${h}" onclick="selectBulkCycleQuick(${h})">${h}h</button>`).join('')}
+        </div>
+      </div>
+      <div id="f-err" class="err" style="display:none;"></div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">취소</button>
+        <button class="btn primary" id="bulk-cycle-save-btn" onclick="submitBulkCycle()">${ids.length}대 일괄 저장</button>
+      </div>
+    </div>
+  </div>`;
+}
+function selectBulkCycleQuick(h){
+  const input = document.getElementById('f-bulk-cycle');
+  if(input) input.value = h;
+  const wrap = document.getElementById('bulk-cycle-quick-buttons');
+  if(wrap) wrap.querySelectorAll('button[data-cycle-h]').forEach(btn=>{
+    btn.classList.toggle('primary', Number(btn.dataset.cycleH)===h);
+  });
+}
+async function submitBulkCycle(){
+  const saveBtn = document.getElementById('bulk-cycle-save-btn');
+  if(saveBtn && saveBtn.disabled) return;
+  if(saveBtn) saveBtn.disabled = true;
+  try{
+    const cycle = Number(document.getElementById('f-bulk-cycle').value);
+    const errEl = document.getElementById('f-err');
+    if(isNaN(cycle) || cycle<=0){
+      errEl.textContent='정비 주기는 1 이상의 숫자로 입력해주세요.'; errEl.style.display='block';
+      return;
+    }
+    const ids = maintBulkTargetIds;
+    ids.forEach(id=>{ const g = findGen(id); if(g) g.cycle = cycle; });
+    await saveGens();
+    closeModal();
+    renderContent();
+    flash(`${ids.length}대의 정비 주기가 ${cycle}h로 일괄 변경되었습니다`);
+  } finally {
+    if(saveBtn) saveBtn.disabled = false;
+  }
+}
 function openCycleModal(id){
   const g = findGen(id);
   document.getElementById('modal-root').innerHTML = `
@@ -3708,6 +3762,7 @@ function renderManualTab(){
       ['이력조회', '해당 발전기의 [이력 조회] 탭으로 이동합니다.'],
       ['직접수정', '모델·셋팅 전압·누적시간·마지막 정비시점·마지막 정비일자·연료통 기준높이를 직접 입력·조정하는 곳입니다. 발전기를 처음 등록할 때도 여기서 초기값을 넣고, 데이터 오류 수정도 여기서 합니다. 마지막 정비시 누적시간이 현재 누적시간보다 크면 저장되지 않습니다. 여기서 값을 고치면 정비이력에는 남기지 않고 조용히 반영됩니다 — 실제 현장에서 전압을 바꾼 경우는 [입고] 목록 전압 클릭이나 출고/입고 처리 화면을 이용하면 정비이력에 자동으로 기록됩니다.'],
       ['정비주기', '기본 400시간인 정비 주기를 발전기 개별로 다르게 설정합니다. 직접 숫자를 입력해도 되고, 350h·400h·450h·500h 버튼을 눌러 바로 채울 수도 있습니다.'],
+      ['정비주기 일괄변경', '용량별 보기 버튼 줄 맨 끝에 있는 "⚙️ 정비주기 일괄변경" 버튼입니다. "전체"를 선택한 상태면 지금 목록에 보이는 발전기 전체에, 특정 용량(예: 550kW)을 선택한 상태면 그 용량의 발전기들에만 한 번에 같은 정비 주기를 적용합니다.'],
       ['모델별 정비 이력', '모델을 선택하면 그 모델을 쓴 발전기들의 정비 기록만 모아서 봅니다.'],
       ['용량별 보기 (정비 주기 현황)', '정비 주기 현황 목록 위에 자동으로 생기는 용량(kW) 버튼을 누르면 그 용량의 발전기만 걸러서 봅니다. "전체" 버튼으로 다시 전체 목록으로 돌아갑니다. [입고] 탭의 용량별 보기와 같은 방식입니다.'],
       ['장기임대 정비 준비 리스트', '장기임대 발전기를 정비 임박 순으로 모아, 거래처·현장과 함께 방문시 챙길 자재(엔진오일량·필터 품명/규격)까지 보여줍니다. 🖨 인쇄 버튼으로 체크리스트를 뽑을 수 있습니다.']
