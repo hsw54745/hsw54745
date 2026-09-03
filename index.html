@@ -6491,6 +6491,7 @@ function setInDate(daysFromNow){
   const d = new Date();
   d.setDate(d.getDate()+daysFromNow);
   el.value = toLocalDateStr(d);
+  el.dispatchEvent(new Event('input'));
 }
 function knownCustomerRecords(){
   const map = {};
@@ -8168,16 +8169,21 @@ function openInModal(id){
         </div>
       </div>
       <div class="field-row" style="flex-wrap:wrap;">
-        <div class="field" style="min-width:150px;"><label>입고일</label>
-          <input type="date" id="f-indate" value="${todayStr()}">
-          ${dateQuickButtonsPastHtml('setInDate')}
-        </div>
-        <div class="field" style="min-width:180px;"><label>입고시(반납) 누적 사용시간(h)</label>
-          <input type="number" id="f-endhours" placeholder="예: ${suggested}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0})">
-          <div class="hint" style="font-size:14px;font-weight:700;color:var(--primary);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
-          <div id="in-usage-preview" style="margin-top:10px;padding:20px 16px;border-radius:10px;background:var(--primary-tint);border:1px solid var(--primary);min-height:110px;box-sizing:border-box;flex-direction:column;justify-content:center;align-items:center;text-align:center;display:none;">
+        <div style="flex:2;min-width:340px;display:flex;flex-direction:column;">
+          <div class="field-row" style="margin-bottom:0;">
+            <div class="field" style="min-width:150px;"><label>입고일</label>
+              <input type="date" id="f-indate" value="${todayStr()}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
+              ${dateQuickButtonsPastHtml('setInDate')}
+            </div>
+            <div class="field" style="min-width:180px;"><label>입고시(반납) 누적 사용시간(h)</label>
+              <input type="number" id="f-endhours" placeholder="예: ${suggested}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
+              <div class="hint" style="font-size:14px;font-weight:700;color:var(--primary);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
+            </div>
+          </div>
+          <div id="in-usage-preview" style="margin-top:10px;padding:20px 16px;border-radius:10px;background:var(--primary-tint);border:1px solid var(--primary);min-height:110px;box-sizing:border-box;flex:1;flex-direction:column;justify-content:center;align-items:center;text-align:center;display:none;">
             <div class="muted" style="font-size:13px;font-weight:700;">임대중 사용시간</div>
             <div id="in-usage-preview-value" style="font-size:42px;font-weight:800;color:var(--primary-dark);line-height:1.2;">-</div>
+            <div id="in-usage-preview-avg" class="muted" style="font-size:12.5px;font-weight:700;margin-top:4px;"></div>
           </div>
         </div>
         <div class="field" style="min-width:150px;"><label>전압</label>
@@ -8219,10 +8225,11 @@ function openInModal(id){
   </div>`;
   renderSuppliesButtons();
 }
-function updateInUsagePreview(startHours){
+function updateInUsagePreview(startHours, outDate){
   const input = document.getElementById('f-endhours');
   const wrap = document.getElementById('in-usage-preview');
   const valueEl = document.getElementById('in-usage-preview-value');
+  const avgEl = document.getElementById('in-usage-preview-avg');
   if(!input || !wrap || !valueEl) return;
   const endHours = Number(input.value);
   if(!input.value || isNaN(endHours) || endHours < startHours){
@@ -8231,6 +8238,20 @@ function updateInUsagePreview(startHours){
   }
   const used = endHours - startHours;
   valueEl.textContent = `${used.toLocaleString()}h`;
+  if(avgEl){
+    avgEl.textContent = '';
+    const indateEl = document.getElementById('f-indate');
+    const inDate = indateEl ? indateEl.value : '';
+    if(outDate && inDate){
+      const out = new Date(outDate+'T00:00:00');
+      const inD = new Date(inDate+'T00:00:00');
+      if(!isNaN(out.getTime()) && !isNaN(inD.getTime())){
+        const days = Math.max(1, Math.round((inD-out)/86400000));
+        const avg = used/days;
+        avgEl.textContent = `${days}일간, 일평균 ${avg.toFixed(1)}h/일`;
+      }
+    }
+  }
   wrap.style.display = 'flex';
 }
 function setInCondition(val){
