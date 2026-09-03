@@ -2086,6 +2086,15 @@ function clearOutRegionFilter(){
   outRegionFilter = null;
   renderContent();
 }
+let outCapacityFilter = null; // 숫자(kW) 또는 null
+function viewCapacityOutList(cap){
+  outCapacityFilter = cap;
+  switchTab('out');
+}
+function clearOutCapacityFilter(){
+  outCapacityFilter = null;
+  renderContent();
+}
 let bulkInSelection = new Set();
 function bulkInBarHtml(){
   const n = bulkInSelection.size;
@@ -2137,7 +2146,8 @@ function longtermPrepListHtml(){
   `;
 }
 function renderOutList(){
-  const list = activeGens().filter(g=>g.status==='out' && (!outRegionFilter || regionOf((g.rental&&(g.rental.address||g.rental.site))||'')===outRegionFilter))
+  const allOutGens = activeGens().filter(g=>g.status==='out');
+  const list = allOutGens.filter(g=>(!outRegionFilter || regionOf((g.rental&&(g.rental.address||g.rental.site))||'')===outRegionFilter) && (outCapacityFilter==null || capacityOf(g)===outCapacityFilter))
     .sort((a,b)=>((b.rental&&b.rental.outDate)||'').localeCompare((a.rental&&a.rental.outDate)||''));
   for(const id of [...bulkInSelection]){
     const g = findGen(id);
@@ -2192,11 +2202,26 @@ function renderOutList(){
   const longRows = longList.map(rowHtml).join('');
   const theadHtml = `<thead><tr><th style="width:30px;"><input type="checkbox" onchange="toggleSelectAllBulkIn(this)" title="전체 선택"></th><th>번호</th><th>모델</th><th>출고완료</th><th>전압</th><th>거래처/현장</th><th>도착일</th><th>정비 주기(추정)</th><th>정비 예상시점</th><th>입고예정일</th><th></th></tr></thead>`;
 
+  // 용량(kW)별 버튼 목록
+  const capacityCounts = {};
+  allOutGens.forEach(g=>{
+    const cap = capacityOf(g);
+    if(!isFinite(cap)) return;
+    capacityCounts[cap] = (capacityCounts[cap]||0) + 1;
+  });
+  const capacityEntries = Object.entries(capacityCounts).map(([k,v])=>[parseFloat(k),v]).sort((a,b)=>a[0]-b[0]);
+  const capacityButtonsHtml = capacityEntries.length===0 ? '' : `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+      <button class="btn sm${outCapacityFilter==null?' primary':''}" onclick="clearOutCapacityFilter()">전체</button>
+      ${capacityEntries.map(([cap,cnt])=>`<button class="btn sm${outCapacityFilter===cap?' primary':''}" onclick="viewCapacityOutList(${cap})">${cap}kW <span class="muted" style="font-size:11px;">(${cnt})</span></button>`).join('')}
+    </div>`;
+
   return `
-    <div class="section-title">출고중 발전기 <span class="cnt">${list.length}대</span>${outRegionFilter? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">지역: ${escR(outRegionFilter)} <button onclick="clearOutRegionFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''} <button type="button" class="btn sm" onclick="downloadOutFieldListFile()">🖨 출고 리스트 인쇄(단기/장기)</button></div>
+    <div class="section-title">출고중 발전기 <span class="cnt">${list.length}대</span>${outRegionFilter? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">지역: ${escR(outRegionFilter)} <button onclick="clearOutRegionFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}${outCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${outCapacityFilter}kW <button onclick="clearOutCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''} <button type="button" class="btn sm" onclick="downloadOutFieldListFile()">🖨 출고 리스트 인쇄(단기/장기)</button></div>
+    ${capacityButtonsHtml}
     <p class="muted" style="font-size:12.5px;margin-top:-4px;">같은 거래처에서 여러 대를 한 번에 반납받을 때는 왼쪽 체크박스로 여러 대를 선택한 뒤 "한번에 입고" 버튼을 눌러주세요. 현장 정기 점검 출장 전에는 위 "출고 리스트 인쇄" 버튼으로 단기 1장·장기 1장짜리 리스트를 뽑을 수 있습니다.</p>
     <div id="bulk-in-bar">${bulkInBarHtml()}</div>
-    ${list.length===0? `<div class="empty">${outRegionFilter? `"${escR(outRegionFilter)}" 지역에 출고중인 발전기가 없습니다.`:'출고중인 발전기가 없습니다.'}</div>` : `
+    ${list.length===0? `<div class="empty">${outRegionFilter||outCapacityFilter!=null? `조건에 맞는 출고중인 발전기가 없습니다.`:'출고중인 발전기가 없습니다.'}</div>` : `
     <div class="section-title" style="font-size:14px;margin-top:14px;">단기임대 <span class="cnt">${shortList.length}대</span></div>
     ${shortList.length===0? `<div class="empty">단기임대 중인 발전기가 없습니다.</div>` : `
     <div class="table-scroll"><table>
@@ -2333,16 +2358,40 @@ function renderMaintTab(){
     <div id="maint-list-wrap"></div>
   `;
 }
+let maintCapacityFilter = null; // 숫자(kW) 또는 null
+function viewCapacityMaintList(cap){
+  maintCapacityFilter = cap;
+  renderMaintList();
+}
+function clearMaintCapacityFilter(){
+  maintCapacityFilter = null;
+  renderMaintList();
+}
 function renderMaintList(){
   const wrapCnt = document.getElementById('maint-list-cnt');
   const wrap = document.getElementById('maint-list-wrap');
   if(!wrap) return;
-  const sorted = [...activeGens()].sort((a,b)=>{
+  const allGens = activeGens();
+  const sorted = allGens.filter(g=>maintCapacityFilter==null || capacityOf(g)===maintCapacityFilter).sort((a,b)=>{
     const ra = hasHourData(a) ? (a.status==='in'? remainingHours(a): estRemaining(a)) : 9999;
     const rb = hasHourData(b) ? (b.status==='in'? remainingHours(b): estRemaining(b)) : 9999;
     return ra-rb;
   });
   if(wrapCnt) wrapCnt.textContent = `${sorted.length}대`;
+
+  const capacityCounts = {};
+  allGens.forEach(g=>{
+    const cap = capacityOf(g);
+    if(!isFinite(cap)) return;
+    capacityCounts[cap] = (capacityCounts[cap]||0) + 1;
+  });
+  const capacityEntries = Object.entries(capacityCounts).map(([k,v])=>[parseFloat(k),v]).sort((a,b)=>a[0]-b[0]);
+  const capacityButtonsHtml = capacityEntries.length===0 ? '' : `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+      <button class="btn sm${maintCapacityFilter==null?' primary':''}" onclick="clearMaintCapacityFilter()">전체</button>
+      ${capacityEntries.map(([cap,cnt])=>`<button class="btn sm${maintCapacityFilter===cap?' primary':''}" onclick="viewCapacityMaintList(${cap})">${cap}kW <span class="muted" style="font-size:11px;">(${cnt})</span></button>`).join('')}
+    </div>`;
+
   let rows = sorted.map(g=>{
     const known = hasHourData(g);
     const el = g.status==='in'? elapsedHours(g): estElapsed(g);
@@ -2361,11 +2410,13 @@ function renderMaintList(){
       </div></td>
     </tr>`;
   }).join('');
-  wrap.innerHTML = sorted.length===0 ? `<div class="empty">검색 결과가 없습니다.</div>` : `
+  wrap.innerHTML = `
+    ${capacityButtonsHtml}
+    ${sorted.length===0 ? `<div class="empty">${maintCapacityFilter!=null? `${maintCapacityFilter}kW 용량의 발전기가 없습니다.` : '검색 결과가 없습니다.'}</div>` : `
     <div class="table-scroll"><table>
       <thead><tr><th>번호</th><th>모델</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
-    </table></div>`;
+    </table></div>`}`;
 }
 function renderMaintByModel(){
   const model = document.getElementById('maint-model-filter').value;
@@ -3596,6 +3647,7 @@ function renderManualTab(){
       ['상단 카드', '전체/입고/출고중·출고율/정비 필요/고장·수리중/미입금 출고/출고 대기 숫자. 카드를 누르면 해당 메뉴로 바로 이동합니다.'],
       ['알림 배너', '백업 안내, 부품 재고 부족, 장기임대 정비 임박, 하루 10시간 초과 과다사용 이력이 있으면 빨간 배너로 뜹니다. 배너의 버튼을 누르면 관련 화면으로 이동합니다.'],
       ['지역별 출고 현황', '출고중인 발전기를 지역(경기북부/남부 등)별로 몇 대씩 나가있는지 보여줍니다. 카드를 누르면 그 지역만 걸러서 [출고중] 목록을 봅니다.'],
+      ['용량별 보기 (출고중)', '[출고중] 목록 위에도 자동으로 용량(kW) 버튼이 생겨서, 그 용량의 발전기만 걸러서 볼 수 있습니다. 지역 필터와 같이 켜두면 두 조건이 동시에 적용됩니다. "전체" 버튼으로 용량 필터만 해제할 수 있습니다.'],
       ['정비 임박/필요', '정비 시점이 다가오거나 지난 발전기를 최대 15대까지 보여줍니다.'],
       ['🕐 최근 입고 처리한 발전기', '최근 입고 처리한 발전기 5대를 번호·모델·처리시각·전압·처리자·거래처·지역과 함께 보여줍니다. 방금 전압을 바꿨는지 기억이 안 날 때 여기서 바로 확인할 수 있고, 전압을 클릭하면 곧바로 수정할 수도 있습니다. 연료를 넣어드린 건은 "50L→25L (사용 25L)"처럼 반납시 확인한 사용량이 표시되고, 아직 확인을 안 한 건은 "연료 미확인"으로 빨갛게 표시됩니다. "전체보기"를 누르면 [입고] 탭으로 이동합니다.'],
       ['입고 예정 (5일 이내)', '5일 이내 반납 예정인 발전기 중 최근 5대를 보여줍니다. "입고 처리" 버튼으로 바로 처리할 수 있습니다. "전체보기"를 누르면 [입고] 탭으로 이동합니다.'],
@@ -3653,6 +3705,7 @@ function renderManualTab(){
       ['직접수정', '모델·셋팅 전압·누적시간·마지막 정비시점·마지막 정비일자·연료통 기준높이를 직접 입력·조정하는 곳입니다. 발전기를 처음 등록할 때도 여기서 초기값을 넣고, 데이터 오류 수정도 여기서 합니다. 마지막 정비시 누적시간이 현재 누적시간보다 크면 저장되지 않습니다. 여기서 값을 고치면 정비이력에는 남기지 않고 조용히 반영됩니다 — 실제 현장에서 전압을 바꾼 경우는 [입고] 목록 전압 클릭이나 출고/입고 처리 화면을 이용하면 정비이력에 자동으로 기록됩니다.'],
       ['정비주기', '기본 400시간인 정비 주기를 발전기 개별로 다르게 설정합니다. 직접 숫자를 입력해도 되고, 350h·400h·450h·500h 버튼을 눌러 바로 채울 수도 있습니다.'],
       ['모델별 정비 이력', '모델을 선택하면 그 모델을 쓴 발전기들의 정비 기록만 모아서 봅니다.'],
+      ['용량별 보기 (정비 주기 현황)', '정비 주기 현황 목록 위에 자동으로 생기는 용량(kW) 버튼을 누르면 그 용량의 발전기만 걸러서 봅니다. "전체" 버튼으로 다시 전체 목록으로 돌아갑니다. [입고] 탭의 용량별 보기와 같은 방식입니다.'],
       ['장기임대 정비 준비 리스트', '장기임대 발전기를 정비 임박 순으로 모아, 거래처·현장과 함께 방문시 챙길 자재(엔진오일량·필터 품명/규격)까지 보여줍니다. 🖨 인쇄 버튼으로 체크리스트를 뽑을 수 있습니다.']
     ])}
 
