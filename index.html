@@ -3799,6 +3799,7 @@ function renderManualTab(){
       ['업체별 매출현황', '지금 출고중인 발전기를 출고일 순서대로 보여줍니다. 발전기별로 청구일자·업체명·현장명·용량·발전기번호·사용기간·견적금액(공급가·세액·합계)·계산서 발행·운임(출고운임/세액, 입고운임/세액)·입금일/입금금액·미수금·담당자·연락처·비고를 표 안에서 바로 입력할 수 있고, 공급가와 각 운임을 넣으면 세액(10%)이 자동 계산되며 합계도 자동으로 더해집니다(합계는 직접 고칠 수도 있음). 업체명에 담당자 이름·전화번호가 같이 적혀 있으면 자동으로 나눠서 담당자·연락처 칸에 채워줍니다. 입력한 내용은 곧바로 저장되며, 별도의 등록 버튼이 필요 없습니다. 한 번 생성된 매출 기록은 이후 출고취소·입고가 되어도 지워지지 않고 그대로 남습니다.'],
       ['계산서 발행 버튼', '견적금액 칸 아래 있는 토글 버튼입니다. 누르면 "발행 처리할까요?" 또는 "미발행으로 변경할까요?" 확인창이 뜨고, 확인해야만 "계산서 미발행" ↔ "계산서 발행함" 상태가 바뀝니다.'],
       ['이 매출 숨기기', '청구일자 칸 아래 큰 버튼입니다. 누르면 숨기는 이유를 입력하라는 창이 뜨고, 이유를 적고 확인하면 목록에서 안 보이게 숨겨집니다(삭제 아님). "숨김매출" 체크를 켜면 숨긴 건만 모아서 볼 수 있고, 각 건에 적어둔 숨긴 이유도 함께 표시되며 "복원하기" 버튼으로 다시 되돌릴 수 있습니다.'],
+      ['+ 매출 항목 직접 추가', '발전기 출고와 상관없이 매출 건을 직접 새로 등록합니다. 전달에서 이월된 미수금, 예전에 시스템에 안 남아있던 건 등을 넣을 때 씁니다. 업체명·현장명·용량·발전기번호·사용기간·담당자·연락처를 입력해서 추가하며, 업체명만 필수입니다. 이렇게 직접 추가한 건은 업체명·현장명·용량·발전기번호·사용기간 칸이 표에서 직접 수정 가능한 입력칸으로 나오고(자동 생성된 일반 매출 건은 이 칸들이 출고 정보 기준으로 고정되어 있어 수정 불가), 나머지 사용법(견적금액·운임·입금·숨기기 등)은 일반 매출 건과 동일합니다.'],
       ['출고취소와 매출 기록의 연동', '[출고중] 목록에서 "🚫 출고취소"를 누르면 취소 사유를 적고 "비용발생"/"비용발생 안함" 중 골라야 합니다. "비용발생"을 고르면 그 건의 매출 기록은 정상 목록에 그대로 남고, "비용발생 안함"을 고르면 사유와 함께 자동으로 "숨김매출" 처리되어 정상 목록에서 빠집니다.'],
       ['필터 (월별·입금상태·업체별·발전기번호별)', '청구일자 기준 월별 필터, 입금완료/미입금 버튼, 업체별 보기, 발전기번호별 보기 드롭다운으로 원하는 내역만 골라볼 수 있습니다. "출고운임·입고운임 표시" 체크를 끄면 운임 관련 칸이 숨겨져 화면이 더 단순해집니다.'],
       ['입금완료 표시 · 인쇄', '견적금액에서 입금액 합계를 뺀 미수금이 0 이하가 되면 그 줄은 초록색, 미수가 남아있으면 붉은색 배경으로 표시됩니다. 상단 "🖨 인쇄" 버튼을 누르면 지금 적용된 필터 그대로 새 창에 미리보기가 뜨고 인쇄 대화상자가 자동으로 열립니다(팝업 차단 시 브라우저에서 팝업을 허용해주세요).'],
@@ -3941,6 +3942,111 @@ function getOrCreateBillingRecord(g){
 function findBillingRecord(recId){
   return (DB.salesBillingRecords||[]).find(r=>r.id===recId);
 }
+function openAddManualBillingModal(){
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>매출 항목 직접 추가</h3>
+      <div class="modal-sub">발전기 출고와 연결되지 않은 매출 건을 직접 등록합니다. 전달 이월분·과거 누락건 등을 넣을 때 사용하세요. 여기서 입력 안 한 항목도 등록 후 표에서 언제든 채울 수 있습니다.</div>
+
+      <div class="section-title" style="margin-top:0;font-size:14px;">기본 정보</div>
+      <div class="field"><label>청구일자</label><input type="date" id="f-manual-billdate"></div>
+      <div class="field"><label>업체명 (필수)</label><input type="text" id="f-manual-customer" placeholder="예: 00건설"></div>
+      <div class="field"><label>현장명</label><input type="text" id="f-manual-site" placeholder="예: 00현장"></div>
+      <div class="field"><label>용량(kW)</label><input type="number" id="f-manual-capacity" min="0" placeholder="예: 100"></div>
+      <div class="field"><label>발전기번호</label><input type="text" id="f-manual-genid" placeholder="예: S-1"></div>
+      <div class="field"><label>사용기간</label><input type="text" id="f-manual-period" placeholder="예: 2026-07 ~ 2026-08 (전달 이월)"></div>
+
+      <div class="section-title" style="font-size:14px;">견적금액</div>
+      <div class="field"><label>공급가</label><input type="number" id="f-manual-unitprice" min="0" placeholder="예: 1000000"></div>
+      <div class="field"><label>세액</label><input type="number" id="f-manual-tax" min="0" placeholder="예: 100000"></div>
+      <div class="field"><label>합계</label><input type="number" id="f-manual-total" min="0" placeholder="비워두면 공급가+세액+운임으로 자동 계산"></div>
+      <div class="field chk"><input type="checkbox" id="f-manual-invoice"><label for="f-manual-invoice">계산서 발행함</label></div>
+
+      <div class="section-title" style="font-size:14px;">운임</div>
+      <div class="field"><label>출고운임</label><input type="number" id="f-manual-freight-out" min="0"></div>
+      <div class="field"><label>출고운임 세액</label><input type="number" id="f-manual-freight-out-tax" min="0"></div>
+      <div class="field"><label>입고운임</label><input type="number" id="f-manual-freight-in" min="0"></div>
+      <div class="field"><label>입고운임 세액</label><input type="number" id="f-manual-freight-in-tax" min="0"></div>
+
+      <div class="section-title" style="font-size:14px;">입금 내역</div>
+      <div class="field-row">
+        <div class="field"><label>입금1 일자</label><input type="date" id="f-manual-pay1-date"></div>
+        <div class="field"><label>입금1 금액</label><input type="number" id="f-manual-pay1-amount" min="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>입금2 일자</label><input type="date" id="f-manual-pay2-date"></div>
+        <div class="field"><label>입금2 금액</label><input type="number" id="f-manual-pay2-amount" min="0"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>입금3 일자</label><input type="date" id="f-manual-pay3-date"></div>
+        <div class="field"><label>입금3 금액</label><input type="number" id="f-manual-pay3-amount" min="0"></div>
+      </div>
+
+      <div class="section-title" style="font-size:14px;">담당자·비고</div>
+      <div class="field"><label>담당자</label><input type="text" id="f-manual-manager" placeholder="예: 홍길동"></div>
+      <div class="field"><label>연락처</label><input type="text" id="f-manual-phone" placeholder="예: 010-1234-5678"></div>
+      <div class="field"><label>비고</label><textarea id="f-manual-note" placeholder="비고 또는 메모"></textarea></div>
+
+      <div id="f-manual-err" class="err" style="display:none;"></div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">취소</button>
+        <button class="btn primary" onclick="submitAddManualBilling()">추가</button>
+      </div>
+    </div>
+  </div>`;
+}
+function submitAddManualBilling(){
+  const val = id => document.getElementById(id).value.trim();
+  const num = id => { const v = val(id); return v===''? 0 : (Number(v)||0); };
+  const customer = val('f-manual-customer');
+  const errEl = document.getElementById('f-manual-err');
+  if(!customer){
+    errEl.textContent = '업체명은 필수입니다.';
+    errEl.style.display = 'block';
+    return;
+  }
+  const site = val('f-manual-site');
+  const capacityRaw = val('f-manual-capacity');
+  const capacity = capacityRaw? Number(capacityRaw) : null;
+  const genId = val('f-manual-genid');
+  const period = val('f-manual-period');
+  const manager = val('f-manual-manager');
+  const phone = val('f-manual-phone');
+  const billDate = val('f-manual-billdate');
+  const billUnitPrice = num('f-manual-unitprice');
+  const billTax = num('f-manual-tax');
+  const billFreightOut = num('f-manual-freight-out');
+  const billFreightOutTax = num('f-manual-freight-out-tax');
+  const billFreightIn = num('f-manual-freight-in');
+  const billFreightInTax = num('f-manual-freight-in-tax');
+  const totalRaw = val('f-manual-total');
+  const billTotal = totalRaw!=='' ? (Number(totalRaw)||0) : (billUnitPrice+billTax+billFreightOut+billFreightOutTax+billFreightIn+billFreightInTax);
+  const billInvoiceIssued = document.getElementById('f-manual-invoice').checked;
+  const billPay1Date = val('f-manual-pay1-date');
+  const billPay1Amount = num('f-manual-pay1-amount');
+  const billPay2Date = val('f-manual-pay2-date');
+  const billPay2Amount = num('f-manual-pay2-amount');
+  const billPay3Date = val('f-manual-pay3-date');
+  const billPay3Amount = num('f-manual-pay3-amount');
+  const billNote = val('f-manual-note');
+  DB.salesBillingRecords = DB.salesBillingRecords || [];
+  const rec = {
+    id: uid(), matchKey: `manual__${uid()}`, manual: true, genId: genId||'-', outDate: '',
+    customer, site: site||'-', capacity: (capacity!=null && isFinite(capacity))? capacity : null, period,
+    manager, phone,
+    billDate, billUnitPrice, billTax, billTotal,
+    billFreightOut, billFreightOutTax, billFreightIn, billFreightInTax, billInvoiceIssued,
+    billPay1Date, billPay1Amount, billPay2Date, billPay2Amount, billPay3Date, billPay3Amount,
+    billManager:null, billPhone:null, billNote,
+    hidden:false, createdAt: nowDateTimeStr()
+  };
+  DB.salesBillingRecords.push(rec);
+  saveSalesBillingRecords();
+  closeModal();
+  renderContent();
+  flash('추가되었습니다');
+}
 function hideBillingRecord(recId){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
@@ -4028,7 +4134,7 @@ function renderSalesTab(){
     const g = findGen(rec.genId);
     const cap = rec.capacity;
     const capStr = (cap!=null && isFinite(cap))? `${cap}kW` : '-';
-    const period = rec.outDate? `${dow(rec.outDate)} ~ ${recIsLiveOut(rec)?'진행중':'종료'}` : '-';
+    const period = rec.manual ? (rec.period||'-') : (rec.outDate? `${dow(rec.outDate)} ~ ${recIsLiveOut(rec)?'진행중':'종료'}` : '-');
     const total = Number(rec.billTotal)||0;
     const paid = (Number(rec.billPay1Amount)||0) + (Number(rec.billPay2Amount)||0) + (Number(rec.billPay3Amount)||0);
     const balance = total - paid;
@@ -4050,11 +4156,11 @@ function renderSalesTab(){
             : `<button type="button" class="btn" style="font-size:14px;padding:9px 14px;width:100%;color:var(--danger);border-color:var(--danger);" onclick="hideBillingRecord('${rec.id}')">이 매출 숨기기</button>`}
         </div>
       </td>
-      <td rowspan="2" class="wrap-ok">${escR(rec.customer)}</td>
-      <td rowspan="2" class="wrap-ok">${escR(rec.site)}</td>
-      <td rowspan="2">${capStr}</td>
-      <td rowspan="2" class="gid">${rec.genId}</td>
-      <td rowspan="2" class="wrap-ok">${period}</td>
+      <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.customer).replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','customer', this.value)">` : escR(rec.customer)}</td>
+      <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.site).replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','site', this.value)">` : escR(rec.site)}</td>
+      <td rowspan="2">${rec.manual? `<input type="number" min="0" value="${rec.capacity!=null? rec.capacity:''}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','capacity', this.value===''?null:Number(this.value))">` : capStr}</td>
+      <td rowspan="2" class="gid">${rec.manual? `<input type="text" value="${escR(rec.genId).replace(/"/g,'&quot;')}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','genId', this.value)">` : rec.genId}</td>
+      <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.period||'').replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','period', this.value)">` : period}</td>
       <td rowspan="2">
         <input type="text" inputmode="numeric" placeholder="공급가" id="bill-unitprice-${rec.id}" data-orig="${krFmt(rec.billUnitPrice)}" value="${krFmt(rec.billUnitPrice)}" style="width:82px;display:block;" maxlength="11" oninput="calcOutTotalLive('${rec.id}')" onchange="saveOutBilling('${rec.id}')">
         <input type="text" inputmode="numeric" placeholder="세액" id="bill-tax-${rec.id}" data-orig="${krFmt(rec.billTax)}" value="${krFmt(rec.billTax)}" style="width:82px;display:block;margin-top:4px;color:#1E5FB8;font-weight:700;" maxlength="11" oninput="calcOutTotalLive('${rec.id}', true)" onchange="saveOutBilling('${rec.id}')">
@@ -4104,7 +4210,7 @@ function renderSalesTab(){
     <div class="detail-card" style="padding:14px 16px;margin-bottom:14px;background:var(--warn-tint);border:1px solid var(--warn);">
       <div style="font-weight:800;color:var(--warn);">⚠️ 테스트 중입니다</div>
     </div>
-    <div class="section-title">💰 업체별 매출현황 <span class="cnt">${recs.length}건</span> <button type="button" class="btn" style="font-size:15px;" onclick="printSalesList()">🖨 인쇄</button></div>
+    <div class="section-title">💰 업체별 매출현황 <span class="cnt">${recs.length}건</span> <button type="button" class="btn primary" style="font-size:15px;" onclick="openAddManualBillingModal()">+ 매출 항목 직접 추가</button> <button type="button" class="btn" style="font-size:15px;" onclick="printSalesList()">🖨 인쇄</button></div>
     <p class="muted" style="font-size:13px;margin-top:-4px;">발전기가 출고될 때 매출 기록이 자동으로 생성되고, 이후 출고취소·입고가 되어도 이 기록은 지워지지 않고 그대로 남습니다(발생한 비용은 취소돼도 청구 대상이라서요). 청구일자·공급가·세액·출고운임·입고운임·계산서 발행 여부·입금일자를 입력하면 바로 저장됩니다.</p>
     <div style="display:flex;gap:14px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">
       <div class="detail-card" style="padding:14px 16px;flex:none;">
