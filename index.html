@@ -43,8 +43,7 @@
   nav button{flex:1;min-width:80px;border:none;background:transparent;padding:13px 6px;font-family:var(--sans);font-size:12.5px;font-weight:500;color:var(--ink-soft);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;}
   nav button.active{color:var(--primary-dark);border-bottom-color:var(--primary);font-weight:700;background:var(--surface-2);}
   .tab-unread-badge{display:inline-block;min-width:16px;height:16px;line-height:16px;padding:0 4px;border-radius:9px;background:var(--danger);color:#fff;font-size:10px;font-weight:800;vertical-align:top;margin-left:1px;}
-  main{max-width:1500px;width:100%;margin:0 auto;padding:18px 24px 40px;box-sizing:border-box;}
-  main.wide{max-width:1900px;}
+  main{max-width:1900px;width:100%;margin:0 auto;padding:18px 24px 40px;box-sizing:border-box;}
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:18px;}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 12px;}
   .card .num{font-family:var(--mono);font-weight:700;font-size:26px;line-height:1;}
@@ -1519,7 +1518,6 @@ function restoreFocusState(state){
 function renderContent(){
   const _focus = captureFocusState();
   const c = document.getElementById('content');
-  c.classList.toggle('wide', currentTab==='sales');
   if(currentTab==='notice') c.innerHTML = renderNoticeTab();
   else if(currentTab==='dashboard') c.innerHTML = renderDashboard();
   else if(currentTab==='in') c.innerHTML = renderInList();
