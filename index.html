@@ -6559,8 +6559,10 @@ function renderPartsStockTable(){
     const qtyColor = qty<=0 ? 'var(--danger)' : 'var(--primary-dark)';
     const baseName = (spec && n.endsWith(' '+spec)) ? n.slice(0, n.length - spec.length - 1) : n;
     return `<tr${isLow? ` style="background:var(--danger-tint);"`:''}>
-      <td class="wrap-ok">${escR(baseName)}</td>
-      <td><input type="text" value="${escR(category)}" list="parts-category-datalist" placeholder="-" onchange="updatePartCategory('${escN}', this.value)"></td>
+      <td class="wrap-ok">
+        ${escR(baseName)}
+        <input type="text" value="${escR(category)}" list="parts-category-datalist" placeholder="구분 이동" style="width:100%;font-size:11px;margin-top:3px;" onchange="updatePartCategory('${escN}', this.value)">
+      </td>
       <td><input type="text" value="${spec.replace(/"/g,'&quot;')}" placeholder="예: 15W-40" onchange="updatePartSpec('${escN}', this.value)"></td>
       <td>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
@@ -6576,14 +6578,14 @@ function renderPartsStockTable(){
       <td><button class="btn sm danger" onclick="removeStockPart('${escN}')">삭제</button></td>
     </tr>`;
   };
-  const bodyRows = catNames.map(cat=>`
-    <tr><td colspan="8" style="background:var(--surface-2);font-weight:700;font-size:12.5px;color:var(--primary);padding:6px 10px;">${escR(cat)} <span class="muted" style="font-weight:400;font-size:11px;">(${groups[cat].length}종${groupHasLiquid(cat)? ' · 액체':''})</span></td></tr>
-    ${[...groups[cat]].sort((a,b)=>a.localeCompare(b,'ko')).map(rowHtml).join('')}
-  `).join('');
-  const tableHtml = `<div class="table-scroll"><table class="settings-table">
-    <thead><tr><th>품명</th><th style="width:130px;">구분</th><th style="width:110px;">규격</th><th style="width:90px;">현재고</th><th style="width:110px;">입고(구매) 추가</th><th style="width:110px;">공급업체</th><th style="width:90px;">최소재고</th><th style="width:70px;"></th></tr></thead>
-    <tbody>${bodyRows}</tbody>
-  </table></div>`;
+  const bodyRows = catNames.map(cat=>`<div class="material-card" style="margin-bottom:0;">
+    <div class="section-title" style="margin-top:0;font-size:14px;">${escR(cat)} <span class="cnt">${groups[cat].length}종${groupHasLiquid(cat)? ' · 액체':''}</span></div>
+    <div class="table-scroll"><table class="settings-table">
+      <thead><tr><th>품명</th><th style="width:110px;">규격</th><th style="width:80px;">현재고</th><th style="width:100px;">입고 추가</th><th style="width:100px;">공급업체</th><th style="width:80px;">최소재고</th><th style="width:60px;"></th></tr></thead>
+      <tbody>${[...groups[cat]].sort((a,b)=>a.localeCompare(b,'ko')).map(rowHtml).join('')}</tbody>
+    </table></div>
+  </div>`).join('');
+  const tableHtml = `<div class="model-cards-grid">${bodyRows}</div>`;
   const recentLog = [...(DB.partsPurchaseLog||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,10);
   const logHtml = recentLog.length>0 ? `
     <div class="section-title" style="font-size:13px;margin-top:16px;">최근 재고 입고 내역 <span class="muted" style="font-weight:400;font-size:11px;">(최근 10건)</span></div>
