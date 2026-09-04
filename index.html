@@ -44,6 +44,7 @@
   nav button.active{color:var(--primary-dark);border-bottom-color:var(--primary);font-weight:700;background:var(--surface-2);}
   .tab-unread-badge{display:inline-block;min-width:16px;height:16px;line-height:16px;padding:0 4px;border-radius:9px;background:var(--danger);color:#fff;font-size:10px;font-weight:800;vertical-align:top;margin-left:1px;}
   main{max-width:1500px;width:100%;margin:0 auto;padding:18px 24px 40px;box-sizing:border-box;}
+  main.wide{max-width:1900px;}
   .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:18px;}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 12px;}
   .card .num{font-family:var(--mono);font-weight:700;font-size:26px;line-height:1;}
@@ -95,6 +96,11 @@
   .field input[type=text],.field input[type=number],.field input[type=date],.field select,.field textarea{width:100%;padding:9px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:16px;background:#fff;color:var(--ink);}
   .field textarea{resize:vertical;min-height:60px;}
   input::placeholder,textarea::placeholder{color:var(--ink-faint)!important;font-weight:400!important;opacity:.8;}
+  .sales-table input[type=number],.sales-table input[type=date],.sales-table input[type=text]{font-size:13px;padding:6px 6px;border:1px solid var(--border-strong);border-radius:8px;}
+  .sales-table label{font-size:14px;}
+  .sales-table input[type=checkbox]{width:19px;height:19px;}
+  .sales-table td{padding:9px 8px;vertical-align:top;}
+  .sales-table th{font-size:13.5px;}
   .field .hint{font-size:11px;color:var(--ink-faint);margin-top:4px;}
   .field.chk{display:flex;align-items:center;gap:8px;}
   .field.chk input{width:16px;height:16px;}
@@ -386,13 +392,20 @@ const TABS = [
   {id:'materials', label:'🧰 자재 관리', color:'#1E8E8E'},
   {id:'history', label:'📜 이력 조회', color:'#6B6F1A'},
   {id:'settlement', label:'📊 가동률 통계', color:'#B0338E'},
+  {id:'sales', label:'💰 매출관리', color:'#2F7D4F'},
   {id:'consumable-order', label:'🛒 소모품주문', color:'#3A5FCD'},
   {id:'improvements', label:'📝 보완요청', color:'#CA5A2E'},
   {id:'settings', label:'⚙️ 설정', color:'#555B6E'},
   {id:'manual', label:'📖 사용설명서', color:'#0F766E'}
 ];
-let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, customerNotes:{}, readMarkers:{}, qrIssued:{}, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
+let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], teamMembers:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, customerNotes:{}, readMarkers:{}, qrIssued:{}, salesEnabled:false, salesRecords:[], salesManagers:['','',''], salesPassword:'', salesPasswordBypass:true, salesBillingRecords:[], cancelOutHistory:[], palletDefaultRemoved:false, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
 let currentTab = 'dashboard';
+let salesFilterMonth = '';
+let salesFilterStatus = 'all';
+let salesShowFreight = true;
+let salesShowHiddenOnly = false;
+let salesFilterCustomer = '';
+let salesFilterGenId = '';
 let seenNoticeIds = new Set();
 let seenEventIds = new Set();
 let seenReservationIds = new Set();
@@ -676,6 +689,16 @@ function requireTechnician(actionLabel){
   showInfoModal(`"${actionLabel}"은(는) 정비사로 등록된 사람만 할 수 있습니다.\n\n[설정 → 정비사 목록]에 본인 이름이 등록되어 있는지 확인해주세요.`);
   return false;
 }
+function isSalesManager(){
+  const name = (DB.currentUserName||'').trim();
+  if(!name) return false;
+  return (DB.salesManagers||[]).some(m => (m||'').trim() === name);
+}
+function isSalesUnlocked(){
+  if(DB.salesPasswordBypass) return true;
+  if(!DB.salesPassword) return true;
+  return sessionStorage.getItem('sales-unlocked')==='yes';
+}
 
 // 소모품 편집용 임시 상태 (자재관리 모달)
 let materialsModalState = {model:'', consumables:[]};
@@ -891,6 +914,14 @@ async function saveNotices(){ await storageSetChecked('gen-notices-v1', JSON.str
 async function saveCalendarEvents(){ await storageSetChecked('gen-calendar-events-v1', JSON.stringify(DB.calendarEvents), true); }
 async function saveGenColorOverrides(){ await storageSetChecked('gen-gen-color-overrides-v1', JSON.stringify(DB.genColorOverrides), true); }
 async function saveQrIssued(){ await storageSetChecked('gen-qr-issued-v1', JSON.stringify(DB.qrIssued), true); }
+async function saveSalesEnabled(){ await storageSetChecked('gen-sales-enabled-v1', JSON.stringify(DB.salesEnabled), true); }
+async function saveSalesRecords(){ await storageSetChecked('gen-sales-records-v1', JSON.stringify(DB.salesRecords), true); }
+async function saveSalesManagers(){ await storageSetChecked('gen-sales-managers-v1', JSON.stringify(DB.salesManagers), true); }
+async function saveSalesPassword(){ await storageSetChecked('gen-sales-password-v1', JSON.stringify(DB.salesPassword), true); }
+async function saveSalesPasswordBypass(){ await storageSetChecked('gen-sales-password-bypass-v1', JSON.stringify(DB.salesPasswordBypass), true); }
+async function saveSalesBillingRecords(){ await storageSetChecked('gen-sales-billing-records-v1', JSON.stringify(DB.salesBillingRecords), true); }
+async function saveCancelOutHistory(){ await storageSetChecked('gen-cancel-out-history-v1', JSON.stringify(DB.cancelOutHistory), true); }
+async function savePalletDefaultRemoved(){ await storageSetChecked('gen-pallet-default-removed-v1', JSON.stringify(DB.palletDefaultRemoved), true); }
 async function saveSuppliesSizes(){ await storageSetChecked('gen-supplies-sizes-v1', JSON.stringify(DB.suppliesSizes), true); }
 async function saveSuppliesSpecs(){ await storageSetChecked('gen-supplies-specs-v1', JSON.stringify(DB.suppliesSpecs), true); }
 async function saveSuppliesCategories(){ await storageSetChecked('gen-supplies-categories-v1', JSON.stringify(DB.suppliesCategories), true); }
@@ -899,6 +930,7 @@ async function saveReadMarkers(){ await storageSetChecked('gen-read-markers-v1',
 async function saveWarnThreshold(){ await storageSetChecked('gen-warn-threshold-v1', JSON.stringify(DB.warnThreshold), true); }
 async function saveOveruseDailyLimit(){ await storageSetChecked('gen-overuse-daily-limit-v1', JSON.stringify(DB.overuseDailyLimit), true); }
 async function savePartsStock(){ await storageSetChecked('gen-parts-stock-v1', JSON.stringify(DB.partsStock), true); }
+async function savePartsUnit(){ await storageSetChecked('gen-parts-unit-v1', JSON.stringify(DB.partsUnit), true); }
 async function savePartsSpecs(){ await storageSetChecked('gen-parts-specs-v1', JSON.stringify(DB.partsSpecs), true); }
 async function savePartsCategory(){ await storageSetChecked('gen-parts-category-v1', JSON.stringify(DB.partsCategory), true); }
 async function savePartsSupplier(){ await storageSetChecked('gen-parts-supplier-v1', JSON.stringify(DB.partsSupplier), true); }
@@ -1094,15 +1126,6 @@ function dow(dateStr){
   if(isNaN(d.getTime())) return dateStr;
   const days=['일','월','화','수','목','금','토'];
   return `${dateStr}(${days[d.getDay()]})`;
-}
-function inDateLabel(dateStr){
-  const diff = daysFromToday(dateStr);
-  if(diff===0) return '오늘입고';
-  if(diff===1) return '입고임박';
-  if(diff===2) return '입고2일전';
-  if(diff===3) return '입고3일전';
-  if(diff<0) return `${dow(dateStr)} (지연)`;
-  return dow(dateStr);
 }
 // 날짜와 임박 상태를 한 줄로 합쳐서 보여줄 때 사용 (열 헤더가 "입고예정일"이므로 여기선 접두어 없이 날짜+상태만 표기)
 function inDateLabelFull(dateStr){
@@ -1463,7 +1486,7 @@ function renderTabbar(){
     if(t.id==='consumable-order') return unreadCountFor('consumableOrder', DB.consumableOrders||[]);
     return 0;
   };
-  nav.innerHTML = TABS.map(t=>{
+  nav.innerHTML = TABS.filter(t=>t.id!=='sales' || (DB.salesEnabled && isSalesManager())).map(t=>{
     const n = unreadFor(t);
     return `<button class="${t.id===currentTab?'active':''}" style="color:${t.color};${t.id===currentTab?`border-bottom-color:${t.color};`:''}" onclick="switchTab('${t.id}')">${t.label}${n>0? ` <span class="tab-unread-badge">${n}</span>`:''}</button>`;
   }).join('');
@@ -1496,6 +1519,7 @@ function restoreFocusState(state){
 function renderContent(){
   const _focus = captureFocusState();
   const c = document.getElementById('content');
+  c.classList.toggle('wide', currentTab==='sales');
   if(currentTab==='notice') c.innerHTML = renderNoticeTab();
   else if(currentTab==='dashboard') c.innerHTML = renderDashboard();
   else if(currentTab==='in') c.innerHTML = renderInList();
@@ -1509,12 +1533,13 @@ function renderContent(){
   else if(currentTab==='manual') c.innerHTML = renderManualTab();
   else if(currentTab==='improvements') c.innerHTML = renderImprovementsTab();
   else if(currentTab==='settings') c.innerHTML = renderSettingsTab();
+  else if(currentTab==='sales') c.innerHTML = (DB.salesEnabled && isSalesManager()) ? (isSalesUnlocked() ? renderSalesTab() : renderSalesPasswordGate()) : (currentTab='dashboard', renderDashboard());
   if(currentTab==='history'){ if(historyViewMode==='customer') renderCustomerHistoryView(); else initHistorySelect(); }
   if(currentTab==='maint') renderMaintList();
   if(currentTab==='materials') { renderPartsStockTable(); renderSuppliesCatalogTable(); }
   if(currentTab==='consumable-order') renderConsumableOrderTable();
   if(currentTab==='improvements') renderImprovementsList();
-  if(currentTab==='settings'){ renderTeamMembersTable(); renderVehicleTypesTable(); renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); }
+  if(currentTab==='settings'){ renderVehicleTypesTable(); renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); }
   if(currentTab==='dashboard') renderRecentMaint();
   if(currentTab==='notice'){ renderNoticeList(); renderCalendar(); }
   restoreFocusState(_focus);
@@ -2194,7 +2219,8 @@ function renderOutList(){
           <button class="btn sm primary" onclick="openInModal('${g.id}')" style="white-space:nowrap;">입고 처리</button>
         </div>
         <div class="btn-row" style="flex-wrap:wrap;row-gap:4px;margin-top:4px;">
-          <button class="btn sm" onclick="quickForceInPrompt('${g.id}')" style="white-space:nowrap;" title="거래처·연료·부자재 등 정보 입력 없이 바로 [입고] 상태로 전환합니다. 잘못 출고 처리한 발전기를 되돌릴 때 사용하세요. 이번 출고 이력은 기록되지 않습니다.">⚡ 정보없이 강제입고</button>
+          <button class="btn sm" onclick="quickForceInPrompt('${g.id}')" style="white-space:nowrap;" title="거래처·연료·부자재 등 정보 입력 없이 바로 [입고] 상태로 전환합니다. 잘못 출고 처리한 발전기를 되돌릴 때 사용하세요. 이번 출고 이력은 기록되지 않습니다.">⚡ 강제입고</button>
+          <button class="btn sm" onclick="cancelOutPrompt('${g.id}')" style="white-space:nowrap;color:var(--danger);border-color:var(--danger);" title="이번 출고를 취소하고 바로 창고 재고로 되돌립니다. 이번 출고 이력은 기록되지 않습니다.">🚫 출고취소</button>
           <button class="btn sm" onclick="toggleLongterm('${g.id}')" style="white-space:nowrap;" title="단기/장기 구분 전환">${rt.longTerm? '장기→단기':'단기→장기'}</button>
         </div>
       </td>
@@ -2287,66 +2313,6 @@ async function submitLongtermConvert(id){
   flash('장기로 변경되었습니다');
 }
 
-function openCheckHoursModal(id){
-  const g = findGen(id);
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
-      <h3>운행시간 확인 · 입력</h3>
-      <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
-      ${g.hoursUpdatedAt? `<div class="hint" style="background:var(--warn-tint);border:1px solid var(--warn);border-radius:8px;padding:8px 10px;margin-bottom:12px;color:var(--warn);font-weight:700;">⏱ 마지막 수정: ${escR(g.hoursUpdatedAt)}${g.hoursUpdatedBy? ` (${escR(g.hoursUpdatedBy)})`:''}</div>` : ''}
-      <div class="field chk"><input type="checkbox" id="f-chours-unknown" ${g.hoursKnown? '' : 'checked'} onchange="toggleCHoursUnknown()"><label for="f-chours-unknown">누적시간 확인할 수 없음 (남은 정비시간·정비도래일이 화면에 표시되지 않습니다)</label></div>
-      <div id="f-chours-fields" style="${g.hoursKnown? '' : 'display:none;'}">
-        <div class="field"><label>현재 누적 사용시간(h)</label><input type="number" id="f-chours" min="0" value="${g.hours||0}"></div>
-        <div class="field"><label>마지막 정비시 누적시간(h)</label><input type="number" id="f-clastmaint" min="0" value="${g.lastMaintHours||0}"><div class="hint">모르면 위 누적시간과 같은 값으로 입력해두면 "정비필요"로 잘못 표시되지 않습니다.</div></div>
-      </div>
-      <div id="f-err" class="err" style="display:none;"></div>
-      <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">취소</button>
-        <button class="btn primary" onclick="submitCheckHours('${g.id}')">저장</button>
-      </div>
-    </div>
-  </div>`;
-}
-function toggleCHoursUnknown(){
-  const unknown = document.getElementById('f-chours-unknown').checked;
-  document.getElementById('f-chours-fields').style.display = unknown ? 'none' : 'block';
-}
-async function submitCheckHours(id){
-  const g = findGen(id);
-  const unknown = document.getElementById('f-chours-unknown').checked;
-  if(unknown){
-    g.hoursKnown = false;
-    g.hoursNA = true;
-    g.hoursUpdatedAt = nowDateTimeStr();
-    g.hoursUpdatedBy = DB.currentUserName || null;
-    await saveGens();
-    closeModal();
-    renderContent();
-    flash('해당없음으로 표시되었습니다');
-    return;
-  }
-  const hours = Number(document.getElementById('f-chours').value);
-  const lastMaint = Number(document.getElementById('f-clastmaint').value);
-  const errEl = document.getElementById('f-err');
-  if(isNaN(hours) || hours<0 || isNaN(lastMaint) || lastMaint<0){
-    errEl.textContent='숫자를 정확히 입력해주세요.'; errEl.style.display='block'; return;
-  }
-  if(lastMaint>hours){
-    errEl.textContent='마지막 정비시 누적시간은 현재 누적시간보다 클 수 없습니다.'; errEl.style.display='block'; return;
-  }
-  g.hours = hours;
-  g.lastMaintHours = lastMaint;
-  g.hoursKnown = true;
-  g.hoursNA = false;
-  g.hoursUpdatedAt = nowDateTimeStr();
-  g.hoursUpdatedBy = DB.currentUserName || null;
-  await saveGens();
-  closeModal();
-  renderContent();
-  flash('저장되었습니다');
-}
-
 function renderMaintTab(){
   return `
     <div class="section-title">모델별 정비 이력</div>
@@ -2357,6 +2323,22 @@ function renderMaintTab(){
       </select>
     </div>
     <div id="maint-model-result"></div>
+    <div class="material-card" style="margin-top:14px;">
+      <div class="util-two-col" style="align-items:flex-start;">
+        <div class="field" style="flex:1;min-width:0;">
+          <div class="section-title" style="margin-top:0;">정비 임박 경고 기준</div>
+          <label>잔여시간이 이 값(h) 이하면 "임박"으로 표시</label>
+          <input type="number" id="f-warn-threshold" min="1" value="${DB.warnThreshold||50}" onchange="updateWarnThreshold(this.value)">
+          <div class="hint">기본값은 50h입니다. 전체 발전기에 공통 적용됩니다.</div>
+        </div>
+        <div class="field" style="flex:1;min-width:0;">
+          <div class="section-title" style="margin-top:0;">🚨 과다사용 기준</div>
+          <label>하루 몇 시간 초과시 "과다사용"으로 표시</label>
+          <input type="number" id="f-overuse-limit" min="1" value="${DB.overuseDailyLimit||10}" onchange="updateOveruseDailyLimit(this.value)">
+          <div class="hint">임대기간 중 하루 평균 이 시간을 초과해서 쓰면 "과다사용"으로 표시됩니다. 기본값은 10h입니다. (해당 발전기의 입출고 기록이 3건 이상 쌓인 뒤부터 적용됩니다)</div>
+        </div>
+      </div>
+    </div>
     ${longtermPrepListHtml()}
     <div class="section-title">정비 주기 현황 <span class="cnt" id="maint-list-cnt"></span></div>
     <div id="maint-list-wrap"></div>
@@ -2838,7 +2820,6 @@ function downloadCustomerHistoryPrintFile(customer){
 <title>${escR(customer)} 임대 이력 - ${todayStr()}</title>
 <style>${customerHistoryPrintCss()}</style>
 </head><body>
-<div class="print-hint">이 파일을 열면 인쇄 대화상자가 자동으로 뜹니다. 열리지 않으면 <b>Ctrl+P</b>(맥은 ⌘+P)를 눌러주세요. <button onclick="window.print()">인쇄</button></div>
 <div class="ch-wrap">
   <div class="ch-title">거래처 임대 이력</div>
   <div class="ch-sub">${escR(customer)} · ${dow(todayStr())} 기준 · 총 ${rentals.length}건</div>
@@ -2846,17 +2827,22 @@ function downloadCustomerHistoryPrintFile(customer){
   ${notes.note? `<div class="ch-note">${escR(notes.note)}</div>`:''}
   ${cards}
 </div>
-<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>
 </body></html>`;
-  const blob = new Blob([doc], {type:'text/html;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${customer.replace(/[\\/:*?"<>|]/g,'')}_임대이력_${todayStr()}.html`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
-  flash('인쇄용 파일이 다운로드되었습니다. 다운로드된 파일을 열면 인쇄창이 뜹니다.');
+  const win = window.open('', '_blank', 'width=900,height=1000');
+  if(!win){
+    showInfoModal('팝업이 차단되어 바로 인쇄 창을 열 수 없습니다. 브라우저에서 이 사이트의 팝업을 허용해주세요.');
+    return;
+  }
+  win.document.open();
+  win.document.write(doc);
+  win.document.close();
+  win.onload = function(){
+    setTimeout(function(){
+      win.focus();
+      win.print();
+    }, 300);
+  };
+  win.onafterprint = function(){ win.close(); };
 }
 async function submitCustomerNotes(customer){
   const tagBtns = document.querySelectorAll('#cn-tags-wrap button');
@@ -3099,7 +3085,7 @@ function buildFullBackupObject(){
     data: {
       gens: DB.gens, rentals: DB.rentals, maint: DB.maint, reservations: DB.reservations,
       materials: DB.materials, technicians: DB.technicians, teamMembers: DB.teamMembers, warnThreshold: DB.warnThreshold, overuseDailyLimit: DB.overuseDailyLimit,
-      partsStock: DB.partsStock, partsSpecs: DB.partsSpecs, partsUnit: DB.partsUnit, partsCategory: DB.partsCategory, partsSupplier: DB.partsSupplier, partsMinStock: DB.partsMinStock, partsPurchaseLog: DB.partsPurchaseLog, consumableOrders: DB.consumableOrders, orderMarks: DB.orderMarks, improvements: DB.improvements, suppliesCatalog: DB.suppliesCatalog, suppliesStock: DB.suppliesStock, vehicleTypes: DB.vehicleTypes, vehicleSuggestEnabled: DB.vehicleSuggestEnabled, genSizeDisplayEnabled: DB.genSizeDisplayEnabled, modelColors: DB.modelColors, notices: DB.notices, calendarEvents: DB.calendarEvents, genColorOverrides: DB.genColorOverrides, qrIssued: DB.qrIssued, suppliesSizes: DB.suppliesSizes, suppliesSpecs: DB.suppliesSpecs, suppliesCategories: DB.suppliesCategories, customerNotes: DB.customerNotes, readMarkers: DB.readMarkers, companyInfo: DB.companyInfo
+      partsStock: DB.partsStock, partsSpecs: DB.partsSpecs, partsUnit: DB.partsUnit, partsCategory: DB.partsCategory, partsSupplier: DB.partsSupplier, partsMinStock: DB.partsMinStock, partsPurchaseLog: DB.partsPurchaseLog, consumableOrders: DB.consumableOrders, orderMarks: DB.orderMarks, improvements: DB.improvements, suppliesCatalog: DB.suppliesCatalog, suppliesStock: DB.suppliesStock, vehicleTypes: DB.vehicleTypes, vehicleSuggestEnabled: DB.vehicleSuggestEnabled, genSizeDisplayEnabled: DB.genSizeDisplayEnabled, modelColors: DB.modelColors, notices: DB.notices, calendarEvents: DB.calendarEvents, genColorOverrides: DB.genColorOverrides, qrIssued: DB.qrIssued, salesEnabled: DB.salesEnabled, salesRecords: DB.salesRecords, salesManagers: DB.salesManagers, salesPassword: DB.salesPassword, salesPasswordBypass: DB.salesPasswordBypass, salesBillingRecords: DB.salesBillingRecords, cancelOutHistory: DB.cancelOutHistory, suppliesSizes: DB.suppliesSizes, suppliesSpecs: DB.suppliesSpecs, suppliesCategories: DB.suppliesCategories, customerNotes: DB.customerNotes, readMarkers: DB.readMarkers, companyInfo: DB.companyInfo
     }
   };
 }
@@ -3295,6 +3281,13 @@ function handleRestoreFile(input){
       DB.calendarEvents = d.calendarEvents || [];
       DB.genColorOverrides = d.genColorOverrides || {};
       DB.qrIssued = d.qrIssued || {};
+      DB.salesEnabled = d.salesEnabled === true;
+      DB.salesRecords = d.salesRecords || [];
+      DB.salesManagers = d.salesManagers || [];
+      DB.salesPassword = d.salesPassword || '';
+      DB.salesPasswordBypass = d.salesPasswordBypass !== false;
+      DB.salesBillingRecords = d.salesBillingRecords || [];
+      DB.cancelOutHistory = d.cancelOutHistory || [];
       DB.suppliesSizes = d.suppliesSizes || {};
       DB.suppliesSpecs = d.suppliesSpecs || {};
       DB.suppliesCategories = d.suppliesCategories || {};
@@ -3326,6 +3319,8 @@ function handleRestoreFile(input){
       await saveCalendarEvents();
       await saveGenColorOverrides();
       await saveQrIssued();
+      await saveSalesEnabled();
+      await saveSalesRecords();
       await saveSuppliesSizes();
       await saveSuppliesSpecs();
       await saveOrderMarks();
@@ -3751,7 +3746,7 @@ function renderManualTab(){
       ['정보 수정', '이미 출고중인 발전기의 거래처·현장·날짜·사용기간 등을 입고 처리 없이 바로 고칩니다. 맨 위에서 출고시 누적 사용시간을 먼저 확인·수정합니다.'],
       ['인수증 미리보기', '실제 출고 처리 없이 인수증만 미리 보기 · 🖨 인쇄하기로 바로 인쇄 · 파일 다운로드 · 공유'],
       ['입고 처리', '반납받을 때 눌러서 입고 처리합니다(누적시간, 연료 측정 등 입력). 연료를 넣어드린 발전기인데 실제로 손도 안 대고 그대로 반납된 경우는 "⛽ 연료사용안함" 버튼을 누르면 높이 측정 없이 그렇게 기록되고, [입고] 목록의 "남은연료" 칸에도 "연료사용안함"으로 표시됩니다(다른 측정값처럼 "초기화" 버튼으로 지울 수 있습니다).'],
-      ['⚡ 정보없이 강제입고', '누적시간·연료·부자재 등 아무 정보도 입력하지 않고 바로 [입고] 상태로 전환합니다. 잘못 출고 처리한 발전기를 빠르게 되돌릴 때 사용하며, 이번 출고 이력은 남기지 않습니다.'],
+      ['⚡ 강제입고 / 🚫 출고취소', '둘 다 거래처·연료·부자재 등 아무 정보도 입력하지 않고 바로 [입고] 상태로 전환하며, 이번 출고 이력은 남기지 않습니다. 잘못 출고 처리한 발전기를 빠르게 되돌릴 때 사용하세요. "출고취소"를 누르면 취소 사유를 적고 "비용발생"/"비용발생 안함" 중 골라야 하며, 이 선택은 기록으로 남습니다. 매출관리가 켜져 있으면 "비용발생"은 그 건의 매출 기록을 그대로 두고, "비용발생 안함"은 사유와 함께 자동으로 "숨김매출" 처리됩니다.'],
       ['한번에 입고', '왼쪽 체크박스로 여러 대를 선택하면 뜨는 "한번에 입고" 버튼으로, 여러 대를 한 번에 정상입고 처리합니다. 발전기별 입고시 누적 사용시간을 대별로 각각 입력합니다. (고장 등록이 필요하거나 연료 높이 측정이 필요한 경우는 개별 "입고 처리"를 이용해주세요)'],
       ['장기→단기 / 단기→장기', '임대 구분을 전환합니다. 장기임대는 예상 사용시간을 입력해 정비 시점을 추정합니다.'],
       ['입금 확인', '🚨 미입금 출고 건의 입금 확인 처리.'],
@@ -3765,7 +3760,7 @@ function renderManualTab(){
       ['직접수정', '모델·셋팅 전압·누적시간·마지막 정비시점·마지막 정비일자·연료통 기준높이를 직접 입력·조정하는 곳입니다. 발전기를 처음 등록할 때도 여기서 초기값을 넣고, 데이터 오류 수정도 여기서 합니다. 마지막 정비시 누적시간이 현재 누적시간보다 크면 저장되지 않습니다. 여기서 값을 고치면 정비이력에는 남기지 않고 조용히 반영됩니다 — 실제 현장에서 전압을 바꾼 경우는 [입고] 목록 전압 클릭이나 출고/입고 처리 화면을 이용하면 정비이력에 자동으로 기록됩니다.'],
       ['정비주기', '기본 400시간인 정비 주기를 발전기 개별로 다르게 설정합니다. 직접 숫자를 입력해도 되고, 350h·400h·450h·500h 버튼을 눌러 바로 채울 수도 있습니다.'],
       ['정비주기 일괄변경', '용량별 보기 버튼 줄 맨 끝에 있는 "⚙️ 정비주기 일괄변경" 버튼입니다. "전체"를 선택한 상태면 지금 목록에 보이는 발전기 전체에, 특정 용량(예: 550kW)을 선택한 상태면 그 용량의 발전기들에만 한 번에 같은 정비 주기를 적용합니다.'],
-      ['모델별 정비 이력', '모델을 선택하면 그 모델을 쓴 발전기들의 정비 기록만 모아서 봅니다.'],
+      ['모델별 정비 이력', '모델을 선택하면 그 모델을 쓴 발전기들의 정비 기록만 모아서 봅니다. 바로 아래에 "정비 임박 경고 기준"과 "🚨 과다사용 기준"을 숫자로 직접 설정하는 칸이 있습니다(기본값은 각각 50h, 10h). 잔여시간이 그 값 이하면 "임박"으로, 하루 사용시간이 그 값을 초과하면 "과다사용"으로 표시됩니다.'],
       ['용량별 보기 (정비 주기 현황)', '정비 주기 현황 목록 위에 자동으로 생기는 용량(kW) 버튼을 누르면 그 용량의 발전기만 걸러서 봅니다. "전체" 버튼으로 다시 전체 목록으로 돌아갑니다. [입고] 탭의 용량별 보기와 같은 방식입니다.'],
       ['장기임대 정비 준비 리스트', '장기임대 발전기를 정비 임박 순으로 모아, 거래처·현장과 함께 방문시 챙길 자재(엔진오일량·필터 품명/규격)까지 보여줍니다. 🖨 인쇄 버튼으로 체크리스트를 뽑을 수 있습니다.']
     ])}
@@ -3800,6 +3795,18 @@ function renderManualTab(){
       ['발전기별 가동률(최근 90일)', '최근 90일 중 출고되어 있던 비율입니다. 낮을수록 놀고 있는 장비라는 뜻입니다.']
     ])}
 
+    ${manualSection('💰','매출관리', false,
+      '출고중인 발전기의 청구·입금 현황을 관리하는 탭입니다. [설정 → 매출관리]에서 "매출관리 사용" 체크를 켜야 상단 탭에 나타나고, 꺼두면 탭 자체가 안 보입니다.', [
+      ['접근 권한', '[설정 → 매출관리 → 관리자]에 등록된 이름 1명만 상단 탭에 매출관리가 보이고 사용할 수 있습니다. 이름은 실제 신원 확인 수단이 아니라서(목록에서 고르는 방식), 진짜 출입 통제는 비밀번호가 담당합니다. 비밀번호를 설정해두면 매출관리 탭에 들어갈 때 비밀번호를 입력해야 합니다("비밀번호 없이 사용" 체크를 켜두면 비밀번호를 물어보지 않습니다).'],
+      ['업체별 매출현황', '지금 출고중인 발전기를 출고일 순서대로 보여줍니다. 발전기별로 청구일자·업체명·현장명·용량·발전기번호·사용기간·견적금액(공급가·세액·합계)·계산서 발행·운임(출고운임/세액, 입고운임/세액)·입금일/입금금액·미수금·담당자·연락처·비고를 표 안에서 바로 입력할 수 있고, 공급가와 각 운임을 넣으면 세액(10%)이 자동 계산되며 합계도 자동으로 더해집니다(합계는 직접 고칠 수도 있음). 업체명에 담당자 이름·전화번호가 같이 적혀 있으면 자동으로 나눠서 담당자·연락처 칸에 채워줍니다. 입력한 내용은 곧바로 저장되며, 별도의 등록 버튼이 필요 없습니다. 한 번 생성된 매출 기록은 이후 출고취소·입고가 되어도 지워지지 않고 그대로 남습니다.'],
+      ['계산서 발행 버튼', '견적금액 칸 아래 있는 토글 버튼입니다. 누르면 "발행 처리할까요?" 또는 "미발행으로 변경할까요?" 확인창이 뜨고, 확인해야만 "계산서 미발행" ↔ "계산서 발행함" 상태가 바뀝니다.'],
+      ['이 매출 숨기기', '청구일자 칸 아래 큰 버튼입니다. 누르면 숨기는 이유를 입력하라는 창이 뜨고, 이유를 적고 확인하면 목록에서 안 보이게 숨겨집니다(삭제 아님). "숨김매출" 체크를 켜면 숨긴 건만 모아서 볼 수 있고, 각 건에 적어둔 숨긴 이유도 함께 표시되며 "복원하기" 버튼으로 다시 되돌릴 수 있습니다.'],
+      ['출고취소와 매출 기록의 연동', '[출고중] 목록에서 "🚫 출고취소"를 누르면 취소 사유를 적고 "비용발생"/"비용발생 안함" 중 골라야 합니다. "비용발생"을 고르면 그 건의 매출 기록은 정상 목록에 그대로 남고, "비용발생 안함"을 고르면 사유와 함께 자동으로 "숨김매출" 처리되어 정상 목록에서 빠집니다.'],
+      ['필터 (월별·입금상태·업체별·발전기번호별)', '청구일자 기준 월별 필터, 입금완료/미입금 버튼, 업체별 보기, 발전기번호별 보기 드롭다운으로 원하는 내역만 골라볼 수 있습니다. "출고운임·입고운임 표시" 체크를 끄면 운임 관련 칸이 숨겨져 화면이 더 단순해집니다.'],
+      ['입금완료 표시 · 인쇄', '견적금액에서 입금액 합계를 뺀 미수금이 0 이하가 되면 그 줄은 초록색, 미수가 남아있으면 붉은색 배경으로 표시됩니다. 상단 "🖨 인쇄" 버튼을 누르면 지금 적용된 필터 그대로 새 창에 미리보기가 뜨고 인쇄 대화상자가 자동으로 열립니다(팝업 차단 시 브라우저에서 팝업을 허용해주세요).'],
+      ['총 견적금액 · 총 미수금', '맨 위 요약 카드에 지금 필터에 맞는 견적금액 합계와, 아직 안 받은 미수금 합계가 자동으로 계산되어 표시됩니다.']
+    ])}
+
     ${manualSection('🛒','소모품주문', false,
       '자주 주문하는 소모품의 구매 사이트 링크를 저장해두는 곳입니다. (부품 재고와는 별개의 단순 링크 모음입니다)', [
       ['소모품 추가', '품명·규격1·규격2·사이트 링크 주소·비고를 입력해서 등록합니다. 규격/비고는 입력한 것만 목록에 표시됩니다.'],
@@ -3813,13 +3820,12 @@ function renderManualTab(){
       '앱 전체에 적용되는 값과 데이터 관리 기능이 모여있습니다.', [
       ['🔒 접속 비밀번호', '팀 공통 비밀번호를 설정·변경·해제합니다. 이 화면 자체를 여는 용도이며, 아래 "관리자 모드"는 이것과 별개인 전용 비밀번호를 사용합니다.'],
       ['📄 공용 양식 · 문서', '견적서·관리문서 같은 엑셀/워드/PDF/한글 파일을 올려두면, 팀원 누구나 다운로드해서 바로 쓸 수 있습니다. 파일 1개당 최대 5MB까지 올릴 수 있고, 이 목록은 [설정] 화면을 열 때만 따로 불러와서 앱 전체 로딩 속도에는 영향을 주지 않습니다. 다른 사람이 방금 새로 올린 파일은 자동으로 안 보일 수 있어 "🔄 목록 새로고침"으로 최신 목록을 다시 받아올 수 있습니다.'],
-      ['📱 QR 코드 관리', '발전기마다 붙일 QR코드를 만드는 곳입니다. "🖨 신규 발전기 QR 인쇄 파일 만들기"는 아직 QR을 뽑은 적 없는 발전기만 골라서 인쇄용 파일을 만들어주고, 한번 뽑은 발전기는 번호가 그대로면 다음에 새 발전기를 추가로 등록해도 다시 뽑히지 않아 이미 붙여둔 QR과 계속 같은 채로 유지됩니다. 지금 몇 대가 신규 발급 대상인지도 화면에 숫자로 보여줍니다. QR을 분실·훼손해서 이미 뽑은 것까지 포함해 전부 다시 뽑아야 할 때는 "🔁 전체 다시 인쇄" 버튼을 따로 이용합니다(확인 문구가 한 번 뜹니다). 발전기 한 대씩 QR을 다시 보고 싶으면 [발전기 모델 설정] 목록의 "관리" 버튼 안 "📱 QR코드 보기"에서도 확인할 수 있습니다.'],
+      ['📱 QR 코드 관리', '발전기마다 붙일 QR코드를 만드는 곳입니다. "🖨 신규 발전기 QR 인쇄"는 아직 QR을 뽑은 적 없는 발전기만 골라서 바로 인쇄창을 열어주고, 한번 뽑은 발전기는 번호가 그대로면 다음에 새 발전기를 추가로 등록해도 다시 뽑히지 않아 이미 붙여둔 QR과 계속 같은 채로 유지됩니다. 지금 몇 대가 신규 발급 대상인지도 화면에 숫자로 보여줍니다. QR을 분실·훼손해서 이미 뽑은 것까지 포함해 전부 다시 뽑아야 할 때는 "🔁 전체 다시 인쇄" 버튼을 따로 이용합니다(확인 문구가 한 번 뜹니다). 발전기 한 대씩 QR을 다시 보고 싶으면 [발전기 모델 설정] 목록의 "관리" 버튼 안 "📱 QR코드 보기"에서도 확인할 수 있습니다.'],
       ['📥 엑셀로 불러오기', '[설정 → 관리자 모드] 안에 있는 기능입니다. "📋 엑셀 양식 다운로드" 버튼을 누르면 정해진 양식(시트 6개: 임대이력·정비이력·자재목록·부자재목록·정비사명단·사용자명단) 파일이 바로 받아지고, 그 양식에 맞춰 다른 곳에서 관리하던 데이터를 작성해서 올리면 한 번에 옮겨옵니다. [임대이력]에서 목록에 없는 발전기번호는 새 발전기로 자동 등록되고, 입고일까지 채워진 완료 건은 [이력 조회]에, 입고일을 비워둔(아직 반납 안 된) 건은 [출고중] 목록에 들어갑니다. [정비이력]은 부품:수량 형식으로 사용부품까지 정비이력에 반영되고, [자재목록]·[부자재목록]은 재고·규격·카테고리까지, [정비사명단]은 최대 3명, [사용자명단]은 팀원 목록에 추가됩니다. 필요 없는 시트는 비워두면 됩니다. 업로드하면 시트별로 몇 건씩 들어가는지, 형식이 안 맞아 건너뛴 행은 몇 번째 줄이고 왜 건너뛰었는지까지 먼저 보여주고 "가져오기 실행"을 눌러야 실제로 반영됩니다.'],
       ['전체 백업 다운로드 / 복원', '발전기·임대·정비·예약·자재·부품재고·부자재·차량종류·색상설정·팀원목록 등 모든 데이터를 파일 하나로 저장하거나, 백업 파일로 되돌립니다. (접속 비밀번호는 보안상 백업 대상에서 제외됩니다) 비밀번호 없이 누구나 바로 이용할 수 있습니다.'],
       ['📁 폴더 자동 저장', '"자동 백업 폴더 설정" 버튼으로 컴퓨터의 폴더를 한 번 지정해두면, 그 다음부터는 다운로드 버튼을 안 눌러도 앱을 열 때마다 그 폴더에 최신 백업 파일이 자동으로 저장되고, 저장되면 "OO 폴더에 자동저장되었습니다" 메시지가 잠깐 뜹니다. 파일은 지정한 그 폴더 안에 "발전기관리_자동백업_YYYY-MM-DD.json" 이름으로 날짜별로 쌓여서 저장되어, 예전 날짜 백업도 폴더 안에 그대로 남아있습니다. 자동 저장이 켜져 있으면 [전체현황]에 뜨던 "정기 백업을 아직 안 하셨어요" 리마인더 배너는 더 이상 뜨지 않습니다. 새로고침 도중 네트워크 문제로 발전기 데이터를 다 못 불러온 비정상적인 상태에서는 자동저장을 건너뛰어, 불완전한 상태로 오늘자 백업이 덮어써지는 사고를 방지합니다(다음 접속시 정상 상태면 다시 저장됩니다). 크롬·엣지·네이버 웨일 같은 크로미움 기반 브라우저에서만 되고, 사파리·파이어폭스는 지원하지 않습니다. 이 설정은 지정한 그 컴퓨터·그 브라우저에만 적용되며(다른 팀원 화면에는 영향 없음), 하루에 한 번만 저장하고, "폴더 변경"·"자동 저장 끄기"로 언제든 바꿀 수 있습니다.'],
       ['🔐 관리자 모드 (업체 정보 · 위험 구역)', '업체 정보 수정과 위험 구역(초기화) 작업은 관리자 모드 안에 있습니다. 사이트 접속 비밀번호와는 별개인 전용 관리자 비밀번호를 입력해야 열리며, 이 비밀번호는 화면에서 바꿀 수 없게 고정되어 있습니다. 열리면 5분 동안 유지되고, "지금 잠그기"를 누르거나 5분이 지나면 자동으로 다시 잠깁니다. 열린 동안에는 업체명·주소·전화번호·휴대폰 번호를 수정할 수 있고, 입고로 초기화·출고로 초기화·정비내역 초기화·부품재고 초기화·고객정보 초기화·전체 초기화 버튼도 다시 잠글 때까지 계속 이용할 수 있습니다. 되돌릴 수 없는 작업들이니 실행 전 먼저 백업을 받아두세요.'],
-      ['정비 임박 경고 기준 / 과다사용 기준', '잔여시간이 얼마 이하면 "임박"으로 표시할지, 하루 몇 시간 초과 사용을 "과다사용"으로 볼지 각각 숫자로 직접 설정할 수 있습니다. 기본값은 각각 50h, 10h입니다.'],
-      ['팀원 목록', '사용자 선택 화면에 뜨는 이름 목록을 관리합니다.'],
+      ['사용자(팀원) 목록', '사용자 선택 화면에 뜨는 이름 목록입니다. 정비사 목록과 같은 방식으로 사용자1·사용자2·사용자3 칸에 이름을 입력하면 바로 저장됩니다 (최대 3명).'],
       ['정비사 목록', '정비 등록시 선택할 정비사 이름을 최대 3명까지 등록합니다. 여기 등록된 이름과 접속시 선택한 이름이 같아야만 전압 변경, 정비 등록·수정·삭제, 소요자재입력, 부품 재고 등록·수정·삭제 같은 작업을 할 수 있습니다. 등록 안 된 이름으로 시도하면 "정비사로 등록된 사람만 할 수 있습니다" 안내가 뜨고 저장되지 않습니다.'],
       ['발전기 모델 설정', '번호별 모델(용량), 년식, 정격대비사용을 입력합니다. "관리" 버튼으로 번호(ID) 수정, 매각/폐기 처리, 완전 삭제(등록을 잘못했을 때만)까지 한 곳에서 할 수 있습니다. 폐기 처리시 폐기일자·폐기업체명·전화번호·처리방법·폐기사유·폐차수익을 함께 기록할 수 있습니다.'],
       ['모델별 색상 설정', '모델마다 색상을 지정하면 발전기 목록(입고/출고중/출고대기 등)에서 모델명 옆에 색상 점으로 표시되어 구분하기 쉽습니다. 용량대별로 묶어서 모델명과 함께 보여줍니다.'],
@@ -3827,6 +3833,7 @@ function renderManualTab(){
       ['연료탱크 규격 · 전압 설정 방법', '모델별 탱크 크기(자동 연료환산용), 발전기 자체 크기(가로×세로×높이 — 차량 추천에 사용), 220V/380V/380V 이상/기타참고 셋팅법 사진(종류별 최대 3장)을 등록합니다. 사진 등록·수정·삭제는 이 화면(설정)에서만 가능하며, 입고 목록의 전압 클릭·입고 처리 화면에는 등록된 사진이 보기 전용(클릭하면 크게 보기)으로만 나타납니다.'],
       ['발전기별 발전기 크기 (개별 설정)', '같은 모델이라도 실제 발전기 크기(가로×세로×높이)가 다른 경우, 번호로 찾아서 그 발전기만 따로 입력할 수 있습니다. 비워두면 모델 기본값을 그대로 사용하며, 차량 추천 계산에도 개별 값이 우선 적용됩니다. 개별 설정된 발전기는 목록에 바로 표시되고, "삭제" 버튼으로 개별 설정을 지우면 모델 기본값으로 되돌아갑니다.'],
       ['발전기별 탱크 규격 · 기준높이 (개별 설정)', '같은 모델이라도 실제 탱크 크기가 다른 발전기가 있으면, 번호로 찾아서 그 발전기만 가로×세로×높이와 바닥 기준높이(모델 기본값과 다른 경우)를 한 번에 입력할 수 있습니다. 비워두면 위 "연료탱크 규격 · 전압 설정 방법"에서 등록한 모델 기본값이 그대로 적용됩니다. 계산되는 "남은 연료량"은 이 기준높이만큼(항상 남아있어 실제로 쓸 수 없는 양)을 자동으로 빼고 계산됩니다. 개별 설정된 발전기는 목록에 바로 표시되고, "삭제" 버튼으로 지울 수 있습니다. 높이가 세로(깊이)에 비해 유난히 낮게 입력된 경우(세로·높이를 바꿔 입력하는 실수가 흔함) 그 항목이 빨간색으로 표시되어 바로 눈에 띕니다.'],
+      ['💰 매출관리 사용', '체크하면 상단 탭에 [매출관리] 탭이 새로 생기고, 체크를 풀면 탭 자체가 안 보이게 숨겨집니다(입력해둔 데이터는 지워지지 않고 그대로 남아있습니다). 켜두면 청구·입금 내역을 기록·관리할 수 있습니다.'],
       ['차량 종류 · 적재함 크기', '보유 차량과 적재함 크기(가로×세로×높이)를 등록해두면, 출고하기 화면에서 발전기 크기와 비교해 어떤 차량을 써야 하는지, 여러 대를 함께 실을 수 있는지까지 자동으로 추천해줍니다. "차량 추천 기능 사용"과 "발전기 크기만 표시" 두 체크박스로 출고하기 화면에 무엇을 보여줄지 따로 켜고 끌 수 있습니다.'],
       ['폐기된/매각된 발전기', '처리된 발전기 목록입니다. "복원" 버튼으로 다시 살릴 수 있습니다.']
     ])}
@@ -3865,6 +3872,474 @@ function renderManualTab(){
       ['📅 상단 실시간 날짜·시간 표시', '화면 맨 위 "전체저장" 버튼 아래에 오늘 날짜와 현재 시각이 1초마다 갱신되며 표시됩니다.']
     ])}
   `;
+}
+function renderSalesPasswordGate(){
+  return `
+    <div class="section-title">💰 업체별 매출현황</div>
+    <div class="detail-card" style="padding:24px;max-width:360px;">
+      <p class="muted" style="font-size:13px;margin-top:0;">매출관리에 설정된 비밀번호를 입력해주세요.</p>
+      <input type="password" id="f-sales-unlock-pw" placeholder="비밀번호" style="font-size:16px;padding:10px 12px;width:100%;box-sizing:border-box;margin-bottom:8px;" onkeydown="if(event.key==='Enter')submitSalesUnlock()">
+      <div id="f-sales-unlock-err" class="err" style="display:none;margin-bottom:8px;"></div>
+      <button class="btn primary" onclick="submitSalesUnlock()">열기</button>
+    </div>`;
+}
+function submitSalesUnlock(){
+  const el = document.getElementById('f-sales-unlock-pw');
+  const errEl = document.getElementById('f-sales-unlock-err');
+  if(!el) return;
+  if((el.value||'')!==(DB.salesPassword||'')){
+    if(errEl){ errEl.textContent='비밀번호가 올바르지 않습니다.'; errEl.style.display='block'; }
+    return;
+  }
+  sessionStorage.setItem('sales-unlocked','yes');
+  renderContent();
+}
+function billingMatchKey(genId, outDate){
+  return `${genId}__${outDate||''}`;
+}
+function recIsLiveOut(rec){
+  const g = findGen(rec.genId);
+  return !!(g && g.status==='out' && g.rental && g.rental.outDate===rec.outDate);
+}
+function parseCustomerString(raw){
+  let customer = (raw||'').trim();
+  let name = '', phone = '';
+  const phoneMatch = customer.match(/(01[016789][-.\s]?\d{3,4}[-.\s]?\d{4})/);
+  if(phoneMatch){
+    phone = phoneMatch[1].replace(/[.\s]/g,'-');
+    customer = (customer.slice(0,phoneMatch.index) + customer.slice(phoneMatch.index+phoneMatch[0].length)).trim();
+  }
+  const parenMatch = customer.match(/\(([^)]*)\)\s*$/);
+  if(parenMatch && parenMatch[1].trim()){
+    name = parenMatch[1].trim();
+    customer = customer.slice(0, parenMatch.index).trim();
+  }
+  customer = customer.replace(/[-,/·\s]+$/,'').trim();
+  return { customer: customer || (raw||'').trim(), name, phone };
+}
+function getOrCreateBillingRecord(g){
+  const rt = g.rental||{};
+  const key = billingMatchKey(g.id, rt.outDate);
+  DB.salesBillingRecords = DB.salesBillingRecords || [];
+  let rec = DB.salesBillingRecords.find(r=>r.matchKey===key);
+  if(!rec){
+    const cap = capacityOf(g);
+    const parsed = parseCustomerString(rt.customer);
+    rec = {
+      id: uid(), matchKey: key, genId: g.id, outDate: rt.outDate||'',
+      customer: parsed.customer||'(업체명 미상)', site: rt.site||rt.address||'-', capacity: isFinite(cap)? cap : null,
+      manager: rt.manager||parsed.name||'', phone: rt.phone||parsed.phone||'',
+      billDate:'', billUnitPrice:0, billTax:0, billTotal:0,
+      billFreightOut:0, billFreightOutTax:0, billFreightIn:0, billFreightInTax:0, billInvoiceIssued:false,
+      billPay1Date:'', billPay1Amount:0, billPay2Date:'', billPay2Amount:0, billPay3Date:'', billPay3Amount:0,
+      billManager:null, billPhone:null, billNote:'',
+      hidden:false, createdAt: nowDateTimeStr()
+    };
+    DB.salesBillingRecords.push(rec);
+    saveSalesBillingRecords();
+  }
+  return rec;
+}
+function findBillingRecord(recId){
+  return (DB.salesBillingRecords||[]).find(r=>r.id===recId);
+}
+function hideBillingRecord(recId){
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>이 매출 숨기기</h3>
+      <div class="modal-sub">기록은 지워지지 않고 "숨김매출"에서 다시 볼 수 있습니다. 숨기는 이유를 남겨주세요.</div>
+      <div class="field"><label>숨기는 이유</label><textarea id="f-hide-reason" placeholder="예: 출고 취소, 중복 입력 등"></textarea></div>
+      <div id="f-hide-reason-err" class="err" style="display:none;"></div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">취소</button>
+        <button class="btn danger" onclick="submitHideBillingRecord('${recId}')">숨기기</button>
+      </div>
+    </div>
+  </div>`;
+}
+function submitHideBillingRecord(recId){
+  const reasonEl = document.getElementById('f-hide-reason');
+  const reason = (reasonEl? reasonEl.value : '').trim();
+  const errEl = document.getElementById('f-hide-reason-err');
+  if(!reason){
+    if(errEl){ errEl.textContent = '숨기는 이유를 입력해주세요.'; errEl.style.display = 'block'; }
+    return;
+  }
+  const rec = findBillingRecord(recId);
+  if(!rec) return;
+  rec.hidden = true;
+  rec.hideReason = reason;
+  rec.hiddenBy = DB.currentUserName || null;
+  rec.hiddenAt = nowDateTimeStr();
+  saveSalesBillingRecords();
+  closeModal();
+  renderContent();
+  flash('숨겼습니다');
+}
+function unhideBillingRecord(recId){
+  const rec = findBillingRecord(recId);
+  if(!rec) return;
+  rec.hidden = false;
+  saveSalesBillingRecords();
+  renderContent();
+  flash('복원되었습니다');
+}
+function toggleSalesShowHiddenOnly(checked){
+  salesShowHiddenOnly = !!checked;
+  renderContent();
+}
+function renderSalesTab(){
+  activeGens().filter(g=>g.status==='out').forEach(g=>getOrCreateBillingRecord(g));
+  let retroFixed = false;
+  (DB.salesBillingRecords||[]).forEach(rec=>{
+    if(!rec.manager && !rec.phone && rec.customer){
+      const parsed = parseCustomerString(rec.customer);
+      if(parsed.name || parsed.phone){
+        rec.customer = parsed.customer||rec.customer;
+        rec.manager = parsed.name||'';
+        rec.phone = parsed.phone||'';
+        retroFixed = true;
+      }
+    }
+  });
+  if(retroFixed) saveSalesBillingRecords();
+  const allRecs = [...(DB.salesBillingRecords||[])].sort((a,b)=>(b.outDate||'').localeCompare(a.outDate||''));
+  const custOptions = [...new Set(allRecs.map(r=>r.customer||'(업체명 미상)'))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const genIdOptions = [...new Set(allRecs.map(r=>r.genId))].sort((a,b)=>a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'}));
+  let recs = allRecs.filter(r=> salesShowHiddenOnly ? r.hidden : !r.hidden);
+  if(salesFilterMonth){
+    recs = recs.filter(r=>(r.billDate||'').slice(0,7)===salesFilterMonth);
+  }
+  if(salesFilterStatus!=='all'){
+    recs = recs.filter(r=>{
+      const total = Number(r.billTotal)||0;
+      const paid = (Number(r.billPay1Amount)||0) + (Number(r.billPay2Amount)||0) + (Number(r.billPay3Amount)||0);
+      const isPaid = total>0 && (total-paid)<=0;
+      return salesFilterStatus==='paid' ? isPaid : !isPaid;
+    });
+  }
+  if(salesFilterCustomer){
+    recs = recs.filter(r=>(r.customer||'(업체명 미상)')===salesFilterCustomer);
+  }
+  if(salesFilterGenId){
+    recs = recs.filter(r=>r.genId===salesFilterGenId);
+  }
+  let grandTotal = 0, grandBalance = 0;
+  const rowsHtml = recs.length===0 ? '' : recs.map(rec=>{
+    const g = findGen(rec.genId);
+    const cap = rec.capacity;
+    const capStr = (cap!=null && isFinite(cap))? `${cap}kW` : '-';
+    const period = rec.outDate? `${dow(rec.outDate)} ~ ${recIsLiveOut(rec)?'진행중':'종료'}` : '-';
+    const total = Number(rec.billTotal)||0;
+    const paid = (Number(rec.billPay1Amount)||0) + (Number(rec.billPay2Amount)||0) + (Number(rec.billPay3Amount)||0);
+    const balance = total - paid;
+    grandTotal += total;
+    grandBalance += balance;
+    const isPaid = total>0 && balance<=0;
+    const rowBg = total>0? (isPaid? 'var(--ok-tint)' : 'var(--danger-tint)') : '';
+    const bgAttr = rowBg? ` style="background:${rowBg};"` : '';
+    return `<tr${bgAttr}>
+      <td rowspan="2">
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input type="date" id="bill-date-${rec.id}" value="${rec.billDate||''}" style="width:125px;" onchange="updateBillingRecordField('${rec.id}','billDate', this.value)">
+          <button type="button" class="btn sm" style="padding:4px 8px;font-size:12px;" onclick="setBillDateToday('bill-date-${rec.id}','${rec.id}','billDate')">오늘</button>
+        </div>
+        <div style="margin-top:14px;">
+          ${rec.hidden
+            ? `<button type="button" class="btn" style="font-size:14px;padding:9px 14px;width:100%;" onclick="unhideBillingRecord('${rec.id}')">복원하기</button>
+               ${rec.hideReason? `<div class="muted" style="font-size:11px;margin-top:5px;">숨긴 이유: ${escR(rec.hideReason)}</div>` : ''}`
+            : `<button type="button" class="btn" style="font-size:14px;padding:9px 14px;width:100%;color:var(--danger);border-color:var(--danger);" onclick="hideBillingRecord('${rec.id}')">이 매출 숨기기</button>`}
+        </div>
+      </td>
+      <td rowspan="2" class="wrap-ok">${escR(rec.customer)}</td>
+      <td rowspan="2" class="wrap-ok">${escR(rec.site)}</td>
+      <td rowspan="2">${capStr}</td>
+      <td rowspan="2" class="gid">${rec.genId}</td>
+      <td rowspan="2" class="wrap-ok">${period}</td>
+      <td rowspan="2">
+        <input type="text" inputmode="numeric" placeholder="공급가" id="bill-unitprice-${rec.id}" data-orig="${krFmt(rec.billUnitPrice)}" value="${krFmt(rec.billUnitPrice)}" style="width:82px;display:block;" maxlength="11" oninput="calcOutTotalLive('${rec.id}')" onchange="saveOutBilling('${rec.id}')">
+        <input type="text" inputmode="numeric" placeholder="세액" id="bill-tax-${rec.id}" data-orig="${krFmt(rec.billTax)}" value="${krFmt(rec.billTax)}" style="width:82px;display:block;margin-top:4px;color:#1E5FB8;font-weight:700;" maxlength="11" oninput="calcOutTotalLive('${rec.id}', true)" onchange="saveOutBilling('${rec.id}')">
+        <input type="text" inputmode="numeric" placeholder="합계" id="bill-total-${rec.id}" data-orig="${krFmt(rec.billTotal)}" value="${krFmt(rec.billTotal)}" style="width:82px;display:block;margin-top:4px;font-weight:700;" maxlength="11" oninput="formatAmountInput(this)" onchange="saveOutBilling('${rec.id}')">
+        <button type="button" class="btn sm ${rec.billInvoiceIssued?'primary':''}" style="width:82px;margin-top:6px;font-size:11px;padding:6px 4px;" onclick="toggleBillInvoiceIssued('${rec.id}')">${rec.billInvoiceIssued? '계산서 발행함':'계산서 미발행'}</button>
+      </td>
+      ${salesShowFreight? `<td rowspan="2">
+        <input type="text" inputmode="numeric" placeholder="출고운임" id="bill-freight-out-${rec.id}" data-orig="${krFmt(rec.billFreightOut)}" value="${krFmt(rec.billFreightOut)}" style="width:82px;display:block;" maxlength="11" oninput="calcFreightTaxLive('${rec.id}','out')" onchange="saveOutBilling('${rec.id}')">
+        <input type="text" inputmode="numeric" placeholder="출고세액" id="bill-freight-out-tax-${rec.id}" data-orig="${krFmt(rec.billFreightOutTax)}" value="${krFmt(rec.billFreightOutTax)}" style="width:82px;display:block;margin-top:4px;color:#1E5FB8;font-weight:700;" maxlength="11" oninput="recalcOutTotal('${rec.id}')" onchange="saveOutBilling('${rec.id}')">
+        <input type="text" inputmode="numeric" placeholder="입고운임" id="bill-freight-in-${rec.id}" data-orig="${krFmt(rec.billFreightIn)}" value="${krFmt(rec.billFreightIn)}" style="width:82px;display:block;margin-top:10px;" maxlength="11" oninput="calcFreightTaxLive('${rec.id}','in')" onchange="saveOutBilling('${rec.id}')">
+        <input type="text" inputmode="numeric" placeholder="입고세액" id="bill-freight-in-tax-${rec.id}" data-orig="${krFmt(rec.billFreightInTax)}" value="${krFmt(rec.billFreightInTax)}" style="width:82px;display:block;margin-top:4px;color:#1E5FB8;font-weight:700;" maxlength="11" oninput="recalcOutTotal('${rec.id}')" onchange="saveOutBilling('${rec.id}')">
+      </td>` : ''}
+      <td rowspan="2">
+        <div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">
+          <input type="date" id="bill-pay1-date-${rec.id}" value="${rec.billPay1Date||''}" style="width:125px;" onchange="updateBillingRecordField('${rec.id}','billPay1Date', this.value)">
+          <button type="button" class="btn sm" style="padding:4px 8px;font-size:12px;" onclick="setBillDateToday('bill-pay1-date-${rec.id}','${rec.id}','billPay1Date')">오늘</button>
+          <input type="text" inputmode="numeric" placeholder="입금1 금액" data-orig="${krFmt(rec.billPay1Amount)}" value="${krFmt(rec.billPay1Amount)}" style="width:82px;" maxlength="11" oninput="formatAmountInput(this)" onchange="updateBillingRecordField('${rec.id}','billPay1Amount', krParse(this.value))">
+        </div>
+        <div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">
+          <input type="date" id="bill-pay2-date-${rec.id}" value="${rec.billPay2Date||''}" style="width:125px;" onchange="updateBillingRecordField('${rec.id}','billPay2Date', this.value)">
+          <button type="button" class="btn sm" style="padding:4px 8px;font-size:12px;" onclick="setBillDateToday('bill-pay2-date-${rec.id}','${rec.id}','billPay2Date')">오늘</button>
+          <input type="text" inputmode="numeric" placeholder="입금2 금액" data-orig="${krFmt(rec.billPay2Amount)}" value="${krFmt(rec.billPay2Amount)}" style="width:82px;" maxlength="11" oninput="formatAmountInput(this)" onchange="updateBillingRecordField('${rec.id}','billPay2Amount', krParse(this.value))">
+        </div>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <input type="date" id="bill-pay3-date-${rec.id}" value="${rec.billPay3Date||''}" style="width:125px;" onchange="updateBillingRecordField('${rec.id}','billPay3Date', this.value)">
+          <button type="button" class="btn sm" style="padding:4px 8px;font-size:12px;" onclick="setBillDateToday('bill-pay3-date-${rec.id}','${rec.id}','billPay3Date')">오늘</button>
+          <input type="text" inputmode="numeric" placeholder="입금3 금액" data-orig="${krFmt(rec.billPay3Amount)}" value="${krFmt(rec.billPay3Amount)}" style="width:82px;" maxlength="11" oninput="formatAmountInput(this)" onchange="updateBillingRecordField('${rec.id}','billPay3Amount', krParse(this.value))">
+        </div>
+      </td>
+      <td rowspan="2" style="font-weight:700;color:var(--danger);">${balance.toLocaleString()}원</td>
+      <td><input type="text" value="${(rec.billManager!=null? rec.billManager : (rec.manager||'')).replace(/"/g,'&quot;')}" placeholder="담당자" style="width:95px;" onchange="updateBillingRecordField('${rec.id}','billManager', this.value)"></td>
+      <td><input type="text" value="${(rec.billPhone!=null? rec.billPhone : (rec.phone||'')).replace(/"/g,'&quot;')}" placeholder="연락처" style="width:125px;" onchange="updateBillingRecordField('${rec.id}','billPhone', this.value)"></td>
+    </tr>
+    <tr${bgAttr}>
+      <td colspan="2">
+        <textarea placeholder="비고 또는 메모" style="width:100%;box-sizing:border-box;min-height:44px;resize:vertical;font-size:12px;padding:6px 6px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);" onchange="updateBillingRecordField('${rec.id}','billNote', this.value)">${escR(rec.billNote||'')}</textarea>
+      </td>
+    </tr>`;
+  }).join('');
+  const tableHtml = recs.length===0 ? `<div class="empty">조건에 맞는 매출 내역이 없습니다.</div>` : `
+    <div class="table-scroll"><table class="sales-table">
+      <thead><tr><th>청구일자</th><th>업체명</th><th>현장명</th><th>용량</th><th>발전기번호</th><th>사용기간</th><th>견적금액</th>${salesShowFreight? `<th>운임/세액</th>`:''}<th>입금일/입금금액</th><th>미수금</th><th>담당자</th><th>담당자 연락처</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table></div>`;
+  const hiddenCount = allRecs.filter(r=>r.hidden).length;
+  return `
+    <div class="detail-card" style="padding:14px 16px;margin-bottom:14px;background:var(--warn-tint);border:1px solid var(--warn);">
+      <div style="font-weight:800;color:var(--warn);">⚠️ 테스트 중입니다</div>
+    </div>
+    <div class="section-title">💰 업체별 매출현황 <span class="cnt">${recs.length}건</span> <button type="button" class="btn" style="font-size:15px;" onclick="printSalesList()">🖨 인쇄</button></div>
+    <p class="muted" style="font-size:13px;margin-top:-4px;">발전기가 출고될 때 매출 기록이 자동으로 생성되고, 이후 출고취소·입고가 되어도 이 기록은 지워지지 않고 그대로 남습니다(발생한 비용은 취소돼도 청구 대상이라서요). 청구일자·공급가·세액·출고운임·입고운임·계산서 발행 여부·입금일자를 입력하면 바로 저장됩니다.</p>
+    <div style="display:flex;gap:14px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">
+      <div class="detail-card" style="padding:14px 16px;flex:none;">
+        <label style="display:block;font-size:14px;font-weight:700;margin-bottom:6px;white-space:nowrap;">월별 필터</label>
+        <input type="month" value="${salesFilterMonth}" onchange="setSalesFilterMonth(this.value)" style="font-size:16px;padding:9px 12px;border:1px solid var(--border-strong);border-radius:8px;">
+      </div>
+      <div class="detail-card" style="padding:14px 16px;flex:none;">
+        <label style="display:block;font-size:14px;font-weight:700;margin-bottom:6px;white-space:nowrap;">업체별 보기</label>
+        <select onchange="setSalesFilterCustomer(this.value)" style="font-size:15px;padding:9px 12px;border:1px solid var(--border-strong);border-radius:8px;max-width:180px;">
+          <option value="">전체 업체</option>
+          ${custOptions.map(c=>`<option value="${c.replace(/"/g,'&quot;')}" ${salesFilterCustomer===c?'selected':''}>${escR(c)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="detail-card" style="padding:14px 16px;flex:none;">
+        <label style="display:block;font-size:14px;font-weight:700;margin-bottom:6px;white-space:nowrap;">발전기번호별 보기</label>
+        <select onchange="setSalesFilterGenId(this.value)" style="font-size:15px;padding:9px 12px;border:1px solid var(--border-strong);border-radius:8px;max-width:150px;">
+          <option value="">전체 발전기</option>
+          ${genIdOptions.map(id=>`<option value="${id}" ${salesFilterGenId===id?'selected':''}>${id}</option>`).join('')}
+        </select>
+      </div>
+      <div class="detail-card" style="padding:14px 16px;flex:none;">
+        <label style="display:block;font-size:14px;font-weight:700;margin-bottom:6px;white-space:nowrap;">입금 상태</label>
+        <div class="btn-row" style="flex-wrap:nowrap;">
+          <button type="button" class="btn ${salesFilterStatus==='all'?'primary':''}" style="font-size:14px;padding:9px 15px;white-space:nowrap;" onclick="setSalesFilterStatus('all')">전체</button>
+          <button type="button" class="btn ${salesFilterStatus==='paid'?'primary':''}" style="font-size:14px;padding:9px 15px;white-space:nowrap;" onclick="setSalesFilterStatus('paid')">입금완료</button>
+          <button type="button" class="btn ${salesFilterStatus==='unpaid'?'primary':''}" style="font-size:14px;padding:9px 15px;white-space:nowrap;" onclick="setSalesFilterStatus('unpaid')">미입금</button>
+        </div>
+      </div>
+      <div class="detail-card" style="padding:14px 16px;display:flex;flex-direction:column;justify-content:center;flex:none;">
+        <label style="display:flex;align-items:center;gap:7px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;">
+          <input type="checkbox" style="width:19px;height:19px;flex:none;" ${salesShowHiddenOnly?'checked':''} onchange="toggleSalesShowHiddenOnly(this.checked)">
+          숨김매출 <span class="cnt">${hiddenCount}건</span>
+        </label>
+        <div class="muted" style="font-size:12px;margin-top:5px;white-space:nowrap;">체크하면 숨긴 매출 건만 보여줍니다.</div>
+      </div>
+      <div class="detail-card" style="padding:14px 16px;display:flex;flex-direction:column;justify-content:center;flex:none;">
+        <label style="display:flex;align-items:center;gap:7px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;">
+          <input type="checkbox" style="width:19px;height:19px;flex:none;" ${salesShowFreight?'checked':''} onchange="toggleSalesShowFreight(this.checked)">
+          출고운임·입고운임 표시 켜기/끄기
+        </label>
+        <div class="muted" style="font-size:12px;margin-top:5px;white-space:nowrap;">체크를 끄면 운임 관련 입력칸이 표에서 숨겨집니다.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
+      <div class="detail-card" style="padding:14px 16px;">
+        <div class="muted" style="font-size:12px;font-weight:700;">총 견적금액</div>
+        <div style="font-size:22px;font-weight:800;">${grandTotal.toLocaleString()}원</div>
+      </div>
+      <div class="detail-card" style="padding:14px 16px;">
+        <div class="muted" style="font-size:12px;font-weight:700;color:var(--danger);">총 미수금</div>
+        <div style="font-size:22px;font-weight:800;color:var(--danger);">${grandBalance.toLocaleString()}원</div>
+      </div>
+    </div>
+    ${tableHtml}`;
+}
+function setSalesFilterMonth(value){
+  salesFilterMonth = value||'';
+  renderContent();
+}
+function setSalesFilterStatus(value){
+  salesFilterStatus = value||'all';
+  renderContent();
+}
+function toggleSalesShowFreight(checked){
+  salesShowFreight = !!checked;
+  renderContent();
+}
+function setSalesFilterCustomer(value){
+  salesFilterCustomer = value||'';
+  renderContent();
+}
+function setSalesFilterGenId(value){
+  salesFilterGenId = value||'';
+  renderContent();
+}
+function printSalesList(){
+  let recs = (DB.salesBillingRecords||[]).filter(r=> salesShowHiddenOnly ? r.hidden : !r.hidden).sort((a,b)=>(b.outDate||'').localeCompare(a.outDate||''));
+  if(salesFilterMonth){
+    recs = recs.filter(r=>(r.billDate||'').slice(0,7)===salesFilterMonth);
+  }
+  if(salesFilterStatus!=='all'){
+    recs = recs.filter(r=>{
+      const total = Number(r.billTotal)||0;
+      const paid = (Number(r.billPay1Amount)||0) + (Number(r.billPay2Amount)||0) + (Number(r.billPay3Amount)||0);
+      const isPaid = total>0 && (total-paid)<=0;
+      return salesFilterStatus==='paid' ? isPaid : !isPaid;
+    });
+  }
+  if(salesFilterCustomer){
+    recs = recs.filter(r=>(r.customer||'(업체명 미상)')===salesFilterCustomer);
+  }
+  if(salesFilterGenId){
+    recs = recs.filter(r=>r.genId===salesFilterGenId);
+  }
+  if(recs.length===0){ showInfoModal('인쇄할 내역이 없습니다.'); return; }
+  let grandTotal = 0, grandBalance = 0;
+  const rows = recs.map(rec=>{
+    const total = Number(rec.billTotal)||0;
+    const paid = (Number(rec.billPay1Amount)||0) + (Number(rec.billPay2Amount)||0) + (Number(rec.billPay3Amount)||0);
+    const balance = total-paid;
+    grandTotal += total;
+    grandBalance += balance;
+    return `<tr><td>${rec.billDate? dow(rec.billDate):'-'}</td><td class="name">${escR(rec.customer)}</td><td class="name">${escR(rec.site)}</td><td>${escR(rec.genId)}</td><td>${total.toLocaleString()}원</td><td>${paid.toLocaleString()}원</td><td>${balance.toLocaleString()}원</td><td>${rec.billInvoiceIssued?'유':'무'}</td><td>${escR((rec.billManager!=null? rec.billManager : rec.manager)||'-')}</td></tr>`;
+  }).join('');
+  const filterLabel = [
+    salesFilterMonth? `${salesFilterMonth}` : '전체 기간',
+    salesFilterStatus==='paid'? '입금완료' : salesFilterStatus==='unpaid'? '미입금' : '전체',
+    salesFilterCustomer? `업체: ${salesFilterCustomer}` : '',
+    salesFilterGenId? `발전기: ${salesFilterGenId}` : '',
+    salesShowHiddenOnly? '숨김매출만' : ''
+  ].filter(Boolean).join(' · ');
+  const body = `<div class="ol-wrap">
+    <div class="ol-title">업체별 매출현황</div>
+    <div class="ol-sub">${filterLabel} · 출력일 ${todayStr()}</div>
+    <table class="ol-table">
+      <thead><tr><th>청구일자</th><th>업체명</th><th>현장명</th><th>발전기번호</th><th>견적금액</th><th>입금액</th><th>미수금</th><th>계산서</th><th>담당자</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr style="font-weight:800;"><td colspan="4">합계</td><td>${grandTotal.toLocaleString()}원</td><td></td><td colspan="3">미수금 ${grandBalance.toLocaleString()}원</td></tr></tfoot>
+    </table>
+  </div>`;
+  const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>업체별 매출현황 - ${todayStr()}</title>
+<style>${orderListPrintCss()}</style>
+<style>
+  @page{ size:A4 landscape !important; margin:12mm 10mm; }
+  .ol-wrap{ padding:0 2mm; }
+  .ol-table{ font-size:12px; }
+  .ol-table th,.ol-table td{ padding:6px 6px; }
+</style>
+</head><body>
+${body}
+</body></html>`;
+  const win = window.open('', '_blank', 'width=1100,height=800');
+  if(!win){
+    showInfoModal('팝업이 차단되어 바로 인쇄 창을 열 수 없습니다. 브라우저에서 이 사이트의 팝업을 허용해주세요.');
+    return;
+  }
+  win.document.open();
+  win.document.write(doc);
+  win.document.close();
+  win.onload = function(){
+    setTimeout(function(){
+      win.focus();
+      win.print();
+    }, 300);
+  };
+  win.onafterprint = function(){ win.close(); };
+}
+function krFmt(n){
+  n = Number(n)||0;
+  return n ? n.toLocaleString('ko-KR') : '';
+}
+function krParse(v){
+  return Number(String(v||'').replace(/[^0-9.-]/g,''))||0;
+}
+function formatAmountInput(el){
+  const caretAtEnd = el.selectionStart===el.value.length;
+  el.value = krFmt(krParse(el.value));
+  if(caretAtEnd) el.setSelectionRange(el.value.length, el.value.length);
+}
+function calcOutTotalLive(recId, taxEdited){
+  const priceEl = document.getElementById(`bill-unitprice-${recId}`);
+  const taxEl = document.getElementById(`bill-tax-${recId}`);
+  if(!priceEl || !taxEl) return;
+  const price = krParse(priceEl.value);
+  if(!taxEdited){
+    taxEl.value = price>0 ? krFmt(Math.round(price*0.1)) : '';
+  }
+  recalcOutTotal(recId);
+}
+function calcFreightTaxLive(recId, which){
+  const amtEl = document.getElementById(`bill-freight-${which}-${recId}`);
+  const taxEl = document.getElementById(`bill-freight-${which}-tax-${recId}`);
+  if(!amtEl || !taxEl) return;
+  const amt = krParse(amtEl.value);
+  taxEl.value = amt>0 ? krFmt(Math.round(amt*0.1)) : '';
+  recalcOutTotal(recId);
+}
+function recalcOutTotal(recId){
+  const priceEl = document.getElementById(`bill-unitprice-${recId}`);
+  const taxEl = document.getElementById(`bill-tax-${recId}`);
+  const totalEl = document.getElementById(`bill-total-${recId}`);
+  const freightOutEl = document.getElementById(`bill-freight-out-${recId}`);
+  const freightOutTaxEl = document.getElementById(`bill-freight-out-tax-${recId}`);
+  const freightInEl = document.getElementById(`bill-freight-in-${recId}`);
+  const freightInTaxEl = document.getElementById(`bill-freight-in-tax-${recId}`);
+  if(!priceEl || !taxEl || !totalEl) return;
+  const price = krParse(priceEl.value);
+  const tax = krParse(taxEl.value);
+  const freightOut = krParse(freightOutEl&&freightOutEl.value);
+  const freightOutTax = krParse(freightOutTaxEl&&freightOutTaxEl.value);
+  const freightIn = krParse(freightInEl&&freightInEl.value);
+  const freightInTax = krParse(freightInTaxEl&&freightInTaxEl.value);
+  totalEl.value = krFmt(price+tax+freightOut+freightOutTax+freightIn+freightInTax);
+}
+function saveOutBilling(recId){
+  const priceEl = document.getElementById(`bill-unitprice-${recId}`);
+  const taxEl = document.getElementById(`bill-tax-${recId}`);
+  const totalEl = document.getElementById(`bill-total-${recId}`);
+  const freightOutEl = document.getElementById(`bill-freight-out-${recId}`);
+  const freightOutTaxEl = document.getElementById(`bill-freight-out-tax-${recId}`);
+  const freightInEl = document.getElementById(`bill-freight-in-${recId}`);
+  const freightInTaxEl = document.getElementById(`bill-freight-in-tax-${recId}`);
+  const rec = findBillingRecord(recId);
+  if(!rec || !priceEl || !taxEl || !totalEl) return;
+  rec.billUnitPrice = krParse(priceEl.value);
+  rec.billTax = krParse(taxEl.value);
+  rec.billFreightOut = krParse(freightOutEl&&freightOutEl.value);
+  rec.billFreightOutTax = krParse(freightOutTaxEl&&freightOutTaxEl.value);
+  rec.billFreightIn = krParse(freightInEl&&freightInEl.value);
+  rec.billFreightInTax = krParse(freightInTaxEl&&freightInTaxEl.value);
+  rec.billTotal = krParse(totalEl.value);
+  saveSalesBillingRecords();
+  renderContent();
+}
+function updateBillingRecordField(recId, field, value){
+  const rec = findBillingRecord(recId);
+  if(!rec) return;
+  rec[field] = value;
+  saveSalesBillingRecords();
+  renderContent();
+}
+function toggleBillInvoiceIssued(recId){
+  const rec = findBillingRecord(recId);
+  if(!rec) return;
+  const next = !rec.billInvoiceIssued;
+  const msg = next? '계산서를 발행 처리할까요?' : '계산서 발행을 취소(미발행으로 변경)할까요?';
+  openConfirmModal(msg, function(){
+    updateBillingRecordField(recId, 'billInvoiceIssued', next);
+  }, next? '발행 처리':'미발행으로 변경', '취소');
+}
+function setBillDateToday(inputId, recId, field){
+  updateBillingRecordField(recId, field, todayStr());
 }
 function renderImprovementsTab(){
   const cnt = (DB.improvements||[]).length;
@@ -4275,6 +4750,13 @@ function renderSettingsTab(){
   const techInputs = [0,1,2].map(i=>`
     <div class="field"><label>정비사 ${i+1}</label><input type="text" value="${(DB.technicians[i]||'').replace(/"/g,'&quot;')}" placeholder="이름" onchange="updateTechnician(${i}, this.value)"></div>
   `).join('');
+  const teamMemberInputs = [0,1,2].map(i=>`
+    <div class="field"><label>사용자${i+1}</label><input type="text" value="${(DB.teamMembers[i]||'').replace(/"/g,'&quot;')}" placeholder="이름" onchange="updateTeamMember(${i}, this.value)"></div>
+  `).join('');
+  const salesManagerSet = (DB.salesManagers[0]||'').trim();
+  const salesManagerInput = `<div class="tech-grid">
+    <div class="field"><label>관리자 (1명만 등록 가능)</label><input type="text" value="${salesManagerSet.replace(/"/g,'&quot;')}" placeholder="이름" onchange="updateSalesManager(0, this.value)"></div>
+  </div>`;
   const activeList = activeGens().sort(sortByIdNatural);
   const retiredList = DB.gens.filter(g=>g.retired);
   const disposedList = retiredList.filter(g=>g.retiredReason!=='매각');
@@ -4300,7 +4782,7 @@ function renderSettingsTab(){
       <p class="muted" style="font-size:13px;margin-top:-4px;">발전기마다 QR코드를 뽑아서 본체에 붙여두면, 현장에서 헤더의 "📷 QR 스캔" 버튼으로 QR을 찍는 것만으로 그 발전기가 바로 열립니다. 이미 사무실에서 거래처 정보를 입력해 [출고 대기]에 등록해둔 발전기는 상차자가 QR만 찍으면 내용을 확인하고 "상차완료"만 누르면 되고, 출고중인 발전기는 QR을 찍으면 바로 입고 처리 화면(현재 사용시간 입력 + 출고시 나갔던 정보 확인)이 열립니다.</p>
       <p class="muted" style="font-size:13px;margin-top:8px;">"전체 인쇄"는 <b>아직 QR을 뽑은 적 없는 발전기만</b> 대상으로 합니다. 이미 QR을 뽑아서 본체에 붙여둔 발전기는 번호가 그대로면 QR도 계속 그대로라 다시 뽑을 필요가 없고, 새로 발전기를 등록했을 때 그 발전기만 새로 인쇄됩니다. (현재 신규 발급 대상: <b>${activeList.filter(g=>!(DB.qrIssued||{})[g.id]).length}대</b>)</p>
       <div class="btn-row">
-        <button class="btn primary" onclick="generateAllGenQrPrintFile()">🖨 신규 발전기 QR 인쇄 파일 만들기</button>
+        <button class="btn primary" onclick="generateAllGenQrPrintFile()">🖨 신규 발전기 QR 인쇄</button>
         <button class="btn" onclick="confirmReprintAllGenQr()">🔁 전체 다시 인쇄 (분실·훼손시)</button>
       </div>
       <div class="hint" style="margin-top:8px;">발전기 번호별 QR을 낱장으로 다시 보려면 [발전기 모델 설정] 목록에서 "관리" 버튼을 눌러 확인할 수 있습니다.</div>
@@ -4325,40 +4807,72 @@ function renderSettingsTab(){
       </div>
     </div>
 
-    ${adminModeSectionHtml()}
-
-    <div class="material-card" style="margin-top:20px;">
-      <div class="util-two-col" style="align-items:flex-start;">
-        <div class="field" style="flex:1;min-width:0;">
-          <div class="section-title" style="margin-top:0;">정비 임박 경고 기준</div>
-          <label>잔여시간이 이 값(h) 이하면 "임박"으로 표시</label>
-          <input type="number" id="f-warn-threshold" min="1" value="${DB.warnThreshold||50}" onchange="updateWarnThreshold(this.value)">
-          <div class="hint">기본값은 50h입니다. 전체 발전기에 공통 적용됩니다.</div>
+    ${!isAdminModeUnlocked() ? `
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:20px;">
+      <div class="material-card" style="margin-top:0;flex:1;min-width:240px;">
+        <div class="section-title" style="margin-top:0;">🔐 관리자 모드</div>
+        <p class="muted" style="font-size:13px;margin-top:-4px;">업체 정보 수정, 위험 구역(초기화) 작업은 관리자 모드에서만 할 수 있습니다. 사이트 접속 비밀번호와는 별개인 전용 관리자 비밀번호를 입력하면 ${Math.round(ADMIN_MODE_DURATION_MS/60000)}분 동안 열리고, 시간이 지나면 자동으로 다시 잠깁니다.</p>
+        <div class="field">
+          <input type="password" id="f-admin-pw" placeholder="관리자 비밀번호" onkeydown="if(event.key==='Enter')submitAdminModeUnlock()">
+          <div id="f-admin-pw-err" class="err" style="display:none;"></div>
         </div>
-        <div class="field" style="flex:1;min-width:0;">
-          <div class="section-title" style="margin-top:0;">🚨 과다사용 기준</div>
-          <label>하루 몇 시간 초과시 "과다사용"으로 표시</label>
-          <input type="number" id="f-overuse-limit" min="1" value="${DB.overuseDailyLimit||10}" onchange="updateOveruseDailyLimit(this.value)">
-          <div class="hint">임대기간 중 하루 평균 이 시간을 초과해서 쓰면 "과다사용"으로 표시됩니다. 기본값은 10h입니다. (해당 발전기의 입출고 기록이 3건 이상 쌓인 뒤부터 적용됩니다)</div>
+        <button class="btn primary" onclick="submitAdminModeUnlock()">관리자 모드 열기</button>
+      </div>
+      <div class="material-card" style="margin-top:0;flex:2;min-width:340px;">
+        <div class="section-title" style="margin-top:0;">💰 매출관리자 지정</div>
+        <p class="muted" style="font-size:13px;margin-top:-4px;">출고중인 발전기를 업체별로 묶어서 청구·입금 현황을 보여주는 매출관리 탭입니다. 안 쓰시면 꺼두시면 상단 탭에서 아예 안 보입니다.</p>
+        <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-enabled" ${DB.salesEnabled?'checked':''} onchange="toggleSalesEnabled(this.checked)"><label for="f-sales-enabled">매출관리 사용</label></div>
+
+        <div class="util-two-col" style="align-items:flex-start;margin-top:14px;">
+          <div style="flex:1;min-width:0;">
+            <div class="section-title" style="margin-top:0;font-size:14px;">관리자</div>
+            <p class="muted" style="font-size:12.5px;margin-top:-4px;">등록된 이름으로 접속한 사람만 매출관리 탭을 볼 수 있습니다. 1명만 등록 가능하며, 이름은 실제 신원 확인 수단이 아니라 진짜 출입 통제는 비밀번호가 담당합니다.</p>
+            ${salesManagerInput}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div class="section-title" style="margin-top:0;font-size:14px;">비밀번호</div>
+            <p class="muted" style="font-size:12.5px;margin-top:-4px;">설정해두면 매출관리 탭에 들어갈 때 비밀번호를 입력해야 합니다. 비워두면 바로 들어갈 수 있습니다.</p>
+            <div class="consumable-row" style="flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+              <input type="password" id="f-sales-password" placeholder="비밀번호" value="${(DB.salesPassword||'').replace(/"/g,'&quot;')}" style="width:140px;flex:none;">
+              <button type="button" class="btn sm primary" onclick="saveSalesPasswordFromInput()">저장</button>
+            </div>
+            <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-password-bypass" ${DB.salesPasswordBypass?'checked':''} onchange="toggleSalesPasswordBypass(this.checked)"><label for="f-sales-password-bypass" style="font-size:12.5px;">비밀번호 없이 사용 (수정 중엔 켜두세요)</label></div>
+          </div>
         </div>
       </div>
     </div>
+    ` : `
+    ${adminModeSectionHtml()}
+    <div class="material-card" style="margin-top:20px;">
+      <div class="section-title" style="margin-top:0;">💰 매출관리자 지정</div>
+      <p class="muted" style="font-size:13px;margin-top:-4px;">출고중인 발전기를 업체별로 묶어서 청구·입금 현황을 보여주는 매출관리 탭입니다. 안 쓰시면 꺼두시면 상단 탭에서 아예 안 보입니다.</p>
+      <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-enabled" ${DB.salesEnabled?'checked':''} onchange="toggleSalesEnabled(this.checked)"><label for="f-sales-enabled">매출관리 사용</label></div>
+
+      <div class="section-title" style="margin-top:18px;font-size:14px;">관리자</div>
+      <p class="muted" style="font-size:12.5px;margin-top:-4px;">등록된 이름으로 접속한 사람만 매출관리 탭을 볼 수 있고 사용할 수 있습니다. 관리자는 1명만 등록할 수 있습니다. (이름은 실제 신원 확인 수단이 아니라서, 진짜 출입 통제는 아래 비밀번호가 담당합니다)</p>
+      ${salesManagerInput}
+
+      <div class="section-title" style="margin-top:18px;font-size:14px;">비밀번호</div>
+      <p class="muted" style="font-size:12.5px;margin-top:-4px;">비밀번호를 설정해두면 관리자로 등록된 사람도 매출관리 탭에 들어갈 때 비밀번호를 한 번 더 입력해야 합니다. 비워두면 비밀번호 없이 바로 들어갈 수 있습니다.</p>
+      <div class="consumable-row" style="flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+        <input type="password" id="f-sales-password" placeholder="비밀번호" value="${(DB.salesPassword||'').replace(/"/g,'&quot;')}" style="width:160px;flex:none;">
+        <button type="button" class="btn sm primary" onclick="saveSalesPasswordFromInput()">저장</button>
+      </div>
+      <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-password-bypass" ${DB.salesPasswordBypass?'checked':''} onchange="toggleSalesPasswordBypass(this.checked)"><label for="f-sales-password-bypass">비밀번호 없이 사용 (수정 작업 중일 때 켜두세요)</label></div>
+      <p class="muted" style="font-size:12px;margin-top:2px;">체크되어 있으면 비밀번호를 설정해도 물어보지 않고 바로 들어갑니다. 매출관리 작업이 끝나면 체크를 해제해서 비밀번호를 실제로 적용하세요.</p>
+    </div>
+    `}
 
     <div class="material-card" style="margin-top:20px;">
       <div class="util-two-col" style="align-items:flex-start;">
         <div style="flex:1;min-width:0;">
-          <div class="section-title" style="margin-top:0;">사용자(팀원) 목록</div>
-          <p class="muted" style="font-size:13px;margin-top:-4px;">접속시 이름 선택 화면에 나오는 팀원 목록입니다. 처음 이름을 입력하면 자동으로 추가되고, 아래에서 직접 추가·삭제할 수도 있습니다.</p>
-          <div id="team-members-wrap"></div>
-          <div class="field" style="max-width:340px;margin-top:8px;">
-            <div class="consumable-row">
-              <input type="text" id="f-newmember-name" placeholder="이름">
-              <button type="button" class="btn sm primary" onclick="addTeamMember()">추가</button>
-            </div>
-          </div>
+          <div class="section-title" style="margin-top:0;">사용자(팀원) 목록 (최대 3명)</div>
+          <p class="muted" style="font-size:13px;margin-top:-4px;">접속시 이름 선택 화면에 나오는 팀원 목록입니다.</p>
+          <div class="tech-grid">${teamMemberInputs}</div>
         </div>
         <div style="flex:1;min-width:0;">
           <div class="section-title" style="margin-top:0;">정비사 목록 (최대 3명)</div>
+          <p class="muted" style="font-size:13px;margin-top:-4px;">정비 등록·수정 같은 작업을 할 때 본인 확인용으로 쓰입니다.</p>
           <div class="tech-grid">${techInputs}</div>
         </div>
       </div>
@@ -4654,6 +5168,25 @@ function renderSettingsTab(){
       <div id="vehicle-types-wrap" style="margin-top:10px;"></div>
     </div>
   `;
+}
+async function toggleSalesEnabled(checked){
+  DB.salesEnabled = !!checked;
+  await saveSalesEnabled();
+  renderTabbar();
+  flash(checked? '매출관리가 켜졌습니다' : '매출관리가 꺼졌습니다');
+}
+async function saveSalesPasswordFromInput(){
+  const el = document.getElementById('f-sales-password');
+  if(!el) return;
+  DB.salesPassword = el.value;
+  await saveSalesPassword();
+  sessionStorage.removeItem('sales-unlocked');
+  flash('비밀번호가 저장되었습니다');
+}
+async function toggleSalesPasswordBypass(checked){
+  DB.salesPasswordBypass = !!checked;
+  await saveSalesPasswordBypass();
+  flash(checked? '비밀번호 없이 사용하도록 설정했습니다' : '비밀번호가 적용됩니다');
 }
 async function toggleVehicleSuggestEnabled(checked){
   DB.vehicleSuggestEnabled = !!checked;
@@ -5237,6 +5770,18 @@ async function updateTechnician(i, value){
   await saveTechnicians();
   flash('저장되었습니다');
 }
+async function updateTeamMember(i, value){
+  DB.teamMembers[i] = value.trim();
+  await saveTeamMembers();
+  flash('저장되었습니다');
+}
+async function updateSalesManager(i, value){
+  DB.salesManagers[0] = value.trim();
+  await saveSalesManagers();
+  renderTabbar();
+  renderContent();
+  flash('저장되었습니다');
+}
 
 function openAddGenModal(){
   document.getElementById('modal-root').innerHTML = `
@@ -5449,7 +5994,6 @@ function downloadInGensPrintFile(){
 <title>입고 발전기 목록 - ${todayStr()}</title>
 <style>${inGensPrintCss()}</style>
 </head><body>
-<div class="print-hint">이 파일을 열면 인쇄 대화상자가 자동으로 뜹니다. 열리지 않으면 <b>Ctrl+P</b>(맥은 ⌘+P)를 눌러주세요. 인쇄창에서 용지 방향이 "가로"로 되어있는지 확인해주세요. <button onclick="window.print()">인쇄</button></div>
 <div class="ig-wrap">
   <div class="ig-title">입고 발전기 목록</div>
   <div class="ig-sub">${dow(todayStr())} 기준 · 총 ${list.length}대${inCapacityFilter!=null? ` · ${inCapacityFilter}kW만`:''}</div>
@@ -5458,17 +6002,22 @@ function downloadInGensPrintFile(){
     <tbody>${rows}</tbody>
   </table>
 </div>
-<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>
 </body></html>`;
-  const blob = new Blob([doc], {type:'text/html;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${todayStr()}_입고발전기목록.html`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
-  flash('인쇄용 파일이 다운로드되었습니다. 다운로드된 파일을 열면 인쇄창이 뜹니다.');
+  const win = window.open('', '_blank', 'width=1100,height=800');
+  if(!win){
+    showInfoModal('팝업이 차단되어 바로 인쇄 창을 열 수 없습니다. 브라우저에서 이 사이트의 팝업을 허용해주세요.');
+    return;
+  }
+  win.document.open();
+  win.document.write(doc);
+  win.document.close();
+  win.onload = function(){
+    setTimeout(function(){
+      win.focus();
+      win.print();
+    }, 300);
+  };
+  win.onafterprint = function(){ win.close(); };
 }
 function orderListPrintCss(){
   return `
@@ -5514,23 +6063,27 @@ function downloadOrderListFile(){
 <title>발주리스트 - ${todayStr()}</title>
 <style>${orderListPrintCss()}</style>
 </head><body>
-<div class="print-hint">이 파일을 열면 인쇄 대화상자가 자동으로 뜹니다. 열리지 않으면 <b>Ctrl+P</b>(맥은 ⌘+P)를 눌러주세요. <button onclick="window.print()">인쇄</button></div>
 <div class="ol-wrap">
   <div class="ol-title">부품 발주 리스트</div>
   <div class="ol-sub">${dow(todayStr())} 기준 · 공급업체별 정리 · 총 ${needed.length}건</div>
   ${body}
 </div>
-<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>
 </body></html>`;
-  const blob = new Blob([doc], {type:'text/html;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${todayStr()}_발주리스트.html`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
-  flash('인쇄용 파일이 다운로드되었습니다. 다운로드된 파일을 열면 인쇄창이 뜹니다.');
+  const win = window.open('', '_blank', 'width=1000,height=800');
+  if(!win){
+    showInfoModal('팝업이 차단되어 바로 인쇄 창을 열 수 없습니다. 브라우저에서 이 사이트의 팝업을 허용해주세요.');
+    return;
+  }
+  win.document.open();
+  win.document.write(doc);
+  win.document.close();
+  win.onload = function(){
+    setTimeout(function(){
+      win.focus();
+      win.print();
+    }, 300);
+  };
+  win.onafterprint = function(){ win.close(); };
 }
 function outFieldListRowsHtml(list, showMaintCol){
   return list.map(g=>{
@@ -5602,50 +6155,28 @@ function downloadOutFieldListFile(){
   const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <title>출고 리스트 - ${todayStr()}</title>
 <style>${orderListPrintCss()}</style>
-<style>@page{ size:A4 landscape; margin:12mm 14mm; }</style>
+<style>
+  @page{ size:A4 landscape !important; margin:12mm 10mm; }
+  .ol-wrap{ padding:0 2mm; }
+</style>
 </head><body>
-<div class="print-hint">이 파일을 열면 인쇄 대화상자가 자동으로 뜹니다. 열리지 않으면 <b>Ctrl+P</b>(맥은 ⌘+P)를 눌러주세요. <button onclick="window.print()">인쇄</button></div>
 ${body}
-<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>
 </body></html>`;
-  const blob = new Blob([doc], {type:'text/html;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${todayStr()}_출고리스트.html`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
-  flash('인쇄용 파일이 다운로드되었습니다. 다운로드된 파일을 열면 인쇄창이 뜹니다.');
-}
-function renderTeamMembersTable(){
-  const wrap = document.getElementById('team-members-wrap');
-  if(!wrap) return;
-  const members = [...(DB.teamMembers||[])].sort((a,b)=>a.localeCompare(b,'ko'));
-  if(members.length===0){ wrap.innerHTML = `<div class="empty">등록된 팀원이 없습니다.</div>`; return; }
-  wrap.innerHTML = `<div class="btn-row">${members.map(n=>`
-    <span class="pill gray" style="display:inline-flex;align-items:center;gap:6px;">${escR(n)}${n===DB.currentUserName? ' (나)':''}<button type="button" onclick="removeTeamMember('${n.replace(/'/g,"\\'")}')" style="border:none;background:none;cursor:pointer;font-weight:700;color:var(--danger);padding:0;">✕</button></span>
-  `).join('')}</div>`;
-}
-async function addTeamMember(){
-  const nameEl = document.getElementById('f-newmember-name');
-  const name = nameEl.value.trim();
-  if(!name) return;
-  if(!(DB.teamMembers||[]).includes(name)){
-    DB.teamMembers = [...(DB.teamMembers||[]), name];
-    await saveTeamMembers();
+  const win = window.open('', '_blank', 'width=1100,height=800');
+  if(!win){
+    showInfoModal('팝업이 차단되어 바로 인쇄 창을 열 수 없습니다. 브라우저에서 이 사이트의 팝업을 허용해주세요.');
+    return;
   }
-  nameEl.value = '';
-  renderTeamMembersTable();
-  flash('추가되었습니다');
-}
-function removeTeamMember(name){
-  openConfirmModal(`"${name}"님을 팀원 목록에서 삭제할까요?`, async function(){
-    DB.teamMembers = (DB.teamMembers||[]).filter(n=>n!==name);
-    await saveTeamMembers();
-    renderTeamMembersTable();
-    flash('삭제되었습니다');
-  }, '삭제');
+  win.document.open();
+  win.document.write(doc);
+  win.document.close();
+  win.onload = function(){
+    setTimeout(function(){
+      win.focus();
+      win.print();
+    }, 300);
+  };
+  win.onafterprint = function(){ win.close(); };
 }
 function renderSuppliesCatalogTable(){
   const wrap = document.getElementById('supplies-catalog-wrap');
@@ -6810,6 +7341,66 @@ async function quickForceIn(id){
   renderContent();
   flash('정보 없이 즉시 입고 처리되었습니다.');
 }
+function cancelOutPrompt(id){
+  const g = findGen(id);
+  if(!g) return;
+  if(g.status==='in'){ showInfoModal('이미 입고된 발전기입니다.'); return; }
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>${g.id} 출고취소</h3>
+      <div class="modal-sub">이번 출고 이력(임대 기록)은 남기지 않고 바로 창고 재고로 전환됩니다. 취소 사유와 비용 발생 여부를 남겨주세요.</div>
+      <div class="field"><label>취소 사유</label><textarea id="f-cancelout-reason" placeholder="예: 고객 단순 변심, 중복 출고 등"></textarea></div>
+      <div id="f-cancelout-err" class="err" style="display:none;"></div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">닫기</button>
+        <button class="btn" style="color:var(--danger);border-color:var(--danger);" onclick="submitCancelOut('${id}', true)">비용발생</button>
+        <button class="btn" onclick="submitCancelOut('${id}', false)">비용발생 안함</button>
+      </div>
+    </div>
+  </div>`;
+}
+async function submitCancelOut(id, costIncurred){
+  const reasonEl = document.getElementById('f-cancelout-reason');
+  const reason = (reasonEl? reasonEl.value : '').trim();
+  const errEl = document.getElementById('f-cancelout-err');
+  if(!reason){
+    if(errEl){ errEl.textContent = '취소 사유를 입력해주세요.'; errEl.style.display = 'block'; }
+    return;
+  }
+  const g = findGen(id);
+  if(!g) return;
+  if(g.status==='in') return;
+  const rt = g.rental||{};
+  const historyEntry = {
+    id: uid(), genId: g.id, customer: rt.customer||'', site: rt.site||rt.address||'',
+    outDate: rt.outDate||'', reason, costIncurred: !!costIncurred,
+    cancelledAt: nowDateTimeStr(), cancelledBy: DB.currentUserName||null
+  };
+  DB.cancelOutHistory = DB.cancelOutHistory || [];
+  DB.cancelOutHistory.push(historyEntry);
+  saveCancelOutHistory();
+  if(DB.salesEnabled){
+    const rec = getOrCreateBillingRecord(g);
+    rec.cancelReason = reason;
+    rec.cancelCostIncurred = !!costIncurred;
+    if(costIncurred){
+      rec.hidden = false;
+    } else {
+      rec.hidden = true;
+      rec.hideReason = `출고취소(비용 미발생): ${reason}`;
+      rec.hiddenBy = DB.currentUserName || null;
+      rec.hiddenAt = nowDateTimeStr();
+    }
+    saveSalesBillingRecords();
+  }
+  g.status = 'in';
+  g.rental = null;
+  closeModal();
+  await saveGens();
+  renderContent();
+  flash('출고가 취소되었습니다.');
+}
 function openOutModal(id, reservationId){
   const g = findGen(id);
   if(!g) return;
@@ -7862,23 +8453,27 @@ function downloadLongtermPrepFile(){
 <title>장기임대 정비 준비 리스트</title>
 <style>${longtermPrepPrintCss()}</style>
 </head><body>
-<div class="print-hint">이 파일을 열면 인쇄 대화상자가 자동으로 뜹니다. 열리지 않으면 <b>Ctrl+P</b>(맥은 ⌘+P)를 눌러주세요. <button onclick="window.print()">인쇄</button></div>
 <div class="lp-wrap">
   <div class="lp-title">장기임대 정비 준비 리스트</div>
   <div class="lp-sub">${dow(todayStr())} 기준 · 정비 임박 순 · 총 ${ltList.length}대</div>
   ${cards}
 </div>
-<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>
 </body></html>`;
-  const blob = new Blob([doc], {type:'text/html;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `장기임대_정비준비리스트_${todayStr()}.html`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
-  flash('인쇄용 파일이 다운로드되었습니다. 다운로드된 파일을 열면 인쇄창이 뜹니다.');
+  const win = window.open('', '_blank', 'width=900,height=1000');
+  if(!win){
+    showInfoModal('팝업이 차단되어 바로 인쇄 창을 열 수 없습니다. 브라우저에서 이 사이트의 팝업을 허용해주세요.');
+    return;
+  }
+  win.document.open();
+  win.document.write(doc);
+  win.document.close();
+  win.onload = function(){
+    setTimeout(function(){
+      win.focus();
+      win.print();
+    }, 300);
+  };
+  win.onafterprint = function(){ win.close(); };
 }
 function receiptPrintCss(){
   return `
@@ -8800,6 +9395,13 @@ async function init(){
     ['calendarEvents', 'gen-calendar-events-v1', [], true],
     ['genColorOverrides', 'gen-gen-color-overrides-v1', {'S-14':'#808080'}, true],
     ['qrIssued', 'gen-qr-issued-v1', {}, true],
+    ['salesEnabled', 'gen-sales-enabled-v1', false, true],
+    ['salesRecords', 'gen-sales-records-v1', [], true],
+    ['salesManagers', 'gen-sales-managers-v1', ['','',''], true],
+    ['salesPassword', 'gen-sales-password-v1', '', true],
+    ['salesPasswordBypass', 'gen-sales-password-bypass-v1', true, true],
+    ['salesBillingRecords', 'gen-sales-billing-records-v1', [], true],
+    ['cancelOutHistory', 'gen-cancel-out-history-v1', [], true],
     ['suppliesSizes', 'gen-supplies-sizes-v1', {}, true],
     ['suppliesSpecs', 'gen-supplies-specs-v1', {}, true],
     ['suppliesCategories', 'gen-supplies-categories-v1', {}, true],
@@ -8843,7 +9445,9 @@ async function init(){
   DB.improvements = results.improvements;
   DB.orderMarks = results.orderMarks;
   DB.lastBackupDate = results.lastBackupDate;
-  DB.teamMembers = results.teamMembers;
+  DB.teamMembers = results.teamMembers || [];
+  while(DB.teamMembers.length<3) DB.teamMembers.push('');
+  DB.teamMembers = DB.teamMembers.slice(0,3);
   DB.suppliesCatalog = results.suppliesCatalog;
   DB.suppliesStock = results.suppliesStock;
   DB.vehicleTypes = results.vehicleTypes;
@@ -8854,13 +9458,23 @@ async function init(){
   DB.calendarEvents = results.calendarEvents;
   DB.genColorOverrides = results.genColorOverrides;
   DB.qrIssued = results.qrIssued || {};
+  DB.salesEnabled = results.salesEnabled === true;
+  DB.salesRecords = results.salesRecords || [];
+  DB.salesManagers = results.salesManagers || [];
+  while(DB.salesManagers.length<3) DB.salesManagers.push('');
+  DB.salesManagers = DB.salesManagers.slice(0,3);
+  DB.salesPassword = results.salesPassword || '';
+  DB.salesPasswordBypass = results.salesPasswordBypass !== false;
+  DB.salesBillingRecords = results.salesBillingRecords || [];
+  DB.cancelOutHistory = results.cancelOutHistory || [];
   DB.suppliesSizes = results.suppliesSizes;
   DB.suppliesSpecs = results.suppliesSpecs;
   DB.suppliesCategories = results.suppliesCategories || {};
   DB.customerNotes = results.customerNotes || {};
   DB.readMarkers = results.readMarkers || {};
   DB.companyInfo = results.companyInfo && results.companyInfo.name ? results.companyInfo : {name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'};
-  if(!results.palletDefaultRemoved && (DB.suppliesCatalog||[]).includes('깔판')){
+  DB.palletDefaultRemoved = results.palletDefaultRemoved === true;
+  if(!DB.palletDefaultRemoved && (DB.suppliesCatalog||[]).includes('깔판')){
     DB.suppliesCatalog = DB.suppliesCatalog.filter(n=>n!=='깔판');
     if(DB.suppliesStock) delete DB.suppliesStock['깔판'];
     if(DB.suppliesSizes) delete DB.suppliesSizes['깔판'];
@@ -8869,7 +9483,8 @@ async function init(){
     saveSuppliesStock();
     saveSuppliesSizes();
     saveSuppliesSpecs();
-    storageSetChecked('gen-pallet-default-removed-v1', JSON.stringify(true), true);
+    DB.palletDefaultRemoved = true;
+    savePalletDefaultRemoved();
   }
   seenNoticeIds = new Set((DB.notices||[]).map(n=>n.id));
   seenEventIds = new Set((DB.calendarEvents||[]).map(e=>e.id));
@@ -8895,7 +9510,9 @@ async function saveAllNow(){
     ['발전기 목록', saveGens], ['임대 이력', saveRentals], ['정비 이력', saveMaint],
     ['출고 대기', saveReservations], ['자재 정보', saveMaterials], ['정비사 목록', saveTechnicians],
     ['정비 경고 기준', saveWarnThreshold], ['부품 재고', savePartsStock], ['부품 규격', savePartsSpecs], ['부품 공급업체', savePartsSupplier],
-    ['부품 최소재고', savePartsMinStock], ['부품 입고내역', savePartsPurchaseLog], ['소모품주문', saveConsumableOrders], ['발주 완료표시', saveOrderMarks], ['보완요청', saveImprovements], ['팀원 목록', saveTeamMembers], ['부자재 목록', saveSuppliesCatalog], ['부자재 재고', saveSuppliesStock], ['차량 종류', saveVehicleTypes], ['차량 추천 사용여부', saveVehicleSuggestEnabled], ['발전기 크기 표시 사용여부', saveGenSizeDisplayEnabled], ['모델 색상', saveModelColors], ['공지사항', saveNotices], ['일정표', saveCalendarEvents], ['발전기별 색상', saveGenColorOverrides], ['부자재 크기', saveSuppliesSizes], ['부자재 규격', saveSuppliesSpecs], ['과다사용 기준', saveOveruseDailyLimit], ['업체 정보', saveCompanyInfo]
+    ['부품 최소재고', savePartsMinStock], ['부품 입고내역', savePartsPurchaseLog], ['소모품주문', saveConsumableOrders], ['발주 완료표시', saveOrderMarks], ['보완요청', saveImprovements], ['팀원 목록', saveTeamMembers], ['부자재 목록', saveSuppliesCatalog], ['부자재 재고', saveSuppliesStock], ['차량 종류', saveVehicleTypes], ['차량 추천 사용여부', saveVehicleSuggestEnabled], ['발전기 크기 표시 사용여부', saveGenSizeDisplayEnabled], ['모델 색상', saveModelColors], ['공지사항', saveNotices], ['일정표', saveCalendarEvents], ['발전기별 색상', saveGenColorOverrides], ['부자재 크기', saveSuppliesSizes], ['부자재 규격', saveSuppliesSpecs], ['과다사용 기준', saveOveruseDailyLimit], ['업체 정보', saveCompanyInfo],
+    ['부품 단위', savePartsUnit], ['부품 카테고리', savePartsCategory], ['부자재 카테고리', saveSuppliesCategories], ['고객 메모', saveCustomerNotes], ['읽음 표시', saveReadMarkers], ['QR 발급기록', saveQrIssued],
+    ['매출관리 사용여부', saveSalesEnabled], ['매출 청구내역', saveSalesRecords], ['매출관리자', saveSalesManagers], ['매출관리 비밀번호', saveSalesPassword], ['매출관리 비밀번호 우회', saveSalesPasswordBypass], ['매출 기록', saveSalesBillingRecords], ['출고취소 이력', saveCancelOutHistory], ['깔판 초기화 플래그', savePalletDefaultRemoved]
   ];
   // 동시 요청으로 인한 실패를 피하기 위해 하나씩 순서대로, 실패시 재시도까지 하며 저장합니다.
   const failed = [];
@@ -8920,7 +9537,7 @@ function renderUserBadge(){
   el.textContent = DB.currentUserName ? `${DB.currentUserName}님` : '이름 선택';
 }
 function openUserNameGate(){
-  const names = [...new Set([...(DB.teamMembers||[]), '이성웅','홍승우','이영숙'])];
+  const names = [...new Set([...(DB.teamMembers||[]).filter(Boolean), '이성웅','홍승우','이영숙'])];
   const cur = DB.currentUserName;
   const options = names.map(n=>`<button type="button" class="btn${n===cur?' primary':''}" style="font-size:16px;padding:14px 10px;" onclick="submitUserName('${n.replace(/'/g,"\\'")}')">${escR(n)}${n===cur? ' (이전 접속)':''}</button>`).join('');
   document.getElementById('modal-root').innerHTML = `
@@ -8941,10 +9558,6 @@ async function submitUserName(nameArg){
   renderTabbar();
   flash(`${name}님, 환영합니다`);
   saveWithRetry(saveCurrentUserName);
-  if(!(DB.teamMembers||[]).includes(name)){
-    DB.teamMembers = [...(DB.teamMembers||[]), name];
-    saveWithRetry(saveTeamMembers);
-  }
   showLoadingPopupOnLogin();
   checkQrUrlParamOnLoad();
 }
@@ -8966,7 +9579,7 @@ async function syncFromStorage(){
   if(shouldSkipSync()) return;
   syncInFlight = true;
   try{
-    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, overuseDailyLimit, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, vehicleTypes, vehicleSuggestEnabled, genSizeDisplayEnabled, modelColors, notices, calendarEvents, genColorOverrides, qrIssued, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
+    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, overuseDailyLimit, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, vehicleTypes, vehicleSuggestEnabled, genSizeDisplayEnabled, modelColors, notices, calendarEvents, genColorOverrides, qrIssued, salesEnabled, salesRecords, salesManagers, salesPassword, salesPasswordBypass, salesBillingRecords, cancelOutHistory, palletDefaultRemoved, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
       peekStorage('gen-fleet-v2', DB.gens),
       peekStorage('gen-rentals-v2', DB.rentals),
       peekStorage('gen-maintenance-v2', DB.maint),
@@ -8996,6 +9609,14 @@ async function syncFromStorage(){
       peekStorage('gen-calendar-events-v1', DB.calendarEvents),
       peekStorage('gen-gen-color-overrides-v1', DB.genColorOverrides),
       peekStorage('gen-qr-issued-v1', DB.qrIssued),
+      peekStorage('gen-sales-enabled-v1', DB.salesEnabled),
+      peekStorage('gen-sales-records-v1', DB.salesRecords),
+      peekStorage('gen-sales-managers-v1', DB.salesManagers),
+      peekStorage('gen-sales-password-v1', DB.salesPassword),
+      peekStorage('gen-sales-password-bypass-v1', DB.salesPasswordBypass),
+      peekStorage('gen-sales-billing-records-v1', DB.salesBillingRecords),
+      peekStorage('gen-cancel-out-history-v1', DB.cancelOutHistory),
+      peekStorage('gen-pallet-default-removed-v1', DB.palletDefaultRemoved),
       peekStorage('gen-supplies-sizes-v1', DB.suppliesSizes),
       peekStorage('gen-supplies-specs-v1', DB.suppliesSpecs),
       peekStorage('gen-supplies-categories-v1', DB.suppliesCategories),
@@ -9004,8 +9625,8 @@ async function syncFromStorage(){
       peekStorage('gen-company-info-v1', DB.companyInfo),
       peekStorage('gen-last-backup-date-v1', DB.lastBackupDate)
     ]);
-    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,overuseDailyLimit:DB.overuseDailyLimit,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,vehicleTypes:DB.vehicleTypes,vehicleSuggestEnabled:DB.vehicleSuggestEnabled,genSizeDisplayEnabled:DB.genSizeDisplayEnabled,modelColors:DB.modelColors,notices:DB.notices,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
-    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,overuseDailyLimit,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,vehicleTypes,vehicleSuggestEnabled,genSizeDisplayEnabled,modelColors,notices,calendarEvents,genColorOverrides,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate});
+    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,overuseDailyLimit:DB.overuseDailyLimit,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,vehicleTypes:DB.vehicleTypes,vehicleSuggestEnabled:DB.vehicleSuggestEnabled,genSizeDisplayEnabled:DB.genSizeDisplayEnabled,modelColors:DB.modelColors,notices:DB.notices,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,qrIssued:DB.qrIssued,salesEnabled:DB.salesEnabled,salesRecords:DB.salesRecords,salesManagers:DB.salesManagers,salesPassword:DB.salesPassword,salesPasswordBypass:DB.salesPasswordBypass,salesBillingRecords:DB.salesBillingRecords,cancelOutHistory:DB.cancelOutHistory,palletDefaultRemoved:DB.palletDefaultRemoved,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
+    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,overuseDailyLimit,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,vehicleTypes,vehicleSuggestEnabled,genSizeDisplayEnabled,modelColors,notices,calendarEvents,genColorOverrides,qrIssued,salesEnabled,salesRecords,salesManagers,salesPassword,salesPasswordBypass,salesBillingRecords,cancelOutHistory,palletDefaultRemoved,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate});
     if(before !== after){
       const newNotices = (notices||[]).filter(n=>n && !seenNoticeIds.has(n.id) && n.authorBy!==DB.currentUserName);
       const newEvents = (calendarEvents||[]).filter(e=>e && !seenEventIds.has(e.id) && e.authorBy!==DB.currentUserName);
@@ -9015,7 +9636,7 @@ async function syncFromStorage(){
       seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad).map(r=>r.id));
       DB.gens = gens; DB.rentals = rentals; DB.maint = maint; DB.reservations = reservations;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold; DB.overuseDailyLimit = overuseDailyLimit;
-      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.qrIssued = qrIssued || {}; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
+      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.qrIssued = qrIssued || {}; DB.salesEnabled = salesEnabled === true; DB.salesRecords = salesRecords || []; DB.salesManagers = salesManagers || []; DB.salesPassword = salesPassword || ''; DB.salesPasswordBypass = salesPasswordBypass !== false; DB.salesBillingRecords = salesBillingRecords || []; DB.cancelOutHistory = cancelOutHistory || []; DB.palletDefaultRemoved = palletDefaultRemoved === true; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
       applyCompanyBranding();
       if(!shouldSkipSync()){
         renderTabbar();
@@ -9173,35 +9794,38 @@ async function generateAllGenQrPrintFile(forceAll){
   *{box-sizing:border-box;}
   body{font-family:'Noto Sans KR',-apple-system,sans-serif;margin:0;padding:0;}
   .page-pad{padding:15mm;}
-  .print-hint{background:#FBEDDB;border:1px solid #C97A1E;padding:8px 12px;margin-bottom:14px;font-size:13px;border-radius:6px;}
   .qr-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8mm 6mm;justify-items:center;}
   .qr-card{width:100%;height:56mm;border:1px dashed #999;border-radius:6px;padding:3mm;text-align:center;break-inside:avoid;display:flex;flex-direction:column;align-items:center;justify-content:center;}
   .qr-card img{display:block;width:38mm;height:38mm;margin:0 auto 2mm;}
   .qr-id{font-weight:800;font-size:16px;line-height:1.1;}
   .qr-page-break{grid-column:1/-1;height:0;break-before:page;}
   @page{ size:A4 portrait; margin:15mm; }
-  @media print{ .print-hint{ display:none; } .page-pad{ padding:0; } }
 </style>
 </head><body>
 <div class="page-pad">
-<div class="print-hint no-print">이 파일을 열면 인쇄 대화상자가 자동으로 뜹니다. 열리지 않으면 <b>Ctrl+P</b>(맥은 ⌘+P)를 눌러주세요. 인쇄창에서 "추가 설정 &gt; 머리글과 바닥글"을 꺼주시면 여백에 주소/날짜가 안 찍힙니다. 인쇄 후 오려서 발전기 본체에 붙여주세요. <button onclick="window.print()">인쇄</button></div>
 <div class="qr-grid">${cards.join('')}</div>
 </div>
-<script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };<\/script>
 </body></html>`;
-  const blob = new Blob([doc], {type:'text/html;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${todayStr()}_발전기QR코드${forceAll? '_전체':'_신규'}.html`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
+  const win = window.open('', '_blank', 'width=900,height=1000');
+  if(!win){
+    showInfoModal('팝업이 차단되어 바로 인쇄 창을 열 수 없습니다. 브라우저에서 이 사이트의 팝업을 허용해주세요.');
+    return;
+  }
+  win.document.open();
+  win.document.write(doc);
+  win.document.close();
+  win.onload = function(){
+    setTimeout(function(){
+      win.focus();
+      win.print();
+    }, 300);
+  };
+  win.onafterprint = function(){ win.close(); };
   DB.qrIssued = DB.qrIssued || {};
   list.forEach(g=>{ DB.qrIssued[g.id] = true; });
   saveWithRetry(saveQrIssued);
   renderContent();
-  flash(`QR코드 인쇄용 파일이 다운로드되었습니다. (${list.length}대)`);
+  flash(`QR코드 인쇄 준비 완료 (${list.length}대). 인쇄창에서 "추가 설정 > 머리글과 바닥글"을 꺼주시면 여백에 주소/날짜가 안 찍혀요.`);
 }
 function confirmReprintAllGenQr(){
   openConfirmModal('이미 발급된 QR을 포함해 전체 발전기 QR을 다시 만들까요?\n\n발전기 번호가 그대로면 QR 내용은 똑같지만, 이미 본체에 붙어있는 QR이 있다면 새로 인쇄한 걸로 교체하실 필요는 없습니다. 분실·훼손된 QR만 다시 뽑고 싶다면 취소 후 [설정 → 발전기 모델 설정 → 관리]에서 그 발전기만 개별로 확인해주세요.', function(){ closeModal(); generateAllGenQrPrintFile(true); }, '전체 다시 인쇄', '취소');
@@ -9222,7 +9846,7 @@ async function showGenQrModal(id){
       <img src="${url}" width="200" height="200" style="margin:10px auto;display:block;">
       <div class="modal-actions">
         <button class="btn" onclick="closeModal()">닫기</button>
-        <button class="btn primary" onclick="generateAllGenQrPrintFile(true)">전체 다시 인쇄 파일로 받기</button>
+        <button class="btn primary" onclick="generateAllGenQrPrintFile(true)">전체 다시 인쇄</button>
       </div>
     </div>
   </div>`;
@@ -9628,7 +10252,7 @@ async function commitExcelImport(){
     if(data.parts.length>0){
       await saveWithRetry(savePartsStock);
       await saveWithRetry(savePartsSpecs);
-      await saveWithRetry(async()=>{ await storageSetChecked('gen-parts-unit-v1', JSON.stringify(DB.partsUnit), true); });
+      await saveWithRetry(savePartsUnit);
       await saveWithRetry(savePartsCategory);
       await saveWithRetry(savePartsSupplier);
       await saveWithRetry(savePartsMinStock);
