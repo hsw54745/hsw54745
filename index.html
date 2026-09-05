@@ -4162,41 +4162,45 @@ function renderSalesTab(){
       <td rowspan="2" class="gid">${rec.manual? `<input type="text" value="${escR(rec.genId).replace(/"/g,'&quot;')}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','genId', this.value)">` : rec.genId}</td>
       <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.period||'').replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','period', this.value)">` : period}</td>
       <td rowspan="2">
-        <input type="text" inputmode="numeric" placeholder="공급가" id="bill-unitprice-${rec.id}" data-orig="${krFmt(rec.billUnitPrice)}" value="${krFmt(rec.billUnitPrice)}" style="width:82px;display:block;" maxlength="11" oninput="calcOutTotalLive('${rec.id}')" onchange="saveOutBilling('${rec.id}')">
-        <input type="text" inputmode="numeric" placeholder="세액" id="bill-tax-${rec.id}" data-orig="${krFmt(rec.billTax)}" value="${krFmt(rec.billTax)}" style="width:82px;display:block;margin-top:4px;color:#1E5FB8;font-weight:700;" maxlength="11" oninput="calcOutTotalLive('${rec.id}', true)" onchange="saveOutBilling('${rec.id}')">
-        <input type="text" inputmode="numeric" placeholder="합계" id="bill-total-${rec.id}" data-orig="${krFmt(rec.billTotal)}" value="${krFmt(rec.billTotal)}" style="width:82px;display:block;margin-top:4px;font-weight:700;" maxlength="11" oninput="formatAmountInput(this)" onchange="saveOutBilling('${rec.id}')">
-        <button type="button" class="btn sm ${rec.billInvoiceIssued?'primary':''}" style="width:82px;margin-top:6px;font-size:11px;padding:6px 4px;" onclick="toggleBillInvoiceIssued('${rec.id}')">${rec.billInvoiceIssued? '계산서 발행함':'계산서 미발행'}</button>
+        <input type="text" inputmode="numeric" placeholder="공급가" id="bill-unitprice-${rec.id}" data-orig="${krFmt(rec.billUnitPrice)}" value="${krFmt(rec.billUnitPrice)}" style="width:96px;display:block;" maxlength="11" oninput="calcOutTotalLive('${rec.id}')" onchange="saveOutBilling('${rec.id}')">
+        <input type="text" inputmode="numeric" placeholder="세액" id="bill-tax-${rec.id}" data-orig="${krFmt(rec.billTax)}" value="${krFmt(rec.billTax)}" style="width:96px;display:block;margin-top:4px;color:#1E5FB8;font-weight:700;" maxlength="11" oninput="calcOutTotalLive('${rec.id}', true)" onchange="saveOutBilling('${rec.id}')">
+        <input type="text" inputmode="numeric" placeholder="합계" id="bill-total-${rec.id}" data-orig="${krFmt(rec.billTotal)}" value="${krFmt(rec.billTotal)}" style="width:96px;display:block;margin-top:4px;font-weight:800;background:var(--surface-2);border-radius:6px;" maxlength="11" oninput="formatAmountInput(this)" onchange="saveOutBilling('${rec.id}')">
+        <button type="button" class="btn sm ${rec.billInvoiceIssued?'primary':''}" style="width:96px;margin-top:6px;font-size:11px;padding:6px 4px;" onclick="toggleBillInvoiceIssued('${rec.id}')">${rec.billInvoiceIssued? '계산서 발행함':'계산서 미발행'}</button>
       </td>
       ${salesShowFreight? `<td rowspan="2">
-        <input type="text" inputmode="numeric" placeholder="출고운임" id="bill-freight-out-${rec.id}" data-orig="${krFmt(rec.billFreightOut)}" value="${krFmt(rec.billFreightOut)}" style="width:82px;display:block;" maxlength="11" oninput="calcFreightTaxLive('${rec.id}','out')" onchange="saveOutBilling('${rec.id}')">
-        <input type="text" inputmode="numeric" placeholder="출고세액" id="bill-freight-out-tax-${rec.id}" data-orig="${krFmt(rec.billFreightOutTax)}" value="${krFmt(rec.billFreightOutTax)}" style="width:82px;display:block;margin-top:4px;color:#1E5FB8;font-weight:700;" maxlength="11" oninput="recalcOutTotal('${rec.id}')" onchange="saveOutBilling('${rec.id}')">
-        <input type="text" inputmode="numeric" placeholder="입고운임" id="bill-freight-in-${rec.id}" data-orig="${krFmt(rec.billFreightIn)}" value="${krFmt(rec.billFreightIn)}" style="width:82px;display:block;margin-top:10px;" maxlength="11" oninput="calcFreightTaxLive('${rec.id}','in')" onchange="saveOutBilling('${rec.id}')">
-        <input type="text" inputmode="numeric" placeholder="입고세액" id="bill-freight-in-tax-${rec.id}" data-orig="${krFmt(rec.billFreightInTax)}" value="${krFmt(rec.billFreightInTax)}" style="width:82px;display:block;margin-top:4px;color:#1E5FB8;font-weight:700;" maxlength="11" oninput="recalcOutTotal('${rec.id}')" onchange="saveOutBilling('${rec.id}')">
+        <input type="text" inputmode="numeric" placeholder="출고운임" id="bill-freight-out-${rec.id}" data-orig="${krFmt(rec.billFreightOut)}" value="${krFmt(rec.billFreightOut)}" style="width:96px;display:block;" maxlength="11" oninput="calcFreightTaxLive('${rec.id}','out')" onchange="saveOutBilling('${rec.id}')">
+        <input type="text" inputmode="numeric" placeholder="출고세액" id="bill-freight-out-tax-${rec.id}" data-orig="${krFmt(rec.billFreightOutTax)}" value="${krFmt(rec.billFreightOutTax)}" style="width:96px;display:block;margin-top:4px;color:#1E5FB8;font-weight:700;" maxlength="11" oninput="recalcOutTotal('${rec.id}')" onchange="saveOutBilling('${rec.id}')">
+        <input type="text" inputmode="numeric" placeholder="입고운임" id="bill-freight-in-${rec.id}" data-orig="${krFmt(rec.billFreightIn)}" value="${krFmt(rec.billFreightIn)}" style="width:96px;display:block;margin-top:10px;" maxlength="11" oninput="calcFreightTaxLive('${rec.id}','in')" onchange="saveOutBilling('${rec.id}')">
+        <input type="text" inputmode="numeric" placeholder="입고세액" id="bill-freight-in-tax-${rec.id}" data-orig="${krFmt(rec.billFreightInTax)}" value="${krFmt(rec.billFreightInTax)}" style="width:96px;display:block;margin-top:4px;color:#1E5FB8;font-weight:700;" maxlength="11" oninput="recalcOutTotal('${rec.id}')" onchange="saveOutBilling('${rec.id}')">
       </td>` : ''}
       <td rowspan="2">
         <div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">
           <input type="date" id="bill-pay1-date-${rec.id}" value="${rec.billPay1Date||''}" style="width:125px;" onchange="updateBillingRecordField('${rec.id}','billPay1Date', this.value)">
           <button type="button" class="btn sm" style="padding:4px 8px;font-size:12px;" onclick="setBillDateToday('bill-pay1-date-${rec.id}','${rec.id}','billPay1Date')">오늘</button>
-          <input type="text" inputmode="numeric" placeholder="입금1 금액" data-orig="${krFmt(rec.billPay1Amount)}" value="${krFmt(rec.billPay1Amount)}" style="width:82px;" maxlength="11" oninput="formatAmountInput(this)" onchange="updateBillingRecordField('${rec.id}','billPay1Amount', krParse(this.value))">
+          <input type="text" inputmode="numeric" placeholder="입금1 금액" data-orig="${krFmt(rec.billPay1Amount)}" value="${krFmt(rec.billPay1Amount)}" style="width:96px;" maxlength="11" oninput="formatAmountInput(this)" onchange="updateBillingRecordField('${rec.id}','billPay1Amount', krParse(this.value))">
         </div>
         <div style="display:flex;gap:4px;margin-bottom:4px;align-items:center;">
           <input type="date" id="bill-pay2-date-${rec.id}" value="${rec.billPay2Date||''}" style="width:125px;" onchange="updateBillingRecordField('${rec.id}','billPay2Date', this.value)">
           <button type="button" class="btn sm" style="padding:4px 8px;font-size:12px;" onclick="setBillDateToday('bill-pay2-date-${rec.id}','${rec.id}','billPay2Date')">오늘</button>
-          <input type="text" inputmode="numeric" placeholder="입금2 금액" data-orig="${krFmt(rec.billPay2Amount)}" value="${krFmt(rec.billPay2Amount)}" style="width:82px;" maxlength="11" oninput="formatAmountInput(this)" onchange="updateBillingRecordField('${rec.id}','billPay2Amount', krParse(this.value))">
+          <input type="text" inputmode="numeric" placeholder="입금2 금액" data-orig="${krFmt(rec.billPay2Amount)}" value="${krFmt(rec.billPay2Amount)}" style="width:96px;" maxlength="11" oninput="formatAmountInput(this)" onchange="updateBillingRecordField('${rec.id}','billPay2Amount', krParse(this.value))">
         </div>
         <div style="display:flex;gap:4px;align-items:center;">
           <input type="date" id="bill-pay3-date-${rec.id}" value="${rec.billPay3Date||''}" style="width:125px;" onchange="updateBillingRecordField('${rec.id}','billPay3Date', this.value)">
           <button type="button" class="btn sm" style="padding:4px 8px;font-size:12px;" onclick="setBillDateToday('bill-pay3-date-${rec.id}','${rec.id}','billPay3Date')">오늘</button>
-          <input type="text" inputmode="numeric" placeholder="입금3 금액" data-orig="${krFmt(rec.billPay3Amount)}" value="${krFmt(rec.billPay3Amount)}" style="width:82px;" maxlength="11" oninput="formatAmountInput(this)" onchange="updateBillingRecordField('${rec.id}','billPay3Amount', krParse(this.value))">
+          <input type="text" inputmode="numeric" placeholder="입금3 금액" data-orig="${krFmt(rec.billPay3Amount)}" value="${krFmt(rec.billPay3Amount)}" style="width:96px;" maxlength="11" oninput="formatAmountInput(this)" onchange="updateBillingRecordField('${rec.id}','billPay3Amount', krParse(this.value))">
+        </div>
+        <div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border-strong);display:flex;justify-content:space-between;">
+          <span style="font-weight:800;color:var(--ok);font-size:15px;">입금 소계</span>
+          <span style="font-weight:800;color:var(--ok);font-size:15px;">${paid.toLocaleString()}원</span>
         </div>
       </td>
-      <td rowspan="2" style="font-weight:700;color:var(--danger);">${balance.toLocaleString()}원</td>
+      <td rowspan="2" style="font-weight:700;font-size:15px;color:var(--danger);">${balance.toLocaleString()}원</td>
       <td><input type="text" value="${(rec.billManager!=null? rec.billManager : (rec.manager||'')).replace(/"/g,'&quot;')}" placeholder="담당자" style="width:95px;" onchange="updateBillingRecordField('${rec.id}','billManager', this.value)"></td>
       <td><input type="text" value="${(rec.billPhone!=null? rec.billPhone : (rec.phone||'')).replace(/"/g,'&quot;')}" placeholder="연락처" style="width:125px;" onchange="updateBillingRecordField('${rec.id}','billPhone', this.value)"></td>
     </tr>
     <tr${bgAttr}>
-      <td colspan="2">
-        <textarea placeholder="비고 또는 메모" style="width:100%;box-sizing:border-box;min-height:44px;resize:vertical;font-size:12px;padding:6px 6px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);" onchange="updateBillingRecordField('${rec.id}','billNote', this.value)">${escR(rec.billNote||'')}</textarea>
+      <td colspan="2" style="height:1px;">
+        <textarea placeholder="비고 또는 메모" style="width:100%;height:100%;box-sizing:border-box;min-height:80px;resize:vertical;font-size:12px;padding:6px 6px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);" onchange="updateBillingRecordField('${rec.id}','billNote', this.value)">${escR(rec.billNote||'')}</textarea>
       </td>
     </tr>`;
   }).join('');
