@@ -399,6 +399,7 @@ const TABS = [
 ];
 let DB = {gens:[], rentals:[], maint:[], reservations:[], materials:{}, technicians:['','',''], teamMembers:['','',''], warnThreshold:50, overuseDailyLimit:10, partsStock:{}, consumableOrders:[], improvements:[], suppliesCatalog:[], suppliesStock:{}, vehicleTypes:[], vehicleSuggestEnabled:true, genSizeDisplayEnabled:false, modelColors:{}, notices:[], calendarEvents:[], genColorOverrides:{}, suppliesSizes:{}, suppliesSpecs:{}, suppliesCategories:{}, customerNotes:{}, readMarkers:{}, qrIssued:{}, salesEnabled:false, salesRecords:[], salesManagers:['','',''], salesPassword:'', salesPasswordBypass:true, salesBillingRecords:[], cancelOutHistory:[], palletDefaultRemoved:false, companyInfo:{name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}};
 let currentTab = 'dashboard';
+const SALES_MANAGER_FIXED_NAME = '이영숙';
 let salesFilterMonth = '';
 let salesFilterStatus = 'all';
 let salesShowFreight = true;
@@ -4900,7 +4901,6 @@ function renderSettingsTab(){
   const teamMemberInputs = [0,1,2].map(i=>`
     <div class="field"><label>사용자${i+1}</label><input type="text" value="${(DB.teamMembers[i]||'').replace(/"/g,'&quot;')}" placeholder="이름" onchange="updateTeamMember(${i}, this.value)"></div>
   `).join('');
-  const SALES_MANAGER_FIXED_NAME = '이영숙';
   if((DB.salesManagers[0]||'').trim() !== SALES_MANAGER_FIXED_NAME){
     DB.salesManagers[0] = SALES_MANAGER_FIXED_NAME;
     saveSalesManagers();
@@ -9621,6 +9621,10 @@ async function init(){
   DB.salesManagers = results.salesManagers || [];
   while(DB.salesManagers.length<3) DB.salesManagers.push('');
   DB.salesManagers = DB.salesManagers.slice(0,3);
+  if((DB.salesManagers[0]||'').trim() !== SALES_MANAGER_FIXED_NAME){
+    DB.salesManagers[0] = SALES_MANAGER_FIXED_NAME;
+    saveSalesManagers();
+  }
   DB.salesPassword = results.salesPassword || '';
   DB.salesPasswordBypass = results.salesPasswordBypass !== false;
   DB.salesBillingRecords = results.salesBillingRecords || [];
@@ -9794,7 +9798,7 @@ async function syncFromStorage(){
       seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad).map(r=>r.id));
       DB.gens = gens; DB.rentals = rentals; DB.maint = maint; DB.reservations = reservations;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold; DB.overuseDailyLimit = overuseDailyLimit;
-      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.qrIssued = qrIssued || {}; DB.salesEnabled = salesEnabled === true; DB.salesRecords = salesRecords || []; DB.salesManagers = salesManagers || []; DB.salesPassword = salesPassword || ''; DB.salesPasswordBypass = salesPasswordBypass !== false; DB.salesBillingRecords = salesBillingRecords || []; DB.cancelOutHistory = cancelOutHistory || []; DB.palletDefaultRemoved = palletDefaultRemoved === true; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
+      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.vehicleTypes = vehicleTypes; DB.vehicleSuggestEnabled = vehicleSuggestEnabled!==false; DB.genSizeDisplayEnabled = genSizeDisplayEnabled===true; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.qrIssued = qrIssued || {}; DB.salesEnabled = salesEnabled === true; DB.salesRecords = salesRecords || []; DB.salesManagers = salesManagers || []; if((DB.salesManagers[0]||'').trim() !== SALES_MANAGER_FIXED_NAME){ DB.salesManagers[0] = SALES_MANAGER_FIXED_NAME; saveSalesManagers(); } DB.salesPassword = salesPassword || ''; DB.salesPasswordBypass = salesPasswordBypass !== false; DB.salesBillingRecords = salesBillingRecords || []; DB.cancelOutHistory = cancelOutHistory || []; DB.palletDefaultRemoved = palletDefaultRemoved === true; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
       applyCompanyBranding();
       if(!shouldSkipSync()){
         renderTabbar();
