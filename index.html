@@ -3795,7 +3795,7 @@ function renderManualTab(){
 
     ${manualSection('💰','매출관리', false,
       '출고중인 발전기의 청구·입금 현황을 관리하는 탭입니다. [설정 → 매출관리]에서 "매출관리 사용" 체크를 켜야 상단 탭에 나타나고, 꺼두면 탭 자체가 안 보입니다.', [
-      ['접근 권한', '[설정 → 매출관리 → 관리자]에 등록된 이름 1명만 상단 탭에 매출관리가 보이고 사용할 수 있습니다. 이름은 실제 신원 확인 수단이 아니라서(목록에서 고르는 방식), 진짜 출입 통제는 비밀번호가 담당합니다. 비밀번호를 설정해두면 매출관리 탭에 들어갈 때 비밀번호를 입력해야 합니다("비밀번호 없이 사용" 체크를 켜두면 비밀번호를 물어보지 않습니다).'],
+      ['접근 권한', '매출관리 관리자 이름은 "이영숙"으로 고정되어 있어 바꿀 수 없습니다. "이영숙"으로 접속했을 때만 상단 탭에 매출관리가 보이고 사용할 수 있으며, 그 외 이름으로 접속하면 탭 자체가 안 보입니다. 비밀번호도 "이영숙"으로 접속했을 때만 [설정 → 매출관리자 지정]에서 설정할 수 있고, 다른 이름으로 접속하면 비밀번호 입력칸 자체가 안 보입니다. 비밀번호를 설정해두면 매출관리 탭에 들어갈 때 비밀번호를 입력해야 합니다("비밀번호 없이 사용" 체크를 켜두면 비밀번호를 물어보지 않습니다).'],
       ['업체별 매출현황', '지금 출고중인 발전기를 출고일 순서대로 보여줍니다. 발전기별로 청구일자·업체명·현장명·용량·발전기번호·사용기간·견적금액(공급가·세액·합계)·계산서 발행·운임(출고운임/세액, 입고운임/세액)·입금일/입금금액·미수금·담당자·연락처·비고를 표 안에서 바로 입력할 수 있고, 공급가와 각 운임을 넣으면 세액(10%)이 자동 계산되며 합계도 자동으로 더해집니다(합계는 직접 고칠 수도 있음). 업체명에 담당자 이름·전화번호가 같이 적혀 있으면 자동으로 나눠서 담당자·연락처 칸에 채워줍니다. 입력한 내용은 곧바로 저장되며, 별도의 등록 버튼이 필요 없습니다. 한 번 생성된 매출 기록은 이후 출고취소·입고가 되어도 지워지지 않고 그대로 남습니다.'],
       ['계산서 발행 버튼', '견적금액 칸 아래 있는 토글 버튼입니다. 누르면 "발행 처리할까요?" 또는 "미발행으로 변경할까요?" 확인창이 뜨고, 확인해야만 "계산서 미발행" ↔ "계산서 발행함" 상태가 바뀝니다.'],
       ['이 매출 숨기기', '청구일자 칸 아래 큰 버튼입니다. 누르면 숨기는 이유를 입력하라는 창이 뜨고, 이유를 적고 확인하면 목록에서 안 보이게 숨겨집니다(삭제 아님). "숨김매출" 체크를 켜면 숨긴 건만 모아서 볼 수 있고, 각 건에 적어둔 숨긴 이유도 함께 표시되며 "복원하기" 버튼으로 다시 되돌릴 수 있습니다.'],
@@ -3893,8 +3893,8 @@ function submitSalesUnlock(){
   sessionStorage.setItem('sales-unlocked','yes');
   renderContent();
 }
-function billingMatchKey(genId, outDate){
-  return `${genId}__${outDate||''}`;
+function billingMatchKey(genId, outDate, customer){
+  return `${genId}__${outDate||''}__${(customer||'').trim()}`;
 }
 function dedupRepeatedText(s){
   s = (s||'').trim();
@@ -3943,7 +3943,7 @@ function parseCustomerString(raw){
 }
 function getOrCreateBillingRecord(g){
   const rt = g.rental||{};
-  const key = billingMatchKey(g.id, rt.outDate);
+  const key = billingMatchKey(g.id, rt.outDate, rt.customer);
   DB.salesBillingRecords = DB.salesBillingRecords || [];
   let rec = DB.salesBillingRecords.find(r=>r.matchKey===key);
   if(!rec){
@@ -4142,9 +4142,10 @@ function renderSalesTab(){
   });
   if(retroFixed) saveSalesBillingRecords();
   const allRecs = [...(DB.salesBillingRecords||[])].sort((a,b)=>(b.outDate||'').localeCompare(a.outDate||''));
-  const custOptions = [...new Set(allRecs.map(r=>r.customer||'(업체명 미상)'))].sort((a,b)=>a.localeCompare(b,'ko'));
-  const genIdOptions = [...new Set(allRecs.map(r=>r.genId))].sort((a,b)=>a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'}));
-  let recs = allRecs.filter(r=> salesShowHiddenOnly ? r.hidden : !r.hidden);
+  const visibleScopeRecs = allRecs.filter(r=> salesShowHiddenOnly ? r.hidden : !r.hidden);
+  const custOptions = [...new Set(visibleScopeRecs.map(r=>r.customer||'(업체명 미상)'))].sort((a,b)=>a.localeCompare(b,'ko'));
+  const genIdOptions = [...new Set(visibleScopeRecs.map(r=>r.genId))].sort((a,b)=>a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'}));
+  let recs = visibleScopeRecs;
   if(salesFilterMonth){
     recs = recs.filter(r=>(r.billDate||'').slice(0,7)===salesFilterMonth);
   }
@@ -4439,12 +4440,13 @@ function recalcOutTotal(recId){
   const freightInEl = document.getElementById(`bill-freight-in-${recId}`);
   const freightInTaxEl = document.getElementById(`bill-freight-in-tax-${recId}`);
   if(!priceEl || !taxEl || !totalEl) return;
+  const rec = findBillingRecord(recId);
   const price = krParse(priceEl.value);
   const tax = krParse(taxEl.value);
-  const freightOut = krParse(freightOutEl&&freightOutEl.value);
-  const freightOutTax = krParse(freightOutTaxEl&&freightOutTaxEl.value);
-  const freightIn = krParse(freightInEl&&freightInEl.value);
-  const freightInTax = krParse(freightInTaxEl&&freightInTaxEl.value);
+  const freightOut = freightOutEl ? krParse(freightOutEl.value) : Number((rec&&rec.billFreightOut)||0);
+  const freightOutTax = freightOutTaxEl ? krParse(freightOutTaxEl.value) : Number((rec&&rec.billFreightOutTax)||0);
+  const freightIn = freightInEl ? krParse(freightInEl.value) : Number((rec&&rec.billFreightIn)||0);
+  const freightInTax = freightInTaxEl ? krParse(freightInTaxEl.value) : Number((rec&&rec.billFreightInTax)||0);
   totalEl.value = krFmt(price+tax+freightOut+freightOutTax+freightIn+freightInTax);
 }
 function saveOutBilling(recId){
@@ -4459,10 +4461,10 @@ function saveOutBilling(recId){
   if(!rec || !priceEl || !taxEl || !totalEl) return;
   rec.billUnitPrice = krParse(priceEl.value);
   rec.billTax = krParse(taxEl.value);
-  rec.billFreightOut = krParse(freightOutEl&&freightOutEl.value);
-  rec.billFreightOutTax = krParse(freightOutTaxEl&&freightOutTaxEl.value);
-  rec.billFreightIn = krParse(freightInEl&&freightInEl.value);
-  rec.billFreightInTax = krParse(freightInTaxEl&&freightInTaxEl.value);
+  if(freightOutEl) rec.billFreightOut = krParse(freightOutEl.value);
+  if(freightOutTaxEl) rec.billFreightOutTax = krParse(freightOutTaxEl.value);
+  if(freightInEl) rec.billFreightIn = krParse(freightInEl.value);
+  if(freightInTaxEl) rec.billFreightInTax = krParse(freightInTaxEl.value);
   rec.billTotal = krParse(totalEl.value);
   saveSalesBillingRecords();
   renderContent();
@@ -4898,10 +4900,16 @@ function renderSettingsTab(){
   const teamMemberInputs = [0,1,2].map(i=>`
     <div class="field"><label>사용자${i+1}</label><input type="text" value="${(DB.teamMembers[i]||'').replace(/"/g,'&quot;')}" placeholder="이름" onchange="updateTeamMember(${i}, this.value)"></div>
   `).join('');
-  const salesManagerSet = (DB.salesManagers[0]||'').trim();
+  const SALES_MANAGER_FIXED_NAME = '이영숙';
+  if((DB.salesManagers[0]||'').trim() !== SALES_MANAGER_FIXED_NAME){
+    DB.salesManagers[0] = SALES_MANAGER_FIXED_NAME;
+    saveSalesManagers();
+  }
+  const salesManagerSet = SALES_MANAGER_FIXED_NAME;
   const salesManagerInput = `<div class="tech-grid">
-    <div class="field"><label>관리자 (1명만 등록 가능)</label><input type="text" value="${salesManagerSet.replace(/"/g,'&quot;')}" placeholder="이름" onchange="updateSalesManager(0, this.value)"></div>
+    <div class="field"><label>관리자 (고정)</label><input type="text" value="${salesManagerSet}" disabled style="background:var(--surface-2);color:var(--ink-soft);"></div>
   </div>`;
+  const isSalesManagerViewing = (DB.currentUserName||'').trim() === SALES_MANAGER_FIXED_NAME;
   const activeList = activeGens().sort(sortByIdNatural);
   const retiredList = DB.gens.filter(g=>g.retired);
   const disposedList = retiredList.filter(g=>g.retiredReason!=='매각');
@@ -4973,17 +4981,21 @@ function renderSettingsTab(){
         <div class="util-two-col" style="align-items:flex-start;margin-top:14px;">
           <div style="flex:1;min-width:0;">
             <div class="section-title" style="margin-top:0;font-size:14px;">관리자</div>
-            <p class="muted" style="font-size:12.5px;margin-top:-4px;">등록된 이름으로 접속한 사람만 매출관리 탭을 볼 수 있습니다. 1명만 등록 가능하며, 이름은 실제 신원 확인 수단이 아니라 진짜 출입 통제는 비밀번호가 담당합니다.</p>
+            <p class="muted" style="font-size:12.5px;margin-top:-4px;">관리자 이름은 "${salesManagerSet}"으로 고정되어 있습니다. 등록된 이름으로 접속한 사람만 매출관리 탭을 볼 수 있습니다.</p>
             ${salesManagerInput}
           </div>
           <div style="flex:1;min-width:0;">
             <div class="section-title" style="margin-top:0;font-size:14px;">비밀번호</div>
+            ${isSalesManagerViewing ? `
             <p class="muted" style="font-size:12.5px;margin-top:-4px;">설정해두면 매출관리 탭에 들어갈 때 비밀번호를 입력해야 합니다. 비워두면 바로 들어갈 수 있습니다.</p>
             <div class="consumable-row" style="flex-wrap:wrap;align-items:center;margin-bottom:8px;">
               <input type="password" id="f-sales-password" placeholder="비밀번호" value="${(DB.salesPassword||'').replace(/"/g,'&quot;')}" style="width:140px;flex:none;">
               <button type="button" class="btn sm primary" onclick="saveSalesPasswordFromInput()">저장</button>
             </div>
             <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-password-bypass" ${DB.salesPasswordBypass?'checked':''} onchange="toggleSalesPasswordBypass(this.checked)"><label for="f-sales-password-bypass" style="font-size:12.5px;">비밀번호 없이 사용 (수정 중엔 켜두세요)</label></div>
+            ` : `
+            <p class="muted" style="font-size:12.5px;margin-top:-4px;">"${salesManagerSet}"님으로 접속했을 때만 여기서 비밀번호를 설정할 수 있습니다.</p>
+            `}
           </div>
         </div>
       </div>
@@ -4996,10 +5008,11 @@ function renderSettingsTab(){
       <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-enabled" ${DB.salesEnabled?'checked':''} onchange="toggleSalesEnabled(this.checked)"><label for="f-sales-enabled">매출관리 사용</label></div>
 
       <div class="section-title" style="margin-top:18px;font-size:14px;">관리자</div>
-      <p class="muted" style="font-size:12.5px;margin-top:-4px;">등록된 이름으로 접속한 사람만 매출관리 탭을 볼 수 있고 사용할 수 있습니다. 관리자는 1명만 등록할 수 있습니다. (이름은 실제 신원 확인 수단이 아니라서, 진짜 출입 통제는 아래 비밀번호가 담당합니다)</p>
+      <p class="muted" style="font-size:12.5px;margin-top:-4px;">관리자 이름은 "${salesManagerSet}"으로 고정되어 있습니다. 등록된 이름으로 접속한 사람만 매출관리 탭을 볼 수 있고 사용할 수 있습니다.</p>
       ${salesManagerInput}
 
       <div class="section-title" style="margin-top:18px;font-size:14px;">비밀번호</div>
+      ${isSalesManagerViewing ? `
       <p class="muted" style="font-size:12.5px;margin-top:-4px;">비밀번호를 설정해두면 관리자로 등록된 사람도 매출관리 탭에 들어갈 때 비밀번호를 한 번 더 입력해야 합니다. 비워두면 비밀번호 없이 바로 들어갈 수 있습니다.</p>
       <div class="consumable-row" style="flex-wrap:wrap;align-items:center;margin-bottom:8px;">
         <input type="password" id="f-sales-password" placeholder="비밀번호" value="${(DB.salesPassword||'').replace(/"/g,'&quot;')}" style="width:160px;flex:none;">
@@ -5007,6 +5020,9 @@ function renderSettingsTab(){
       </div>
       <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-password-bypass" ${DB.salesPasswordBypass?'checked':''} onchange="toggleSalesPasswordBypass(this.checked)"><label for="f-sales-password-bypass">비밀번호 없이 사용 (수정 작업 중일 때 켜두세요)</label></div>
       <p class="muted" style="font-size:12px;margin-top:2px;">체크되어 있으면 비밀번호를 설정해도 물어보지 않고 바로 들어갑니다. 매출관리 작업이 끝나면 체크를 해제해서 비밀번호를 실제로 적용하세요.</p>
+      ` : `
+      <p class="muted" style="font-size:12.5px;margin-top:-4px;">"${salesManagerSet}"님으로 접속했을 때만 여기서 비밀번호를 설정할 수 있습니다.</p>
+      `}
     </div>
     `}
 
@@ -5920,13 +5936,6 @@ async function updateTechnician(i, value){
 async function updateTeamMember(i, value){
   DB.teamMembers[i] = value.trim();
   await saveTeamMembers();
-  flash('저장되었습니다');
-}
-async function updateSalesManager(i, value){
-  DB.salesManagers[0] = value.trim();
-  await saveSalesManagers();
-  renderTabbar();
-  renderContent();
   flash('저장되었습니다');
 }
 
