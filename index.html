@@ -3896,9 +3896,34 @@ function submitSalesUnlock(){
 function billingMatchKey(genId, outDate){
   return `${genId}__${outDate||''}`;
 }
+function dedupRepeatedText(s){
+  s = (s||'').trim();
+  if(!s) return s;
+  return s.replace(/(\S+)(\s+\1)+(?=\s|$)/g, '$1');
+}
 function recIsLiveOut(rec){
   const g = findGen(rec.genId);
   return !!(g && g.status==='out' && g.rental && g.rental.outDate===rec.outDate);
+}
+function billingUsageDays(rec){
+  if(rec.manual || !rec.outDate) return null;
+  if(recIsLiveOut(rec)){
+    return -daysFromToday(rec.outDate) + 1;
+  }
+  const completed = (DB.rentals||[]).find(r=>r.genId===rec.genId && r.outDate===rec.outDate && r.inDate);
+  if(completed){
+    const out = new Date(rec.outDate+'T00:00:00');
+    const inD = new Date(completed.inDate+'T00:00:00');
+    if(!isNaN(out.getTime()) && !isNaN(inD.getTime())){
+      return Math.max(1, Math.round((inD-out)/86400000) + 1);
+    }
+  }
+  return null;
+}
+function billingEndDate(rec){
+  if(rec.manual || !rec.outDate || recIsLiveOut(rec)) return null;
+  const completed = (DB.rentals||[]).find(r=>r.genId===rec.genId && r.outDate===rec.outDate && r.inDate);
+  return completed ? completed.inDate : null;
 }
 function parseCustomerString(raw){
   let customer = (raw||'').trim();
@@ -3926,7 +3951,7 @@ function getOrCreateBillingRecord(g){
     const parsed = parseCustomerString(rt.customer);
     rec = {
       id: uid(), matchKey: key, genId: g.id, outDate: rt.outDate||'',
-      customer: parsed.customer||'(업체명 미상)', site: rt.site||rt.address||'-', capacity: isFinite(cap)? cap : null,
+      customer: parsed.customer||'(업체명 미상)', site: rt.address||rt.site||'-', capacity: isFinite(cap)? cap : null,
       manager: rt.manager||parsed.name||'', phone: rt.phone||parsed.phone||'',
       billDate:'', billUnitPrice:0, billTax:0, billTotal:0,
       billFreightOut:0, billFreightOutTax:0, billFreightIn:0, billFreightInTax:0, billInvoiceIssued:false,
@@ -4106,6 +4131,14 @@ function renderSalesTab(){
         retroFixed = true;
       }
     }
+    if(!rec.manual && rec.site && rec.site===rec.customer){
+      const g = findGen(rec.genId);
+      const rt = g && g.rental;
+      if(rt && rt.outDate===rec.outDate && rt.address){
+        rec.site = rt.address;
+        retroFixed = true;
+      }
+    }
   });
   if(retroFixed) saveSalesBillingRecords();
   const allRecs = [...(DB.salesBillingRecords||[])].sort((a,b)=>(b.outDate||'').localeCompare(a.outDate||''));
@@ -4134,7 +4167,9 @@ function renderSalesTab(){
     const g = findGen(rec.genId);
     const cap = rec.capacity;
     const capStr = (cap!=null && isFinite(cap))? `${cap}kW` : '-';
-    const period = rec.manual ? (rec.period||'-') : (rec.outDate? `${dow(rec.outDate)} ~ ${recIsLiveOut(rec)?'진행중':'종료'}` : '-');
+    const endDate = billingEndDate(rec);
+    const period = rec.manual ? (rec.period||'-') : (rec.outDate? `${dow(rec.outDate)} ~ ${recIsLiveOut(rec)?'진행중':(endDate? dow(endDate) : '종료')}` : '-');
+    const usageDays = billingUsageDays(rec);
     const total = Number(rec.billTotal)||0;
     const paid = (Number(rec.billPay1Amount)||0) + (Number(rec.billPay2Amount)||0) + (Number(rec.billPay3Amount)||0);
     const balance = total - paid;
@@ -4157,10 +4192,10 @@ function renderSalesTab(){
         </div>
       </td>
       <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.customer).replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','customer', this.value)">` : escR(rec.customer)}</td>
-      <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.site).replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','site', this.value)">` : escR(rec.site)}</td>
+      <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(dedupRepeatedText(rec.site)).replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','site', this.value)">` : escR(dedupRepeatedText(rec.site))}</td>
       <td rowspan="2">${rec.manual? `<input type="number" min="0" value="${rec.capacity!=null? rec.capacity:''}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','capacity', this.value===''?null:Number(this.value))">` : capStr}</td>
       <td rowspan="2" class="gid">${rec.manual? `<input type="text" value="${escR(rec.genId).replace(/"/g,'&quot;')}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','genId', this.value)">` : rec.genId}</td>
-      <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.period||'').replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','period', this.value)">` : period}</td>
+      <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.period||'').replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','period', this.value)">` : `<div>${period}</div>${usageDays!=null? `<div class="muted" style="text-align:center;font-size:11px;margin-top:3px;">${recIsLiveOut(rec)? `사용 ${usageDays}일째` : `총 ${usageDays}일 사용`}</div>`:''}`}</td>
       <td rowspan="2">
         <input type="text" inputmode="numeric" placeholder="공급가" id="bill-unitprice-${rec.id}" data-orig="${krFmt(rec.billUnitPrice)}" value="${krFmt(rec.billUnitPrice)}" style="width:96px;display:block;" maxlength="11" oninput="calcOutTotalLive('${rec.id}')" onchange="saveOutBilling('${rec.id}')">
         <input type="text" inputmode="numeric" placeholder="세액" id="bill-tax-${rec.id}" data-orig="${krFmt(rec.billTax)}" value="${krFmt(rec.billTax)}" style="width:96px;display:block;margin-top:4px;color:#1E5FB8;font-weight:700;" maxlength="11" oninput="calcOutTotalLive('${rec.id}', true)" onchange="saveOutBilling('${rec.id}')">
@@ -4319,7 +4354,7 @@ function printSalesList(){
     const balance = total-paid;
     grandTotal += total;
     grandBalance += balance;
-    return `<tr><td>${rec.billDate? dow(rec.billDate):'-'}</td><td class="name">${escR(rec.customer)}</td><td class="name">${escR(rec.site)}</td><td>${escR(rec.genId)}</td><td>${total.toLocaleString()}원</td><td>${paid.toLocaleString()}원</td><td>${balance.toLocaleString()}원</td><td>${rec.billInvoiceIssued?'유':'무'}</td><td>${escR((rec.billManager!=null? rec.billManager : rec.manager)||'-')}</td></tr>`;
+    return `<tr><td>${rec.billDate? dow(rec.billDate):'-'}</td><td class="name">${escR(rec.customer)}</td><td class="name">${escR(dedupRepeatedText(rec.site))}</td><td>${escR(rec.genId)}</td><td>${total.toLocaleString()}원</td><td>${paid.toLocaleString()}원</td><td>${balance.toLocaleString()}원</td><td>${rec.billInvoiceIssued?'유':'무'}</td><td>${escR((rec.billManager!=null? rec.billManager : rec.manager)||'-')}</td></tr>`;
   }).join('');
   const filterLabel = [
     salesFilterMonth? `${salesFilterMonth}` : '전체 기간',
@@ -7487,7 +7522,7 @@ async function submitCancelOut(id, costIncurred){
   if(g.status==='in') return;
   const rt = g.rental||{};
   const historyEntry = {
-    id: uid(), genId: g.id, customer: rt.customer||'', site: rt.site||rt.address||'',
+    id: uid(), genId: g.id, customer: rt.customer||'', site: rt.address||rt.site||'',
     outDate: rt.outDate||'', reason, costIncurred: !!costIncurred,
     cancelledAt: nowDateTimeStr(), cancelledBy: DB.currentUserName||null
   };
