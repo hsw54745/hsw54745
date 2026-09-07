@@ -2010,7 +2010,7 @@ function renderInList(){
       <td class="muted">${hoursStatus(g)==='known'? `${(g.hours||0).toLocaleString()}h <span style="font-size:11px;">(정비: ${(g.lastMaintHours||0).toLocaleString()}h)</span>` : (hoursStatus(g)==='na'? '해당없음' : '미확인')}</td>
       <td class="muted" style="font-size:11px;">${fuelRec && fuelRec.inProcessedBy? escR(fuelRec.inProcessedBy) : '-'}</td>
       <td style="font-size:12.5px;">${fuelCell}</td>
-      <td>${g.hoursKnown? gaugeHtml(el,r,getCycle(g)) : (g.lastMaintDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastMaintDate)}일 초과</span>` : '<span class="muted" style="font-size:12px;">누적시간 확인할 수 없음</span>')}</td>
+      <td>${g.hoursKnown? gaugeHtml(el,r,getCycle(g)) : (g.lastOilChangeDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastOilChangeDate)}일 초과</span>` : '<span class="muted" style="font-size:12px;">누적시간 확인할 수 없음</span>')}</td>
       <td>${isBroken? '<span class="pill danger">수리중</span> ' : ''}${hoursStatus(g)==='known'? pillHtml(maintStatus(r)) : (hoursStatus(g)==='na'? '<span class="pill gray">해당없음</span>' : '<span class="pill gray">확인 필요 (정비관리에서 입력)</span>')}</td>
       <td><div class="btn-row" style="flex-wrap:nowrap;">
         ${isBroken
@@ -2172,7 +2172,7 @@ function renderOutList(){
     const el = isLT? estElapsed(g) : elapsedHours(g);
     const rem = isLT? estRemaining(g) : remainingHours(g);
     const pred = predictedDate(g);
-    let predTxt = g.hoursKnown? '-' : (g.lastMaintDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastMaintDate)}일 초과</span>` : '<span class="muted" style="font-size:12px;">확인불가</span>');
+    let predTxt = g.hoursKnown? '-' : (g.lastOilChangeDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastOilChangeDate)}일 초과</span>` : '<span class="muted" style="font-size:12px;">확인불가</span>');
     if(isLT){ predTxt = pred.overdue ? '<span class="pill danger">정비 도래</span>' : `${dow(pred.date)} (약 ${pred.days}일 후)`; }
     const expIn = expectedInDate(rt);
     return `<tr${rt.forcedOut? ` style="background:var(--danger-tint);"`:''}>
@@ -2433,7 +2433,7 @@ function openAdjustModal(id){
       <div class="hint" style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:10px 12px;margin-bottom:12px;color:var(--danger);">이 발전기는 "누적시간 확인불가 모델"로 설정되어 있습니다. 누적시간 값을 입력하려면 [설정 → 발전기 모델 설정]에서 "가동시간 확인가능" 체크박스를 먼저 체크해주세요.</div>
       <div class="out-row stretch">
         <div class="field f-eq"><div class="out-card">
-          <label>마지막 엔진오일교체일</label><input type="date" id="f-adj-lastoildate" value="${g.lastMaintDate||''}"><div class="hint">누적시간을 알 수 없는 발전기는 이 날짜를 기준으로 [입고] 목록에 "마지막 엔진오일교체후 ○○일 초과"로 표시됩니다.</div>
+          <label>마지막 엔진오일교체일</label><input type="date" id="f-adj-lastoildate" value="${g.lastOilChangeDate||''}"><div class="hint">누적시간을 알 수 없는 발전기는 이 날짜를 기준으로 [입고]/[출고중] 목록에 "마지막 엔진오일교체후 ○○일 초과"로 표시됩니다. 실제로 엔진오일을 교체한 날짜만 입력해주세요.</div>
         </div></div>
       </div>`}
       <div id="f-err" class="err" style="display:none;"></div>
@@ -2472,7 +2472,7 @@ async function submitAdjust(id){
     g.lastMaintHours = lastMaint;
     g.lastMaintDate = lastMaintDate;
   } else {
-    g.lastMaintDate = lastOilDate;
+    g.lastOilChangeDate = lastOilDate;
   }
   g.hoursUpdatedAt = nowDateTimeStr();
   g.hoursUpdatedBy = DB.currentUserName || null;
@@ -2602,8 +2602,8 @@ function recomputeLastMaint(genId){
   const atMax0 = [...recs].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   if(!g.hoursKnown){
     // 설정에서 "가동시간 확인불가"로 지정된 발전기는 여기서 절대 hoursKnown을 켜지 않습니다.
-    // 최근 정비일자만 "마지막 엔진오일교체일"로 갱신합니다.
-    if(atMax0.length>0 && atMax0[0].date) g.lastMaintDate = atMax0[0].date;
+    // 실제 정비(엔진오일교체) 등록 기록이 있을 때만 "마지막 엔진오일교체일"을 갱신합니다.
+    if(atMax0.length>0 && atMax0[0].date) g.lastOilChangeDate = atMax0[0].date;
     return;
   }
   const maxHours = Math.max(...recs.map(r=>r.hours||0));
