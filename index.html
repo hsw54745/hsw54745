@@ -1179,6 +1179,9 @@ function rentalAvgDaily(r){
   return r.usedHours/days;
 }
 function isRentalOveruse(r){
+  // 출고 당시 누적시간을 몰라서 시작값이 0(플레이스홀더)으로 기록된 건은
+  // 그 발전기의 전체 누적시간이 한 번에 usedHours로 잡혀 비정상적으로 커지므로 과다사용 판정에서 제외
+  if(!r.startHours) return false;
   const avg = rentalAvgDaily(r);
   if(avg==null || avg<=overuseLimit()) return false;
   const historyCount = DB.rentals.filter(x=>x.genId===r.genId).length;
@@ -9060,11 +9063,6 @@ function openInModal(id){
   const g = findGen(id);
   const suggested = Math.round(estCurrentHours(g));
   const rt = g.rental;
-  const outInfoRows = [
-    rt.supplies? `<div class="k">부자재</div><div class="v" style="font-size:13px;font-weight:400;">${escR(rt.supplies)}</div>` : null,
-    rt.voltage? `<div class="k">출고시 전압</div><div class="v" style="font-size:13px;font-weight:400;">${escR(rt.voltage)}</div>` : null,
-    (rt.fuelRequested!=null||rt.fuelActual!=null)? `<div class="k">연료</div><div class="v" style="font-size:13px;font-weight:400;">요청 ${rt.fuelRequested!=null?rt.fuelRequested:'-'}L / 주입 ${rt.fuelActual!=null?rt.fuelActual:'-'}L</div>` : null
-  ].filter(Boolean);
   const tankDims = tankDimsOf(g);
   const baselineForModal = fuelBaselineOf(g);
   document.getElementById('modal-root').innerHTML = `
@@ -9120,16 +9118,16 @@ function openInModal(id){
           `}
         </div></div>
         <div class="field f-eq" id="in-usage-preview" style="padding:20px 16px;border-radius:10px;background:var(--primary-tint);border:1px solid var(--primary);min-height:110px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
-          <div class="muted" style="font-size:13px;font-weight:700;">임대중 사용시간</div>
+          <div class="muted" style="font-size:13px;font-weight:700;">임대사용시간</div>
           <div id="in-usage-preview-value" style="font-size:32px;font-weight:800;color:var(--primary-dark);line-height:1.2;">-</div>
           <div id="in-usage-preview-avg" class="muted" style="font-size:12.5px;font-weight:700;margin-top:4px;"></div>
         </div>
         <div class="field f-eq"><div class="out-card" style="text-align:center;">
           <label>반납된 부자재 확인</label>
-          <div class="muted" style="font-size:12.5px;margin-bottom:8px;">출고시 나간 부자재${suppliesListHtml(rt.suppliesItems, rt.suppliesCustom, rt.supplies)}</div>
+          <div class="muted" style="font-size:12.5px;margin-bottom:8px;">출고시 나간 부자재${suppliesListHtml(rt.suppliesItems, rt.suppliesCustom, rt.supplies)}${rt.voltage? `<div>출고시 전압: ${escR(rt.voltage)}</div>`:''}${(rt.fuelRequested!=null||rt.fuelActual!=null)? `<div>연료: 요청 ${rt.fuelRequested!=null?rt.fuelRequested:'-'}L / 주입 ${rt.fuelActual!=null?rt.fuelActual:'-'}L</div>`:''}</div>
           ${rt.note? `<div style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
             <div style="font-size:12px;font-weight:700;color:var(--danger);margin-bottom:4px;">📝 출고시 비고</div>
-            <div style="font-size:17px;font-weight:800;color:var(--danger);line-height:1.35;">${escR(rt.note)}</div>
+            <div style="font-size:13px;font-weight:400;color:var(--danger);line-height:1.35;">${escR(rt.note)}</div>
             <div class="field chk" style="margin-top:10px;margin-bottom:0;justify-content:center;">
               <input type="checkbox" id="f-note-ack" onchange="onNoteAckCheck(this.checked)">
               <label for="f-note-ack">네, 위 비고 내용을 확인했습니다.</label>
@@ -9141,12 +9139,6 @@ function openInModal(id){
           <div id="f-supplies-note-wrap" style="display:none;margin-top:8px;">
             <textarea id="f-supplies-note" placeholder="미회수 내역을 적어주세요 (예: 케이블 20m 미회수)"></textarea>
           </div>
-        </div></div>
-        <div class="field f-eq"><div class="out-card" style="text-align:center;">
-          <div class="muted" style="font-size:11px;font-weight:700;margin-bottom:6px;">출고시 함께 나간 내역</div>
-          ${outInfoRows.length>0? `<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px;justify-content:center;">
-            ${outInfoRows.join('')}
-          </div>` : `<div class="muted" style="font-size:13px;">없음</div>`}
         </div></div>
       </div>
       <div id="f-err" class="err" style="display:none;"></div>
