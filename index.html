@@ -1014,8 +1014,7 @@ async function savePartsPurchaseLog(){ await storageSetChecked('gen-parts-purcha
 async function saveLastBackupDate(){ await storageSetChecked('gen-last-backup-date-v1', JSON.stringify(DB.lastBackupDate), true); }
 
 function hasHourData(g){
-  if(g.status==='in') return !!g.hoursKnown;
-  return !!(g.rental && g.rental.longTerm && g.rental.estDaily>0);
+  return !!g.hoursKnown;
 }
 
 // 배경(overlay)을 마우스로 누른 채 안쪽 표를 옆으로 스크롤하다가 바깥에서 손을 떼도
@@ -1104,7 +1103,7 @@ function estElapsed(g){ return Math.max(0, estCurrentHours(g) - (g.lastMaintHour
 function estRemaining(g){ return getCycle(g) - estElapsed(g); }
 
 function predictedDate(g){
-  if(!(g.status==='out' && g.rental && g.rental.longTerm && g.rental.estDaily>0)) return null;
+  if(!(g.hoursKnown && g.status==='out' && g.rental && g.rental.longTerm && g.rental.estDaily>0)) return null;
   const rem = estRemaining(g);
   if(rem<=0) return {overdue:true};
   const days = rem / g.rental.estDaily;
@@ -1125,6 +1124,9 @@ function daysFromToday(dateStr){
   const d = new Date(dateStr+'T00:00:00');
   const t = new Date(todayStr()+'T00:00:00');
   return Math.round((d-t)/86400000);
+}
+function daysSinceDate(dateStr){
+  return -daysFromToday(dateStr);
 }
 // 전화번호 입력칸에서 숫자만 입력해도 자동으로 하이픈(-)을 넣어줍니다.
 // 서울(02) 지역번호는 2-3-4자리, 그 외(휴대폰 010 등, 지역번호)는 3-3-4 또는 3-4-4자리로 나눕니다.
@@ -1614,7 +1616,7 @@ function lowStockBannerHtml(){
 }
 function longtermMaintBannerHtml(){
   const ltUrgent = activeGens().filter(g=>{
-    if(!(g.status==='out' && g.rental && g.rental.longTerm && g.rental.estDaily>0)) return false;
+    if(!(g.hoursKnown && g.status==='out' && g.rental && g.rental.longTerm && g.rental.estDaily>0)) return false;
     return maintStatus(estRemaining(g))!=='ok';
   });
   if(ltUrgent.length===0) return '';
@@ -2008,7 +2010,7 @@ function renderInList(){
       <td class="muted">${hoursStatus(g)==='known'? `${(g.hours||0).toLocaleString()}h <span style="font-size:11px;">(정비: ${(g.lastMaintHours||0).toLocaleString()}h)</span>` : (hoursStatus(g)==='na'? '해당없음' : '미확인')}</td>
       <td class="muted" style="font-size:11px;">${fuelRec && fuelRec.inProcessedBy? escR(fuelRec.inProcessedBy) : '-'}</td>
       <td style="font-size:12.5px;">${fuelCell}</td>
-      <td>${g.hoursKnown? gaugeHtml(el,r,getCycle(g)) : '<span class="muted" style="font-size:12px;">누적시간 확인할 수 없음</span>'}</td>
+      <td>${g.hoursKnown? gaugeHtml(el,r,getCycle(g)) : (g.lastMaintDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastMaintDate)}일 초과</span>` : '<span class="muted" style="font-size:12px;">누적시간 확인할 수 없음</span>')}</td>
       <td>${isBroken? '<span class="pill danger">수리중</span> ' : ''}${hoursStatus(g)==='known'? pillHtml(maintStatus(r)) : (hoursStatus(g)==='na'? '<span class="pill gray">해당없음</span>' : '<span class="pill gray">확인 필요 (정비관리에서 입력)</span>')}</td>
       <td><div class="btn-row" style="flex-wrap:nowrap;">
         ${isBroken
@@ -2139,7 +2141,7 @@ function clearBulkInSelection(){
   renderContent();
 }
 function longtermPrepListHtml(){
-  const ltList = activeGens().filter(g=>g.status==='out' && g.rental && g.rental.longTerm && g.rental.estDaily>0);
+  const ltList = activeGens().filter(g=>g.hoursKnown && g.status==='out' && g.rental && g.rental.longTerm && g.rental.estDaily>0);
   ltList.sort((a,b)=>estRemaining(a)-estRemaining(b));
   const ltHtml = ltList.map(g=>{
     const rem = estRemaining(g);
@@ -2166,11 +2168,11 @@ function renderOutList(){
   }
   const rowHtml = (g)=>{
     const rt = g.rental;
-    const isLT = rt.longTerm && rt.estDaily>0;
+    const isLT = g.hoursKnown && rt.longTerm && rt.estDaily>0;
     const el = isLT? estElapsed(g) : elapsedHours(g);
     const rem = isLT? estRemaining(g) : remainingHours(g);
     const pred = predictedDate(g);
-    let predTxt = '-';
+    let predTxt = g.hoursKnown? '-' : (g.lastMaintDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastMaintDate)}일 초과</span>` : '<span class="muted" style="font-size:12px;">확인불가</span>');
     if(isLT){ predTxt = pred.overdue ? '<span class="pill danger">정비 도래</span>' : `${dow(pred.date)} (약 ${pred.days}일 후)`; }
     const expIn = expectedInDate(rt);
     return `<tr${rt.forcedOut? ` style="background:var(--danger-tint);"`:''}>
@@ -2190,7 +2192,7 @@ function renderOutList(){
         ${rt.note? `<div class="muted" style="font-size:11px;">비고: ${rt.note}</div>`:''}
       </td>
       <td class="muted">${dow(rt.outDate)||'-'}</td>
-      <td>${isLT? gaugeHtml(el,rem,getCycle(g)) : '<span class="muted" style="font-size:12px;">반납 시 확인</span>'}</td>
+      <td>${isLT? gaugeHtml(el,rem,getCycle(g)) : (g.hoursKnown? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--warn);">누적시간 확인불가 모델</span>')}</td>
       <td style="font-size:12px;">${predTxt}</td>
       <td style="font-size:12px;">${expIn? (()=>{ const diff = daysFromToday(expIn); const isLate = diff!=null && diff<0; const cls = isLate?'danger':(diff<=1?'danger':(diff<=3?'warn':'gray')); return `<span class="pill ${cls}">📅 ${inDateLabelFull(expIn)}</span>`; })() : '<span class="muted">-</span>'}</td>
       <td>
@@ -2414,9 +2416,9 @@ function openAdjustModal(id){
           <label>셋팅 전압</label><input type="text" id="f-adj-voltage" value="${(g.voltage||'').replace(/"/g,'&quot;')}" placeholder="예: 380V">${voltageButtonsHtml('f-adj-voltage')}
         </div></div>
       </div>
-      <div class="field chk out-card" style="margin-bottom:14px;"><input type="checkbox" id="f-adj-unknown" ${g.hoursKnown? '' : 'checked'} onchange="toggleAdjUnknown()"><label for="f-adj-unknown" style="color:var(--danger);">누적시간 확인할 수 없음 (남은 정비시간·정비도래일이 화면에 표시되지 않습니다)</label></div>
+      ${g.hoursKnown? `
       <div class="out-row stretch">
-        <div id="f-adj-fields" style="display:${g.hoursKnown? 'contents' : 'none'};">
+        <div id="f-adj-fields">
           <div class="field f-eq"><div class="out-card">
             <label>현재 누적 사용시간(h)</label><input type="number" id="f-adj-hours" min="0" value="${g.hours||0}">
           </div></div>
@@ -2427,7 +2429,13 @@ function openAdjustModal(id){
             <label>마지막 정비일자</label><input type="date" id="f-adj-lastmaintdate" value="${g.lastMaintDate||''}">
           </div></div>
         </div>
-      </div>
+      </div>` : `
+      <div class="hint" style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:10px 12px;margin-bottom:12px;color:var(--danger);">이 발전기는 "누적시간 확인불가 모델"로 설정되어 있습니다. 누적시간 값을 입력하려면 [설정 → 발전기 모델 설정]에서 "가동시간 확인가능" 체크박스를 먼저 체크해주세요.</div>
+      <div class="out-row stretch">
+        <div class="field f-eq"><div class="out-card">
+          <label>마지막 엔진오일교체일</label><input type="date" id="f-adj-lastoildate" value="${g.lastMaintDate||''}"><div class="hint">누적시간을 알 수 없는 발전기는 이 날짜를 기준으로 [입고] 목록에 "마지막 엔진오일교체후 ○○일 초과"로 표시됩니다.</div>
+        </div></div>
+      </div>`}
       <div id="f-err" class="err" style="display:none;"></div>
       <div class="modal-actions">
         <button class="btn" onclick="closeModal()">취소</button>
@@ -2436,19 +2444,14 @@ function openAdjustModal(id){
     </div>
   </div>`;
 }
-function toggleAdjUnknown(){
-  const unknown = document.getElementById('f-adj-unknown').checked;
-  document.getElementById('f-adj-fields').style.display = unknown ? 'none' : 'contents';
-}
 async function submitAdjust(id){
   const g = findGen(id);
   const model = document.getElementById('f-adj-model').value.trim();
   const oldVoltage = g.voltage||'';
   const voltage = document.getElementById('f-adj-voltage').value.trim();
-  const unknown = document.getElementById('f-adj-unknown').checked;
   const errEl = document.getElementById('f-err');
-  let hours, lastMaint, lastMaintDate;
-  if(!unknown){
+  let hours, lastMaint, lastMaintDate, lastOilDate;
+  if(g.hoursKnown){
     hours = Number(document.getElementById('f-adj-hours').value);
     lastMaint = Number(document.getElementById('f-adj-lastmaint').value);
     lastMaintDate = document.getElementById('f-adj-lastmaintdate').value || null;
@@ -2458,19 +2461,18 @@ async function submitAdjust(id){
     if(lastMaint>hours){
       errEl.textContent='마지막 정비시 누적시간은 현재 누적시간보다 클 수 없습니다.'; errEl.style.display='block'; return;
     }
+  } else {
+    lastOilDate = document.getElementById('f-adj-lastoildate').value || null;
   }
   // 검증을 모두 통과한 뒤에만 실제 값 반영 (검증 실패시 메모리상 값이 먼저 바뀌어버리는 것 방지)
   g.model = model;
   g.voltage = voltage;
-  if(unknown){
-    g.hoursKnown = false;
-    g.hoursNA = true;
-  } else {
+  if(g.hoursKnown){
     g.hours = hours;
     g.lastMaintHours = lastMaint;
     g.lastMaintDate = lastMaintDate;
-    g.hoursKnown = true;
-    g.hoursNA = false;
+  } else {
+    g.lastMaintDate = lastOilDate;
   }
   g.hoursUpdatedAt = nowDateTimeStr();
   g.hoursUpdatedBy = DB.currentUserName || null;
@@ -2597,10 +2599,16 @@ function recomputeLastMaint(genId){
   if(!g) return;
   const recs = DB.maint.filter(m=>m.genId===genId);
   if(recs.length===0) return;
+  const atMax0 = [...recs].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(!g.hoursKnown){
+    // 설정에서 "가동시간 확인불가"로 지정된 발전기는 여기서 절대 hoursKnown을 켜지 않습니다.
+    // 최근 정비일자만 "마지막 엔진오일교체일"로 갱신합니다.
+    if(atMax0.length>0 && atMax0[0].date) g.lastMaintDate = atMax0[0].date;
+    return;
+  }
   const maxHours = Math.max(...recs.map(r=>r.hours||0));
   g.lastMaintHours = maxHours;
   if((g.hours||0) < maxHours) g.hours = maxHours;
-  g.hoursKnown = true;
   g.hoursUpdatedAt = nowDateTimeStr();
   g.hoursUpdatedBy = DB.currentUserName || null;
   const atMax = recs.filter(r=>(r.hours||0)===maxHours).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -3342,7 +3350,7 @@ function renderGenHistory(){
         <div class="item"><div class="k">누적 사용시간</div><div class="v">${hoursStatus(g)==='known'? (g.hours||0).toLocaleString()+'h' : (hoursStatus(g)==='na'? '해당없음' : '미확인')}</div></div>
         <div class="item"><div class="k">마지막 정비시점</div><div class="v">${g.hoursKnown? (g.lastMaintHours||0).toLocaleString()+'h' : '-'}${g.lastMaintDate? `<div class="muted" style="font-size:11px;font-weight:400;">${dow(g.lastMaintDate)}</div>`:''}</div></div>
         <div class="item"><div class="k">정비 후 경과</div><div class="v">${el!==null? Math.round(el).toLocaleString()+'h' : '확인불가'}</div></div>
-        <div class="item"><div class="k">정비 주기</div><div class="v" style="${getCycle(g)!==DEFAULT_CYCLE? 'color:var(--danger);':''}">${getCycle(g).toLocaleString()}h${getCycle(g)!==DEFAULT_CYCLE? ` <span style="font-size:11px;font-weight:400;">(기본값 ${DEFAULT_CYCLE}h 아님)</span>`:''}</div></div>
+        <div class="item"><div class="k">정비 주기</div><div class="v">${getCycle(g).toLocaleString()}h</div></div>
         <div class="item"><div class="k">누적 임대 사용시간</div><div class="v">${totalRentedHours.toLocaleString()}h</div></div>
         <div class="item"><div class="k">누적 임대 건수</div><div class="v">${rentals.length}건</div></div>
         ${g.underRepair? `<div class="item"><div class="k">고장 내용</div><div class="v" style="font-size:13px;font-weight:400;color:var(--danger);">${escR(g.repairNote||'-')}${g.repairSince? ` (${g.repairSince} 접수)`:''}${g.repairPhoto? ` <img src="${g.repairPhoto}" style="width:28px;height:28px;object-fit:cover;border-radius:6px;vertical-align:middle;cursor:pointer;" onclick="openImageViewModal('${g.repairPhoto}','고장 사진')">`:''}</div></div>`:''}
@@ -4964,10 +4972,10 @@ function renderSettingsTab(){
         const modelRowHtml = g=>{
           const cap = capacityOf(g);
           const ratioOptions = [100,90,80,70,60,50,40,30].map(r=>`<option value="${r}" ${(g.usageRatio||100)===r?'selected':''}>${r}%</option>`).join('');
-          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
+          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·장기임대 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가 모델&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
         };
         const half = Math.ceil(activeList.length/2);
-        const thead = `<thead><tr><th style="width:42px;">번호</th><th style="width:112px;">모델/용량</th><th style="width:56px;">년식</th><th style="width:78px;">정격대비사용</th><th style="width:74px;"></th></tr></thead>`;
+        const thead = `<thead><tr><th style="width:42px;">번호</th><th style="width:112px;">모델/용량</th><th style="width:56px;">년식</th><th style="width:78px;">정격대비사용</th><th style="width:64px;">가동시간<br>확인가능</th><th style="width:74px;"></th></tr></thead>`;
         return `<div class="util-two-col model-settings-table">
           <div class="settings-table"><table>${thead}<tbody>${activeList.slice(0,half).map(modelRowHtml).join('')}</tbody></table></div>
           <div class="settings-table"><table>${thead}<tbody>${activeList.slice(half).map(modelRowHtml).join('')}</tbody></table></div>
@@ -5459,6 +5467,22 @@ function renderGenColorOverrideList(){
       <button type="button" onclick="removeGenColorOverride('${id}')" style="border:none;background:none;cursor:pointer;font-weight:700;color:var(--danger);padding:0;">✕</button>
     </span>`;
   }).join('');
+}
+async function toggleHoursKnownSetting(id, checked){
+  const g = findGen(id);
+  g.hoursKnown = checked;
+  g.hoursNA = !checked;
+  if(!checked){
+    // 누적시간 확인불가로 전환할 때 시간 수치는 정리하되, 마지막 정비일자(엔진오일교체일)는
+    // [입고] 목록의 "마지막 엔진오일교체후 ○○일 초과" 표시에 그대로 쓰이므로 남겨둡니다.
+    g.hours = 0;
+    g.lastMaintHours = 0;
+  }
+  g.hoursUpdatedAt = nowDateTimeStr();
+  g.hoursUpdatedBy = DB.currentUserName || null;
+  await saveGens();
+  renderContent();
+  flash(checked? `${g.id} 가동시간 확인가능으로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 실제 값을 입력해주세요.` : `${g.id} 누적시간 확인불가 모델로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 마지막 엔진오일교체일을 입력해주세요.`);
 }
 async function updateManufactureDate(id, value){
   const g = findGen(id);
@@ -7929,6 +7953,13 @@ function openBulkInModal(){
   const hoursRowsHtml = gens.map(g=>{
     const suggested = Math.round(estCurrentHours(g));
     const rt = g.rental;
+    if(!g.hoursKnown){
+      return `
+      <div class="field-row" style="align-items:flex-end;">
+        <div style="flex:0 0 auto;min-width:110px;font-size:13px;font-weight:700;padding-bottom:8px;">${g.id}${g.model? ` <span class="muted" style="font-weight:400;font-size:11.5px;">· ${escR(g.model)}</span>`:''}<div class="muted" style="font-size:11px;font-weight:400;">${escR(rt.customer||'-')}</div></div>
+        <div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">입고시 누적 사용시간(h) <span class="muted" style="font-weight:400;">(선택, 확인불가 모델)</span></label><input type="number" id="fbi-hours-${g.id}" min="${rt.startHours||0}"><div class="hint">이 발전기는 누적시간 확인불가 모델로 설정되어 있어 입력하지 않아도 됩니다.</div></div>
+      </div>`;
+    }
     return `
     <div class="field-row" style="align-items:flex-end;">
       <div style="flex:0 0 auto;min-width:110px;font-size:13px;font-weight:700;padding-bottom:8px;">${g.id}${g.model? ` <span class="muted" style="font-weight:400;font-size:11.5px;">· ${escR(g.model)}</span>`:''}<div class="muted" style="font-size:11px;font-weight:400;">${escR(rt.customer||'-')}</div></div>
@@ -7990,9 +8021,10 @@ async function submitBulkIn(){
       errEl.style.display='block'; return;
     }
   }
-  // 발전기별 누적 사용시간 검증
+  // 발전기별 누적 사용시간 검증 (확인불가 모델은 생략)
   const hoursMap = {};
   for(const g of gens){
+    if(!g.hoursKnown) continue;
     const el = document.getElementById(`fbi-hours-${g.id}`);
     const v = el ? Number(el.value) : NaN;
     if(isNaN(v) || v < (g.rental.startHours||0)){
@@ -8003,18 +8035,19 @@ async function submitBulkIn(){
   }
   gens.forEach(g=>{
     const rt = g.rental;
-    const endHours = hoursMap[g.id];
+    const endHours = hoursMap[g.id]!=null ? hoursMap[g.id] : null;
     DB.rentals.push({
       id: uid(), genId: g.id, customer: rt.customer, manager: rt.manager, phone: rt.phone,
       site: rt.site, address: rt.address, supplies: rt.supplies, suppliesRecovered: !!rt.supplies, suppliesNote: '', fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: rt.note,
       outDate: rt.outDate, inDate, startHours: rt.startHours, endHours,
-      usedHours: endHours - (rt.startHours||0), longTerm: rt.longTerm, estDaily: rt.estDaily,
+      usedHours: endHours!=null ? endHours - (rt.startHours||0) : null, longTerm: rt.longTerm, estDaily: rt.estDaily,
       voltage: g.voltage||rt.voltage||'', outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null,
       measuredFuelHeightCm: null, remainingFuelLiters: null,
       paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null
     });
-    g.hours = endHours;
-    g.hoursKnown = true;
+    if(g.hoursKnown && endHours!=null){
+      g.hours = endHours;
+    }
     g.status = 'in';
     g.rental = null;
   });
@@ -8295,7 +8328,7 @@ function longtermPrepCardPrintHtml(g){
   </div>`;
 }
 function downloadLongtermPrepFile(){
-  const ltList = activeGens().filter(g=>g.status==='out' && g.rental && g.rental.longTerm && g.rental.estDaily>0);
+  const ltList = activeGens().filter(g=>g.hoursKnown && g.status==='out' && g.rental && g.rental.longTerm && g.rental.estDaily>0);
   ltList.sort((a,b)=>estRemaining(a)-estRemaining(b));
   if(ltList.length===0){ showInfoModal('출고중인 장기임대 발전기가 없습니다.'); return; }
   const cards = ltList.map(longtermPrepCardPrintHtml).join('');
@@ -8687,9 +8720,9 @@ function openInModal(id){
           <input type="date" id="f-indate" value="${todayStr()}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
         </div></div>
         <div class="field f-md"><div class="out-card">
-          <label>입고시(반납) 누적 사용시간(h)</label>
+          <label>입고시(반납) 누적 사용시간(h)${g.hoursKnown? '' : ' <span class="muted" style="font-weight:400;">(선택, 확인불가 모델)</span>'}</label>
           <input type="number" id="f-endhours" placeholder="예: ${suggested}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
-          <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
+          <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">${g.hoursKnown? `출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h` : '이 발전기는 누적시간 확인불가 모델로 설정되어 있어 입력하지 않아도 됩니다.'}</div>
         </div></div>
         <div class="field f-sm"><div class="out-card">
           <label>전압</label>
@@ -8838,7 +8871,8 @@ function setSuppliesRecovered(recovered){
 async function submitIn(id){
   const g = findGen(id);
   const inDate = document.getElementById('f-indate').value;
-  const endHours = Number(document.getElementById('f-endhours').value);
+  const endHoursRaw = document.getElementById('f-endhours').value;
+  const endHours = endHoursRaw==='' ? null : Number(endHoursRaw);
   const voltage = document.getElementById('f-in-voltage').value.trim();
   const oldVoltageForLog = g ? (g.voltage||'') : '';
   const supRecoveredEl = document.getElementById('f-sup-recovered');
@@ -8858,13 +8892,14 @@ async function submitIn(id){
     errEl.textContent = '출고시 비고 내용을 확인했다는 체크를 해야 입고 처리할 수 있습니다.';
     errEl.style.display='block'; return;
   }
-  if(!inDate || isNaN(endHours) || endHours < g.rental.startHours){
+  // 누적시간 확인불가 모델은 입력을 생략할 수 있습니다. (설정 → 발전기 모델 설정에서 지정)
+  if(!inDate || (g.hoursKnown && (endHours===null || isNaN(endHours) || endHours < g.rental.startHours))){
     errEl.textContent = '입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다)';
     errEl.style.display='block'; return;
   }
   // 하루 24시간을 초과하는 물리적으로 불가능한 사용시간 감지 (데이터 입력 실수 방지)
   // 단, 출고 당시 누적시간을 몰랐던(미확인) 발전기는 이번이 첫 실측이라 정상적으로 큰 값이 나올 수 있으므로 제외
-  if(g.rental.outDate && inDate && g.hoursKnown){
+  if(g.rental.outDate && inDate && g.hoursKnown && endHours!==null){
     const usedH = endHours - g.rental.startHours;
     const outD = new Date(g.rental.outDate+'T00:00:00');
     const inD = new Date(inDate+'T00:00:00');
@@ -8899,13 +8934,15 @@ async function submitIn(id){
     id: newRentalId, genId: g.id, customer: rt.customer, manager: rt.manager, phone: rt.phone,
     site: rt.site, address: rt.address, supplies: rt.supplies, suppliesItems: rt.suppliesItems||[], suppliesCustom: rt.suppliesCustom||'', suppliesRecovered, suppliesNote, fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: combinedNote,
     outDate: rt.outDate, inDate, startHours: rt.startHours, endHours,
-    usedHours: endHours - rt.startHours, longTerm: rt.longTerm, estDaily: rt.estDaily,
+    usedHours: endHours!=null ? endHours - rt.startHours : null, longTerm: rt.longTerm, estDaily: rt.estDaily,
     voltage, outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null, inProcessedAt: nowDateTimeStr(),
     measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
     paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null
   });
-  g.hours = endHours;
-  g.hoursKnown = true;
+  // 누적시간 확인불가 모델(설정에서 지정)은 여기서 hoursKnown을 절대 자동으로 켜지 않습니다.
+  if(g.hoursKnown && endHours!==null){
+    g.hours = endHours;
+  }
   g.status = 'in';
   g.voltage = voltage;
   g.rental = null;
@@ -9079,7 +9116,7 @@ function openMaintModal(id, editId, repairComplete){
       </div>` : ''}
       <div class="field-row">
         <div class="field"><label>정비일</label><input type="date" id="f-mdate" value="${rec? rec.date : todayStr()}"></div>
-        <div class="field"><label>정비시 누적 사용시간(h)</label><input type="number" id="f-mhours" value="${rec? rec.hours : (g.hours||0)}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 ${(g.hours||0).toLocaleString()}h</div></div>
+        <div class="field"><label>정비시 누적 사용시간(h)${g.hoursKnown? '' : ' <span class="muted" style="font-weight:400;">(선택, 확인불가 모델)</span>'}</label><input type="number" id="f-mhours" value="${rec? (rec.hours||0) : (g.hoursKnown? (g.hours||0) : '')}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">${g.hoursKnown? `현재 ${(g.hours||0).toLocaleString()}h` : '이 발전기는 누적시간 확인불가 모델로 설정되어 있어 입력하지 않아도 됩니다.'}</div></div>
       </div>
       <div class="field-row">
         <div class="field"><label>정비 유형</label>${typeButtonsHtml}</div>
@@ -9140,7 +9177,8 @@ async function submitMaint(id, editId, completeRepair){
   if(!requireTechnician('정비 등록/수정')) return;
   const g = findGen(id);
   const date = document.getElementById('f-mdate').value;
-  const hours = Number(document.getElementById('f-mhours').value);
+  const hoursRaw = document.getElementById('f-mhours').value;
+  const hours = g.hoursKnown ? Number(hoursRaw) : (hoursRaw===''? 0 : Number(hoursRaw));
   const type = document.getElementById('f-mtype').value;
   const technician = document.getElementById('f-mtech').value;
   const contentOptions = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1차교체','오일필터1차점검','오일필터2차교체','오일필터2차점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검 및 보충','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소'];
@@ -9151,7 +9189,7 @@ async function submitMaint(id, editId, completeRepair){
   const contentEtc = document.getElementById('f-mcontent-etc').value.trim();
   const content = [contentItems.join(', '), contentEtc].filter(Boolean).join(' / ');
   const errEl = document.getElementById('f-err');
-  if(!date || isNaN(hours) || hours<0){
+  if(!date || (g.hoursKnown && (isNaN(hours) || hours<0))){
     errEl.textContent = '정비일과 누적 사용시간을 확인해주세요.';
     errEl.style.display='block'; return;
   }
