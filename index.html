@@ -86,6 +86,20 @@
   @media(min-width:640px){.overlay{align-items:center;}}
   .modal{background:#fff;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;border-radius:16px 16px 0 0;padding:20px 20px 24px;}
   @media(min-width:640px){.modal{border-radius:16px;}}
+  @media(min-width:760px){.modal.modal-wide{max-width:960px;}}
+  .out-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:flex-start;}
+  .out-row.stretch{align-items:stretch;}
+  .out-card{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;background:var(--surface);height:100%;box-sizing:border-box;}
+  .out-row>.field{margin-bottom:0;min-width:0;}
+  .out-row>.field.f-xs{flex:1 1 85px;}
+  .out-row>.field.f-sm{flex:1 1 125px;}
+  .out-row>.field.f-md{flex:1 1 170px;}
+  .out-row>.field.f-lg{flex:2 1 220px;}
+  .out-row>.field.f-eq{flex:1 1 200px;}
+  @media(max-width:759px){
+    .out-row{flex-direction:column;}
+    .out-row>.field{flex:1 1 auto !important;width:100%;}
+  }
   .modal h3{font-family:var(--display);font-size:19px;margin:0 0 4px;}
   .modal .modal-sub{font-size:12px;color:var(--ink-soft);margin-bottom:16px;}
   .field{margin-bottom:14px;}
@@ -7378,76 +7392,74 @@ function openOutInfoEditModal(id){
   }
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
+    <div class="modal modal-wide" style="text-align:center;">
       <h3>출고 정보 수정</h3>
       <div class="modal-sub">${g.id} · [${displayModel(g)}]</div>
       <div class="hint" style="margin-bottom:10px;">이미 출고중인 발전기의 거래처·현장·날짜 등 정보를 직접 수정합니다. (입고 처리 없이 바로 저장됩니다)</div>
-      <div class="field"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-oie-starthours" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}" min="0"></div>
-      <div class="field-row">
-        <div class="field"><label>도착일</label>
+      <div class="out-row stretch">
+        <div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-oie-starthours" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}" min="0"></div></div>
+        <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="f-oie-outdate" value="${rt.outDate||todayStr()}">
-        </div>
-        <div class="field"><label>도착시간</label>
+        </div></div>
+        <div class="field f-sm"><div class="out-card"><label>도착시간</label>
           <input type="text" id="f-oie-arrivetime" value="${escR(rt.arriveTime||'')}" placeholder="예: 오전 9시">
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>상차일자</label>
+        </div></div>
+        <div class="field f-sm"><div class="out-card"><label>상차일자</label>
           <input type="date" id="f-oie-loaddate" value="${rt.loadDate||rt.outDate||todayStr()}">
-        </div>
-        <div class="field"><label>운임료 부담</label><select id="f-oie-freight">
+        </div></div>
+        <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="f-oie-freight">
           <option value="우리부담" ${rt.freightBearer!=='고객부담'?'selected':''}>우리부담</option>
           <option value="고객부담" ${rt.freightBearer==='고객부담'?'selected':''}>고객부담</option>
-        </select></div>
+        </select></div></div>
       </div>
-      <div class="field"><label>거래처명</label>
-        <input type="text" id="f-oie-site" list="customer-datalist" value="${(rt.site||rt.customer||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onCustomerNameInputOie()">
-        <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
-        <div id="f-oie-site-warning">${customerWarningHtml(rt.site||rt.customer||'')}</div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>사용일수(일)</label>
+      <div class="out-row">
+        <div class="field f-lg"><label>거래처명</label>
+          <input type="text" id="f-oie-site" list="customer-datalist" value="${(rt.site||rt.customer||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onCustomerNameInputOie()">
+          <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
+          <div id="f-oie-site-warning">${customerWarningHtml(rt.site||rt.customer||'')}</div>
+        </div>
+        <div class="field f-xs"><label>사용일수(일)</label>
           <input type="number" id="f-oie-usagedays" min="0" value="${rt.usageDays||''}" placeholder="예: 7" oninput="syncOieUsageDaysToReturnDate()">
         </div>
-        <div class="field"><label>반납 예정일 (선택)</label>
+        <div class="field f-sm"><label>반납 예정일 (선택)</label>
           <input type="date" id="f-oie-returndate" value="${oiePrefillReturnDate}" onchange="syncOieReturnDateToUsageDays()">
         </div>
       </div>
-      <div class="field"><label>현장 주소</label><input type="text" id="f-oie-address" value="${(rt.address||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
-      <div class="field-row">
-        <div class="field"><label>담당자</label><input type="text" id="f-oie-manager" value="${(rt.manager||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
-        <div class="field"><label>연락처</label><input type="text" id="f-oie-phone" value="${(rt.phone||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
+      <div class="out-row">
+        <div class="field f-eq"><label>현장 주소</label><input type="text" id="f-oie-address" value="${(rt.address||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
+        <div class="field f-eq"><label>담당자</label><input type="text" id="f-oie-manager" value="${(rt.manager||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
+        <div class="field f-eq"><label>연락처</label><input type="text" id="f-oie-phone" value="${(rt.phone||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
       </div>
-      <div class="field-row">
-        <div class="field"><label>전압</label>
+      <div class="out-row stretch">
+        <div class="field f-eq"><div class="out-card"><label>전압</label>
           <input type="text" id="f-oie-voltage" value="${(rt.voltage||g.voltage||'').replace(/"/g,'&quot;')}" placeholder="예: 380V">
           ${voltageButtonsHtml('f-oie-voltage')}
-        </div>
-        <div class="field" style="max-width:110px;"><label>수량</label><input type="number" id="f-oie-qty" min="1" value="${rt.qty||1}"></div>
+        </div></div>
+        <div class="field f-eq"><div class="out-card"><label>부자재 출고</label><input type="text" id="f-oie-supplies" value="${(rt.supplies||'').replace(/"/g,'&quot;')}" placeholder="예: 케이블 50m, 분전반 1대"></div></div>
+        <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-oie-note">${rt.note||''}</textarea></div></div>
       </div>
-      <div class="field"><label>부자재 출고</label><input type="text" id="f-oie-supplies" value="${(rt.supplies||'').replace(/"/g,'&quot;')}" placeholder="예: 케이블 50m, 분전반 1대"></div>
-      <div class="field">
-        <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;">
-          <input type="checkbox" id="f-oie-fuel-toggle" ${(rt.fuelRequested!=null||rt.fuelActual!=null)?'checked':''} onchange="toggleFuelFields('f-oie-fuel-toggle','f-oie-fuel-fields-wrap')">
-          <label for="f-oie-fuel-toggle">⛽ 연료넣고 출고하기</label>
-        </div>
-        <div id="f-oie-fuel-fields-wrap" style="display:${(rt.fuelRequested!=null||rt.fuelActual!=null)?'block':'none'};margin-top:8px;">
-          <label>연료량(L)</label>
-          <div class="consumable-row">
-            <div style="flex:1;">
-              <input type="number" id="f-oie-fuel-req" min="0" value="${rt.fuelRequested!=null?rt.fuelRequested:''}" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;">
-              <div class="hint" style="margin:2px 0 0;">고객요청</div>
-            </div>
-            <div style="flex:1;">
-              <input type="number" id="f-oie-fuel-actual" min="0" value="${rt.fuelActual!=null?rt.fuelActual:''}" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;">
-              <div class="hint" style="margin:2px 0 0;">실제주입</div>
+      <div class="out-row">
+        <div class="field f-eq"><div class="out-card">
+          <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;justify-content:center;">
+            <input type="checkbox" id="f-oie-fuel-toggle" ${(rt.fuelRequested!=null||rt.fuelActual!=null)?'checked':''} onchange="toggleFuelFields('f-oie-fuel-toggle','f-oie-fuel-fields-wrap')">
+            <label for="f-oie-fuel-toggle">⛽ 연료넣고 출고</label>
+          </div>
+          <div id="f-oie-fuel-fields-wrap" style="display:${(rt.fuelRequested!=null||rt.fuelActual!=null)?'block':'none'};margin-top:8px;">
+            <div class="consumable-row">
+              <div style="flex:1;">
+                <label>고객요청</label>
+                <input type="number" id="f-oie-fuel-req" min="0" value="${rt.fuelRequested!=null?rt.fuelRequested:''}" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;">
+              </div>
+              <div style="flex:1;">
+                <label>실제주입</label>
+                <input type="number" id="f-oie-fuel-actual" min="0" value="${rt.fuelActual!=null?rt.fuelActual:''}" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;">
+              </div>
             </div>
           </div>
-        </div>
+        </div></div>
       </div>
-      <div class="field"><label>비고</label><textarea id="f-oie-note">${rt.note||''}</textarea></div>
       <div id="f-err" class="err" style="display:none;"></div>
-      <div class="modal-actions">
+      <div class="modal-actions" style="justify-content:center;">
         <button class="btn" onclick="closeModal()">취소</button>
         <button class="btn primary" onclick="submitOutInfoEdit('${g.id}')">저장</button>
       </div>
@@ -7511,7 +7523,7 @@ async function submitOutInfoEdit(id){
     phone: document.getElementById('f-oie-phone').value.trim(),
     address: document.getElementById('f-oie-address').value.trim(),
     voltage: newVoltageVal,
-    qty: Number(document.getElementById('f-oie-qty').value)||1,
+    qty: g.rental.qty||1,
     supplies: document.getElementById('f-oie-supplies').value.trim(),
     fuelRequested: (document.getElementById('f-oie-fuel-toggle') && document.getElementById('f-oie-fuel-toggle').checked) ? (Number(document.getElementById('f-oie-fuel-req').value)||null) : null,
     fuelActual: (document.getElementById('f-oie-fuel-toggle') && document.getElementById('f-oie-fuel-toggle').checked) ? (Number(document.getElementById('f-oie-fuel-actual').value)||null) : null,
@@ -7669,7 +7681,7 @@ function openOutModal(id, reservationId){
   })();
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
+    <div class="modal modal-wide" style="text-align:center;">
       <h3>${isEditingPending? '상차대기 내용 수정' : '출고하기'}</h3>
       <div class="modal-sub" id="out-modal-sub">${g.id} · [${displayModel(g)}]</div>
       ${isEditingPending? `<div class="field">
@@ -7679,13 +7691,12 @@ function openOutModal(id, reservationId){
       </div>` : ''}
       <div id="vehicle-suggest-wrap">${vehicleSuggestionHtml(g.model, (res&&res.qty)||1, g.id)}</div>
       ${isEditingPending? `<div class="hint" style="margin-bottom:10px;">이 발전기는 이미 [출고 대기]에 상차대기로 등록되어 있습니다. 여기서 수정하면 상차대기 내용이 갱신됩니다.</div>` : ''}
-      <div class="field"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}"><div class="hint" id="starthours-hint">현재 누적시간: ${(g.hours||0).toLocaleString()}h</div></div>
-      <div class="field-row">
-        <div class="field"><label>도착일</label>
+      <div class="out-row stretch">
+        <div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}"><div class="hint" id="starthours-hint">현재 누적: ${(g.hours||0).toLocaleString()}h</div></div></div>
+        <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="f-outdate" value="${(res&&(res.outDate||res.plannedOutDate))||todayStr()}" onchange="syncReturnDateToUsageDays()">
-          ${dateQuickButtonsHtml('setOutDate')}
-        </div>
-        <div class="field"><label>도착시간</label>
+        </div></div>
+        <div class="field f-sm"><div class="out-card"><label>도착시간</label>
           ${(()=>{
             const opts = [...Array.from({length:7},(_,i)=>`오전 ${i+6}시`), ...Array.from({length:6},(_,i)=>`오후 ${i+1}시`)];
             const cur = (res&&res.arriveTime)||'';
@@ -7700,87 +7711,91 @@ function openOutModal(id, reservationId){
             <input type="text" id="f-arrivetime" value="${escR(cur)}" placeholder="예: 오전 6시 30분" style="margin-top:6px;${isCustom?'':'display:none;'}">
             `;
           })()}
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>상차일자</label>
+        </div></div>
+        <div class="field f-sm"><div class="out-card"><label>상차일자</label>
           <input type="date" id="f-loaddate" value="${(res&&(res.loadDate||res.plannedOutDate))||todayStr()}">
-          ${dateQuickButtonsHtml('setLoadDate')}
-        </div>
-        <div class="field"><label>운임료 부담</label><select id="f-freight">
+        </div></div>
+        <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="f-freight">
           <option value="우리부담" ${!res||res.freightBearer!=='고객부담'?'selected':''}>우리부담</option>
           <option value="고객부담" ${res&&res.freightBearer==='고객부담'?'selected':''}>고객부담</option>
-        </select></div>
+        </select></div></div>
       </div>
-      <div class="field"><label>거래처명</label>
-        <input type="text" id="f-site" list="customer-datalist" value="${(res&&(res.site||res.customer)||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onCustomerNameInput()">
-        <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
-        <div class="hint">이전에 거래한 업체명을 선택하면 담당자·연락처·주소가 자동으로 채워집니다.</div>
-        <div id="f-site-warning">${customerWarningHtml((res&&(res.site||res.customer))||'')}</div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>사용일수(일)</label>
+      <div class="out-row">
+        <div class="field f-lg"><label>거래처명</label>
+          <input type="text" id="f-site" list="customer-datalist" value="${(res&&(res.site||res.customer)||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onCustomerNameInput()">
+          <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
+          <div class="hint">이전에 거래한 업체명을 선택하면 담당자·연락처·주소가 자동으로 채워집니다.</div>
+          <div id="f-site-warning">${customerWarningHtml((res&&(res.site||res.customer))||'')}</div>
+        </div>
+        <div class="field f-xs"><label>사용일수(일)</label>
           <input type="number" id="f-usagedays" min="0" value="${(res&&res.usageDays)||''}" placeholder="예: 7" oninput="syncUsageDaysToReturnDate()">
         </div>
-        <div class="field"><label>반납 예정일 (선택)</label>
+        <div class="field f-sm"><label>반납 예정일 (선택)</label>
           <input type="date" id="f-returndate" value="${prefillReturnDate}" onchange="syncReturnDateToUsageDays()">
         </div>
       </div>
-      <div class="field"><label>현장 주소</label><input type="text" id="f-address" value="${(res&&res.address||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
-      <div class="field-row">
-        <div class="field"><label>담당자</label><input type="text" id="f-manager" value="${(res&&res.manager||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
-        <div class="field"><label>연락처</label><input type="text" id="f-phone" value="${(res&&res.phone||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
+      <div class="out-row">
+        <div class="field f-eq"><label>현장 주소</label><input type="text" id="f-address" value="${(res&&res.address||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
+        <div class="field f-eq"><label>담당자</label><input type="text" id="f-manager" value="${(res&&res.manager||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
+        <div class="field f-eq"><label>연락처</label><input type="text" id="f-phone" value="${(res&&res.phone||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
       </div>
-      <div class="field-row">
-        <div class="field"><label>전압</label>
+      <div class="out-row stretch">
+        <div class="field f-eq"><div class="out-card"><label>전압</label>
           <input type="text" id="f-voltage" value="${(res&&res.voltage)||g.voltage||''}" placeholder="예: 380V">
           ${voltageButtonsHtml('f-voltage')}
-        </div>
-        <div class="field" style="max-width:110px;"><label>수량</label><input type="number" id="f-qty" min="1" value="${(res&&res.qty)||1}" onchange="refreshVehicleSuggestion('${(g.model||'').replace(/'/g,"\\'")}', '${g.id}')"></div>
+        </div></div>
+        <div class="field f-eq"><div class="out-card"><label>부자재 출고</label>${suppliesPickerHtml('f-supplies', prefillSuppliesItems, prefillSuppliesCustom, g.model)}</div></div>
+        <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-note">${(res&&res.note)||''}</textarea></div></div>
       </div>
-      <div class="field"><label>부자재 출고</label>${suppliesPickerHtml('f-supplies', prefillSuppliesItems, prefillSuppliesCustom, g.model)}</div>
-      <div class="field"><label>비고</label><textarea id="f-note">${(res&&res.note)||''}</textarea></div>
-      <div class="field">
-        <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;">
-          <input type="checkbox" id="f-fuel-toggle" ${(res&&(res.fuelRequested!=null||res.fuelActual!=null))?'checked':''} onchange="toggleFuelFields('f-fuel-toggle','f-fuel-fields-wrap')">
-          <label for="f-fuel-toggle">⛽ 연료넣고 출고하기</label>
-        </div>
-        <div id="f-fuel-fields-wrap" style="display:${(res&&(res.fuelRequested!=null||res.fuelActual!=null))?'block':'none'};margin-top:8px;">
-          <label>연료량(L)</label>
-          <div class="consumable-row">
-            <div style="flex:1;">
-              <input type="number" id="f-fuel-req" min="0" value="${(res&&res.fuelRequested)||''}" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;" onchange="if(!document.getElementById('f-fuel-actual').value) document.getElementById('f-fuel-actual').value=this.value;">
-              <div class="hint" style="margin:2px 0 0;">고객요청 (공급받는자용에 표시)</div>
-            </div>
-            <div style="flex:1;">
-              <input type="number" id="f-fuel-actual" min="0" value="${(res&&res.fuelActual)||''}" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;">
-              <div class="hint" style="margin:2px 0 0;">실제주입 (공급자용에 표시)</div>
+      <div class="out-row">
+        <div class="field f-eq">
+          <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
+            <input type="checkbox" id="f-fuel-toggle" ${(res&&(res.fuelRequested!=null||res.fuelActual!=null))?'checked':''} onchange="toggleFuelFields('f-fuel-toggle','f-fuel-fields-wrap')">
+            <label for="f-fuel-toggle">⛽ 연료넣고 출고</label>
+          </div>
+          <div id="f-fuel-fields-wrap" style="display:${(res&&(res.fuelRequested!=null||res.fuelActual!=null))?'block':'none'};margin-top:8px;">
+            <label>연료량(L)</label>
+            <div class="consumable-row">
+              <div style="flex:1;">
+                <input type="number" id="f-fuel-req" min="0" value="${(res&&res.fuelRequested)||''}" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;" onchange="if(!document.getElementById('f-fuel-actual').value) document.getElementById('f-fuel-actual').value=this.value;">
+                <div class="hint" style="margin:2px 0 0;">고객요청 (공급받는자용에 표시)</div>
+              </div>
+              <div style="flex:1;">
+                <input type="number" id="f-fuel-actual" min="0" value="${(res&&res.fuelActual)||''}" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;">
+                <div class="hint" style="margin:2px 0 0;">실제주입 (공급자용에 표시)</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <div class="field chk" style="background:var(--warn-tint);border:1px solid var(--warn);border-radius:8px;padding:10px 12px;">
-        <input type="checkbox" id="f-payment-confirmed" onchange="toggleForceOutField()" ${res&&res.paymentConfirmed?'checked':''}>
-        <label for="f-payment-confirmed">입금을 확인했습니다</label>
-      </div>
-      <div id="f-forceout-wrap" style="display:${(res&&res.paymentConfirmed)?'none':'block'};margin-top:8px;">
-        <div class="field chk" style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:10px 12px;">
-          <input type="checkbox" id="f-force-out" onchange="toggleForceOutReason()" ${res&&res.forcedOut?'checked':''}>
-          <label for="f-force-out">🚨 입금 미확인상태로 출고 합니다</label>
+        <div class="field f-eq">
+          <div class="field chk" style="background:var(--warn-tint);border:1px solid var(--warn);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
+            <input type="checkbox" id="f-payment-confirmed" onchange="toggleForceOutField()" ${res&&res.paymentConfirmed?'checked':''}>
+            <label for="f-payment-confirmed">입금 확인 출고</label>
+          </div>
         </div>
-        <div id="f-force-reason-wrap" class="field" style="margin-top:10px;display:${(res&&res.forcedOut)?'block':'none'};">
-          <label for="f-force-reason">강제출고 사유</label>
-          <textarea id="f-force-reason" placeholder="예: 현장 긴급요청, 대표님 승인 등">${escR(res&&res.forceReason||'')}</textarea>
+        <div class="field f-eq" id="f-forceout-wrap" style="display:${(res&&res.paymentConfirmed)?'none':'block'};">
+          <div class="field chk" style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:10px 12px;justify-content:center;">
+            <input type="checkbox" id="f-force-out" onchange="toggleForceOutReason()" ${res&&res.forcedOut?'checked':''}>
+            <label for="f-force-out">🚨 입금 미확인 출고</label>
+          </div>
+          <div id="f-force-reason-wrap" style="margin-top:10px;display:${(res&&res.forcedOut)?'block':'none'};">
+            <label for="f-force-reason">강제출고 사유</label>
+            <textarea id="f-force-reason" placeholder="예: 현장 긴급요청, 대표님 승인 등">${escR(res&&res.forceReason||'')}</textarea>
+          </div>
         </div>
-      </div>
-      <div class="field chk"><input type="checkbox" id="f-longterm" onchange="toggleLongtermField()"><label for="f-longterm">장기 임대입니다 (실사용 시간을 바로 확인할 수 없음)</label></div>
-      <div class="field" id="f-estdaily-wrap" style="display:none;">
-        <label>예상 일일 사용시간(h/일)</label>
-        <input type="number" id="f-estdaily" step="0.5" placeholder="예: 8">
-        <div class="hint">입력한 값으로 정비 도래 시점을 미리 추정합니다.</div>
+        <div class="field f-eq">
+          <div class="field chk" style="background:var(--ok-tint);border:1px solid var(--ok);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
+            <input type="checkbox" id="f-longterm" onchange="toggleLongtermField()"><label for="f-longterm">장기 임대 출고</label>
+          </div>
+          <div class="field" id="f-estdaily-wrap" style="display:none;margin-top:8px;">
+            <label>예상 일일 사용시간(h/일)</label>
+            <input type="number" id="f-estdaily" step="0.5" placeholder="예: 8">
+            <div class="hint">입력한 값으로 정비 도래 시점을 미리 추정합니다.</div>
+          </div>
+        </div>
       </div>
       <div id="f-err" class="err" style="display:none;"></div>
-      <div class="modal-actions">
+      <div class="modal-actions" style="justify-content:center;">
         <button class="btn" onclick="closeModal()">취소</button>
         <button class="btn primary" onclick="submitOut('${g.id}'${reservationId? `,'${reservationId}'`:''})">${isEditingPending? '수정 저장' : '출고하기'}</button>
       </div>
@@ -7870,7 +7885,7 @@ async function submitOut(idParam, reservationId){
   const suppliesCustomEl = document.getElementById('f-supplies-custom');
   const suppliesCustom = suppliesCustomEl ? suppliesCustomEl.value.trim() : '';
   const voltage = document.getElementById('f-voltage').value.trim();
-  const qty = Number(document.getElementById('f-qty').value)||1;
+  const qty = 1;
   const fuelEnabled = document.getElementById('f-fuel-toggle') ? document.getElementById('f-fuel-toggle').checked : true;
   const fuelRequested = fuelEnabled ? (Number(document.getElementById('f-fuel-req').value)||null) : null;
   const fuelActual = fuelEnabled ? (Number(document.getElementById('f-fuel-actual').value)|| fuelRequested || null) : null;
@@ -9055,56 +9070,42 @@ function openInModal(id){
   const baselineForModal = fuelBaselineOf(g);
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:640px;">
+    <div class="modal modal-wide" style="text-align:center;">
       <h3>입고 처리</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)} · ${g.rental.customer||'-'}</div>
-      ${outInfoRows.length>0? `<div class="detail-card" style="margin-bottom:14px;padding:12px 14px;">
-        <div class="muted" style="font-size:11px;font-weight:700;margin-bottom:6px;">출고시 함께 나간 내역</div>
-        <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px;">
-          ${outInfoRows.join('')}
-        </div>
-      </div>` : ''}
-      <div class="field">
-        <label>입고 상태</label>
-        <input type="hidden" id="f-in-condition" value="ok">
-        <div class="btn-row">
-          <button type="button" class="btn sm primary" id="f-in-cond-btn-ok" onclick="setInCondition('ok')">정상입고</button>
-          <button type="button" class="btn sm" id="f-in-cond-btn-broken" onclick="setInCondition('broken')">고장 (수리 필요)</button>
-        </div>
-        <div id="f-in-repairnote-wrap" style="display:none;margin-top:8px;">
-          <textarea id="f-in-repairnote" placeholder="고장 내용을 입력해주세요 (예: 엔진 시동불량, 발전기 출력 이상)"></textarea>
-          <div class="hint" style="color:var(--danger);">고장으로 입고 처리하면 수리 완료 처리 전까지 이 발전기는 출고할 수 없습니다.</div>
-        </div>
-      </div>
-      <div class="field-row" style="flex-wrap:wrap;">
-        <div style="flex:2;min-width:340px;display:flex;flex-direction:column;">
-          <div class="field-row" style="margin-bottom:0;">
-            <div class="field" style="min-width:150px;"><label>입고일</label>
-              <input type="date" id="f-indate" value="${todayStr()}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
-              ${dateQuickButtonsPastHtml('setInDate')}
-            </div>
-            <div class="field" style="min-width:180px;"><label>입고시(반납) 누적 사용시간(h)</label>
-              <input type="number" id="f-endhours" placeholder="예: ${suggested}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
-              <div class="hint" style="font-size:14px;font-weight:700;color:var(--primary);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
-            </div>
+      <div class="out-row stretch">
+        <div class="field f-md"><div class="out-card">
+          <label>입고 상태</label>
+          <input type="hidden" id="f-in-condition" value="ok">
+          <div class="btn-row" style="justify-content:center;">
+            <button type="button" class="btn sm primary" id="f-in-cond-btn-ok" onclick="setInCondition('ok')">정상입고</button>
+            <button type="button" class="btn sm" id="f-in-cond-btn-broken" onclick="setInCondition('broken')">고장입고</button>
           </div>
-          <div id="in-usage-preview" style="margin-top:10px;padding:20px 16px;border-radius:10px;background:var(--primary-tint);border:1px solid var(--primary);min-height:110px;box-sizing:border-box;flex:1;flex-direction:column;justify-content:center;align-items:center;text-align:center;display:none;">
-            <div class="muted" style="font-size:13px;font-weight:700;">임대중 사용시간</div>
-            <div id="in-usage-preview-value" style="font-size:42px;font-weight:800;color:var(--primary-dark);line-height:1.2;">-</div>
-            <div id="in-usage-preview-avg" class="muted" style="font-size:12.5px;font-weight:700;margin-top:4px;"></div>
+          <div id="f-in-repairnote-wrap" style="display:none;margin-top:8px;">
+            <textarea id="f-in-repairnote" placeholder="고장 내용을 입력해주세요 (예: 엔진 시동불량, 발전기 출력 이상)"></textarea>
+            <div class="hint" style="color:var(--danger);">고장으로 입고 처리하면 수리 완료 처리 전까지 이 발전기는 출고할 수 없습니다.</div>
           </div>
-        </div>
-        <div class="field" style="min-width:150px;"><label>전압</label>
+        </div></div>
+        <div class="field f-sm"><div class="out-card">
+          <label>입고일</label>
+          <input type="date" id="f-indate" value="${todayStr()}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
+        </div></div>
+        <div class="field f-md"><div class="out-card">
+          <label>입고시(반납) 누적 사용시간(h)</label>
+          <input type="number" id="f-endhours" placeholder="예: ${suggested}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
+          <div class="hint" style="font-size:14px;font-weight:700;color:var(--primary);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
+        </div></div>
+        <div class="field f-sm"><div class="out-card">
+          <label>전압</label>
           <input type="text" id="f-in-voltage" value="${g.rental.voltage||g.voltage||''}" placeholder="예: 380V">
           ${voltageButtonsHtml('f-in-voltage')}
-          <div class="hint">입고 처리시 확인·기록해두면 입고중에도 계속 표시됩니다.</div>
-          ${voltageGuideGalleryHtml(g.model)}
-        </div>
+        </div></div>
       </div>
-      <div class="field-row">
-        ${(rt.fuelRequested!=null || rt.fuelActual!=null) ? `
-        <div class="field"><label>⛽ 측정한 연료 높이(cm)${baselineForModal>0? ` <span class="muted" style="font-weight:400;">(바닥 기준높이 ${baselineForModal}cm 위로 올라온 높이만 재서 입력)</span>`:''}</label>
-          <div class="hint" style="color:var(--primary-dark);font-weight:700;margin-top:0;">출고시 연료를 넣어드린 발전기입니다. 요청 ${rt.fuelRequested!=null?rt.fuelRequested:'-'}L / 주입 ${rt.fuelActual!=null?rt.fuelActual:'-'}L — 반납된 연료를 재서 사용량을 확인해주세요.</div>
+      <div class="out-row stretch">
+        <div class="field f-eq"><div class="out-card" style="text-align:center;">
+          ${(rt.fuelRequested!=null || rt.fuelActual!=null) ? `
+          <label>⛽ 측정한 연료 높이(cm)${baselineForModal>0? ` <span class="muted" style="font-weight:400;">(바닥 기준높이 ${baselineForModal}cm 위로 올라온 높이만 재서 입력)</span>`:''}</label>
+          <div class="hint" style="color:var(--primary-dark);font-weight:700;margin-top:0;">출고시 연료를 넣어드린 발전기입니다.<br>요청 ${rt.fuelRequested!=null?rt.fuelRequested:'-'}L / 주입 ${rt.fuelActual!=null?rt.fuelActual:'-'}L</div>
           <input type="hidden" id="f-fuel-not-used" value="">
           <div id="f-fuel-height-wrap">
             <input type="number" id="f-fuel-height" min="-5" step="0.5" placeholder="예: 32" oninput="calcRemainingFuel('${g.id}')">
@@ -9114,30 +9115,43 @@ function openInModal(id){
           </div>
           <div id="f-fuel-calc-result" class="detail-card" style="margin-top:8px;padding:10px 12px;display:none;"></div>
           <button type="button" class="btn sm" id="f-fuel-not-used-btn" style="margin-top:8px;" onclick="toggleFuelNotUsed()">⛽ 연료사용안함</button>
-        </div>` : `
-        <div class="field"><label class="muted">연료</label>
+          ` : `
+          <label class="muted">연료</label>
           <div class="hint" style="margin-top:0;">이 출고는 연료 요청·주입 기록이 없어 연료 확인이 필요 없습니다.</div>
-        </div>`}
-      </div>
-      <div class="field"><label>반납된 부자재 확인</label>
-        <div class="muted" style="font-size:12.5px;margin-bottom:8px;">출고시 나간 부자재${suppliesListHtml(rt.suppliesItems, rt.suppliesCustom, rt.supplies)}</div>
-        ${rt.note? `<div style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
-          <div style="font-size:12px;font-weight:700;color:var(--danger);margin-bottom:4px;">📝 출고시 비고</div>
-          <div style="font-size:17px;font-weight:800;color:var(--danger);line-height:1.35;">${escR(rt.note)}</div>
-          <div class="field chk" style="margin-top:10px;margin-bottom:0;">
-            <input type="checkbox" id="f-note-ack" onchange="onNoteAckCheck(this.checked)">
-            <label for="f-note-ack">네, 위 비고 내용을 확인했습니다.</label>
-          </div>
-          <div id="f-note-ack-err" class="err" style="display:none;">체크해야 입고 처리를 진행할 수 있습니다.</div>
-        </div>`:''}
-        <input type="hidden" id="f-sup-recovered" value="${rt.supplies? '' : 'yes'}">
-        <div id="f-sup-buttons-wrap"></div>
-        <div id="f-supplies-note-wrap" style="display:none;margin-top:8px;">
-          <textarea id="f-supplies-note" placeholder="미회수 내역을 적어주세요 (예: 케이블 20m 미회수)"></textarea>
+          `}
+        </div></div>
+        <div class="field f-eq" id="in-usage-preview" style="padding:20px 16px;border-radius:10px;background:var(--primary-tint);border:1px solid var(--primary);min-height:110px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
+          <div class="muted" style="font-size:13px;font-weight:700;">임대중 사용시간</div>
+          <div id="in-usage-preview-value" style="font-size:32px;font-weight:800;color:var(--primary-dark);line-height:1.2;">-</div>
+          <div id="in-usage-preview-avg" class="muted" style="font-size:12.5px;font-weight:700;margin-top:4px;"></div>
         </div>
+        <div class="field f-eq"><div class="out-card" style="text-align:center;">
+          <label>반납된 부자재 확인</label>
+          <div class="muted" style="font-size:12.5px;margin-bottom:8px;">출고시 나간 부자재${suppliesListHtml(rt.suppliesItems, rt.suppliesCustom, rt.supplies)}</div>
+          ${rt.note? `<div style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+            <div style="font-size:12px;font-weight:700;color:var(--danger);margin-bottom:4px;">📝 출고시 비고</div>
+            <div style="font-size:17px;font-weight:800;color:var(--danger);line-height:1.35;">${escR(rt.note)}</div>
+            <div class="field chk" style="margin-top:10px;margin-bottom:0;justify-content:center;">
+              <input type="checkbox" id="f-note-ack" onchange="onNoteAckCheck(this.checked)">
+              <label for="f-note-ack">네, 위 비고 내용을 확인했습니다.</label>
+            </div>
+            <div id="f-note-ack-err" class="err" style="display:none;">체크해야 입고 처리를 진행할 수 있습니다.</div>
+          </div>`:''}
+          <input type="hidden" id="f-sup-recovered" value="${rt.supplies? '' : 'yes'}">
+          <div id="f-sup-buttons-wrap"></div>
+          <div id="f-supplies-note-wrap" style="display:none;margin-top:8px;">
+            <textarea id="f-supplies-note" placeholder="미회수 내역을 적어주세요 (예: 케이블 20m 미회수)"></textarea>
+          </div>
+        </div></div>
+        <div class="field f-eq"><div class="out-card" style="text-align:center;">
+          <div class="muted" style="font-size:11px;font-weight:700;margin-bottom:6px;">출고시 함께 나간 내역</div>
+          ${outInfoRows.length>0? `<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px;justify-content:center;">
+            ${outInfoRows.join('')}
+          </div>` : `<div class="muted" style="font-size:13px;">없음</div>`}
+        </div></div>
       </div>
       <div id="f-err" class="err" style="display:none;"></div>
-      <div class="modal-actions">
+      <div class="modal-actions" style="justify-content:center;">
         <button class="btn" onclick="closeModal()">취소</button>
         <button class="btn primary" onclick="submitIn('${g.id}')">입고 처리</button>
       </div>
@@ -9153,7 +9167,8 @@ function updateInUsagePreview(startHours, outDate){
   if(!input || !wrap || !valueEl) return;
   const endHours = Number(input.value);
   if(!input.value || isNaN(endHours) || endHours < startHours){
-    wrap.style.display = 'none';
+    valueEl.textContent = '-';
+    if(avgEl) avgEl.textContent = '';
     return;
   }
   const used = endHours - startHours;
@@ -9172,7 +9187,6 @@ function updateInUsagePreview(startHours, outDate){
       }
     }
   }
-  wrap.style.display = 'flex';
 }
 function setInCondition(val){
   const el = document.getElementById('f-in-condition');
@@ -9193,7 +9207,7 @@ function renderSuppliesButtons(){
   if(!wrap) return;
   const recoveredEl = document.getElementById('f-sup-recovered');
   const val = recoveredEl ? recoveredEl.value : 'yes';
-  wrap.innerHTML = `<div class="btn-row">
+  wrap.innerHTML = `<div class="btn-row" style="justify-content:center;">
     <button type="button" class="btn sm${val==='yes'?' primary':''}" id="f-sup-yes-btn" onclick="setSuppliesRecovered(true)">회수됨</button>
     <button type="button" class="btn sm${val==='no'?' primary':''}" id="f-sup-no-btn" onclick="setSuppliesRecovered(false)">회수안됨</button>
   </div>
@@ -9218,7 +9232,7 @@ function setSuppliesRecovered(recovered){
     if(wrap){
       wrap.innerHTML = `
         <div class="hint" style="color:var(--danger);font-weight:700;margin-bottom:6px;">부자재를 정말 전부 회수 확인 하셨습니까?</div>
-        <div class="field chk" style="margin-bottom:4px;">
+        <div class="field chk" style="margin-bottom:4px;justify-content:center;">
           <input type="checkbox" id="f-sup-confirm-check" onchange="onSuppliesConfirmCheck(this.checked)">
           <label for="f-sup-confirm-check">네, 부자재를 전부 회수한 것을 확인했습니다.</label>
         </div>
