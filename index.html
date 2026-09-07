@@ -80,11 +80,11 @@
   .btn.danger{background:var(--danger-tint);border-color:var(--danger);color:var(--danger);}
   .btn.warn{background:var(--warn-tint);border-color:var(--warn);color:var(--warn);}
   .btn.sm{padding:5px 10px;font-size:12px;}
-  .btn-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .btn-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;}
   .empty{padding:34px 14px;text-align:center;color:var(--ink-faint);font-size:13px;background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);}
   .overlay{position:fixed;inset:0;background:rgba(20,22,26,.5);display:flex;align-items:flex-end;justify-content:center;z-index:100;}
   @media(min-width:640px){.overlay{align-items:center;}}
-  .modal{background:#fff;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;border-radius:16px 16px 0 0;padding:20px 20px 24px;}
+  .modal{background:#fff;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;border-radius:16px 16px 0 0;padding:20px 20px 24px;text-align:center;}
   @media(min-width:640px){.modal{border-radius:16px;}}
   @media(min-width:760px){.modal.modal-wide{max-width:960px;}}
   .out-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:flex-start;}
@@ -106,7 +106,7 @@
   .field-row{display:flex;gap:10px;margin-bottom:14px;}
   .field-row .field{margin-bottom:0;flex:1;min-width:0;}
   .field label{display:block;font-size:13.5px;font-weight:700;color:var(--primary);margin-bottom:5px;}
-  .field input[type=text],.field input[type=number],.field input[type=date],.field select,.field textarea{width:100%;padding:9px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:16px;background:#fff;color:var(--ink);}
+  .field input[type=text],.field input[type=number],.field input[type=date],.field select,.field textarea{width:100%;padding:9px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:16px;background:#fff;color:var(--ink);text-align:center;}
   .field textarea{resize:vertical;min-height:60px;}
   input::placeholder,textarea::placeholder{color:var(--ink-faint)!important;font-weight:400!important;opacity:.8;}
   .sales-table input[type=number],.sales-table input[type=date],.sales-table input[type=text]{font-size:13px;padding:6px 6px;border:1px solid var(--border-strong);border-radius:8px;}
@@ -115,11 +115,11 @@
   .sales-table td{padding:9px 8px;vertical-align:top;}
   .sales-table th{font-size:13.5px;}
   .field .hint{font-size:11px;color:var(--ink-faint);margin-top:4px;}
-  .field.chk{display:flex;align-items:center;gap:8px;}
+  .field.chk{display:flex;align-items:center;gap:8px;justify-content:center;}
   .field.chk input{width:16px;height:16px;}
   .field.chk label{margin:0;font-size:13px;font-weight:500;color:var(--ink);}
   .err{color:var(--danger);font-size:12px;margin-top:5px;}
-  .modal-actions{display:flex;gap:8px;margin-top:18px;}
+  .modal-actions{display:flex;gap:8px;margin-top:18px;justify-content:center;}
   .modal-actions .btn{flex:1;text-align:center;}
   select#hist-select,select#hist-model-select{max-width:220px;}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
@@ -4907,15 +4907,14 @@ function loadingListPopupHtml(){
       <div class="muted" style="font-size:15.5px;">${escR(rt.customer||'거래처 미기재')} · ${escR(rt.address||'-')}</div>
     </div>`;
   };
-  // 카드 하나 = 오늘/내일 × 상차/입고 중 한 조합. 목록이 비어있으면 카드 자체를 만들지 않음(''을 반환).
+  // 항상 표시. 목록이 비어있으면 "없음"으로 표시.
   const card = (icon,title,list,rowFn,colorVar,tintVar)=>{
-    if(list.length===0) return '';
     return `<div style="flex:1 1 320px;min-width:280px;border:1.5px solid var(${colorVar});border-radius:var(--radius);background:var(--surface);overflow:hidden;">
       <div style="background:var(${tintVar});color:var(${colorVar});font-weight:800;font-size:18px;padding:11px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <span>${icon} ${title}</span>
         <span style="background:var(${colorVar});color:#fff;border-radius:999px;padding:2px 11px;font-size:14px;white-space:nowrap;">${list.length}건</span>
       </div>
-      <div style="padding:2px 16px;">${list.map(rowFn).join('')}</div>
+      <div style="padding:2px 16px;">${list.length>0? list.map(rowFn).join('') : `<div class="muted" style="padding:16px 0;font-size:15px;">없음</div>`}</div>
     </div>`;
   };
   const cards = [
@@ -4923,8 +4922,8 @@ function loadingListPopupHtml(){
     card('🚚', `내일(${dow(tomorrow)}) 상차`, tomorrowLoad, loadRowHtml, '--warn', '--warn-tint'),
     card('📥', `오늘(${dow(today)}) 입고예정`, todayIn, inRowHtml, '--primary', '--primary-tint'),
     card('📥', `내일(${dow(tomorrow)}) 입고예정`, tomorrowIn, inRowHtml, '--primary', '--primary-tint'),
-  ].filter(Boolean);
-  return `<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;">${cards.join('')}</div>`;
+  ];
+  return `<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:stretch;">${cards.join('')}</div>`;
 }
 function showLoadingListPopup(isNewNotice){
   if(loadingPopupData().total===0) return;
