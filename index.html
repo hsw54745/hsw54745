@@ -7069,7 +7069,7 @@ function openOutInfoEditModal(id){
       <div class="modal-sub">${g.id} · [${displayModel(g)}]</div>
       <div class="hint" style="margin-bottom:10px;color:var(--danger);">이미 출고중인 발전기의 거래처·현장·날짜 등 정보를 직접 수정합니다. (입고 처리 없이 바로 저장됩니다)</div>
       <div class="out-row stretch">
-        <div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-oie-starthours" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}" min="0"></div></div>
+        ${g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-oie-starthours" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}" min="0"></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;">누적시간 확인불가 모델</div></div></div>`}
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="f-oie-outdate" value="${rt.outDate||todayStr()}">
         </div></div>
@@ -7183,7 +7183,8 @@ async function submitOutInfoEdit(id){
   const errEl = document.getElementById('f-err');
   const site = document.getElementById('f-oie-site').value.trim();
   if(!site){ errEl.textContent='거래처명을 입력해주세요.'; errEl.style.display='block'; return; }
-  const startHours = Number(document.getElementById('f-oie-starthours').value);
+  const startHoursEl = document.getElementById('f-oie-starthours');
+  const startHours = startHoursEl ? Number(startHoursEl.value) : NaN;
   const usageDays = Number(document.getElementById('f-oie-usagedays').value)||null;
   const oldVoltage = g.voltage||'';
   const newVoltageVal = document.getElementById('f-oie-voltage').value.trim();
@@ -7363,7 +7364,7 @@ function openOutModal(id, reservationId){
       </div>` : ''}
       ${isEditingPending? `<div class="hint" style="margin-bottom:10px;color:var(--danger);">이 발전기는 이미 [출고 대기]에 상차대기로 등록되어 있습니다. 여기서 수정하면 상차대기 내용이 갱신됩니다.</div>` : ''}
       <div class="out-row stretch">
-        <div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}"><div class="hint" id="starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 누적: ${(g.hours||0).toLocaleString()}h</div></div></div>
+        ${g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}"><div class="hint" id="starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 누적: ${(g.hours||0).toLocaleString()}h</div></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;">누적시간 확인불가 모델</div></div></div>`}
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="f-outdate" value="${(res&&(res.outDate||res.plannedOutDate))||todayStr()}" onchange="syncReturnDateToUsageDays()">
         </div></div>
@@ -7535,7 +7536,8 @@ async function submitOut(idParam, reservationId){
   const paymentNote = document.getElementById('f-payment-note').value.trim();
   const note = document.getElementById('f-note').value.trim();
   const outDate = document.getElementById('f-outdate').value;
-  const startHours = Number(document.getElementById('f-starthours').value);
+  const startHoursEl = document.getElementById('f-starthours');
+  const startHours = startHoursEl ? Number(startHoursEl.value) : (g.hours||0);
   const longTerm = document.getElementById('f-longterm').checked;
   const estDaily = longTerm ? Number(document.getElementById('f-estdaily').value||0) : null;
   const errEl = document.getElementById('f-err');
@@ -7543,7 +7545,7 @@ async function submitOut(idParam, reservationId){
     errEl.textContent = '거래처명, 현장 주소, 담당자, 연락처를 모두 입력해주세요.';
     errEl.style.display='block'; return;
   }
-  if(!outDate || isNaN(startHours) || startHours < (g.hours||0)){
+  if(!outDate || (g.hoursKnown && (isNaN(startHours) || startHours < (g.hours||0)))){
     errEl.textContent = '도착일과 누적 사용시간을 확인해주세요. (현재 누적시간보다 작을 수 없습니다)';
     errEl.style.display='block'; return;
   }
@@ -7675,7 +7677,7 @@ function openBulkOutModal(){
   const hoursRowsHtml = gens.map(g=>`
     <div class="field-row" style="align-items:flex-end;">
       <div style="flex:0 0 auto;min-width:90px;font-size:13px;font-weight:700;padding-bottom:8px;">${g.id}${g.model? ` <span class="muted" style="font-weight:400;font-size:11.5px;">· ${escR(g.model)}</span>`:''}</div>
-      <div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">출고시 누적 사용시간(h)</label><input type="number" id="fb-hours-${g.id}" value="${g.hours||0}" min="${g.hours||0}"></div>
+      ${g.hoursKnown? `<div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">출고시 누적 사용시간(h)</label><input type="number" id="fb-hours-${g.id}" value="${g.hours||0}" min="0"></div>` : `<div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">누적 사용시간</label><div class="hint" style="margin-top:4px;">누적시간 확인불가 모델</div></div>`}
     </div>`).join('');
   const fuelRowsHtml = gens.map(g=>`
     <div class="field-row" style="align-items:flex-end;flex-wrap:wrap;margin-bottom:4px;">
@@ -7900,11 +7902,12 @@ async function submitBulkOut(){
     errEl.textContent = '장기 임대는 예상 일일 사용시간을 입력해주세요.';
     errEl.style.display='block'; return;
   }
-  // 발전기별 누적 사용시간 검증
+  // 발전기별 누적 사용시간 검증 (확인불가 모델은 생략)
   const hoursMap = {};
   for(const id of ids){
     const g = findGen(id);
     if(!g) continue;
+    if(!g.hoursKnown){ hoursMap[id] = g.hours||0; continue; }
     const el = document.getElementById(`fb-hours-${id}`);
     const v = el ? Number(el.value) : NaN;
     if(isNaN(v) || v < (g.hours||0)){
@@ -7957,7 +7960,7 @@ function openBulkInModal(){
       return `
       <div class="field-row" style="align-items:flex-end;">
         <div style="flex:0 0 auto;min-width:110px;font-size:13px;font-weight:700;padding-bottom:8px;">${g.id}${g.model? ` <span class="muted" style="font-weight:400;font-size:11.5px;">· ${escR(g.model)}</span>`:''}<div class="muted" style="font-size:11px;font-weight:400;">${escR(rt.customer||'-')}</div></div>
-        <div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">입고시 누적 사용시간(h) <span class="muted" style="font-weight:400;">(선택, 확인불가 모델)</span></label><input type="number" id="fbi-hours-${g.id}" min="${rt.startHours||0}"><div class="hint">이 발전기는 누적시간 확인불가 모델로 설정되어 있어 입력하지 않아도 됩니다.</div></div>
+        <div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">누적 사용시간</label><div class="hint" style="margin-top:4px;">누적시간 확인불가 모델</div></div>
       </div>`;
     }
     return `
@@ -8719,11 +8722,14 @@ function openInModal(id){
           <label>입고일</label>
           <input type="date" id="f-indate" value="${todayStr()}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
         </div></div>
-        <div class="field f-md"><div class="out-card">
-          <label>입고시(반납) 누적 사용시간(h)${g.hoursKnown? '' : ' <span class="muted" style="font-weight:400;">(선택, 확인불가 모델)</span>'}</label>
+        ${g.hoursKnown? `<div class="field f-md"><div class="out-card">
+          <label>입고시(반납) 누적 사용시간(h)</label>
           <input type="number" id="f-endhours" placeholder="예: ${suggested}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
-          <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">${g.hoursKnown? `출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h` : '이 발전기는 누적시간 확인불가 모델로 설정되어 있어 입력하지 않아도 됩니다.'}</div>
-        </div></div>
+          <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
+        </div></div>` : `<div class="field f-md"><div class="out-card">
+          <label>누적 사용시간</label>
+          <div class="hint" style="margin-top:8px;">누적시간 확인불가 모델</div>
+        </div></div>`}
         <div class="field f-sm"><div class="out-card">
           <label>전압</label>
           <input type="text" id="f-in-voltage" value="${g.rental.voltage||g.voltage||''}" placeholder="예: 380V">
@@ -8871,8 +8877,8 @@ function setSuppliesRecovered(recovered){
 async function submitIn(id){
   const g = findGen(id);
   const inDate = document.getElementById('f-indate').value;
-  const endHoursRaw = document.getElementById('f-endhours').value;
-  const endHours = endHoursRaw==='' ? null : Number(endHoursRaw);
+  const endHoursEl = document.getElementById('f-endhours');
+  const endHours = endHoursEl ? (endHoursEl.value==='' ? null : Number(endHoursEl.value)) : null;
   const voltage = document.getElementById('f-in-voltage').value.trim();
   const oldVoltageForLog = g ? (g.voltage||'') : '';
   const supRecoveredEl = document.getElementById('f-sup-recovered');
@@ -9116,7 +9122,7 @@ function openMaintModal(id, editId, repairComplete){
       </div>` : ''}
       <div class="field-row">
         <div class="field"><label>정비일</label><input type="date" id="f-mdate" value="${rec? rec.date : todayStr()}"></div>
-        <div class="field"><label>정비시 누적 사용시간(h)${g.hoursKnown? '' : ' <span class="muted" style="font-weight:400;">(선택, 확인불가 모델)</span>'}</label><input type="number" id="f-mhours" value="${rec? (rec.hours||0) : (g.hoursKnown? (g.hours||0) : '')}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">${g.hoursKnown? `현재 ${(g.hours||0).toLocaleString()}h` : '이 발전기는 누적시간 확인불가 모델로 설정되어 있어 입력하지 않아도 됩니다.'}</div></div>
+        ${g.hoursKnown? `<div class="field"><label>정비시 누적 사용시간(h)</label><input type="number" id="f-mhours" value="${rec? (rec.hours||0) : (g.hours||0)}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 ${(g.hours||0).toLocaleString()}h</div></div>` : `<div class="field"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;">누적시간 확인불가 모델</div></div>`}
       </div>
       <div class="field-row">
         <div class="field"><label>정비 유형</label>${typeButtonsHtml}</div>
@@ -9177,8 +9183,8 @@ async function submitMaint(id, editId, completeRepair){
   if(!requireTechnician('정비 등록/수정')) return;
   const g = findGen(id);
   const date = document.getElementById('f-mdate').value;
-  const hoursRaw = document.getElementById('f-mhours').value;
-  const hours = g.hoursKnown ? Number(hoursRaw) : (hoursRaw===''? 0 : Number(hoursRaw));
+  const mhoursEl = document.getElementById('f-mhours');
+  const hours = mhoursEl ? Number(mhoursEl.value) : 0;
   const type = document.getElementById('f-mtype').value;
   const technician = document.getElementById('f-mtech').value;
   const contentOptions = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1차교체','오일필터1차점검','오일필터2차교체','오일필터2차점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검 및 보충','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소'];
