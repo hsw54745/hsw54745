@@ -550,11 +550,11 @@ const ADMIN_MODE_PASSWORD_HASH = 'c585d6bd58c558d93a6340d107873d7b0f24002ad383e2
 let adminModeUnlockedUntil = 0;
 const ADMIN_MODE_DURATION_MS = 5*60*1000; // 5분
 let adminModeRelockTimer = null;
-let adminSalesOverride = false;
 function isAdminModeUnlocked(){ return Date.now() < adminModeUnlockedUntil; }
-function canViewSalesViaAdminMode(){ return isAdminModeUnlocked() && adminSalesOverride; }
+function canViewSalesViaAdminMode(){ return sessionStorage.getItem('sales-admin-override')==='yes'; }
 function toggleAdminSalesOverride(checked){
-  adminSalesOverride = !!checked;
+  if(checked){ sessionStorage.setItem('sales-admin-override','yes'); }
+  else { sessionStorage.removeItem('sales-admin-override'); }
   renderTabbar();
   renderContent();
 }
@@ -563,8 +563,6 @@ function scheduleAdminModeRelock(){
   const remain = adminModeUnlockedUntil - Date.now();
   if(remain<=0) return;
   adminModeRelockTimer = setTimeout(function(){
-    adminSalesOverride = false;
-    renderTabbar();
     if(currentTab==='settings') renderContent();
   }, remain + 200);
 }
@@ -584,7 +582,6 @@ async function submitAdminModeUnlock(){
 }
 function lockAdminModeNow(){
   adminModeUnlockedUntil = 0;
-  adminSalesOverride = false;
   if(adminModeRelockTimer) clearTimeout(adminModeRelockTimer);
   renderTabbar();
   renderContent();
@@ -609,7 +606,7 @@ function adminModeSectionHtml(){
         <span>🔓 관리자 모드 열림</span>
         <span style="font-size:12px;font-weight:400;" class="muted">약 ${remainMin}분 후 자동 잠금 · <button type="button" class="btn sm" onclick="lockAdminModeNow()">지금 잠그기</button></span>
       </div>
-      <div class="field chk" style="margin-top:8px;"><input type="checkbox" id="f-admin-sales-override" ${adminSalesOverride?'checked':''} onchange="toggleAdminSalesOverride(this.checked)"><label for="f-admin-sales-override">매출관리 보기 (관리자 모드가 켜져있는 동안만, 매출관리자 지정과는 별개)</label></div>
+      <div class="field chk" style="margin-top:8px;"><input type="checkbox" id="f-admin-sales-override" ${canViewSalesViaAdminMode()?'checked':''} onchange="toggleAdminSalesOverride(this.checked)"><label for="f-admin-sales-override">매출관리 보기 (이 기기·이 브라우저에서만 적용, 관리자 모드가 잠겨도 계속 유지됨)</label></div>
     </div>
     <div class="material-card" style="margin-top:12px;">
       <div class="section-title" style="margin-top:0;">🏢 업체 정보</div>
@@ -3816,7 +3813,7 @@ function renderManualTab(){
     ${manualSection('💰','매출관리', false,
       '출고중인 발전기의 청구·입금 현황을 관리하는 탭입니다. [설정 → 매출관리]에서 "매출관리 사용" 체크를 켜야 상단 탭에 나타나고, 꺼두면 탭 자체가 안 보입니다.', [
       ['접근 권한', '매출관리 관리자 이름은 "이영숙"으로 고정되어 있어 바꿀 수 없습니다. "이영숙"으로 접속했을 때만 상단 탭에 매출관리가 보이고 사용할 수 있으며, 그 외 이름으로 접속하면 탭 자체가 안 보입니다. 비밀번호도 "이영숙"으로 접속했을 때만 [설정 → 매출관리자 지정]에서 설정할 수 있고, 다른 이름으로 접속하면 비밀번호 입력칸 자체가 안 보입니다. 비밀번호를 설정해두면 매출관리 탭에 들어갈 때 비밀번호를 입력해야 합니다("비밀번호 없이 사용" 체크를 켜두면 비밀번호를 물어보지 않습니다).'],
-      ['관리자 모드로 임시 열람', '"이영숙"이 아니어도, [설정 → 🔐 관리자 모드]를 전용 비밀번호로 열고 그 안의 "매출관리 보기" 체크를 켜면 매출관리 탭이 임시로 보입니다(매출관리자 지정과는 완전히 별개의 통로입니다). 이 경로로 들어갈 때는 매출관리 자체 비밀번호는 물어보지 않고 바로 들어가집니다(관리자 모드 비밀번호로 이미 확인된 것으로 간주). 관리자 모드가 잠기면(5분 후 자동 또는 "지금 잠그기") 이 체크도 자동으로 꺼지고 탭도 다시 안 보이게 됩니다.'],
+      ['관리자 모드로 매출관리 열람', '"이영숙"이 아니어도, [설정 → 🔐 관리자 모드]를 전용 비밀번호로 열고 그 안의 "매출관리 보기" 체크를 켜면 매출관리 탭이 보입니다(매출관리자 지정과는 완전히 별개의 통로입니다). 이 경로로 들어갈 때는 매출관리 자체 비밀번호는 물어보지 않고 바로 들어가집니다(관리자 모드 비밀번호로 이미 확인된 것으로 간주). 이 체크는 **지금 쓰고 있는 이 기기·이 브라우저에만 적용**되고, 다른 사람 화면이나 다른 기기에는 전혀 영향을 주지 않습니다. 관리자 모드가 5분 후 잠겨도 이 체크는 계속 유지되며, 다시 끄고 싶으면 관리자 모드를 한 번 더 열어서 체크를 직접 풀어야 합니다.'],
       ['비밀번호 변경시 다른 기기 자동 잠금', '한 기기에서 비밀번호를 새로 저장하면, 그 기기는 계속 열람 가능한 상태로 유지되지만 이미 열려있던 다른 기기·다른 창은 새 비밀번호를 모르는 상태가 되어 다음 자동 동기화 때(최대 2분 이내) 자동으로 다시 잠깁니다. 그 화면에서 다시 들어가려면 새 비밀번호를 입력해야 합니다.'],
       ['업체별 매출현황', '지금 출고중인 발전기를 출고일 순서대로 보여줍니다. 발전기별로 청구일자·업체명·현장명·용량·발전기번호·사용기간·견적금액(공급가·세액·합계)·계산서 발행·운임(출고운임/세액, 입고운임/세액)·입금일/입금금액·미수금·담당자·연락처·비고를 표 안에서 바로 입력할 수 있고, 공급가와 각 운임을 넣으면 세액(10%)이 자동 계산되며 합계도 자동으로 더해집니다(합계는 직접 고칠 수도 있음). 업체명에 담당자 이름·전화번호가 같이 적혀 있으면 자동으로 나눠서 담당자·연락처 칸에 채워줍니다. 입력한 내용은 곧바로 저장되며, 별도의 등록 버튼이 필요 없습니다. 한 번 생성된 매출 기록은 이후 출고취소·입고가 되어도 지워지지 않고 그대로 남습니다.'],
       ['계산서 발행 버튼', '견적금액 칸 아래 있는 토글 버튼입니다. 누르면 "발행 처리할까요?" 또는 "미발행으로 변경할까요?" 확인창이 뜨고, 확인해야만 "계산서 미발행" ↔ "계산서 발행함" 상태가 바뀝니다.'],
@@ -3825,7 +3822,8 @@ function renderManualTab(){
       ['출고취소와 매출 기록의 연동', '[출고중] 목록에서 "🚫 출고취소"를 누르면 취소 사유를 적고 "비용발생"/"비용발생 안함" 중 골라야 합니다. "비용발생"을 고르면 그 건의 매출 기록은 정상 목록에 그대로 남고, "비용발생 안함"을 고르면 사유와 함께 자동으로 "숨김매출" 처리되어 정상 목록에서 빠집니다.'],
       ['필터 (월별·입금상태·업체별·발전기번호별)', '청구일자 기준 월별 필터, 입금완료/미입금 버튼, 업체별 보기, 발전기번호별 보기 드롭다운으로 원하는 내역만 골라볼 수 있습니다. "출고운임·입고운임 표시" 체크를 끄면 운임 관련 칸이 숨겨져 화면이 더 단순해집니다.'],
       ['입금완료 표시 · 인쇄', '견적금액에서 입금액 합계를 뺀 미수금이 0 이하가 되면 그 줄은 초록색, 미수가 남아있으면 붉은색 배경으로 표시됩니다. 상단 "🖨 인쇄" 버튼을 누르면 지금 적용된 필터 그대로 새 창에 미리보기가 뜨고 인쇄 대화상자가 자동으로 열립니다(팝업 차단 시 브라우저에서 팝업을 허용해주세요).'],
-      ['총 견적금액 · 총 미수금', '맨 위 요약 카드에 지금 필터에 맞는 견적금액 합계와, 아직 안 받은 미수금 합계가 자동으로 계산되어 표시됩니다.']
+      ['💵 현금매출', '"이 매출 숨기기" 버튼 밑에 있는 체크박스입니다. 켜면 견적금액 칸이 "현금 공급가" 입력 하나로 바뀌고 세액 칸과 계산서 발행 버튼이 없어집니다(세액 자동 0원, 계산서 자동 미발행 처리). 운임은 켜져있는 경우 그대로 따로 입력할 수 있고 합계에 정확히 합산됩니다. 맨 위 요약 카드에 "현금 매출 총액"으로 지금 필터에 맞는 현금매출 건들의 합계가 따로 표시됩니다.'],
+      ['총 견적금액 · 총 미수금', '맨 위 요약 카드의 "총 견적금액"은 지금 필터에 맞는 공급가+세액 합계만 더한 값입니다(운임은 포함되지 않습니다). "총 미수금"은 운임까지 포함한 실제 합계에서 입금액을 뺀 값으로, 아직 안 받은 진짜 남은 돈을 보여줍니다.']
     ])}
 
     ${manualSection('🛒','소모품주문', false,
@@ -4185,7 +4183,7 @@ function renderSalesTab(){
   if(salesFilterGenId){
     recs = recs.filter(r=>r.genId===salesFilterGenId);
   }
-  let grandTotal = 0, grandBalance = 0;
+  let grandTotal = 0, grandBalance = 0, grandCashTotal = 0;
   const rowsHtml = recs.length===0 ? '' : recs.map(rec=>{
     const g = findGen(rec.genId);
     const cap = rec.capacity;
@@ -4194,10 +4192,12 @@ function renderSalesTab(){
     const period = rec.manual ? (rec.period||'-') : (rec.outDate? `${dow(rec.outDate)} ~ ${recIsLiveOut(rec)?'진행중':(endDate? dow(endDate) : '종료')}` : '-');
     const usageDays = billingUsageDays(rec);
     const total = Number(rec.billTotal)||0;
+    const quoteOnly = (Number(rec.billUnitPrice)||0) + (Number(rec.billTax)||0);
     const paid = (Number(rec.billPay1Amount)||0) + (Number(rec.billPay2Amount)||0) + (Number(rec.billPay3Amount)||0);
     const balance = total - paid;
-    grandTotal += total;
+    grandTotal += quoteOnly;
     grandBalance += balance;
+    if(rec.isCashSale) grandCashTotal += total;
     const isPaid = total>0 && balance<=0;
     const rowBg = total>0? (isPaid? 'var(--ok-tint)' : 'var(--danger-tint)') : '';
     const bgAttr = rowBg? ` style="background:${rowBg};"` : '';
@@ -4213,6 +4213,13 @@ function renderSalesTab(){
                ${rec.hideReason? `<div class="muted" style="font-size:11px;margin-top:5px;">숨긴 이유: ${escR(rec.hideReason)}</div>` : ''}`
             : `<button type="button" class="btn" style="font-size:14px;padding:9px 14px;width:100%;color:var(--danger);border-color:var(--danger);" onclick="hideBillingRecord('${rec.id}')">이 매출 숨기기</button>`}
         </div>
+        <div class="detail-card" style="margin-top:10px;padding:8px 10px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" ${rec.isCashSale?'checked':''} onchange="toggleCashSale('${rec.id}', this.checked)">
+            💵 현금매출
+          </label>
+          <div class="muted" style="font-size:10.5px;margin-top:3px;">부가세 없음 · 계산서 미발행</div>
+        </div>
       </td>
       <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.customer).replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','customer', this.value)">` : escR(rec.customer)}</td>
       <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(dedupRepeatedText(rec.site)).replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','site', this.value)">` : escR(dedupRepeatedText(rec.site))}</td>
@@ -4220,10 +4227,16 @@ function renderSalesTab(){
       <td rowspan="2" class="gid">${rec.manual? `<input type="text" value="${escR(rec.genId).replace(/"/g,'&quot;')}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','genId', this.value)">` : rec.genId}</td>
       <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.period||'').replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','period', this.value)">` : `<div>${period}</div>${usageDays!=null? `<div class="muted" style="text-align:center;font-size:11px;margin-top:3px;">${recIsLiveOut(rec)? `사용 ${usageDays}일째` : `총 ${usageDays}일 사용`}</div>`:''}`}</td>
       <td rowspan="2">
+        ${rec.isCashSale ? `
+        <input type="text" inputmode="numeric" placeholder="현금 공급가" id="bill-unitprice-${rec.id}" data-orig="${krFmt(rec.billUnitPrice)}" value="${krFmt(rec.billUnitPrice)}" style="width:96px;display:block;" maxlength="11" oninput="formatAmountInput(this)" onchange="saveCashAmount('${rec.id}', this.value)">
+        <input type="text" id="bill-total-${rec.id}" value="${krFmt(rec.billTotal)}" disabled style="width:96px;display:block;margin-top:4px;font-weight:800;background:var(--surface-2);border-radius:6px;color:var(--ink-soft);" title="합계(운임 포함, 자동계산)">
+        <div class="muted" style="font-size:10.5px;margin-top:4px;">💵 현금매출 (부가세·계산서 없음)</div>
+        ` : `
         <input type="text" inputmode="numeric" placeholder="공급가" id="bill-unitprice-${rec.id}" data-orig="${krFmt(rec.billUnitPrice)}" value="${krFmt(rec.billUnitPrice)}" style="width:96px;display:block;" maxlength="11" oninput="calcOutTotalLive('${rec.id}')" onchange="saveOutBilling('${rec.id}')">
         <input type="text" inputmode="numeric" placeholder="세액" id="bill-tax-${rec.id}" data-orig="${krFmt(rec.billTax)}" value="${krFmt(rec.billTax)}" style="width:96px;display:block;margin-top:4px;color:#1E5FB8;font-weight:700;" maxlength="11" oninput="calcOutTotalLive('${rec.id}', true)" onchange="saveOutBilling('${rec.id}')">
         <input type="text" inputmode="numeric" placeholder="합계" id="bill-total-${rec.id}" data-orig="${krFmt(rec.billTotal)}" value="${krFmt(rec.billTotal)}" style="width:96px;display:block;margin-top:4px;font-weight:800;background:var(--surface-2);border-radius:6px;" maxlength="11" oninput="formatAmountInput(this)" onchange="saveOutBilling('${rec.id}')">
         <button type="button" class="btn sm ${rec.billInvoiceIssued?'primary':''}" style="width:96px;margin-top:6px;font-size:11px;padding:6px 4px;" onclick="toggleBillInvoiceIssued('${rec.id}')">${rec.billInvoiceIssued? '계산서 발행함':'계산서 미발행'}</button>
+        `}
       </td>
       ${salesShowFreight? `<td rowspan="2">
         <input type="text" inputmode="numeric" placeholder="출고운임" id="bill-freight-out-${rec.id}" data-orig="${krFmt(rec.billFreightOut)}" value="${krFmt(rec.billFreightOut)}" style="width:96px;display:block;" maxlength="11" oninput="calcFreightTaxLive('${rec.id}','out')" onchange="saveOutBilling('${rec.id}')">
@@ -4320,12 +4333,16 @@ function renderSalesTab(){
     </div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
       <div class="detail-card" style="padding:14px 16px;">
-        <div class="muted" style="font-size:12px;font-weight:700;">총 견적금액</div>
+        <div class="muted" style="font-size:12px;font-weight:700;">총 견적금액 (운임 제외)</div>
         <div style="font-size:22px;font-weight:800;">${grandTotal.toLocaleString()}원</div>
       </div>
       <div class="detail-card" style="padding:14px 16px;">
         <div class="muted" style="font-size:12px;font-weight:700;color:var(--danger);">총 미수금</div>
         <div style="font-size:22px;font-weight:800;color:var(--danger);">${grandBalance.toLocaleString()}원</div>
+      </div>
+      <div class="detail-card" style="padding:14px 16px;">
+        <div class="muted" style="font-size:12px;font-weight:700;">💵 현금 매출 총액</div>
+        <div style="font-size:22px;font-weight:800;">${grandCashTotal.toLocaleString()}원</div>
       </div>
     </div>
     ${tableHtml}`;
@@ -4373,9 +4390,10 @@ function printSalesList(){
   let grandTotal = 0, grandBalance = 0;
   const rows = recs.map(rec=>{
     const total = Number(rec.billTotal)||0;
+    const quoteOnly = (Number(rec.billUnitPrice)||0) + (Number(rec.billTax)||0);
     const paid = (Number(rec.billPay1Amount)||0) + (Number(rec.billPay2Amount)||0) + (Number(rec.billPay3Amount)||0);
     const balance = total-paid;
-    grandTotal += total;
+    grandTotal += quoteOnly;
     grandBalance += balance;
     return `<tr><td>${rec.billDate? dow(rec.billDate):'-'}</td><td class="name">${escR(rec.customer)}</td><td class="name">${escR(dedupRepeatedText(rec.site))}</td><td>${escR(rec.genId)}</td><td>${total.toLocaleString()}원</td><td>${paid.toLocaleString()}원</td><td>${balance.toLocaleString()}원</td><td>${rec.billInvoiceIssued?'유':'무'}</td><td>${escR((rec.billManager!=null? rec.billManager : rec.manager)||'-')}</td></tr>`;
   }).join('');
@@ -4392,7 +4410,7 @@ function printSalesList(){
     <table class="ol-table">
       <thead><tr><th>청구일자</th><th>업체명</th><th>현장명</th><th>발전기번호</th><th>견적금액</th><th>입금액</th><th>미수금</th><th>계산서</th><th>담당자</th></tr></thead>
       <tbody>${rows}</tbody>
-      <tfoot><tr style="font-weight:800;"><td colspan="4">합계</td><td>${grandTotal.toLocaleString()}원</td><td></td><td colspan="3">미수금 ${grandBalance.toLocaleString()}원</td></tr></tfoot>
+      <tfoot><tr style="font-weight:800;"><td colspan="4">합계(운임 제외)</td><td>${grandTotal.toLocaleString()}원</td><td></td><td colspan="3">미수금 ${grandBalance.toLocaleString()}원</td></tr></tfoot>
     </table>
   </div>`;
   const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
@@ -4461,10 +4479,10 @@ function recalcOutTotal(recId){
   const freightOutTaxEl = document.getElementById(`bill-freight-out-tax-${recId}`);
   const freightInEl = document.getElementById(`bill-freight-in-${recId}`);
   const freightInTaxEl = document.getElementById(`bill-freight-in-tax-${recId}`);
-  if(!priceEl || !taxEl || !totalEl) return;
+  if(!priceEl || !totalEl) return;
   const rec = findBillingRecord(recId);
   const price = krParse(priceEl.value);
-  const tax = krParse(taxEl.value);
+  const tax = taxEl ? krParse(taxEl.value) : 0;
   const freightOut = freightOutEl ? krParse(freightOutEl.value) : Number((rec&&rec.billFreightOut)||0);
   const freightOutTax = freightOutTaxEl ? krParse(freightOutTaxEl.value) : Number((rec&&rec.billFreightOutTax)||0);
   const freightIn = freightInEl ? krParse(freightInEl.value) : Number((rec&&rec.billFreightIn)||0);
@@ -4480,9 +4498,9 @@ function saveOutBilling(recId){
   const freightInEl = document.getElementById(`bill-freight-in-${recId}`);
   const freightInTaxEl = document.getElementById(`bill-freight-in-tax-${recId}`);
   const rec = findBillingRecord(recId);
-  if(!rec || !priceEl || !taxEl || !totalEl) return;
+  if(!rec || !priceEl || !totalEl) return;
   rec.billUnitPrice = krParse(priceEl.value);
-  rec.billTax = krParse(taxEl.value);
+  rec.billTax = taxEl ? krParse(taxEl.value) : 0;
   if(freightOutEl) rec.billFreightOut = krParse(freightOutEl.value);
   if(freightOutTaxEl) rec.billFreightOutTax = krParse(freightOutTaxEl.value);
   if(freightInEl) rec.billFreightIn = krParse(freightInEl.value);
@@ -4506,6 +4524,29 @@ function toggleBillInvoiceIssued(recId){
   openConfirmModal(msg, function(){
     updateBillingRecordField(recId, 'billInvoiceIssued', next);
   }, next? '발행 처리':'미발행으로 변경', '취소');
+}
+function toggleCashSale(recId, checked){
+  const rec = findBillingRecord(recId);
+  if(!rec) return;
+  rec.isCashSale = !!checked;
+  if(rec.isCashSale){
+    rec.billTax = 0;
+    rec.billInvoiceIssued = false;
+    rec.billTotal = (Number(rec.billUnitPrice)||0) + (Number(rec.billFreightOut)||0) + (Number(rec.billFreightOutTax)||0) + (Number(rec.billFreightIn)||0) + (Number(rec.billFreightInTax)||0);
+  } else {
+    rec.billTotal = (Number(rec.billUnitPrice)||0) + (Number(rec.billTax)||0) + (Number(rec.billFreightOut)||0) + (Number(rec.billFreightOutTax)||0) + (Number(rec.billFreightIn)||0) + (Number(rec.billFreightInTax)||0);
+  }
+  saveSalesBillingRecords();
+  renderContent();
+}
+function saveCashAmount(recId, value){
+  const rec = findBillingRecord(recId);
+  if(!rec) return;
+  rec.billUnitPrice = krParse(value);
+  rec.billTax = 0;
+  rec.billTotal = rec.billUnitPrice + (Number(rec.billFreightOut)||0) + (Number(rec.billFreightOutTax)||0) + (Number(rec.billFreightIn)||0) + (Number(rec.billFreightInTax)||0);
+  saveSalesBillingRecords();
+  renderContent();
 }
 function setBillDateToday(inputId, recId, field){
   updateBillingRecordField(recId, field, todayStr());
