@@ -3665,7 +3665,7 @@ function renderManualTab(){
       '현재 창고에 있는(입고 상태) 발전기 목록입니다.', [
       ['누적시간 표시 (보기 전용)', '목록에 "누적시간(정비: OOh)" 형태로 표시만 됩니다. 값을 아직 등록 안 했으면 "미확인", 구형이라 계기 자체가 없으면 "해당없음"으로 표시됩니다. 이 화면에서는 수정할 수 없고, 값을 입력·수정하려면 [정비 관리 → 직접수정]을 이용해주세요.'],
       ['🖨 인쇄', '"입고 발전기" 제목 옆 인쇄 버튼으로, 현재 필터된 입고 목록(번호·모델·전압·누적시간·정비상태)을 가로(landscape) 방향 인쇄용 파일로 받을 수 있습니다.'],
-      ['🤝 발전기 임의추가 · 반납', '협력업체 등에서 급하게 빌려온 발전기를 임시로 등록할 때 사용합니다. "🖨 인쇄" 버튼 옆에 있으며, 발전기 번호·모델(용량 포함)·현재 누적 사용시간·마지막 정비시 누적시간만 입력하면 등록됩니다. 자재·부품은 관리하지 않고, 모델에 용량(kW)이 포함되어 있으면 우리 발전기와 똑같은 방식으로 정비주기가 자동 계산됩니다. 목록에는 모델명 옆에 "🤝 임대" 배지로 표시되고, 출고·입고 처리는 일반 발전기와 완전히 동일하게 하면 됩니다. 다 쓰고 협력업체에 돌려줄 때는 [입고] 목록 처리 버튼 칸의 "↩ 반납"을 누르면 되는데(고장수리중이거나 이미 출고대기 중이면 안 뜹니다), 반납하면 우리가 관리하는 발전기 목록에서는 사라지지만 그동안의 임대·정비 기록은 이력에 그대로 남습니다. 출고 나가면 매출관리에도 일반 발전기와 똑같이 잡히고, 각 매출 건 카드에 "🤝 발전기 임대비용" 칸이 추가로 나와서 협력업체에 지불하는 임대료를 따로 기록할 수 있습니다.'],
+      ['🤝 발전기 임의추가 · 반납', '협력업체 등에서 급하게 빌려온 발전기를 임시로 등록할 때 사용합니다. "🖨 인쇄" 버튼 옆에 있으며, 발전기 번호·모델(용량 포함)·현재 누적 사용시간·마지막 정비시 누적시간만 입력하면 등록됩니다. 자재·부품은 관리하지 않고, 모델에 용량(kW)이 포함되어 있으면 우리 발전기와 똑같은 방식으로 정비주기가 자동 계산됩니다. 목록에는 모델명 옆에 "🤝 임대" 배지로 표시되고, 출고·입고 처리는 일반 발전기와 완전히 동일하게 하면 됩니다. 다 쓰고 협력업체에 돌려줄 때는 [입고] 목록 처리 버튼 칸의 "↩ 반납"을 누르면 되는데(고장수리중이거나 이미 출고대기 중이면 안 뜹니다), 반납하면 우리가 관리하는 발전기 목록에서는 사라지지만 그동안의 임대·정비 기록은 이력에 그대로 남습니다. 출고 나가면 매출관리에도 일반 발전기와 똑같이 잡히고, 각 매출 건 카드에 "🤝 외주업체명"·"🤝 발전기 임대비용" 칸이 추가로 나와서 어느 협력업체에서 빌렸고 얼마를 지불하는지 따로 기록할 수 있으며, 마진(이익)도 자동으로 계산됩니다.'],
       ['용량별 보기', '목록 위에 자동으로 생기는 용량(kW) 버튼을 누르면 그 용량의 발전기만 걸러서 봅니다. "전체" 버튼으로 다시 전체 목록으로 돌아갑니다.'],
       ['출고하기', '이 발전기를 바로 출고 처리합니다(거래처·현장 정보 입력). 맨 위에서 출고시 누적 사용시간을 먼저 입력합니다.'],
       ['⚡ 정보없이 강제출고', '거래처명·날짜 등 아무 정보도 입력하지 않고 바로 [출고중] 상태로 전환합니다. 잘못 입고 처리한 발전기를 빠르게 되돌릴 때 사용하며, 상세 정보는 이후 [출고중] 탭의 "정보 수정"에서 입력하면 됩니다.'],
@@ -3755,7 +3755,9 @@ function renderManualTab(){
       ['필터 (월별·입금상태·업체별·발전기번호별)', '청구일자 기준 월별 필터, 입금완료/미입금 버튼, 업체별 보기, 발전기번호별 보기 드롭다운으로 원하는 내역만 골라볼 수 있습니다. "출고운임·입고운임 표시" 체크를 끄면 운임 관련 칸이 숨겨져 화면이 더 단순해집니다.'],
       ['입금완료 표시 · 인쇄', '견적금액에서 입금액 합계를 뺀 미수금이 0 이하가 되면 그 줄은 초록색, 미수가 남아있으면 붉은색 배경으로 표시됩니다. 상단 "🖨 인쇄" 버튼을 누르면 지금 적용된 필터 그대로 새 창에 미리보기가 뜨고 인쇄 대화상자가 자동으로 열립니다(팝업 차단 시 브라우저에서 팝업을 허용해주세요).'],
       ['💵 현금매출', '"이 매출 숨기기" 버튼 밑에 있는 체크박스입니다. 켜면 견적금액 칸이 "현금 공급가" 입력 하나로 바뀌고 세액 칸과 계산서 발행 버튼이 없어집니다(세액 자동 0원, 계산서 자동 미발행 처리). 운임은 켜져있는 경우 그대로 따로 입력할 수 있고 합계에 정확히 합산됩니다. 맨 위 요약 카드에 "현금 매출 총액"으로 지금 필터에 맞는 현금매출 건들의 합계가 따로 표시됩니다.'],
-      ['🤝 임대발전기 매출', '[입고]에서 "🤝 발전기 임의추가"로 등록한 협력업체 발전기가 출고되면 일반 발전기와 똑같이 여기 매출관리에 잡히고, 매출 카드 안에 "🤝 발전기 임대비용" 입력칸이 추가로 나와서 협력업체에 지불하는 임대료를 따로 적을 수 있습니다. "숨김매출" 체크 옆에 있는 "🤝 임대발전기 매출" 체크를 켜면 임대 발전기 건만 따로 모아서 볼 수 있고, 맨 위 요약 카드에도 지금 필터 기준 "임대발전기 임대료 총액"(우리가 지불한 금액)과 "임대발전기 매출총액"(우리가 받은 금액)이 현금 매출 총액 옆에 따로 표시됩니다.'],
+      ['🤝 임대발전기 매출', '[입고]에서 "🤝 발전기 임의추가"로 등록한 협력업체 발전기가 출고되면 일반 발전기와 똑같이 여기 매출관리에 잡히고, 매출 카드 안에 "🤝 외주업체명"과 "🤝 발전기 임대비용" 입력칸이 추가로 나와서 어느 협력업체에서 빌렸고 얼마를 지불하는지 따로 적을 수 있습니다. 임대비용을 입력하면 바로 아래 "마진(이익)" 줄에 견적금액에서 임대비용을 뺀 값이 자동으로 계산되어 표시됩니다. "숨김매출" 체크 옆에 있는 "🤝 임대발전기 매출" 체크를 켜면 임대 발전기 건만 따로 모아서 볼 수 있습니다.'],
+      ['임대발전기 요약 카드 · 순이익', '맨 위 요약 카드 줄에 지금 필터 기준 "임대발전기 임대료 총액"(협력업체에 지불한 금액), "임대발전기 매출총액"(고객에게 받은 금액), "임대발전기 순이익(마진)"(매출총액에서 임대료를 뺀 실제 남는 돈) 3개가 순서대로 표시됩니다. 매출(청구금액)은 항상 고객에게 받은 금액 그대로 두고 임대료를 미리 빼지 않는 방식이라, 세금계산서 발행 금액과 매출이 항상 일치합니다. 순이익 카드 바로 옆에는 이 계산 방식을 설명하는 안내 카드도 함께 표시됩니다.'],
+      ['요약 카드는 가로 스크롤', '맨 위 숫자 요약 카드들은 화면이 좁아져도 순서가 바뀌거나 세로로 줄바꿈되지 않고, 항상 정해둔 순서 그대로 한 줄을 유지합니다. 화면이 좁으면 그 줄만 좌우로 스크롤해서 안 보이는 카드를 볼 수 있습니다.'],
       ['총 견적금액 · 총 미수금', '맨 위 요약 카드의 "총 견적금액"은 지금 필터에 맞는 공급가+세액 합계만 더한 값입니다(운임은 포함되지 않습니다). "총 미수금"은 운임까지 포함한 실제 합계에서 입금액을 뺀 값으로, 아직 안 받은 진짜 남은 돈을 보여줍니다.']
     ])}
 
@@ -3902,7 +3904,7 @@ function getOrCreateBillingRecord(g){
       billFreightOut:0, billFreightOutTax:0, billFreightIn:0, billFreightInTax:0, billInvoiceIssued:false,
       billPay1Date:'', billPay1Amount:0, billPay2Date:'', billPay2Amount:0, billPay3Date:'', billPay3Amount:0,
       billManager:null, billPhone:null, billNote: rt.paymentNote||'',
-      borrowed: !!g.borrowed, borrowRentalCost: 0,
+      borrowed: !!g.borrowed, borrowRentalCost: 0, borrowedFrom: '',
       hidden:false, createdAt: nowDateTimeStr()
     };
     DB.salesBillingRecords.push(rec);
@@ -4047,9 +4049,15 @@ function renderSalesTab(){
           <div class="muted" style="font-size:10.5px;margin-top:3px;">부가세 없음 · 계산서 미발행</div>
         </div>
         ${rec.borrowed? `<div class="detail-card" style="margin-top:8px;padding:8px 10px;background:var(--primary-tint);">
-          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--primary-dark);margin-bottom:4px;white-space:nowrap;">🤝 발전기 임대비용</label>
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--primary-dark);margin-bottom:4px;white-space:nowrap;">🤝 외주업체명</label>
+          <input type="text" value="${(rec.borrowedFrom||'').replace(/"/g,'&quot;')}" placeholder="예: OO중공업" style="width:100%;" onchange="updateBillingRecordField('${rec.id}','borrowedFrom', this.value)">
+          <label style="display:block;font-size:12.5px;font-weight:700;color:var(--primary-dark);margin:6px 0 4px;white-space:nowrap;">🤝 발전기 임대비용</label>
           <input type="number" min="0" value="${rec.borrowRentalCost||''}" placeholder="0" style="width:100%;" onchange="updateBillingRecordField('${rec.id}','borrowRentalCost', Number(this.value)||0)">
           <div class="muted" style="font-size:10.5px;margin-top:3px;">협력업체에 지불하는 임대료</div>
+          <div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--primary);display:flex;justify-content:space-between;white-space:nowrap;">
+            <span style="font-weight:800;color:var(--primary-dark);font-size:13px;">마진(이익)</span>
+            <span style="font-weight:800;color:var(--primary-dark);font-size:13px;">${(quoteOnly-(Number(rec.borrowRentalCost)||0)).toLocaleString()}원</span>
+          </div>
         </div>` : ''}
       </td>
       <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.customer).replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','customer', this.value)">` : escR(rec.customer)}</td>
@@ -4167,26 +4175,38 @@ function renderSalesTab(){
         <div class="muted" style="font-size:12px;margin-top:5px;white-space:nowrap;">체크를 끄면 운임 관련 입력칸이 표에서 숨겨집니다.</div>
       </div>
     </div>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;">
-      <div class="detail-card" style="padding:14px 16px;">
+    <div style="display:flex;gap:14px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">
+      <div class="detail-card" style="padding:14px 16px;flex:none;">
         <div class="muted" style="font-size:12px;font-weight:700;">총 견적금액 (운임 제외)</div>
         <div style="font-size:22px;font-weight:800;">${grandTotal.toLocaleString()}원</div>
       </div>
-      <div class="detail-card" style="padding:14px 16px;">
+      <div class="detail-card" style="padding:14px 16px;flex:none;">
         <div class="muted" style="font-size:12px;font-weight:700;color:var(--danger);">총 미수금</div>
         <div style="font-size:22px;font-weight:800;color:var(--danger);">${grandBalance.toLocaleString()}원</div>
       </div>
-      <div class="detail-card" style="padding:14px 16px;">
+      <div class="detail-card" style="padding:14px 16px;flex:none;">
         <div class="muted" style="font-size:12px;font-weight:700;">💵 현금 매출 총액</div>
         <div style="font-size:22px;font-weight:800;">${grandCashTotal.toLocaleString()}원</div>
       </div>
-      <div class="detail-card" style="padding:14px 16px;background:var(--primary-tint);">
+      <div class="detail-card" style="padding:14px 16px;flex:none;background:var(--primary-tint);">
         <div class="muted" style="font-size:12px;font-weight:700;color:var(--primary-dark);">🤝 임대발전기 임대료 총액</div>
         <div style="font-size:22px;font-weight:800;color:var(--primary-dark);">${grandBorrowCost.toLocaleString()}원</div>
       </div>
-      <div class="detail-card" style="padding:14px 16px;background:var(--primary-tint);">
+      <div class="detail-card" style="padding:14px 16px;flex:none;background:var(--primary-tint);">
         <div class="muted" style="font-size:12px;font-weight:700;color:var(--primary-dark);">🤝 임대발전기 매출총액</div>
         <div style="font-size:22px;font-weight:800;color:var(--primary-dark);">${grandBorrowRevenue.toLocaleString()}원</div>
+      </div>
+      <div class="detail-card" style="padding:14px 16px;flex:none;background:var(--primary-tint);">
+        <div class="muted" style="font-size:12px;font-weight:700;color:var(--primary-dark);">🤝 임대발전기 순이익(마진)</div>
+        <div style="font-size:22px;font-weight:800;color:var(--primary-dark);">${(grandBorrowRevenue-grandBorrowCost).toLocaleString()}원</div>
+      </div>
+      <div class="detail-card sales-info-card" style="padding:14px 16px;flex:none;width:380px;background:var(--surface-2);">
+        <div style="font-size:13.5px;font-weight:700;color:var(--primary-dark);margin-bottom:5px;">ℹ️ 순이익은 이렇게 계산돼요</div>
+        <div style="font-size:13.5px;line-height:1.6;color:var(--ink-soft);">
+          매출(견적금액)은 고객에게 청구한 금액 그대로 잡고, 임대료는 빼지 않습니다.<br>
+          순이익 = 임대발전기 매출총액 − 임대료 총액<br>
+          이렇게 나눠서 계산해야 세금계산서 발행 금액과 매출이 항상 일치하고, 각 건마다 얼마 남았는지도 따로 확인할 수 있어요.
+        </div>
       </div>
     </div>
     ${tableHtml}`;
@@ -7098,9 +7118,9 @@ function openOutInfoEditModal(id){
         </div>
       </div>
       <div class="out-row">
-        <div class="field f-eq"><label>현장 주소</label><input type="text" id="f-oie-address" value="${(rt.address||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
-        <div class="field f-eq"><label>담당자</label><input type="text" id="f-oie-manager" value="${(rt.manager||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
-        <div class="field f-eq"><label>연락처</label><input type="text" id="f-oie-phone" value="${(rt.phone||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
+        <div class="field f-lg"><label>현장 주소</label><input type="text" id="f-oie-address" value="${(rt.address||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
+        <div class="field f-sm"><label>담당자</label><input type="text" id="f-oie-manager" value="${(rt.manager||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
+        <div class="field f-sm"><label>연락처</label><input type="text" id="f-oie-phone" value="${(rt.phone||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
       </div>
       <div class="out-row stretch">
         <div class="field f-eq"><div class="out-card"><label>전압</label>
@@ -7407,9 +7427,9 @@ function openOutModal(id, reservationId){
         </div>
       </div>
       <div class="out-row">
-        <div class="field f-eq"><label>현장 주소</label><input type="text" id="f-address" value="${(res&&res.address||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
-        <div class="field f-eq"><label>담당자</label><input type="text" id="f-manager" value="${(res&&res.manager||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
-        <div class="field f-eq"><label>연락처</label><input type="text" id="f-phone" value="${(res&&res.phone||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
+        <div class="field f-lg"><label>현장 주소</label><input type="text" id="f-address" value="${(res&&res.address||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
+        <div class="field f-sm"><label>담당자</label><input type="text" id="f-manager" value="${(res&&res.manager||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
+        <div class="field f-sm"><label>연락처</label><input type="text" id="f-phone" value="${(res&&res.phone||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
       </div>
       <div class="out-row stretch">
         <div class="field f-eq"><div class="out-card"><label>전압</label>
