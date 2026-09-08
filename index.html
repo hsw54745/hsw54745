@@ -3832,7 +3832,8 @@ function renderManualTab(){
       ['🕐 마지막 수정 시각 표시', '누적 사용시간을 수정(누적시간 수정 · 정보 직접 수정)하면, 다음에 그 화면을 다시 열 때 "마지막 수정: 날짜 시간 (수정한 사람)"이 노란 알림으로 표시되어 언제 누가 마지막으로 고쳤는지 바로 알 수 있습니다.'],
       ['전압 수정 팝업 개선', '[입고] 목록에서 전압을 클릭하면 뜨는 팝업에 "셋팅 전압" 라벨 옆으로 마지막으로 수정한 날짜·시간·수정자가 함께 표시됩니다. 24시간 이내에 이미 전압을 바꾼 발전기를 또 바꾸려고 하면 "이미 변경했는데 다시 변경하시겠습니까?" 확인창이 한 번 더 뜹니다. 220V/380V/440V/480V 버튼은 세로로 크게 배치되어 색상과 함께 누르기 편합니다.'],
       ['⚡ 전압변경 자동 정비기록', '[입고] 목록의 전압 클릭 수정, [출고중 → 정보 수정], 입고 처리시 전압 확인 화면 — 이 세 곳 중 어디서든 발전기의 전압 값이 실제로 바뀌면 "전압을 실제로 변경하셨습니까?" 확인창이 뜹니다. "예"를 누르면 정비 기록에 몇 볼트에서 몇 볼트로, 누가, 언제 바꿨는지 자동으로 기록되고, "아니오"를 누르면 기록되지 않습니다.'],
-      ['🚫 하루 24시간 초과 사용시간 차단', '입고 처리시 (입고 누적시간 − 출고 누적시간)을 임대일수로 나눈 값이 하루 24시간을 넘으면 물리적으로 불가능한 값이므로 처리를 막고 안내 문구를 보여줍니다. 대부분 출고시 또는 입고시 누적시간을 잘못 입력한 경우이니, 두 값을 다시 확인하고 정정하면 됩니다.'],
+      ['🚫 하루 24시간 초과 사용시간 차단', '입고 처리시 (입고 누적시간 − 출고 누적시간)을 임대일수로 나눈 값이 하루 24시간을 넘으면 물리적으로 불가능한 값이므로 처리를 막고 안내 문구를 보여줍니다. 대부분 출고시 또는 입고시 누적시간을 잘못 입력한 경우이니, 두 값을 다시 확인하고 정정하면 됩니다. 개별 입고 처리뿐 아니라 "여러 대 한번에 입고(일괄입고)"에서도 발전기 하나하나마다 똑같이 검사합니다.'],
+      ['여러 대 한번에 입고 · 부자재 재고', '부자재가 딸린 발전기가 섞여 있으면 "부자재를 전부 회수 확인했습니다" 체크를 해야 입고 처리가 진행되고, 체크하고 나면 개별 입고 처리와 동일하게 그 발전기들의 부자재 재고 수량이 자동으로 다시 채워집니다.'],
       ['🟢 온라인 상태 배지', '화면 상단 오른쪽에 🟢 온라인 / 🟡 로컬 임시저장 배지가 표시됩니다. 인터넷이 안 되는 상황에서도 입력이 막히지 않고 이 기기에 임시 저장되며, 다시 연결되면 정상 저장됩니다.'],
       ['🗑 발전기 등록 실수 바로잡기', '[설정 → 발전기 모델 설정]의 "관리" 버튼으로 번호(ID)를 수정하거나, 잘못 등록한 발전기를 완전히 삭제할 수 있습니다. 완전 삭제는 사용 이력이 있으면 경고가 뜨며, 이력이 있는 발전기는 삭제 대신 폐기/매각 처리를 권장합니다.'],
       ['📅 상단 실시간 날짜·시간 표시', '화면 맨 위 "전체저장" 버튼 아래에 오늘 날짜와 현재 시각이 1초마다 갱신되며 표시됩니다.']
@@ -7224,24 +7225,52 @@ async function submitOutInfoEdit(id){
   const site = document.getElementById('f-oie-site').value.trim();
   if(!site){ errEl.textContent='거래처명을 입력해주세요.'; errEl.style.display='block'; return; }
   const startHoursEl = document.getElementById('f-oie-starthours');
-  const startHours = startHoursEl ? Number(startHoursEl.value) : NaN;
+  const startHoursRaw = startHoursEl ? startHoursEl.value : '';
+  const startHours = startHoursRaw==='' ? NaN : Number(startHoursRaw);
+  if(startHoursRaw!=='' && (isNaN(startHours) || startHours<0 || startHours < (g.lastMaintHours||0))){
+    errEl.textContent = `출고시 누적시간을 확인해주세요. (마지막 정비시 누적시간 ${(g.lastMaintHours||0).toLocaleString()}h보다 작을 수 없습니다)`;
+    errEl.style.display='block'; return;
+  }
   const usageDays = Number(document.getElementById('f-oie-usagedays').value)||null;
   const oldVoltage = g.voltage||'';
   const newVoltageVal = document.getElementById('f-oie-voltage').value.trim();
+  const newOutDate = document.getElementById('f-oie-outdate').value || todayStr();
+  const newAddress = document.getElementById('f-oie-address').value.trim();
+  const newManager = document.getElementById('f-oie-manager').value.trim();
+  const newPhone = document.getElementById('f-oie-phone').value.trim();
+  // 매출관리 청구 기록은 "발전기번호+출고일+거래처명"으로 구분되므로,
+  // 여기서 거래처명·출고일을 바꾸면 새 기록이 중복 생성되지 않도록 기존 기록을 같이 갱신합니다.
+  if(DB.salesEnabled && typeof billingMatchKey==='function'){
+    const oldKey = billingMatchKey(g.id, g.rental.outDate, g.rental.customer);
+    const newKey = billingMatchKey(g.id, newOutDate, site);
+    if(oldKey!==newKey){
+      const existingRec = (DB.salesBillingRecords||[]).find(r=>r.matchKey===oldKey);
+      if(existingRec){
+        const parsed = parseCustomerString(site);
+        existingRec.matchKey = newKey;
+        existingRec.outDate = newOutDate;
+        existingRec.customer = parsed.customer || existingRec.customer;
+        if(!existingRec.manager) existingRec.manager = newManager || parsed.name || existingRec.manager;
+        if(!existingRec.phone) existingRec.phone = newPhone || parsed.phone || existingRec.phone;
+        if(newAddress) existingRec.site = newAddress;
+        saveSalesBillingRecords();
+      }
+    }
+  }
   g.rental = {
     ...g.rental,
     customer: site,
     site,
-    manager: document.getElementById('f-oie-manager').value.trim(),
-    phone: document.getElementById('f-oie-phone').value.trim(),
-    address: document.getElementById('f-oie-address').value.trim(),
+    manager: newManager,
+    phone: newPhone,
+    address: newAddress,
     voltage: newVoltageVal,
     qty: g.rental.qty||1,
     supplies: document.getElementById('f-oie-supplies').value.trim(),
     fuelRequested: (document.getElementById('f-oie-fuel-toggle') && document.getElementById('f-oie-fuel-toggle').checked) ? (Number(document.getElementById('f-oie-fuel-req').value)||null) : null,
     fuelActual: (document.getElementById('f-oie-fuel-toggle') && document.getElementById('f-oie-fuel-toggle').checked) ? (Number(document.getElementById('f-oie-fuel-actual').value)||null) : null,
     usageDays,
-    outDate: document.getElementById('f-oie-outdate').value || todayStr(),
+    outDate: newOutDate,
     loadDate: document.getElementById('f-oie-loaddate').value || null,
     arriveTime: document.getElementById('f-oie-arrivetime').value.trim() || null,
     freightBearer: document.getElementById('f-oie-freight').value,
@@ -8074,6 +8103,19 @@ async function submitBulkIn(){
       errEl.textContent = `${g.id}의 누적 사용시간을 확인해주세요. (출고시 누적시간 ${(g.rental.startHours||0).toLocaleString()}h보다 작을 수 없습니다)`;
       errEl.style.display='block'; return;
     }
+    // 하루 24시간을 초과하는 물리적으로 불가능한 사용시간 감지 (데이터 입력 실수 방지)
+    const rt = g.rental;
+    if(rt.outDate && inDate){
+      const usedH = v - (rt.startHours||0);
+      const outD = new Date(rt.outDate+'T00:00:00');
+      const inD = new Date(inDate+'T00:00:00');
+      const days = Math.max(1, Math.round((inD-outD)/86400000));
+      const avgDaily = usedH/days;
+      if(avgDaily > 24){
+        errEl.textContent = `${g.id}: 입력하신 누적시간 차이(${usedH.toLocaleString()}h)를 임대일수(${days}일)로 나누면 하루 평균 ${avgDaily.toFixed(1)}시간이 됩니다. 하루는 24시간을 넘을 수 없으니, 출고시 누적시간(${(rt.startHours||0).toLocaleString()}h) 또는 지금 입력한 누적시간을 다시 확인해주세요.`;
+        errEl.style.display='block'; return;
+      }
+    }
     hoursMap[g.id] = v;
   }
   gens.forEach(g=>{
@@ -8091,9 +8133,17 @@ async function submitBulkIn(){
     if(g.hoursKnown && endHours!=null){
       g.hours = endHours;
     }
+    // 부자재 재고 복원 (개별 입고 처리와 동일하게, 회수 확인된 건은 재고를 다시 채워줍니다)
+    if(g.rental && g.rental.suppliesItems && g.rental.suppliesItems.length){
+      DB.suppliesStock = DB.suppliesStock || {};
+      g.rental.suppliesItems.forEach(it=>{
+        DB.suppliesStock[it.name] = (DB.suppliesStock[it.name]!==undefined ? DB.suppliesStock[it.name] : 0) + (it.qty||1);
+      });
+    }
     g.status = 'in';
     g.rental = null;
   });
+  if(suppliesGens.length>0) await saveSuppliesStock();
   await Promise.all([saveGens(), saveRentals()]);
   bulkInSelection.clear();
   closeModal();
