@@ -976,7 +976,45 @@ async function saveWithRetry(fn, retries){
 }
 async function saveCurrentUserName(){ await storageSetChecked('gen-user-name-v1', JSON.stringify(DB.currentUserName), false); }
 async function saveTeamMembers(){ await storageSetChecked('gen-team-members-v1', JSON.stringify(DB.teamMembers), true); }
-async function saveGens(){ await storageSetChecked('gen-fleet-v2', JSON.stringify(DB.gens), true); }
+// 발전기 목록(gens)은 전체를 하나의 값으로 저장/조회합니다. 그런데 여러 명이 동시에
+// 서로 다른 발전기를 수정하면, 나중에 저장하는 사람이 자기 브라우저에 남아있던
+// "예전 스냅샷" 전체를 그대로 덮어써서 그 사이 다른 사람이 입력한(내가 화면에서 못 본)
+// 다른 발전기의 변경분이 통째로 사라지는 문제가 있었습니다.
+// (예: 내가 A발전기를 직접수정으로 저장하는 순간, 방금 다른 사람이 정비등록으로 바꿔놓은
+//  B발전기의 마지막정비 누적시간이 내 저장으로 인해 예전 값으로 되돌아가 버림)
+// 이를 막기 위해 저장 직전에 서버의 최신 값을 다시 받아와서, "이번에 내가 실제로
+// 건드린 발전기"만 내 값으로 반영하고 나머지 발전기는 서버의 최신 상태를 그대로 유지합니다.
+let lastSyncedGensSnapshot = {};
+function snapshotGens(list){
+  const m = {};
+  (list||[]).forEach(g=>{ if(g && g.id) m[g.id] = JSON.stringify(g); });
+  return m;
+}
+async function saveGens(){
+  const hasBaseline = Object.keys(lastSyncedGensSnapshot).length>0;
+  if(hasBaseline && !hasPendingWrite('gen-fleet-v2', true)){
+    try{
+      const remote = await window.storage.get('gen-fleet-v2', true);
+      const remoteList = remote ? JSON.parse(remote.value) : null;
+      if(Array.isArray(remoteList)){
+        const dirtyIds = new Set();
+        DB.gens.forEach(g=>{
+          if(!g || !g.id) return;
+          const prevJson = lastSyncedGensSnapshot[g.id];
+          if(prevJson === undefined || prevJson !== JSON.stringify(g)) dirtyIds.add(g.id);
+        });
+        const localById = {};
+        DB.gens.forEach(g=>{ if(g && g.id) localById[g.id] = g; });
+        const merged = remoteList.map(rg => (rg && rg.id && dirtyIds.has(rg.id) && localById[rg.id]) ? localById[rg.id] : rg);
+        const remoteIds = new Set(remoteList.filter(rg=>rg && rg.id).map(rg=>rg.id));
+        DB.gens.forEach(g=>{ if(g && g.id && !remoteIds.has(g.id)) merged.push(g); }); // 서버에 아직 없는 새 발전기(내가 방금 추가)는 뒤에 추가
+        DB.gens = merged;
+      }
+    }catch(e){ /* 서버 조회 실패시(오프라인 등) 기존처럼 로컬 배열을 그대로 저장합니다 */ }
+  }
+  await storageSetChecked('gen-fleet-v2', JSON.stringify(DB.gens), true);
+  lastSyncedGensSnapshot = snapshotGens(DB.gens);
+}
 async function saveRentals(){ await storageSetChecked('gen-rentals-v2', JSON.stringify(DB.rentals), true); }
 async function saveMaint(){ await storageSetChecked('gen-maintenance-v2', JSON.stringify(DB.maint), true); }
 async function saveReservations(){ await storageSetChecked('gen-reservations-v1', JSON.stringify(DB.reservations), true); }
@@ -1094,7 +1132,7 @@ function maintStatus(remaining){
 }
 function activeGens(){ return DB.gens.filter(g=>!g.retired); }
 function estCurrentHours(g){
-  if(g.status==='out' && g.rental && g.rental.longTerm && g.rental.estDaily>0 && g.rental.outDate){
+  if(g.status==='out' && g.rental && g.rental.estDaily>0 && g.rental.outDate){
     const days = Math.max(0,(Date.now() - new Date(g.rental.outDate+'T00:00:00').getTime())/86400000);
     return g.rental.startHours + days*g.rental.estDaily;
   }
@@ -1104,7 +1142,7 @@ function estElapsed(g){ return Math.max(0, estCurrentHours(g) - (g.lastMaintHour
 function estRemaining(g){ return getCycle(g) - estElapsed(g); }
 
 function predictedDate(g){
-  if(!(g.hoursKnown && g.status==='out' && g.rental && g.rental.longTerm && g.rental.estDaily>0)) return null;
+  if(!(g.hoursKnown && g.status==='out' && g.rental && g.rental.estDaily>0)) return null;
   const rem = estRemaining(g);
   if(rem<=0) return {overdue:true};
   const days = rem / g.rental.estDaily;
@@ -1571,6 +1609,7 @@ function regionOf(address){
   const gyeonggiSouth = ['수원','성남','용인','안양','부천','안산','평택','화성','시흥','군포','의왕','하남','오산','이천','안성','여주','과천','광명'];
   if(gyeonggiNorth.some(c=>a.includes(c))) return '경기북부';
   if(gyeonggiSouth.some(c=>a.includes(c))) return '경기남부';
+  if(/경기.*광주|광주.*경기/.test(a)) return '경기남부';
   if(/경기/.test(a)) return '경기(기타)';
   if(/광주/.test(a)) return '광주';
   const chungnam = ['천안','아산','서산','당진','논산','공주','보령','계룡','금산','부여','서천','청양','홍성','예산','태안'];
@@ -2169,7 +2208,7 @@ function renderOutList(){
   }
   const rowHtml = (g)=>{
     const rt = g.rental;
-    const isLT = g.hoursKnown && rt.longTerm && rt.estDaily>0;
+    const isLT = g.hoursKnown && rt.estDaily>0;
     const el = isLT? estElapsed(g) : elapsedHours(g);
     const rem = isLT? estRemaining(g) : remainingHours(g);
     const pred = predictedDate(g);
@@ -2260,7 +2299,6 @@ function toggleLongterm(id){
   if(rt.longTerm){
     openConfirmModal('이 발전기를 "장기"에서 "단기"로 변경할까요?', function(){
       rt.longTerm = false;
-      rt.estDaily = null;
       saveGens();
       renderContent();
       flash('단기로 변경되었습니다');
@@ -2618,7 +2656,19 @@ function recomputeLastMaint(genId){
   const g = findGen(genId);
   if(!g) return;
   const recs = DB.maint.filter(m=>m.genId===genId);
-  if(recs.length===0) return;
+  if(recs.length===0){
+    // 정비 이력이 전부 삭제된 경우 "마지막 정비시 누적시간"이 예전 값에 그대로 남아있으면
+    // 실제 상태와 어긋나므로, 현재 누적시간과 같은 값으로 맞춰 "정비필요"가 잘못 표시되지 않게 합니다.
+    if(g.hoursKnown){
+      g.lastMaintHours = g.hours||0;
+      g.lastMaintDate = null;
+      g.hoursUpdatedAt = nowDateTimeStr();
+      g.hoursUpdatedBy = DB.currentUserName || null;
+    } else {
+      g.lastOilChangeDate = null;
+    }
+    return;
+  }
   const atMax0 = [...recs].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   if(!g.hoursKnown){
     // 설정에서 "가동시간 확인불가"로 지정된 발전기는 여기서 절대 hoursKnown을 켜지 않습니다.
@@ -7212,6 +7262,10 @@ function openOutInfoEditModal(id){
         <div class="field f-xs"><label>사용일수(일)</label>
           <input type="number" id="f-oie-usagedays" min="0" value="${rt.usageDays||''}" placeholder="예: 7" oninput="syncOieUsageDaysToReturnDate()">
         </div>
+        <div class="field f-xs"><label>예상가동시간(h/일)</label>
+          <input type="number" id="f-oie-estdaily" step="0.5" min="0" value="${rt.estDaily||''}" placeholder="예: 8">
+          <div class="hint">입력하면 정비 도래 시점을 미리 추정해 보여줍니다.</div>
+        </div>
         <div class="field f-sm"><label>반납 예정일 (선택)</label>
           <input type="date" id="f-oie-returndate" value="${oiePrefillReturnDate}" onchange="syncOieReturnDateToUsageDays()">
         </div>
@@ -7310,6 +7364,8 @@ async function submitOutInfoEdit(id){
     errEl.style.display='block'; return;
   }
   const usageDays = Number(document.getElementById('f-oie-usagedays').value)||null;
+  const estDailyOieRaw = Number(document.getElementById('f-oie-estdaily').value||0);
+  const estDailyOie = estDailyOieRaw>0 ? estDailyOieRaw : null;
   const oldVoltage = g.voltage||'';
   const newVoltageVal = document.getElementById('f-oie-voltage').value.trim();
   const newOutDate = document.getElementById('f-oie-outdate').value || todayStr();
@@ -7348,6 +7404,7 @@ async function submitOutInfoEdit(id){
     fuelRequested: (document.getElementById('f-oie-fuel-toggle') && document.getElementById('f-oie-fuel-toggle').checked) ? (Number(document.getElementById('f-oie-fuel-req').value)||null) : null,
     fuelActual: (document.getElementById('f-oie-fuel-toggle') && document.getElementById('f-oie-fuel-toggle').checked) ? (Number(document.getElementById('f-oie-fuel-actual').value)||null) : null,
     usageDays,
+    estDaily: estDailyOie,
     outDate: newOutDate,
     loadDate: document.getElementById('f-oie-loaddate').value || null,
     arriveTime: document.getElementById('f-oie-arrivetime').value.trim() || null,
@@ -7549,6 +7606,10 @@ function openOutModal(id, reservationId){
         <div class="field f-xs"><label>사용일수(일)</label>
           <input type="number" id="f-usagedays" min="0" value="${(res&&res.usageDays)||''}" placeholder="예: 7" oninput="syncUsageDaysToReturnDate()">
         </div>
+        <div class="field f-xs"><label>예상가동시간(h/일)</label>
+          <input type="number" id="f-estdaily" step="0.5" min="0" value="${(res&&res.estDaily)||''}" placeholder="예: 8">
+          <div class="hint">입력하면 출고중 목록에 정비 도래 시점을 미리 추정해 보여줍니다.</div>
+        </div>
         <div class="field f-sm"><label>반납 예정일 (선택)</label>
           <input type="date" id="f-returndate" value="${prefillReturnDate}" onchange="syncReturnDateToUsageDays()">
         </div>
@@ -7588,13 +7649,9 @@ function openOutModal(id, reservationId){
         </div>
         <div class="field f-eq">
           <div class="field chk" style="background:var(--ok-tint);border:1px solid var(--ok);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
-            <input type="checkbox" id="f-longterm" onchange="toggleLongtermField()"><label for="f-longterm">장기 임대 출고</label>
+            <input type="checkbox" id="f-longterm"><label for="f-longterm">장기 임대 출고</label>
           </div>
-          <div class="field" id="f-estdaily-wrap" style="display:none;margin-top:8px;">
-            <label>예상 일일 사용시간(h/일)</label>
-            <input type="number" id="f-estdaily" step="0.5" placeholder="예: 8">
-            <div class="hint">입력한 값으로 정비 도래 시점을 미리 추정합니다.</div>
-          </div>
+          <div class="hint" style="margin-top:8px;">예상가동시간은 위 "사용일수" 옆에 입력합니다. 장기임대 체크는 목록 구분·방문정비 준비 리스트용입니다.</div>
         </div>
         <div class="field f-eq">
           <input type="text" id="f-payment-note" value="${escR(res&&res.paymentNote||'')}" placeholder="입금관련 메모">
@@ -7627,8 +7684,8 @@ function onTargetGenChange(){
   if(hintEl) hintEl.textContent = `현재 누적시간: ${(g.hours||0).toLocaleString()}h`;
 }
 function toggleLongtermField(){
-  const on = document.getElementById('f-longterm').checked;
-  document.getElementById('f-estdaily-wrap').style.display = on ? 'block' : 'none';
+  // 예상가동시간 입력칸이 "사용일수" 옆으로 이동해 항상 보이므로,
+  // 장기임대 체크박스는 더 이상 이 필드의 표시 여부를 토글하지 않습니다.
 }
 async function submitOut(idParam, reservationId){
   const targetSelEl = document.getElementById('f-target-gen');
@@ -7686,7 +7743,8 @@ async function submitOut(idParam, reservationId){
   const startHoursEl = document.getElementById('f-starthours');
   const startHours = startHoursEl ? Number(startHoursEl.value) : (g.hours||0);
   const longTerm = document.getElementById('f-longterm').checked;
-  const estDaily = longTerm ? Number(document.getElementById('f-estdaily').value||0) : null;
+  const estDailyRaw = Number(document.getElementById('f-estdaily').value||0);
+  const estDaily = estDailyRaw>0 ? estDailyRaw : null;
   const errEl = document.getElementById('f-err');
   if(!customer || !address || !manager || !phone){
     errEl.textContent = '거래처명, 현장 주소, 담당자, 연락처를 모두 입력해주세요.';
@@ -7696,16 +7754,12 @@ async function submitOut(idParam, reservationId){
     errEl.textContent = '도착일과 누적 사용시간을 확인해주세요. (현재 누적시간보다 작을 수 없습니다)';
     errEl.style.display='block'; return;
   }
-  if(longTerm && (!estDaily || estDaily<=0)){
-    errEl.textContent = '장기 임대는 예상 일일 사용시간을 입력해주세요.';
-    errEl.style.display='block'; return;
-  }
   const existing = reservationId ? DB.reservations.find(r=>r.id===reservationId) : null;
   const pendingData = {
     id: reservationId || uid(), genId: id, pendingLoad: true, batchId: (existing && existing.batchId) || null,
     customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty,
     fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
-    outDate, startHours, longTerm, estDaily: longTerm? estDaily: null,
+    outDate, startHours, longTerm, estDaily,
     outProcessedBy: DB.currentUserName || (existing&&existing.outProcessedBy) || null,
     createdAt: (existing && existing.createdAt) || todayStr()
   };
@@ -7886,6 +7940,10 @@ function openBulkOutModal(){
         <div class="field"><label>사용일수(일)</label>
           <input type="number" id="fb-usagedays" min="0" placeholder="예: 7" oninput="syncBulkUsageDaysToReturnDate()">
         </div>
+        <div class="field"><label>예상가동시간(h/일, 대당)</label>
+          <input type="number" id="fb-estdaily" step="0.5" min="0" placeholder="예: 8">
+          <div class="hint">입력하면 출고중 목록에 정비 도래 시점을 미리 추정해 보여줍니다.</div>
+        </div>
         <div class="field"><label>반납 예정일 (선택)</label>
           <input type="date" id="fb-returndate" onchange="syncBulkReturnDateToUsageDays()">
         </div>
@@ -7925,12 +7983,7 @@ function openBulkOutModal(){
           <textarea id="fb-force-reason" placeholder="예: 현장 긴급요청, 대표님 승인 등"></textarea>
         </div>
       </div>
-      <div class="field chk"><input type="checkbox" id="fb-longterm" onchange="toggleBulkLongtermField()"><label for="fb-longterm">장기 임대입니다 (실사용 시간을 바로 확인할 수 없음)</label></div>
-      <div class="field" id="fb-estdaily-wrap" style="display:none;">
-        <label>예상 일일 사용시간(h/일, 대당)</label>
-        <input type="number" id="fb-estdaily" step="0.5" placeholder="예: 8">
-        <div class="hint">입력한 값으로 정비 도래 시점을 미리 추정합니다.</div>
-      </div>
+      <div class="field chk"><input type="checkbox" id="fb-longterm"><label for="fb-longterm">장기 임대입니다 (목록 구분·방문정비 준비 리스트용)</label></div>
       <div id="fb-err" class="err" style="display:none;"></div>
       <div class="modal-actions">
         <button class="btn" onclick="closeModal()">취소</button>
@@ -8003,8 +8056,7 @@ function toggleBulkForceOutReason(){
   document.getElementById('fb-force-reason-wrap').style.display = on ? 'block' : 'none';
 }
 function toggleBulkLongtermField(){
-  const on = document.getElementById('fb-longterm').checked;
-  document.getElementById('fb-estdaily-wrap').style.display = on ? 'block' : 'none';
+  // 예상가동시간 입력칸이 항상 보이도록 옮겨서 더 이상 이 필드를 토글하지 않습니다.
 }
 async function submitBulkOut(){
   const ids = [...bulkOutSelection];
@@ -8028,7 +8080,8 @@ async function submitBulkOut(){
   const note = document.getElementById('fb-note').value.trim();
   const outDate = document.getElementById('fb-outdate').value;
   const longTerm = document.getElementById('fb-longterm').checked;
-  const estDaily = longTerm ? Number(document.getElementById('fb-estdaily').value||0) : null;
+  const estDailyRawB = Number(document.getElementById('fb-estdaily').value||0);
+  const estDaily = estDailyRawB>0 ? estDailyRawB : null;
   if(!customer || !address || !manager || !phone){
     errEl.textContent = '거래처명, 현장 주소, 담당자, 연락처를 모두 입력해주세요.';
     errEl.style.display='block'; return;
@@ -9467,6 +9520,7 @@ async function init(){
     });
   }
   DB.gens = results.gens;
+  lastSyncedGensSnapshot = snapshotGens(DB.gens);
   DB.rentals = results.rentals;
   DB.maint = results.maint;
   DB.reservations = results.reservations;
@@ -9670,7 +9724,7 @@ async function syncFromStorage(){
       seenNoticeIds = new Set((notices||[]).map(n=>n.id));
       seenEventIds = new Set((calendarEvents||[]).map(e=>e.id));
       seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad).map(r=>r.id));
-      DB.gens = gens; DB.rentals = rentals; DB.maint = maint; DB.reservations = reservations;
+      DB.gens = gens; lastSyncedGensSnapshot = snapshotGens(DB.gens); DB.rentals = rentals; DB.maint = maint; DB.reservations = reservations;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold;
       DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.salesEnabled = salesEnabled === true; DB.salesRecords = salesRecords || []; DB.salesManagers = salesManagers || []; if((DB.salesManagers[0]||'').trim() !== SALES_MANAGER_FIXED_NAME){ DB.salesManagers[0] = SALES_MANAGER_FIXED_NAME; saveSalesManagers(); } DB.salesPassword = salesPassword || ''; DB.salesPasswordBypass = salesPasswordBypass !== false; DB.salesBillingRecords = salesBillingRecords || []; DB.cancelOutHistory = cancelOutHistory || []; DB.palletDefaultRemoved = palletDefaultRemoved === true; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
       applyCompanyBranding();
