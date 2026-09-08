@@ -2301,6 +2301,13 @@ function renderMaintTab(){
   return `
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
       <div style="flex:1;min-width:200px;">
+        <div class="section-title" style="margin:0 0 10px;">발전기별 정비 이력</div>
+        <select id="maint-gen-filter" onchange="renderMaintByGen()" style="width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:13px;background:#fff;">
+          <option value="">번호 선택</option>
+          ${[...new Set(DB.gens.map(g=>g.id))].sort().map(id=>`<option value="${id}">${id}</option>`).join('')}
+        </select>
+      </div>
+      <div style="flex:1;min-width:200px;">
         <div class="section-title" style="margin:0 0 10px;">모델별 정비 이력</div>
         <select id="maint-model-filter" onchange="renderMaintByModel()" style="width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:13px;background:#fff;">
           <option value="">모델 선택</option>
@@ -2312,6 +2319,7 @@ function renderMaintTab(){
         <input type="number" id="f-warn-threshold" min="1" value="${DB.warnThreshold||50}" onchange="updateWarnThreshold(this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:13px;background:#fff;box-sizing:border-box;">
       </div>
     </div>
+    <div id="maint-gen-result"></div>
     <div id="maint-model-result"></div>
     ${longtermPrepListHtml()}
     <div class="section-title">정비 주기 현황 <span class="cnt" id="maint-list-cnt"></span></div>
@@ -2379,6 +2387,17 @@ function renderMaintList(){
       <thead><tr><th>번호</th><th>모델</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`}`;
+}
+function renderMaintByGen(){
+  const genId = document.getElementById('maint-gen-filter').value;
+  const el = document.getElementById('maint-gen-result');
+  if(!genId){ el.innerHTML=''; return; }
+  const recs = DB.maint.filter(m=>m.genId===genId).sort((a,b)=>b.date.localeCompare(a.date));
+  if(recs.length===0){ el.innerHTML = `<div class="empty">"${genId}" 발전기의 정비 이력이 없습니다.</div>`; return; }
+  el.innerHTML = `<div class="table-scroll"><table>
+    <thead><tr><th>정비일</th><th>번호</th><th>정비시 누적시간</th><th>구분</th><th>정비자</th><th>사용부품</th><th>정비 내용</th></tr></thead>
+    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':'<span class="pill gray">정기정비</span>'}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;">${(r.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td><td class="wrap-ok">${r.content||'-'}</td></tr>`).join('')}</tbody>
+  </table></div>`;
 }
 function renderMaintByModel(){
   const model = document.getElementById('maint-model-filter').value;
@@ -3710,6 +3729,7 @@ function renderManualTab(){
       ['직접수정', '모델·셋팅 전압·누적시간·마지막 정비시점·마지막 정비일자를 직접 입력·조정하는 곳입니다. 발전기를 처음 등록할 때도 여기서 초기값을 넣고, 데이터 오류 수정도 여기서 합니다. 마지막 정비시 누적시간이 현재 누적시간보다 크면 저장되지 않습니다. 여기서 값을 고치면 정비이력에는 남기지 않고 조용히 반영됩니다 — 실제 현장에서 전압을 바꾼 경우는 [입고] 목록 전압 클릭이나 출고/입고 처리 화면을 이용하면 정비이력에 자동으로 기록됩니다. 연료통 기준높이는 [설정 → 발전기별 탱크 규격·기준높이]에서 따로 관리합니다.'],
       ['정비주기', '기본 400시간인 정비 주기를 발전기 개별로 다르게 설정합니다. 직접 숫자를 입력해도 되고, 350h·400h·450h·500h 버튼을 눌러 바로 채울 수도 있습니다.'],
       ['정비주기 일괄변경', '용량별 보기 버튼 줄 맨 끝에 있는 "⚙️ 정비주기 일괄변경" 버튼입니다. "전체"를 선택한 상태면 지금 목록에 보이는 발전기 전체에, 특정 용량(예: 550kW)을 선택한 상태면 그 용량의 발전기들에만 한 번에 같은 정비 주기를 적용합니다.'],
+      ['발전기별 정비 이력', '발전기 번호를 선택하면 그 발전기 한 대의 정비 기록만 모아서 봅니다. "모델별 정비 이력" 바로 왼쪽에 같은 크기의 카드로 나란히 있습니다.'],
       ['모델별 정비 이력', '모델을 선택하면 그 모델을 쓴 발전기들의 정비 기록만 모아서 봅니다. 바로 아래에 "정비 임박 경고 기준"을 숫자로 직접 설정하는 칸이 있습니다(기본값 50h). 잔여시간이 그 값 이하면 "임박"으로 표시됩니다.'],
       ['용량별 보기 (정비 주기 현황)', '정비 주기 현황 목록 위에 자동으로 생기는 용량(kW) 버튼을 누르면 그 용량의 발전기만 걸러서 봅니다. "전체" 버튼으로 다시 전체 목록으로 돌아갑니다. [입고] 탭의 용량별 보기와 같은 방식입니다.'],
       ['장기임대 정비 준비 리스트', '장기임대 발전기를 정비 임박 순으로 모아, 거래처·현장과 함께 방문시 챙길 자재(엔진오일량·필터 품명/규격)까지 보여줍니다. 🖨 인쇄 버튼으로 체크리스트를 뽑을 수 있습니다.']
