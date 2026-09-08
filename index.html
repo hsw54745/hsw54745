@@ -3986,7 +3986,45 @@ function toggleSalesShowBorrowedOnly(checked){
   salesShowBorrowedOnly = !!checked;
   renderContent();
 }
+// 2026-09-04~05 사이 청구기록 구분키(matchKey) 형식이 "번호+출고일"에서 "번호+출고일+거래처명"으로
+// 바뀌면서, 그 이전에 만들어진 옛날 형식의 기록들이 새 형식과 매칭되지 못해 하나씩 중복 생성된 문제를
+// 자동으로 정리합니다. 같은 발전기·출고일·거래처 조합이 여러 개면 금액이 입력된 쪽(또는 더 최근 것)을
+// 남기고, 나머지가 채워둔 값이 있으면 옮겨 담은 뒤 중복은 지웁니다. 중복이 없으면 아무 것도 하지 않습니다.
+function dedupBillingRecords(){
+  const list = DB.salesBillingRecords||[];
+  if(list.length===0) return false;
+  const groups = {};
+  list.forEach(rec=>{
+    const k = billingMatchKey(rec.genId, rec.outDate, rec.customer);
+    (groups[k] = groups[k]||[]).push(rec);
+  });
+  let changed = false;
+  const survivors = [];
+  Object.values(groups).forEach(g=>{
+    if(g.length===1){ survivors.push(g[0]); return; }
+    const hasMoney = r => (Number(r.billTotal)||0)>0 || (Number(r.billPay1Amount)||0)>0 || (Number(r.billPay2Amount)||0)>0 || (Number(r.billPay3Amount)||0)>0;
+    g.sort((a,b)=> (hasMoney(b)?1:0)-(hasMoney(a)?1:0) || (b.createdAt||'').localeCompare(a.createdAt||''));
+    const keeper = g[0];
+    const isEmptyVal = v => v===0 || v==='' || v==null || v===false;
+    for(let i=1;i<g.length;i++){
+      const loser = g[i];
+      Object.keys(loser).forEach(key=>{
+        if(key==='id'||key==='matchKey'||key==='createdAt') return;
+        if(isEmptyVal(keeper[key]) && !isEmptyVal(loser[key])) keeper[key] = loser[key];
+      });
+    }
+    keeper.matchKey = billingMatchKey(keeper.genId, keeper.outDate, keeper.customer);
+    survivors.push(keeper);
+    changed = true;
+  });
+  if(changed){
+    DB.salesBillingRecords = survivors;
+    saveSalesBillingRecords();
+  }
+  return changed;
+}
 function renderSalesTab(){
+  dedupBillingRecords();
   activeGens().filter(g=>g.status==='out').forEach(g=>getOrCreateBillingRecord(g));
   let retroFixed = false;
   (DB.salesBillingRecords||[]).forEach(rec=>{
