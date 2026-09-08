@@ -479,6 +479,7 @@ let currentTab = 'dashboard';
 const SALES_MANAGER_FIXED_NAME = '이영숙';
 let salesFilterMonth = '';
 let salesFilterStatus = 'all';
+let salesFilterBillNo = '';
 let salesShowFreight = true;
 let salesShowHiddenOnly = false;
 let salesShowBorrowedOnly = false;
@@ -3768,12 +3769,12 @@ function renderManualTab(){
       ['접근 권한', '매출관리 관리자 이름은 "이영숙"으로 고정되어 있어 바꿀 수 없습니다. "이영숙"으로 접속했을 때만 상단 탭에 매출관리가 보이고 사용할 수 있으며, 그 외 이름으로 접속하면 탭 자체가 안 보입니다. 비밀번호도 "이영숙"으로 접속했을 때만 [설정 → 매출관리자 지정]에서 설정할 수 있고, 다른 이름으로 접속하면 비밀번호 입력칸 자체가 안 보입니다. 비밀번호를 설정해두면 매출관리 탭에 들어갈 때 비밀번호를 입력해야 합니다("비밀번호 없이 사용" 체크를 켜두면 비밀번호를 물어보지 않습니다).'],
       ['관리자 모드로 매출관리 열람', '"이영숙"이 아니어도, [설정 → 🔐 관리자 모드]를 전용 비밀번호로 열고 그 안의 "매출관리 보기" 체크를 켜면 매출관리 탭이 보입니다(매출관리자 지정과는 완전히 별개의 통로입니다). 이 경로로 들어갈 때는 매출관리 자체 비밀번호는 물어보지 않고 바로 들어가집니다(관리자 모드 비밀번호로 이미 확인된 것으로 간주). 이 체크는 **지금 쓰고 있는 이 기기·이 브라우저에만 적용**되고, 다른 사람 화면이나 다른 기기에는 전혀 영향을 주지 않습니다. 관리자 모드가 5분 후 잠겨도 이 체크는 계속 유지되며, 다시 끄고 싶으면 관리자 모드를 한 번 더 열어서 체크를 직접 풀어야 합니다.'],
       ['비밀번호 변경시 다른 기기 자동 잠금', '한 기기에서 비밀번호를 새로 저장하면, 그 기기는 계속 열람 가능한 상태로 유지되지만 이미 열려있던 다른 기기·다른 창은 새 비밀번호를 모르는 상태가 되어 다음 자동 동기화 때(최대 2분 이내) 자동으로 다시 잠깁니다. 그 화면에서 다시 들어가려면 새 비밀번호를 입력해야 합니다.'],
-      ['업체별 매출현황', '지금 출고중인 발전기를 출고일 순서대로 보여줍니다. 발전기별로 청구일자·업체명·현장명·용량·발전기번호·사용기간·견적금액(공급가·세액·합계)·계산서 발행·운임(출고운임/세액, 입고운임/세액)·입금일/입금금액·미수금·담당자·연락처·비고를 표 안에서 바로 입력할 수 있고, 공급가와 각 운임을 넣으면 세액(10%)이 자동 계산되며 합계도 자동으로 더해집니다(합계는 직접 고칠 수도 있음). 업체명에 담당자 이름·전화번호가 같이 적혀 있으면 자동으로 나눠서 담당자·연락처 칸에 채워줍니다. 입력한 내용은 곧바로 저장되며, 별도의 등록 버튼이 필요 없습니다. 한 번 생성된 매출 기록은 이후 출고취소·입고가 되어도 지워지지 않고 그대로 남습니다.'],
+      ['업체별 매출현황', '지금 출고중인 발전기를 출고일 순서대로 보여줍니다. 각 매출 건은 현장명 아래에 "HS-1, HS-2..."처럼 계속 증가하는 고유 매출번호가 카드로 크게 표시되어, 전화나 대화로 특정 건을 빠르게 지칭할 때 씁니다(숨기거나 취소해도 번호는 재사용되지 않습니다). 발전기별로 청구일자·업체명·현장명·용량·발전기번호·사용기간·견적금액(공급가·세액·합계)·계산서 발행·운임(출고운임/세액, 입고운임/세액)·입금일/입금금액·미수금·담당자·연락처·비고를 표 안에서 바로 입력할 수 있고, 공급가와 각 운임을 넣으면 세액(10%)이 자동 계산되며 합계도 자동으로 더해집니다(합계는 직접 고칠 수도 있음). 업체명에 담당자 이름·전화번호가 같이 적혀 있으면 자동으로 나눠서 담당자·연락처 칸에 채워줍니다. 입력한 내용은 곧바로 저장되며, 별도의 등록 버튼이 필요 없습니다. 한 번 생성된 매출 기록은 이후 출고취소·입고가 되어도 지워지지 않고 그대로 남습니다.'],
       ['계산서 발행 버튼', '견적금액 칸 아래 있는 토글 버튼입니다. 누르면 "발행 처리할까요?" 또는 "미발행으로 변경할까요?" 확인창이 뜨고, 확인해야만 "계산서 미발행" ↔ "계산서 발행함" 상태가 바뀝니다.'],
       ['이 매출 숨기기', '청구일자 칸 아래 큰 버튼입니다. 누르면 숨기는 이유를 입력하라는 창이 뜨고, 이유를 적고 확인하면 목록에서 안 보이게 숨겨집니다(삭제 아님). "숨김매출" 체크를 켜면 숨긴 건만 모아서 볼 수 있고, 각 건에 적어둔 숨긴 이유도 함께 표시되며 "복원하기" 버튼으로 다시 되돌릴 수 있습니다.'],
       ['출고취소와 매출 기록의 연동', '[출고중] 목록에서 "🚫 출고취소"를 누르면 취소 사유를 적고 "비용발생"/"비용발생 안함" 중 골라야 합니다. "비용발생"을 고르면 그 건의 매출 기록은 정상 목록에 그대로 남고, "비용발생 안함"을 고르면 사유와 함께 자동으로 "숨김매출" 처리되어 정상 목록에서 빠집니다.'],
-      ['필터 (월별·입금상태·업체별·발전기번호별)', '청구일자 기준 월별 필터, 입금완료/미입금 버튼, 업체별 보기, 발전기번호별 보기 드롭다운으로 원하는 내역만 골라볼 수 있습니다. "출고운임·입고운임 표시" 체크를 끄면 운임 관련 칸이 숨겨져 화면이 더 단순해집니다.'],
-      ['입금완료 표시 · 인쇄', '견적금액에서 입금액 합계를 뺀 미수금이 0 이하가 되면 그 줄은 초록색, 미수가 남아있으면 붉은색 배경으로 표시됩니다. 상단 "🖨 인쇄" 버튼을 누르면 지금 적용된 필터 그대로 새 창에 미리보기가 뜨고 인쇄 대화상자가 자동으로 열립니다(팝업 차단 시 브라우저에서 팝업을 허용해주세요).'],
+      ['필터 (매출번호·월별·입금상태·업체별·발전기번호별)', '"매출번호로 보기"에 HS-번호의 숫자만 입력하면 그 매출 건 하나만 걸러서 볼 수 있습니다(500건이든 몇 건이든 목록으로 나열하지 않고, 번호를 직접 입력해서 찾는 방식입니다). 그 외 청구일자 기준 월별 필터, 입금완료/미입금 버튼, 업체별 보기, 발전기번호별 보기 드롭다운으로 원하는 내역만 골라볼 수 있습니다. "출고운임·입고운임 표시" 체크를 끄면 운임 관련 칸이 숨겨져 화면이 더 단순해집니다.'],
+      ['입금완료 표시 · 인쇄', '견적금액에서 입금액 합계를 뺀 미수금이 0 이하가 되면 그 줄은 초록색, 미수가 남아있으면 붉은색 배경으로 표시됩니다. 상단 "🖨 인쇄" 버튼을 누르면 지금 적용된 필터 그대로(매출번호 필터 포함) 새 창에 미리보기가 뜨고 인쇄 대화상자가 자동으로 열립니다. 인쇄물 맨 앞 열에도 매출번호가 함께 나옵니다(팝업 차단 시 브라우저에서 팝업을 허용해주세요).'],
       ['💵 현금매출', '"이 매출 숨기기" 버튼 밑에 있는 체크박스입니다. 켜면 견적금액 칸이 "현금 공급가" 입력 하나로 바뀌고 세액 칸과 계산서 발행 버튼이 없어집니다(세액 자동 0원, 계산서 자동 미발행 처리). 운임은 켜져있는 경우 그대로 따로 입력할 수 있고 합계에 정확히 합산됩니다. 맨 위 요약 카드에 "현금 매출 총액"으로 지금 필터에 맞는 현금매출 건들의 합계가 따로 표시됩니다.'],
       ['🤝 임대발전기 매출', '[입고]에서 "🤝 발전기 임의추가"로 등록한 협력업체 발전기가 출고되면 일반 발전기와 똑같이 여기 매출관리에 잡히고, 매출 카드 안에 "🤝 외주업체명"과 "🤝 발전기 임대비용" 입력칸이 추가로 나와서 어느 협력업체에서 빌렸고 얼마를 지불하는지 따로 적을 수 있습니다. 임대비용을 입력하면 바로 아래 "마진(이익)" 줄에 견적금액에서 임대비용을 뺀 값이 자동으로 계산되어 표시됩니다. "숨김매출" 체크 옆에 있는 "🤝 임대발전기 매출" 체크를 켜면 임대 발전기 건만 따로 모아서 볼 수 있습니다.'],
       ['임대발전기 요약 카드 · 순이익', '맨 위 요약 카드 줄에 지금 필터 기준 "임대발전기 임대료 총액"(협력업체에 지불한 금액), "임대발전기 매출총액"(고객에게 받은 금액), "임대발전기 순이익(마진)"(매출총액에서 임대료를 뺀 실제 남는 돈) 3개가 순서대로 표시됩니다. 매출(청구금액)은 항상 고객에게 받은 금액 그대로 두고 임대료를 미리 빼지 않는 방식이라, 세금계산서 발행 금액과 매출이 항상 일치합니다. 순이익 카드 바로 옆에는 이 계산 방식을 설명하는 안내 카드도 함께 표시됩니다.'],
@@ -3909,6 +3910,14 @@ function parseCustomerString(raw){
   customer = customer.replace(/[-,/·\s]+$/,'').trim();
   return { customer: customer || (raw||'').trim(), name, phone };
 }
+function nextBillSeqNo(){
+  return nextBillSeqNoFrom(DB.salesBillingRecords||[]);
+}
+function nextBillSeqNoFrom(list){
+  let max = 0;
+  (list||[]).forEach(r=>{ if(r.billSeqNo && r.billSeqNo>max) max = r.billSeqNo; });
+  return max+1;
+}
 function getOrCreateBillingRecord(g){
   const rt = g.rental||{};
   const key = billingMatchKey(g.id, rt.outDate, rt.customer);
@@ -3918,7 +3927,7 @@ function getOrCreateBillingRecord(g){
     const cap = capacityOf(g);
     const parsed = parseCustomerString(rt.customer);
     rec = {
-      id: uid(), matchKey: key, genId: g.id, outDate: rt.outDate||'',
+      id: uid(), matchKey: key, billSeqNo: nextBillSeqNo(), genId: g.id, outDate: rt.outDate||'',
       customer: parsed.customer||'(업체명 미상)', site: rt.address||rt.site||'-', capacity: isFinite(cap)? cap : null,
       manager: rt.manager||parsed.name||'', phone: rt.phone||parsed.phone||'',
       billDate:'', billUnitPrice:0, billTax:0, billTotal:0,
@@ -4017,6 +4026,15 @@ function dedupBillingRecords(){
     survivors.push(keeper);
     changed = true;
   });
+  // 매출번호(HS-1, HS-2...)가 없는 기록에 번호를 부여합니다 (신규 기능 적용 전 기록들에 대한 1회성 처리).
+  // 출고일 순서대로 번호를 매겨서, 숫자가 대략 시간 순서와 맞도록 합니다.
+  const missing = survivors.filter(r=>!r.billSeqNo);
+  if(missing.length>0){
+    missing.sort((a,b)=> (a.outDate||'').localeCompare(b.outDate||'') || (a.createdAt||'').localeCompare(b.createdAt||''));
+    let n = nextBillSeqNoFrom(survivors);
+    missing.forEach(r=>{ r.billSeqNo = n++; });
+    changed = true;
+  }
   if(changed){
     DB.salesBillingRecords = survivors;
     saveSalesBillingRecords();
@@ -4052,6 +4070,9 @@ function renderSalesTab(){
   const custOptions = [...new Set(visibleScopeRecs.map(r=>r.customer||'(업체명 미상)'))].sort((a,b)=>a.localeCompare(b,'ko'));
   const genIdOptions = [...new Set(visibleScopeRecs.map(r=>r.genId))].sort((a,b)=>a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'}));
   let recs = visibleScopeRecs;
+  if(salesFilterBillNo){
+    recs = recs.filter(r=>String(r.billSeqNo||'')===salesFilterBillNo);
+  }
   if(salesFilterMonth){
     recs = recs.filter(r=>(r.billDate||'').slice(0,7)===salesFilterMonth);
   }
@@ -4120,7 +4141,11 @@ function renderSalesTab(){
         </div>` : ''}
       </td>
       <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.customer).replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','customer', this.value)">` : escR(rec.customer)}</td>
-      <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(dedupRepeatedText(rec.site)).replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','site', this.value)">` : escR(dedupRepeatedText(rec.site))}</td>
+      <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(dedupRepeatedText(rec.site)).replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','site', this.value)">` : escR(dedupRepeatedText(rec.site))}
+        ${rec.billSeqNo? `<div class="detail-card" style="margin-top:8px;padding:9px 8px;min-width:110px;text-align:center;background:var(--primary-tint);border:1px solid var(--primary);">
+          <span style="font-size:19px;font-weight:900;letter-spacing:0.5px;color:var(--primary-dark);white-space:nowrap;">HS-${rec.billSeqNo}</span>
+        </div>` : ''}
+      </td>
       <td rowspan="2">${rec.manual? `<input type="number" min="0" value="${rec.capacity!=null? rec.capacity:''}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','capacity', this.value===''?null:Number(this.value))">` : capStr}</td>
       <td rowspan="2" class="gid">${rec.manual? `<input type="text" value="${escR(rec.genId).replace(/"/g,'&quot;')}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','genId', this.value)">` : rec.genId}</td>
       <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.period||'').replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','period', this.value)">` : `<div>${period}</div>${usageDays!=null? `<div class="muted" style="text-align:center;font-size:11px;margin-top:3px;">${recIsLiveOut(rec)? `사용 ${usageDays}일째` : `총 ${usageDays}일 사용`}</div>`:''}`}</td>
@@ -4186,6 +4211,13 @@ function renderSalesTab(){
     <div class="section-title">💰 업체별 매출현황 <span class="cnt">${recs.length}건</span> <button type="button" class="btn" style="font-size:15px;" onclick="printSalesList()">🖨 인쇄</button></div>
     <p class="muted" style="font-size:13px;margin-top:-4px;">발전기가 출고될 때 매출 기록이 자동으로 생성되고, 이후 출고취소·입고가 되어도 이 기록은 지워지지 않고 그대로 남습니다(발생한 비용은 취소돼도 청구 대상이라서요). 청구일자·공급가·세액·출고운임·입고운임·계산서 발행 여부·입금일자를 입력하면 바로 저장됩니다.</p>
     <div style="display:flex;gap:14px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">
+      <div class="detail-card" style="padding:14px 16px;flex:none;">
+        <label style="display:block;font-size:14px;font-weight:700;margin-bottom:6px;white-space:nowrap;">매출번호로 보기</label>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <span style="font-size:15px;font-weight:700;color:var(--primary-dark);">HS-</span>
+          <input type="number" min="1" placeholder="번호" value="${salesFilterBillNo}" onchange="setSalesFilterBillNo(this.value)" style="font-size:16px;padding:9px 10px;border:1px solid var(--border-strong);border-radius:8px;width:90px;">
+        </div>
+      </div>
       <div class="detail-card" style="padding:14px 16px;flex:none;">
         <label style="display:block;font-size:14px;font-weight:700;margin-bottom:6px;white-space:nowrap;">월별 선택보기</label>
         <input type="month" value="${salesFilterMonth}" onchange="setSalesFilterMonth(this.value)" style="font-size:16px;padding:9px 12px;border:1px solid var(--border-strong);border-radius:8px;">
@@ -4274,6 +4306,10 @@ function setSalesFilterMonth(value){
   salesFilterMonth = value||'';
   renderContent();
 }
+function setSalesFilterBillNo(value){
+  salesFilterBillNo = value||'';
+  renderContent();
+}
 function setSalesFilterStatus(value){
   salesFilterStatus = value||'all';
   renderContent();
@@ -4292,6 +4328,9 @@ function setSalesFilterGenId(value){
 }
 function printSalesList(){
   let recs = (DB.salesBillingRecords||[]).filter(r=> salesShowHiddenOnly ? r.hidden : !r.hidden).sort((a,b)=>(b.outDate||'').localeCompare(a.outDate||''));
+  if(salesFilterBillNo){
+    recs = recs.filter(r=>String(r.billSeqNo||'')===salesFilterBillNo);
+  }
   if(salesFilterMonth){
     recs = recs.filter(r=>(r.billDate||'').slice(0,7)===salesFilterMonth);
   }
@@ -4318,9 +4357,10 @@ function printSalesList(){
     const balance = total-paid;
     grandTotal += quoteOnly;
     grandBalance += balance;
-    return `<tr><td>${rec.billDate? dow(rec.billDate):'-'}</td><td class="name">${escR(rec.customer)}</td><td class="name">${escR(dedupRepeatedText(rec.site))}</td><td>${escR(rec.genId)}</td><td>${total.toLocaleString()}원</td><td>${paid.toLocaleString()}원</td><td>${balance.toLocaleString()}원</td><td>${rec.billInvoiceIssued?'유':'무'}</td><td>${escR((rec.billManager!=null? rec.billManager : rec.manager)||'-')}</td></tr>`;
+    return `<tr><td style="font-weight:800;">${rec.billSeqNo? `HS-${rec.billSeqNo}`:'-'}</td><td>${rec.billDate? dow(rec.billDate):'-'}</td><td class="name">${escR(rec.customer)}</td><td class="name">${escR(dedupRepeatedText(rec.site))}</td><td>${escR(rec.genId)}</td><td>${total.toLocaleString()}원</td><td>${paid.toLocaleString()}원</td><td>${balance.toLocaleString()}원</td><td>${rec.billInvoiceIssued?'유':'무'}</td><td>${escR((rec.billManager!=null? rec.billManager : rec.manager)||'-')}</td></tr>`;
   }).join('');
   const filterLabel = [
+    salesFilterBillNo? `매출번호: HS-${salesFilterBillNo}` : '',
     salesFilterMonth? `${salesFilterMonth}` : '전체 기간',
     salesFilterStatus==='paid'? '입금완료' : salesFilterStatus==='unpaid'? '미입금' : '전체',
     salesFilterCustomer? `업체: ${salesFilterCustomer}` : '',
@@ -4331,9 +4371,9 @@ function printSalesList(){
     <div class="ol-title">업체별 매출현황</div>
     <div class="ol-sub">${filterLabel} · 출력일 ${todayStr()}</div>
     <table class="ol-table">
-      <thead><tr><th>청구일자</th><th>업체명</th><th>현장명</th><th>발전기번호</th><th>견적금액</th><th>입금액</th><th>미수금</th><th>계산서</th><th>담당자</th></tr></thead>
+      <thead><tr><th>매출번호</th><th>청구일자</th><th>업체명</th><th>현장명</th><th>발전기번호</th><th>견적금액</th><th>입금액</th><th>미수금</th><th>계산서</th><th>담당자</th></tr></thead>
       <tbody>${rows}</tbody>
-      <tfoot><tr style="font-weight:800;"><td colspan="4">합계(운임 제외)</td><td>${grandTotal.toLocaleString()}원</td><td></td><td colspan="3">미수금 ${grandBalance.toLocaleString()}원</td></tr></tfoot>
+      <tfoot><tr style="font-weight:800;"><td colspan="5">합계(운임 제외)</td><td>${grandTotal.toLocaleString()}원</td><td></td><td colspan="3">미수금 ${grandBalance.toLocaleString()}원</td></tr></tfoot>
     </table>
   </div>`;
   const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
