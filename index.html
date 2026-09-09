@@ -5059,10 +5059,9 @@ function tomorrowStr(){
 }
 function loadingPopupData(){
   const today = todayStr(), tomorrow = tomorrowStr();
-  // 발전기가 아직 미지정인 출고예약(pendingLoad:false)도 상차 예정에 포함시킵니다.
-  // (이전엔 pendingLoad:true인 것만 걸러서, 미지정 출고예약은 이 팝업에 아예 안 떴습니다.)
-  // 단, 문자오더인데 아직 도착시간을 입력하지 않은 건은 정식 상차 예정으로 잡지 않습니다.
-  const pending = (DB.reservations||[]).filter(r=>(r.pendingLoad || r.genId===UNASSIGNED_GEN_ID) && !(r.smsOrder && !r.arriveTime));
+  // 발전기가 아직 배정되지 않은 건(미지정 출고예약, 문자오더 포함)은 상차 예정으로 잡지 않습니다.
+  // 이 팝업의 목적은 "오늘 상차가 확정된 것"을 확인하는 것이라, 아직 발전기도 안 정해진 건 의미가 없습니다.
+  const pending = (DB.reservations||[]).filter(r=>r.pendingLoad);
   const loadDateOf = r => r.loadDate || r.outDate || r.plannedOutDate;
   const todayLoad = pending.filter(r=>loadDateOf(r)===today).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
   const tomorrowLoad = pending.filter(r=>loadDateOf(r)===tomorrow).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
