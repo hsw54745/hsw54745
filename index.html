@@ -1098,6 +1098,7 @@ function endSaving(){
 }
 
 function findGen(id){ return DB.gens.find(g=>g.id===id); }
+const UNASSIGNED_GEN_ID = '__UNASSIGNED__'; // 출고예약 등록 시 발전기를 아직 정하지 않은 경우 사용하는 표시값
 // 누적시간 상태: 'known'(확인됨) / 'na'(해당없음 - 구형이라 계기 자체가 없음) / 'unknown'(미확인 - 아직 값 미입력)
 function hoursStatus(g){
   if(g.hoursKnown) return 'known';
@@ -6893,6 +6894,36 @@ function renderReserveTab(){
   const delayedCount = list.filter(r=>dateOf(r) && daysFromToday(dateOf(r))<0).length;
   const pendingCount = list.filter(r=>r.pendingLoad).length;
   const rows = list.map(r=>{
+    if(r.genId === UNASSIGNED_GEN_ID){
+      const d2 = r.plannedOutDate;
+      const isDelayed2 = d2 && daysFromToday(d2)<0;
+      const fuelForList2 = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
+      const suppliesCell2 = r.supplies
+        ? `<button class="btn sm" style="color:var(--danger);font-weight:700;border-color:var(--danger);" onclick="showSuppliesModal('${r.id}')">부자재확인</button>`
+        : `<span class="muted">부자재없음</span>`;
+      const noteMarker2 = (r.note && r.note.trim()) ? `<button class="btn sm" style="color:var(--primary-dark);font-weight:700;border-color:var(--primary);text-align:center;margin-top:4px;" onclick="showNoteModal('${r.id}')">비고확인</button>` : '';
+      return `<tr${isDelayed2? ` style="background:var(--danger-tint);"`:''}>
+        <td class="gid"><span class="pill warn">🅾 미지정</span></td>
+        <td class="wrap-ok" style="max-width:130px;"><span class="muted">발전기 배정 전</span></td>
+        <td class="muted" style="font-size:11px;">${r.outProcessedBy? escR(r.outProcessedBy) : '-'}</td>
+        <td class="wrap-ok" style="font-size:12px;">
+          ${r.customer||r.site||'<span class="muted">미기재</span>'}
+          ${r.address? `<div class="muted" style="font-size:11px;">${escR(r.address)}</div>`:''}
+        </td>
+        <td class="muted">-</td>
+        <td class="muted">${dow(d2)||'-'}<div><span class="pill">출고예약</span>${isDelayed2? ' <span class="pill danger">지연</span>':''}</div></td>
+        <td class="muted">${r.arriveTime||'-'}</td>
+        <td class="muted">${r.freightBearer||'-'}</td>
+        <td class="muted">${r.voltage||'-'}</td>
+        <td class="muted">${fuelForList2!=null? `<span style="font-size:16px;font-weight:800;color:var(--primary-dark);">${fuelForList2}L</span>` : '-'}</td>
+        <td><div style="display:flex;flex-direction:column;align-items:center;gap:2px;">${suppliesCell2}${noteMarker2}</div></td>
+        <td class="muted">${r.usageDays? r.usageDays+'일' : '-'}</td>
+        <td><div class="btn-row" style="flex-wrap:nowrap;">
+          <button class="btn sm primary" onclick="openAssignGenModal('${r.id}')">🔧 발전기 배정</button>
+          <button class="btn sm danger" onclick="cancelReservation('${r.id}')">예약 취소</button>
+        </div></td>
+      </tr>`;
+    }
     const g = findGen(r.genId);
     const d = dateOf(r);
     const isDelayed = d && daysFromToday(d)<0;
@@ -6941,6 +6972,13 @@ function renderReserveTab(){
   return `
     <div class="section-title">출고 대기 <span class="cnt">${list.length}건</span>${pendingCount>0? `<span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">상차대기 ${pendingCount}건</span>`:''}${delayedCount>0? `<span class="cnt" style="background:var(--danger-tint);color:var(--danger);border-color:var(--danger);">지연 ${delayedCount}건</span>`:''}</div>
     <p class="muted" style="font-size:12.5px;margin-top:-4px;">출고하기를 하면 발전기가 여기 "상차대기"로 표시됩니다. 상차 담당자가 실제 싣고 나갈 때 "상차완료"를 누르면 그때 출고(출고중)로 처리됩니다. 연료는 실제 주입량 기준으로 표시됩니다.</p>
+    <div class="detail-card" style="margin:10px 0 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--primary-tint);border:1px solid var(--primary);">
+      <div style="text-align:left;">
+        <div style="font-weight:700;font-size:14px;">📝 출고예약</div>
+        <div class="muted" style="font-size:12px;margin-top:2px;">발전기를 아직 정하지 않아도 거래처 정보만 먼저 등록해둘 수 있습니다. 아래 목록에 같이 표시되며, 나중에 발전기를 배정하면 정상 출고로 이어집니다.</div>
+      </div>
+      <button class="btn primary" onclick="openReserveNoGenModal()">+ 출고예약 등록</button>
+    </div>
     ${list.length===0? `<div class="empty" style="margin-top:12px;">등록된 출고 대기가 없습니다.</div>` : `
     <div class="table-scroll" style="margin-top:12px;"><table>
       <thead><tr><th>번호</th><th style="max-width:130px;">모델</th><th>출고요청</th><th>거래처/현장</th><th>상차일</th><th>도착일</th><th>도착시간</th><th>운임</th><th>전압</th><th>주입연료</th><th>부자재</th><th>사용일수</th><th></th></tr></thead>
@@ -7016,11 +7054,48 @@ function cancelReservation(id){
 function processReservation(resId){
   const r = DB.reservations.find(x=>x.id===resId);
   if(!r) return;
+  if(r.genId === UNASSIGNED_GEN_ID){ openAssignGenModal(resId); return; }
   const g = findGen(r.genId);
   if(!g){ showInfoModal('해당 발전기를 찾을 수 없습니다.'); return; }
   if(g.status==='out'){ showInfoModal('입고 처리가 완료되지 않은 발전기입니다. 먼저 입고 처리를 완료한 뒤 출고해주세요.'); return; }
   if(g.underRepair){ showInfoModal('고장 수리 중인 발전기입니다. 수리 완료 처리 후 출고할 수 있습니다.'); return; }
   openOutModal(r.genId, resId);
+}
+function openAssignGenModal(resId){
+  const r = DB.reservations.find(x=>x.id===resId);
+  if(!r) return;
+  const candidates = activeGens().filter(x=>x.status==='in' && !x.underRepair && !DB.reservations.some(o=>o.genId===x.id)).sort(sortByIdNatural);
+  if(candidates.length===0){
+    showInfoModal('지금 배정할 수 있는(입고 상태인) 발전기가 없습니다.');
+    return;
+  }
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>🔧 발전기 배정</h3>
+      <div class="modal-sub">${escR(r.customer||r.site||'-')} · 출고예약</div>
+      <div class="field" style="text-align:left;">
+        <label>배정할 발전기 (현재 입고 상태만 표시됩니다)</label>
+        <select id="f-assign-gen">${candidates.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('')}</select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">취소</button>
+        <button class="btn primary" onclick="confirmAssignGen('${resId}')">다음 (출고 정보 입력)</button>
+      </div>
+    </div>
+  </div>`;
+}
+function confirmAssignGen(resId){
+  const r = DB.reservations.find(x=>x.id===resId);
+  const sel = document.getElementById('f-assign-gen');
+  if(!r || !sel || !sel.value) return;
+  const chosenId = sel.value;
+  const g = findGen(chosenId);
+  if(!g || g.status!=='in' || g.underRepair){ showInfoModal('선택한 발전기를 지금은 배정할 수 없습니다. 다시 선택해주세요.'); return; }
+  r.genId = chosenId;
+  r.pendingLoad = true; // 발전기가 정해졌으니 이제부터는 일반 상차대기와 동일하게 취급합니다.
+  saveWithRetry(saveReservations);
+  openOutModal(chosenId, resId);
 }
 function confirmLoadPrompt(resId){
   const r = DB.reservations.find(x=>x.id===resId);
@@ -7152,6 +7227,218 @@ function showInfoModal(message){
   document.getElementById('info-ok-btn').addEventListener('click', closeModal);
 }
 
+function openReserveNoGenModal(){
+  const candidates = activeGens().filter(x=>x.status==='in' && !x.underRepair && !DB.reservations.some(r=>r.genId===x.id)).sort(sortByIdNatural);
+  const genOptionsHtml = `<option value="${UNASSIGNED_GEN_ID}" selected>🅾 미지정 (나중에 발전기 배정)</option>` +
+    candidates.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal modal-wide" style="text-align:center;">
+      <h3>📝 출고예약</h3>
+      <div class="modal-sub">발전기를 아직 정하지 않았어도 거래처 정보를 먼저 등록해둘 수 있습니다. 나중에 [출고 대기]에서 발전기를 배정하면 정상 출고로 이어집니다.</div>
+      <div class="out-row stretch">
+        <div class="field f-sm"><div class="out-card"><label>발전기</label>
+          <select id="f-rsv-gen" onchange="onRsvGenChange()">${genOptionsHtml}</select>
+        </div></div>
+        <div class="field f-sm" id="f-rsv-starthours-wrap" style="display:none;"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-rsv-starthours" value="0" min="0"><div class="hint" id="rsv-starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);"></div></div></div>
+        <div class="field f-sm"><div class="out-card"><label>출고예정일</label>
+          <input type="date" id="f-rsv-outdate" value="${todayStr()}" onchange="syncRsvReturnDateToUsageDays()">
+        </div></div>
+        <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="f-rsv-freight">
+          <option value="우리부담" selected>우리부담</option>
+          <option value="고객부담">고객부담</option>
+        </select></div></div>
+      </div>
+      <div class="out-row">
+        <div class="field f-lg"><label>거래처명</label>
+          <input type="text" id="f-rsv-site" list="customer-datalist" placeholder="예: 00건설" oninput="onRsvCustomerNameInput()">
+          <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
+          <div class="hint">이전에 거래한 업체명을 선택하면 담당자·연락처·주소가 자동으로 채워집니다.</div>
+          <div id="f-rsv-site-warning"></div>
+        </div>
+        <div class="field f-xs"><label>사용일수(일)</label>
+          <input type="number" id="f-rsv-usagedays" min="0" placeholder="예: 7" oninput="syncRsvUsageDaysToReturnDate()">
+        </div>
+        <div class="field f-xs"><label>예상가동시간(h/일)</label>
+          <input type="number" id="f-rsv-estdaily" step="0.5" min="0" placeholder="예: 8">
+        </div>
+        <div class="field f-sm"><label>반납 예정일 (선택)</label>
+          <input type="date" id="f-rsv-returndate" onchange="syncRsvReturnDateToUsageDays()">
+        </div>
+      </div>
+      <div class="out-row">
+        <div class="field f-lg"><label>현장 주소</label><input type="text" id="f-rsv-address" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
+        <div class="field f-sm"><label>담당자</label><input type="text" id="f-rsv-manager" placeholder="예: 홍길동 과장"></div>
+        <div class="field f-sm"><label>연락처</label><input type="text" id="f-rsv-phone" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
+      </div>
+      <div class="out-row stretch">
+        <div class="field f-eq"><div class="out-card"><label>전압</label>
+          <input type="text" id="f-rsv-voltage" placeholder="예: 380V">
+          ${voltageButtonsHtml('f-rsv-voltage')}
+        </div></div>
+        <div class="field f-eq"><div class="out-card"><label>부자재 출고</label>${suppliesPickerHtml('f-rsv-supplies', [], '', '')}</div></div>
+        <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-rsv-note"></textarea></div></div>
+      </div>
+      <div class="out-row">
+        <div class="field f-eq">
+          <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
+            <input type="checkbox" id="f-rsv-fuel-toggle" onchange="toggleFuelFields('f-rsv-fuel-toggle','f-rsv-fuel-fields-wrap')">
+            <label for="f-rsv-fuel-toggle">⛽ 연료넣고 출고</label>
+          </div>
+          <div id="f-rsv-fuel-fields-wrap" style="display:none;margin-top:8px;">
+            <label>연료량(L)</label>
+            <div class="consumable-row">
+              <div style="flex:1;">
+                <input type="number" id="f-rsv-fuel-req" min="0" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;" onchange="if(!document.getElementById('f-rsv-fuel-actual').value) document.getElementById('f-rsv-fuel-actual').value=this.value;">
+                <div class="hint" style="margin:2px 0 0;">고객요청 (공급받는자용에 표시)</div>
+              </div>
+              <div style="flex:1;">
+                <input type="number" id="f-rsv-fuel-actual" min="0" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;">
+                <div class="hint" style="margin:2px 0 0;">실제주입 (공급자용에 표시)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="field f-eq">
+          <div class="field chk" style="background:var(--ok-tint);border:1px solid var(--ok);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
+            <input type="checkbox" id="f-rsv-longterm"><label for="f-rsv-longterm">장기 임대 출고</label>
+          </div>
+        </div>
+        <div class="field f-eq">
+          <input type="text" id="f-rsv-payment-note" placeholder="입금관련 메모">
+        </div>
+      </div>
+      <div id="f-rsv-err" class="err" style="display:none;"></div>
+      <div class="modal-actions" style="justify-content:center;">
+        <button class="btn" onclick="closeModal()">취소</button>
+        <button class="btn primary" onclick="submitReserveNoGen()">출고예약 등록</button>
+      </div>
+    </div>
+  </div>`;
+  initSuppliesPicker('f-rsv-supplies');
+}
+function onRsvGenChange(){
+  const sel = document.getElementById('f-rsv-gen');
+  const wrap = document.getElementById('f-rsv-starthours-wrap');
+  if(!sel || !wrap) return;
+  if(sel.value===UNASSIGNED_GEN_ID){ wrap.style.display='none'; return; }
+  const g = findGen(sel.value);
+  if(!g || !g.hoursKnown){ wrap.style.display='none'; return; }
+  wrap.style.display='block';
+  const hoursEl = document.getElementById('f-rsv-starthours');
+  const hintEl = document.getElementById('rsv-starthours-hint');
+  if(hoursEl){ hoursEl.value = g.hours||0; hoursEl.min = g.hours||0; }
+  if(hintEl) hintEl.textContent = `현재 누적: ${(g.hours||0).toLocaleString()}h`;
+}
+function onRsvCustomerNameInput(){
+  const el = document.getElementById('f-rsv-site');
+  if(!el) return;
+  const val = el.value.trim();
+  const warnEl = document.getElementById('f-rsv-site-warning');
+  if(warnEl) warnEl.innerHTML = customerWarningHtml(val);
+  if(!val) return;
+  const records = knownCustomerRecords();
+  const match = records.find(r=>r.customer===val);
+  if(!match) return;
+  const managerEl = document.getElementById('f-rsv-manager');
+  const phoneEl = document.getElementById('f-rsv-phone');
+  const addressEl = document.getElementById('f-rsv-address');
+  if(managerEl && !managerEl.value) managerEl.value = match.manager;
+  if(phoneEl && !phoneEl.value) phoneEl.value = match.phone;
+  if(addressEl && !addressEl.value) addressEl.value = match.address || match.site;
+}
+function syncRsvUsageDaysToReturnDate(){
+  const outEl = document.getElementById('f-rsv-outdate');
+  const daysEl = document.getElementById('f-rsv-usagedays');
+  const retEl = document.getElementById('f-rsv-returndate');
+  if(!outEl || !daysEl || !retEl) return;
+  const days = Number(daysEl.value);
+  if(!outEl.value || !days || days<=0){ retEl.value = ''; return; }
+  const d = new Date(outEl.value+'T00:00:00');
+  d.setDate(d.getDate()+days);
+  retEl.value = toLocalDateStr(d);
+}
+function syncRsvReturnDateToUsageDays(){
+  const outEl = document.getElementById('f-rsv-outdate');
+  const daysEl = document.getElementById('f-rsv-usagedays');
+  const retEl = document.getElementById('f-rsv-returndate');
+  if(!outEl || !daysEl || !retEl) return;
+  if(!outEl.value || !retEl.value) return;
+  const start = new Date(outEl.value+'T00:00:00');
+  const end = new Date(retEl.value+'T00:00:00');
+  const days = Math.round((end-start)/86400000);
+  if(days>0) daysEl.value = days;
+}
+function submitReserveNoGen(){
+  const genSel = document.getElementById('f-rsv-gen').value;
+  const customer = document.getElementById('f-rsv-site').value.trim();
+  const site = customer;
+  const manager = document.getElementById('f-rsv-manager').value.trim();
+  const phone = document.getElementById('f-rsv-phone').value.trim();
+  const address = document.getElementById('f-rsv-address').value.trim();
+  const supplies = document.getElementById('f-rsv-supplies').value.trim();
+  let suppliesItems = [];
+  try{ suppliesItems = JSON.parse(document.getElementById('f-rsv-supplies-items').value || '[]'); }catch(e){ suppliesItems = []; }
+  const suppliesCustomEl = document.getElementById('f-rsv-supplies-custom');
+  const suppliesCustom = suppliesCustomEl ? suppliesCustomEl.value.trim() : '';
+  const voltage = document.getElementById('f-rsv-voltage').value.trim();
+  const fuelEnabled = document.getElementById('f-rsv-fuel-toggle').checked;
+  const fuelRequested = fuelEnabled ? (Number(document.getElementById('f-rsv-fuel-req').value)||null) : null;
+  const fuelActual = fuelEnabled ? (Number(document.getElementById('f-rsv-fuel-actual').value)|| fuelRequested || null) : null;
+  const usageDays = Number(document.getElementById('f-rsv-usagedays').value)||null;
+  const freightBearer = document.getElementById('f-rsv-freight').value;
+  const paymentNote = document.getElementById('f-rsv-payment-note').value.trim();
+  const note = document.getElementById('f-rsv-note').value.trim();
+  const outDate = document.getElementById('f-rsv-outdate').value;
+  const longTerm = document.getElementById('f-rsv-longterm').checked;
+  const estDailyRaw = Number(document.getElementById('f-rsv-estdaily').value||0);
+  const estDaily = estDailyRaw>0 ? estDailyRaw : null;
+  const errEl = document.getElementById('f-rsv-err');
+  if(!customer || !address || !manager || !phone){
+    errEl.textContent = '거래처명, 현장 주소, 담당자, 연락처를 모두 입력해주세요.';
+    errEl.style.display='block'; return;
+  }
+  if(!outDate){
+    errEl.textContent = '출고예정일을 입력해주세요.';
+    errEl.style.display='block'; return;
+  }
+  if(genSel !== UNASSIGNED_GEN_ID){
+    // 이 자리에서 바로 발전기를 골랐으면, 일반 출고와 똑같이 상차대기로 등록합니다.
+    const g = findGen(genSel);
+    if(!g){ errEl.textContent = '선택한 발전기를 찾을 수 없습니다.'; errEl.style.display='block'; return; }
+    const startHoursEl = document.getElementById('f-rsv-starthours');
+    const startHours = g.hoursKnown ? Number(startHoursEl.value) : (g.hours||0);
+    if(g.hoursKnown && (isNaN(startHours) || startHours < (g.hours||0))){
+      errEl.textContent = '출고시 누적 사용시간을 확인해주세요. (현재 누적시간보다 작을 수 없습니다)';
+      errEl.style.display='block'; return;
+    }
+    const pendingData = {
+      id: uid(), genId: genSel, pendingLoad: true, batchId: null,
+      customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
+      fuelRequested, fuelActual, usageDays, loadDate: outDate, arriveTime: null, freightBearer, paymentNote, note,
+      outDate, startHours, longTerm, estDaily,
+      outProcessedBy: DB.currentUserName || null, createdAt: todayStr()
+    };
+    DB.reservations.push(pendingData);
+    saveWithRetry(saveReservations);
+    closeModal();
+    currentTab = 'reserve'; renderTabbar(); renderContent();
+    flash('출고 대기(상차대기)에 등록되었습니다. 상차완료를 눌러야 출고됩니다.');
+    return;
+  }
+  const pendingData = {
+    id: uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false, plannedOutDate: outDate, batchId: null,
+    customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
+    fuelRequested, fuelActual, usageDays, freightBearer, paymentNote, note,
+    longTerm, estDaily,
+    outProcessedBy: DB.currentUserName || null, createdAt: todayStr()
+  };
+  DB.reservations.push(pendingData);
+  saveWithRetry(saveReservations);
+  closeModal();
+  currentTab = 'reserve'; renderTabbar(); renderContent();
+  flash('출고예약이 등록되었습니다. [출고 대기]에서 발전기를 배정하면 출고로 이어집니다.');
+}
 function syncUsageDaysToReturnDate(){
   const outEl = document.getElementById('f-outdate');
   const daysEl = document.getElementById('f-usagedays');
