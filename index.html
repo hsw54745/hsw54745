@@ -533,9 +533,65 @@ function renderQuickModeUI(){
       <button id="qm-btn" onclick="submitQuickOrder()" style="width:100%;margin-top:16px;padding:22px;font-size:24px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">등록하기</button>
       <div style="text-align:center;color:#777;font-size:14px;margin-top:12px;">등록 후 내용이 틀리면 사무실에서 나중에 고칠 수 있으니 걱정 안 하셔도 됩니다</div>
       <div id="qm-status" style="margin-top:16px;padding:16px;border-radius:12px;font-size:17px;font-weight:700;text-align:center;white-space:pre-line;display:none;"></div>
+      <div style="margin-top:22px;border-top:2px solid #ddd;padding-top:16px;">
+        <div style="font-size:15px;font-weight:800;color:#444;margin-bottom:10px;">📨 최근 내가 등록한 문자오더</div>
+        <div id="qm-recent"><div style="text-align:center;color:#999;font-size:13px;">불러오는 중...</div></div>
+      </div>
     </div>
   `);
   document.getElementById('qm-text').focus();
+  loadQuickRecentList();
+}
+function fmtQmTime(ts){
+  if(!ts) return '';
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  const isToday = toLocalDateStr(d) === todayStr();
+  return isToday ? `오늘 ${hh}:${mm}` : `${toLocalDateStr(d)} ${hh}:${mm}`;
+}
+async function loadQuickRecentList(){
+  const wrap = document.getElementById('qm-recent');
+  if(!wrap) return;
+  try{
+    const [logCur, resCur] = await Promise.all([
+      window.storage.get('quickOrderLog-v1', true).catch(()=>null),
+      window.storage.get('gen-reservations-v1', true).catch(()=>null)
+    ]);
+    let log = [];
+    try{ log = logCur ? JSON.parse(logCur.value) : []; }catch(e){ log = []; }
+    if(!Array.isArray(log)) log = [];
+    let resList = [];
+    try{ resList = resCur ? JSON.parse(resCur.value) : []; }catch(e){ resList = []; }
+    if(!Array.isArray(resList)) resList = [];
+    const resById = {};
+    resList.forEach(r=>{ resById[r.id] = r; });
+    const recent = [...log].sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0)).slice(0,5);
+    if(!document.getElementById('qm-recent')) return; // 화면이 이미 닫혔으면 무시
+    if(recent.length===0){
+      wrap.innerHTML = '<div style="text-align:center;color:#999;font-size:13px;">아직 등록한 내역이 없습니다.</div>';
+      return;
+    }
+    wrap.innerHTML = recent.map(item=>{
+      const raw = item.text||'';
+      const snippet = raw.slice(0,45);
+      const r = resById[item.resId];
+      let statusHtml;
+      if(!r){
+        statusHtml = `<span style="color:#2C6E49;font-weight:700;">✅ 상차완료 (사무실 처리됨)</span>`;
+      } else if(r.genId && r.genId!==UNASSIGNED_GEN_ID){
+        statusHtml = `<span style="color:#8A5A00;font-weight:700;">🔧 발전기 배정됨 (상차대기)</span>`;
+      } else {
+        statusHtml = `<span style="color:#2C4A66;font-weight:700;">🅾 출고예약 등록됨 (배정 대기)</span>`;
+      }
+      return `<div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 12px;margin-bottom:8px;text-align:left;">
+        <div style="font-size:12px;color:#888;margin-bottom:3px;">${fmtQmTime(item.createdAtTs)} · ${statusHtml}</div>
+        <div style="font-size:13.5px;color:#333;white-space:pre-wrap;">${escR(snippet)}${raw.length>45? '…':''}</div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    if(document.getElementById('qm-recent')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:13px;">최근 내역을 불러오지 못했습니다.</div>';
+  }
 }
 async function pasteFromClipboard(){
   const textEl = document.getElementById('qm-text');
@@ -584,7 +640,7 @@ async function submitQuickOrder(){
       note: '',
       smsOrder: text,
       longTerm: false, estDaily: null,
-      outProcessedBy: '이영숙(문자접수)', createdAt: today
+      outProcessedBy: '이영숙(문자접수)', createdAt: today, createdAtTs: Date.now()
     };
     // 저장 직전에 최신 목록을 다시 받아와서 그 위에 이번 건만 추가합니다 (동시편집 충돌 방지)
     const cur = await window.storage.get('gen-reservations-v1', true);
@@ -593,10 +649,22 @@ async function submitQuickOrder(){
     if(!Array.isArray(list)) list = [];
     list.push(newItem);
     await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
+    // 별도 기록(로그)에도 남겨둡니다 - 나중에 사무실에서 처리(출고완료)되어 출고대기 목록에서
+    // 빠지더라도, 이영숙님 화면의 "최근 등록 내역"에서는 계속 보이게 하기 위함입니다.
+    try{
+      const logCur = await window.storage.get('quickOrderLog-v1', true);
+      let log = [];
+      try{ log = logCur ? JSON.parse(logCur.value) : []; }catch(e2){ log = []; }
+      if(!Array.isArray(log)) log = [];
+      log.push({ resId: newItem.id, text, createdAtTs: newItem.createdAtTs });
+      if(log.length > 30) log = log.slice(log.length - 30);
+      await window.storage.set('quickOrderLog-v1', JSON.stringify(log), true);
+    }catch(e3){ /* 로그 저장 실패는 등록 자체를 막지 않습니다 */ }
 
     box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
     box.textContent = '✅ 등록 완료되었습니다!\n사무실 화면에 곧 나타납니다.';
     textEl.value = '';
+    loadQuickRecentList();
   }catch(e){
     box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
     box.textContent = '등록에 실패했습니다. 인터넷 연결을 확인하고 다시 눌러주세요.';
@@ -1698,7 +1766,7 @@ function renderContent(){
   if(currentTab==='materials') { renderPartsStockTable(); renderSuppliesCatalogTable(); }
   if(currentTab==='consumable-order') renderConsumableOrderTable();
   if(currentTab==='improvements') renderImprovementsList();
-  if(currentTab==='settings'){ renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); renderQuickOrderQr(); }
+  if(currentTab==='settings'){ renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); renderQuickOrderQr(); renderVoiceSelect(); }
   if(currentTab==='dashboard') renderRecentMaint();
   if(currentTab==='notice'){ renderNoticeList(); renderCalendar(); }
   restoreFocusState(_focus);
@@ -5048,7 +5116,7 @@ function loadingListPopupHtml(){
     <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:stretch;">${inCards.join('')}</div>
   </div>`;
 }
-function showLoadingListPopup(isNewNotice){
+function showLoadingListPopup(isNewNotice, newItems){
   const data = loadingPopupData();
   if(data.total===0) return;
   document.getElementById('modal-root').innerHTML = `
@@ -5064,8 +5132,13 @@ function showLoadingListPopup(isNewNotice){
     </div>
   </div>`;
   if(isNewNotice && data.todayLoad.length>0 && isWithinVoiceAlertHours()){
-    const first = data.todayLoad[0];
-    speakText(`새 상차 예약이 등록되었습니다. ${first.customer||'거래처 미기재'}${data.todayLoad.length>1? ` 외 ${koNativeCount(data.todayLoad.length-1)} 건`:''}`);
+    const smsItems = (newItems||[]).filter(r=>r && r.smsOrder);
+    if(smsItems.length>0){
+      speakText(smsItems.length>1 ? `문자오더가 등록되었습니다. ${koNativeCount(smsItems.length)}건입니다.` : `문자오더가 등록되었습니다. ${smsItems[0].customer||'거래처 미기재'}`);
+    } else {
+      const first = data.todayLoad[0];
+      speakText(`새 상차 예약이 등록되었습니다. ${first.customer||'거래처 미기재'}${data.todayLoad.length>1? ` 외 ${koNativeCount(data.todayLoad.length-1)} 건`:''}`);
+    }
   }
 }
 function showLoadingPopupOnLogin(){
@@ -5130,8 +5203,8 @@ function renderSettingsTab(){
   const disposedList = retiredList.filter(g=>g.retiredReason!=='매각');
   const soldList = retiredList.filter(g=>g.retiredReason==='매각');
   return `
-    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:stretch;">
-      <div class="material-card" style="margin-top:0;flex:1;min-width:260px;">
+    <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:20px;align-items:stretch;">
+      <div class="material-card" style="margin-top:0;">
         <div class="section-title" style="margin-top:0;">🔒 접속 비밀번호</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">이 화면을 여는 모든 사람이 공통으로 쓰는 비밀번호입니다. 여기서 언제든 바꾸거나 아예 해제할 수 있습니다. (브라우저 안에서만 확인하는 방식이라 완전한 보안은 아니고, 팀 외 사람이 실수로 들어오는 걸 막는 용도입니다)</p>
         <div class="field-row">
@@ -5146,14 +5219,14 @@ function renderSettingsTab(){
         </div>
       </div>
 
-      <div class="material-card" style="margin-top:0;flex:1.6;min-width:360px;">
+      <div class="material-card" style="margin-top:0;">
         <div class="section-title" style="margin-top:0;">🔊 음성 알림 (이 PC/브라우저 전용)</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">화면을 보고 있는 동안, 다른 사람이 상차 예약을 새로 등록하면 바로, 또한 오늘 상차할 게 아직 안 끝났으면 아래 설정한 주기마다 음성으로 알려줍니다. 다른 기기/브라우저와는 별개로 이 PC에만 적용됩니다.</p>
         <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;">
           <input type="checkbox" id="f-voice-alerts" ${isVoiceAlertsEnabled()?'checked':''} onchange="setVoiceAlertsEnabled(this.checked)">
           <label for="f-voice-alerts">음성 알림 사용</label>
         </div>
-        <div class="field-row" style="margin-top:8px;flex-wrap:nowrap;">
+        <div class="field-row" style="margin-top:8px;flex-wrap:wrap;">
           <div class="field" style="white-space:nowrap;"><label style="white-space:nowrap;">알림 주기(분)</label>
             <input type="number" id="f-voice-interval" min="1" value="${getVoiceAlertIntervalMin()}" onchange="setVoiceAlertIntervalMin(this.value)">
           </div>
@@ -5165,12 +5238,21 @@ function renderSettingsTab(){
           </div>
         </div>
         <div class="hint" style="margin-top:2px;">설정한 시간대 안에서만 음성이 재생됩니다 (예: 08:00~18:00으로 두면 그 시간 밖에서는 조용합니다).</div>
+        <div class="field-row" style="margin-top:8px;flex-wrap:nowrap;">
+          <div class="field"><label>안내 목소리</label>
+            <select id="f-voice-select" onchange="setVoiceAlertVoiceName(this.value)"></select>
+          </div>
+          <div class="field" style="max-width:160px;"><label>안내 속도 (<span id="f-voice-rate-out">${getVoiceAlertRate()}</span>배)</label>
+            <input type="range" id="f-voice-rate" min="0.5" max="1.8" step="0.1" value="${getVoiceAlertRate()}" oninput="document.getElementById('f-voice-rate-out').textContent=this.value;" onchange="setVoiceAlertRate(this.value)">
+          </div>
+        </div>
         <div class="btn-row" style="margin-top:8px;">
-          <button class="btn sm" onclick="speakText('음성 알림 테스트입니다. 오늘 상차하실 발전기를 확인해주세요.')">🔊 테스트 재생</button>
+          <button class="btn sm" onclick="playDingDong()">🔔 띵동 소리만 듣기</button>
+          <button class="btn sm" onclick="speakText('음성 알림 테스트입니다. 오늘 상차하실 발전기를 확인해주세요.')">🔊 전체 테스트 재생(띵동+음성)</button>
         </div>
       </div>
 
-      <div class="material-card" style="margin-top:0;flex:1;min-width:300px;">
+      <div class="material-card" style="margin-top:0;">
         <div class="section-title" style="margin-top:0;">📱 문자 간편등록 QR코드</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">문자로 오더를 주시는 분(예: 이영숙님)이 카메라로 QR을 찍으면 문자 붙여넣기 전용 간편등록 화면이 바로 열립니다. 아래 주소는 메인 앱 주소 뒤에 <code>?quick=1</code>을 붙인 형태여야 합니다.</p>
         <div class="field"><label>간편등록 페이지 주소</label>
@@ -5184,12 +5266,12 @@ function renderSettingsTab(){
         </div>
       </div>
 
-      <div class="material-card" style="margin-top:0;flex:1;min-width:260px;">
+      <div class="material-card" style="margin-top:0;">
         <div class="section-title" style="margin-top:0;">📄 공용 양식 · 문서</div>
         <div id="doc-templates-wrap"></div>
       </div>
 
-      <div class="material-card" style="margin-top:0;flex:0.7;min-width:200px;">
+      <div class="material-card" style="margin-top:0;">
         <div class="section-title" style="margin-top:0;">전체 데이터 백업</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">발전기 목록, 임대·정비 이력, 예약, 자재정보, 부품재고 등 모든 데이터를 파일 하나로 내려받거나 복원할 수 있습니다. 정기적으로 백업 파일을 받아두시길 권장합니다.</p>
         <div class="btn-row">
@@ -5198,7 +5280,7 @@ function renderSettingsTab(){
           <input type="file" id="f-restore-file" accept="application/json" style="display:none;" onchange="handleRestoreFile(this)">
         </div>
       </div>
-      <div class="material-card" style="margin-top:0;flex:0.7;min-width:200px;">
+      <div class="material-card" style="margin-top:0;">
         <div class="section-title" style="margin-top:0;">📁 폴더 자동 저장</div>
         <div id="auto-backup-folder-wrap"></div>
       </div>
@@ -5206,8 +5288,8 @@ function renderSettingsTab(){
 
 
     ${!isAdminModeUnlocked() ? `
-    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:stretch;margin-top:20px;">
-      <div class="material-card" style="margin-top:0;flex:1;min-width:240px;">
+    <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:20px;align-items:stretch;margin-top:20px;">
+      <div class="material-card" style="margin-top:0;">
         <div class="section-title" style="margin-top:0;">🔐 관리자 모드</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">업체 정보 수정, 위험 구역(초기화) 작업은 관리자 모드에서만 할 수 있습니다. 사이트 접속 비밀번호와는 별개인 전용 관리자 비밀번호를 입력하면 ${Math.round(ADMIN_MODE_DURATION_MS/60000)}분 동안 열리고, 시간이 지나면 자동으로 다시 잠깁니다.</p>
         <div class="field" style="max-width:220px;">
@@ -5215,9 +5297,8 @@ function renderSettingsTab(){
           <div id="f-admin-pw-err" class="err" style="display:none;"></div>
         </div>
         <button class="btn primary" onclick="submitAdminModeUnlock()">관리자 모드 열기</button>
-      </div>
-      <div class="material-card" style="margin-top:0;flex:1;min-width:340px;">
-        <div class="section-title" style="margin-top:0;">💰 매출관리자 지정</div>
+
+        <div class="section-title" style="margin-top:18px;">💰 매출관리자 지정</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">출고중인 발전기를 업체별로 묶어서 청구·입금 현황을 보여주는 매출관리 탭입니다. 안 쓰시면 꺼두시면 상단 탭에서 아예 안 보입니다.</p>
         <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-enabled" ${DB.salesEnabled?'checked':''} onchange="toggleSalesEnabled(this.checked)"><label for="f-sales-enabled">매출관리 사용</label></div>
 
@@ -5243,21 +5324,20 @@ function renderSettingsTab(){
           </div>
         </div>
       </div>
-      <div class="material-card" style="margin-top:0;flex:1;min-width:240px;">
+      <div class="material-card" style="margin-top:0;">
         <div class="section-title" style="margin-top:0;">사용자(팀원) 목록 (최대 3명)</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">접속시 이름 선택 화면에 나오는 팀원 목록입니다.</p>
         <div class="tech-grid-3">${teamMemberInputs}</div>
-      </div>
-      <div class="material-card" style="margin-top:0;flex:1;min-width:240px;">
-        <div class="section-title" style="margin-top:0;">정비사 목록 (최대 3명)</div>
+
+        <div class="section-title" style="margin-top:18px;">정비사 목록 (최대 3명)</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">정비 등록·수정 같은 작업을 할 때 본인 확인용으로 쓰입니다.</p>
         <div class="tech-grid-3">${techInputs}</div>
       </div>
     </div>
     ` : `
     ${adminModeSectionHtml()}
-    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:stretch;margin-top:20px;">
-      <div class="material-card" style="margin-top:0;flex:1;min-width:340px;">
+    <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:20px;align-items:stretch;margin-top:20px;">
+      <div class="material-card" style="margin-top:0;">
         <div class="section-title" style="margin-top:0;">💰 매출관리자 지정</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">출고중인 발전기를 업체별로 묶어서 청구·입금 현황을 보여주는 매출관리 탭입니다. 안 쓰시면 꺼두시면 상단 탭에서 아예 안 보입니다.</p>
         <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-enabled" ${DB.salesEnabled?'checked':''} onchange="toggleSalesEnabled(this.checked)"><label for="f-sales-enabled">매출관리 사용</label></div>
@@ -5280,13 +5360,12 @@ function renderSettingsTab(){
         <p class="muted" style="font-size:12.5px;margin-top:-4px;">"${salesManagerSet}"님으로 접속했을 때만 여기서 비밀번호를 설정할 수 있습니다.</p>
         `}
       </div>
-      <div class="material-card" style="margin-top:0;flex:1;min-width:240px;">
+      <div class="material-card" style="margin-top:0;">
         <div class="section-title" style="margin-top:0;">사용자(팀원) 목록 (최대 3명)</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">접속시 이름 선택 화면에 나오는 팀원 목록입니다.</p>
         <div class="tech-grid-3">${teamMemberInputs}</div>
-      </div>
-      <div class="material-card" style="margin-top:0;flex:1;min-width:240px;">
-        <div class="section-title" style="margin-top:0;">정비사 목록 (최대 3명)</div>
+
+        <div class="section-title" style="margin-top:18px;">정비사 목록 (최대 3명)</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">정비 등록·수정 같은 작업을 할 때 본인 확인용으로 쓰입니다.</p>
         <div class="tech-grid-3">${techInputs}</div>
       </div>
@@ -10481,7 +10560,7 @@ async function syncFromStorage(){
         renderTabbar();
         renderContent();
         renderUserBadge();
-        if(newReservations.length>0) showLoadingListPopup(true);
+        if(newReservations.length>0) showLoadingListPopup(true, newReservations);
         else if(newNotices.length>0 || newEvents.length>0) showNewPostPopup(newNotices, newEvents);
       }
     }
@@ -10495,6 +10574,29 @@ if(!isQuickMode()) setInterval(syncFromStorage, 120000);
 
 // ===== 음성 알림 (오늘 상차 미완료 안내) =====
 function isVoiceAlertsEnabled(){ return localStorage.getItem('voiceAlertsEnabled') !== '0'; }
+function getVoiceAlertVoiceName(){ return localStorage.getItem('voiceAlertVoiceName') || ''; }
+function setVoiceAlertVoiceName(v){ localStorage.setItem('voiceAlertVoiceName', v||''); }
+function getVoiceAlertRate(){ return Number(localStorage.getItem('voiceAlertRate')) || 1; }
+function setVoiceAlertRate(v){ localStorage.setItem('voiceAlertRate', Math.max(0.5, Math.min(1.8, Number(v)||1))); }
+function renderVoiceSelect(){
+  const sel = document.getElementById('f-voice-select');
+  if(!sel || !window.speechSynthesis) return;
+  const fill = ()=>{
+    if(!document.getElementById('f-voice-select')) return; // 화면이 이미 바뀌었으면 무시
+    let voices = window.speechSynthesis.getVoices() || [];
+    const koVoices = voices.filter(v=>v.lang && v.lang.toLowerCase().startsWith('ko'));
+    const listToShow = koVoices.length>0 ? koVoices : voices;
+    if(listToShow.length===0){
+      sel.innerHTML = '<option value="">(이 브라우저에서 선택 가능한 목소리가 없습니다 - 기본 목소리로 재생됩니다)</option>';
+      return;
+    }
+    const saved = getVoiceAlertVoiceName();
+    sel.innerHTML = listToShow.map(v=>`<option value="${escR(v.name)}" ${v.name===saved?'selected':''}>${escR(v.name)}${v.lang? ` (${escR(v.lang)})`:''}</option>`).join('');
+    if(!listToShow.some(v=>v.name===saved)) setVoiceAlertVoiceName(listToShow[0].name); // 저장된 목소리가 이 브라우저에 없으면 첫번째로 대체
+  };
+  fill();
+  window.speechSynthesis.onvoiceschanged = fill; // 일부 브라우저는 목소리 목록을 비동기로 늦게 줍니다
+}
 function setVoiceAlertsEnabled(v){ localStorage.setItem('voiceAlertsEnabled', v?'1':'0'); }
 function getVoiceAlertIntervalMin(){ return Number(localStorage.getItem('voiceAlertIntervalMin')) || 30; }
 function setVoiceAlertIntervalMin(v){
@@ -10592,16 +10694,42 @@ function koNativeCount(n){
   }
   return String(n); // 60건 이상은 그냥 숫자로 읽습니다
 }
+function playDingDong(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    const tone = (freq, start, dur)=>{
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, now+start);
+      gain.gain.exponentialRampToValueAtTime(0.35, now+start+0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now+start+dur);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now+start); osc.stop(now+start+dur+0.05);
+    };
+    tone(880, 0, 0.18);   // 띵
+    tone(659, 0.22, 0.24); // 동
+  }catch(e){ /* 오디오 지원 안 되는 환경이면 조용히 무시 */ }
+}
 function speakText(text){
   if(!isVoiceAlertsEnabled()) return;
   try{
     if(!window.speechSynthesis) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ko-KR';
-    u.rate = 1;
-    u.pitch = 1;
     window.speechSynthesis.cancel(); // 이전에 말하던 게 남아있으면 끊고 새로 말함
-    window.speechSynthesis.speak(u);
+    playDingDong();
+    setTimeout(()=>{
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ko-KR';
+      u.rate = getVoiceAlertRate();
+      u.pitch = 1;
+      const savedVoiceName = getVoiceAlertVoiceName();
+      if(savedVoiceName){
+        const match = (window.speechSynthesis.getVoices()||[]).find(v=>v.name===savedVoiceName);
+        if(match) u.voice = match;
+      }
+      window.speechSynthesis.speak(u);
+    }, 550); // 띵동 소리가 끝난 뒤 음성이 시작되도록 약간의 간격을 둡니다
   }catch(e){ /* 음성 지원 안 되는 환경이면 조용히 무시 */ }
 }
 function announceUnloadedToday(){
