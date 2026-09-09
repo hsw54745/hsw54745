@@ -259,6 +259,7 @@
 </header>
 
 <nav id="tabbar"></nav>
+<div id="today-load-banner"></div>
 <main id="content"><div class="loading">불러오는 중…</div></main>
 <div id="modal-root"></div>
 <div id="receipt-overlay"></div>
@@ -514,6 +515,129 @@ function pwGateHide(){
   if(!el) return;
   el.classList.remove('show');
   el.innerHTML = '';
+}
+// ===== 간편모드 (문자 붙여넣기 전용, 로그인/이름선택 없이 바로 접속) =====
+// 주소 뒤에 ?quick=1 을 붙여서 접속하면(예: https://.../index.html?quick=1) 이 화면만 뜹니다.
+function isQuickMode(){
+  try{ return new URLSearchParams(location.search).get('quick')==='1'; }catch(e){ return false; }
+}
+function renderQuickModeUI(){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:24px;font-weight:800;color:#2C6E49;">📋 문자 간편등록</div>
+        <div style="font-size:15px;color:#555;margin-top:8px;line-height:1.5;">문자로 받은 오더 내용을 아래에 그대로 붙여넣고<br>큰 초록 버튼만 누르시면 됩니다</div>
+      </div>
+      <textarea id="qm-text" rows="8" style="width:100%;font-size:20px;line-height:1.5;padding:14px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;" placeholder="여기를 눌러서 문자 내용을 붙여넣으세요"></textarea>
+      <button id="qm-btn" onclick="submitQuickOrder()" style="width:100%;margin-top:16px;padding:22px;font-size:24px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">등록하기</button>
+      <div style="text-align:center;color:#777;font-size:14px;margin-top:12px;">등록 후 내용이 틀리면 사무실에서 나중에 고칠 수 있으니 걱정 안 하셔도 됩니다</div>
+      <div id="qm-status" style="margin-top:16px;padding:16px;border-radius:12px;font-size:17px;font-weight:700;text-align:center;white-space:pre-line;display:none;"></div>
+    </div>
+  `);
+  document.getElementById('qm-text').focus();
+}
+async function submitQuickOrder(){
+  const textEl = document.getElementById('qm-text');
+  const btn = document.getElementById('qm-btn');
+  const box = document.getElementById('qm-status');
+  const text = textEl.value.trim();
+  box.style.display = 'none';
+  if(!text){
+    box.style.display = 'block'; box.style.background = '#FBEAEA'; box.style.color = '#B23A34';
+    box.textContent = '문자 내용을 먼저 붙여넣어주세요.';
+    return;
+  }
+  btn.disabled = true; btn.textContent = '등록 중...';
+  try{
+    const today = todayStr();
+    const prompt = `오늘 날짜는 ${today}입니다. 아래는 발전기 임대 업체가 거래처로부터 받은 문자 원문입니다.
+
+먼저 이 문자의 종류를 판단하세요:
+- "checkout": 새로 발전기를 보내달라는 출고(도착·투입 등) 요청
+- "return": 이미 나가있는 발전기를 다시 데려오라는 회수(철수 등) 요청
+- "cancel": 이전에 요청했던 출고를 취소한다는 내용
+- "unclear": 판단이 어려운 경우
+
+그 다음 아래 항목을 가진 JSON 객체 하나만 응답하세요. 설명, 코드블록 표시(백틱) 없이 순수 JSON만 출력하세요. 모르는 값은 null로 두세요.
+
+문자가 띄어쓰기나 줄바꿈 없이 다 붙어서 오는 경우가 많으니, customer(거래처명/현장명)와 address(주소)를 구분할 때 이렇게 판단하세요:
+- address는 보통 "○○시/도", "○○구/군", "○○동/읍/면", "○○로/길", 번지·건물번호 숫자, "공장/현장/센터/변전실" 같은 위치 단어를 포함합니다.
+- customer는 보통 회사명 패턴("건설","산업","개발","공업","종합","(주)","㈜" 등)이거나, 주소 패턴에 안 맞는 앞부분의 고유명사입니다.
+- 회사명 뒤에 바로 현장 설명이 붙어 나오는 경우 그 전체를 customer로 보되, 뒤에 이어지는 실제 도로명/지번 주소가 또 나오면 그건 address로 분리하세요.
+- 그래도 경계가 애매하면 억지로 나누지 말고 customer에 전체를 넣고, note에 "⚠️ 거래처명/주소 구분이 불명확하니 확인 필요"라고 남기세요.
+
+{
+  "orderType": "checkout" 또는 "return" 또는 "cancel" 또는 "unclear",
+  "customer": "거래처명 또는 현장명",
+  "address": "현장 주소",
+  "manager": "담당자 이름",
+  "phone": "연락처 (숫자와 하이픈만, 예: 010-1234-5678)",
+  "voltage": "전압, 예: 380V 또는 220V",
+  "usageDays": 사용예정 일수(숫자, 예: 7),
+  "outDate": "출고(상차) 희망일. YYYY-MM-DD 형식. 문자의 '내일', '모레', '이번주 금요일' 같은 상대적 표현은 오늘 날짜(${today}) 기준으로 계산",
+  "fuelRequested": "연료가 '200(180)'처럼 표기되어 있으면 괄호 밖 숫자(고객 요청량), 숫자 하나만 있으면 그 값, 연료 언급이 없으면 null",
+  "fuelActual": "연료가 '200(180)'처럼 괄호가 있으면 괄호 안 숫자(실제 주입량), 괄호가 없으면 null",
+  "note": "위 항목에 안 들어가는 나머지 특이사항. 발전기 용량 언급(예: 100kW)이나 분전반·배전반·깔판·전선·휀스 같은 부자재 관련 언급이 있으면 반드시 여기에 원문 그대로 옮겨 적으세요. 단, 차량 배차 담당자 이름·연락처 등 단체문자에 흔히 붙는, 발전기 임대와 무관한 인적사항은 절대 포함하지 마세요."
+}
+
+문자 원문:
+"""
+${text}
+"""`;
+    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] })
+    });
+    const aiData = await aiRes.json();
+    const outText = (aiData.content||[]).map(b=>b.text||'').join('');
+    const clean = outText.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+
+    if(parsed.orderType==='return'){
+      box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+      box.textContent = '⚠️ 이건 발전기를 도로 가져오라는 회수(철수) 요청 같습니다.\n등록하지 않았습니다. 사무실에 전화로 알려주세요.';
+      btn.disabled=false; btn.textContent='등록하기';
+      return;
+    }
+    if(parsed.orderType==='cancel'){
+      box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+      box.textContent = '⚠️ 이건 취소 요청 같습니다.\n등록하지 않았습니다. 사무실에 전화로 알려주세요.';
+      btn.disabled=false; btn.textContent='등록하기';
+      return;
+    }
+
+    const newItem = {
+      id: uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false,
+      plannedOutDate: parsed.outDate || today, batchId: null,
+      customer: parsed.customer || '', site: parsed.customer || '',
+      manager: parsed.manager || '', phone: parsed.phone || '', address: parsed.address || '',
+      supplies: '', suppliesItems: [], suppliesCustom: '',
+      voltage: parsed.voltage || '', qty: 1,
+      fuelRequested: parsed.fuelRequested || null, fuelActual: parsed.fuelActual || null,
+      usageDays: parsed.usageDays || null, loadDate: null, arriveTime: null,
+      freightBearer: '우리부담', paymentNote: '',
+      note: [parsed.orderType==='unclear'? '⚠️ 출고/회수/취소 여부가 불명확한 문자였습니다. 내용을 꼭 확인해주세요.' : null, parsed.note, '(문자 원문: ' + text + ')'].filter(Boolean).join(' / '),
+      longTerm: false, estDaily: null,
+      outProcessedBy: '이영숙(문자접수)', createdAt: today
+    };
+    // 저장 직전에 최신 목록을 다시 받아와서 그 위에 이번 건만 추가합니다 (동시편집 충돌 방지)
+    const cur = await window.storage.get('gen-reservations-v1', true);
+    let list = [];
+    try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    list.push(newItem);
+    await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
+
+    box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
+    box.textContent = '✅ 등록 완료되었습니다!\n사무실 화면에 곧 나타납니다.';
+    textEl.value = '';
+  }catch(e){
+    box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+    box.textContent = '등록에 실패했습니다. 인터넷 연결을 확인하고 다시 눌러주세요.';
+  }finally{
+    btn.disabled=false; btn.textContent='등록하기';
+  }
 }
 async function initPasswordGate(){
   if(sessionStorage.getItem('gen-pw-unlocked')==='yes'){ init(); return; }
@@ -931,7 +1055,15 @@ window.addEventListener('beforeunload', function(e){
   if(saveInFlightCount>0){
     e.preventDefault();
     e.returnValue = '저장이 아직 끝나지 않았습니다. 잠시 후 다시 닫아주세요.';
+    return;
   }
+  try{
+    const {todayLoad} = loadingPopupData();
+    if(todayLoad && todayLoad.length>0){
+      e.preventDefault();
+      e.returnValue = `오늘 상차 예정 발전기가 아직 ${todayLoad.length}건 남아있습니다. 정말 닫으시겠어요?`;
+    }
+  }catch(err){ /* 팝업 데이터 계산 실패시 그냥 통과 */ }
 });
 async function saveOneWithRetry(fn, retries){
   let lastErr = null;
@@ -1567,7 +1699,19 @@ function restoreFocusState(state){
     }
   }catch(e){}
 }
+function renderTodayLoadBanner(){
+  const el = document.getElementById('today-load-banner');
+  if(!el) return;
+  let todayLoad = [];
+  try{ todayLoad = loadingPopupData().todayLoad || []; }catch(e){ todayLoad = []; }
+  if(todayLoad.length===0){ el.innerHTML=''; return; }
+  el.innerHTML = `<div style="background:var(--danger);color:#fff;padding:9px 16px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;cursor:pointer;" onclick="switchTab('reserve')">
+    <span>⚠️ 오늘 상차 예정 발전기 ${todayLoad.length}건 남음</span>
+    <span style="text-decoration:underline;">출고대기 보기</span>
+  </div>`;
+}
 function renderContent(){
+  renderTodayLoadBanner();
   const _focus = captureFocusState();
   const c = document.getElementById('content');
   if(currentTab==='notice') c.innerHTML = renderNoticeTab();
@@ -1589,7 +1733,7 @@ function renderContent(){
   if(currentTab==='materials') { renderPartsStockTable(); renderSuppliesCatalogTable(); }
   if(currentTab==='consumable-order') renderConsumableOrderTable();
   if(currentTab==='improvements') renderImprovementsList();
-  if(currentTab==='settings'){ renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); }
+  if(currentTab==='settings'){ renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); renderQuickOrderQr(); }
   if(currentTab==='dashboard') renderRecentMaint();
   if(currentTab==='notice'){ renderNoticeList(); renderCalendar(); }
   restoreFocusState(_focus);
@@ -5036,21 +5180,21 @@ function renderSettingsTab(){
         </div>
       </div>
 
-      <div class="material-card" style="margin-top:0;flex:1;min-width:260px;">
+      <div class="material-card" style="margin-top:0;flex:1.6;min-width:360px;">
         <div class="section-title" style="margin-top:0;">🔊 음성 알림 (이 PC/브라우저 전용)</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">화면을 보고 있는 동안, 다른 사람이 상차 예약을 새로 등록하면 바로, 또한 오늘 상차할 게 아직 안 끝났으면 아래 설정한 주기마다 음성으로 알려줍니다. 다른 기기/브라우저와는 별개로 이 PC에만 적용됩니다.</p>
         <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;">
           <input type="checkbox" id="f-voice-alerts" ${isVoiceAlertsEnabled()?'checked':''} onchange="setVoiceAlertsEnabled(this.checked)">
           <label for="f-voice-alerts">음성 알림 사용</label>
         </div>
-        <div class="field-row" style="margin-top:8px;">
-          <div class="field"><label>알림 주기(분)</label>
+        <div class="field-row" style="margin-top:8px;flex-wrap:nowrap;">
+          <div class="field" style="white-space:nowrap;"><label style="white-space:nowrap;">알림 주기(분)</label>
             <input type="number" id="f-voice-interval" min="1" value="${getVoiceAlertIntervalMin()}" onchange="setVoiceAlertIntervalMin(this.value)">
           </div>
-          <div class="field"><label>알림 가능 시작시간</label>
+          <div class="field" style="white-space:nowrap;"><label style="white-space:nowrap;">알림 가능 시작시간</label>
             <input type="time" id="f-voice-start" value="${getVoiceAlertRange().start}" onchange="setVoiceAlertStartTime(this.value)">
           </div>
-          <div class="field"><label>알림 가능 종료시간</label>
+          <div class="field" style="white-space:nowrap;"><label style="white-space:nowrap;">알림 가능 종료시간</label>
             <input type="time" id="f-voice-end" value="${getVoiceAlertRange().end}" onchange="setVoiceAlertEndTime(this.value)">
           </div>
         </div>
@@ -5060,12 +5204,26 @@ function renderSettingsTab(){
         </div>
       </div>
 
+      <div class="material-card" style="margin-top:0;flex:1;min-width:300px;">
+        <div class="section-title" style="margin-top:0;">📱 문자 간편등록 QR코드</div>
+        <p class="muted" style="font-size:13px;margin-top:-4px;">문자로 오더를 주시는 분(예: 이영숙님)이 카메라로 QR을 찍으면 문자 붙여넣기 전용 간편등록 화면이 바로 열립니다. 아래 주소는 quick-order.html 파일을 올려두신 곳으로 바꿔주세요.</p>
+        <div class="field"><label>간편등록 페이지 주소</label>
+          <input type="text" id="f-quickorder-url" value="${escR(getQuickOrderUrl())}" oninput="setQuickOrderUrl(this.value);renderQuickOrderQr();">
+        </div>
+        <div style="text-align:center;margin-top:10px;">
+          <img id="quick-order-qr" src="" alt="QR" width="220" height="220" style="border:6px solid #fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);">
+        </div>
+        <div class="btn-row" style="margin-top:10px;justify-content:center;">
+          <button class="btn primary" onclick="printQuickOrderQr()">🖨 QR코드 인쇄</button>
+        </div>
+      </div>
+
       <div class="material-card" style="margin-top:0;flex:1;min-width:260px;">
         <div class="section-title" style="margin-top:0;">📄 공용 양식 · 문서</div>
         <div id="doc-templates-wrap"></div>
       </div>
 
-      <div class="material-card" style="margin-top:0;flex:1;min-width:260px;">
+      <div class="material-card" style="margin-top:0;flex:0.7;min-width:200px;">
         <div class="section-title" style="margin-top:0;">전체 데이터 백업</div>
         <p class="muted" style="font-size:13px;margin-top:-4px;">발전기 목록, 임대·정비 이력, 예약, 자재정보, 부품재고 등 모든 데이터를 파일 하나로 내려받거나 복원할 수 있습니다. 정기적으로 백업 파일을 받아두시길 권장합니다.</p>
         <div class="btn-row">
@@ -5074,8 +5232,8 @@ function renderSettingsTab(){
           <input type="file" id="f-restore-file" accept="application/json" style="display:none;" onchange="handleRestoreFile(this)">
         </div>
       </div>
-      <div class="material-card" style="margin-top:0;flex:1;min-width:260px;">
-        <div class="section-title" style="margin-top:0;">📁 폴더 자동 저장 (이 컴퓨터·이 브라우저 한정)</div>
+      <div class="material-card" style="margin-top:0;flex:0.7;min-width:200px;">
+        <div class="section-title" style="margin-top:0;">📁 폴더 자동 저장</div>
         <div id="auto-backup-folder-wrap"></div>
       </div>
     </div>
@@ -7015,6 +7173,7 @@ function renderReserveTab(){
         <div class="muted" style="font-size:12px;margin-top:2px;">발전기를 아직 정하지 않아도 거래처 정보만 먼저 등록해둘 수 있습니다. 아래 목록에 같이 표시되며, 나중에 발전기를 배정하면 정상 출고로 이어집니다.</div>
       </div>
       <button class="btn primary" onclick="openReserveNoGenModal()">+ 출고예약 등록</button>
+      <button class="btn" onclick="openPasteSmsModal()">📋 문자 붙여넣기로 등록</button>
     </div>
     ${list.length===0? `<div class="empty" style="margin-top:12px;">등록된 출고 대기가 없습니다.</div>` : `
     <div class="table-scroll" style="margin-top:12px;"><table>
@@ -7030,7 +7189,7 @@ function showSuppliesModal(resId){
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
       <h3>📦 부자재 내역</h3>
-      <div class="modal-sub">${escR(r.genId)}</div>
+      <div class="modal-sub">${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)}</div>
       <div style="font-size:14px;line-height:1.6;border:1px solid var(--border);border-radius:8px;padding:12px;">${suppliesListHtml(r.suppliesItems, r.suppliesCustom, r.supplies)}</div>
       <div class="modal-actions">
         <button class="btn primary" onclick="closeModal()">닫기</button>
@@ -7045,7 +7204,7 @@ function showNoteModal(resId){
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
       <h3>📝 비고</h3>
-      <div class="modal-sub">${escR(r.genId)}</div>
+      <div class="modal-sub">${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)}</div>
       <div style="font-size:14px;white-space:pre-wrap;line-height:1.6;border:1px solid var(--border);border-radius:8px;padding:12px;">${escR(r.note||'')}</div>
       <div class="modal-actions">
         <button class="btn primary" onclick="closeModal()">닫기</button>
@@ -7264,15 +7423,217 @@ function showInfoModal(message){
   document.getElementById('info-ok-btn').addEventListener('click', closeModal);
 }
 
-function openReserveNoGenModal(resId){
+function openPasteSmsModal(){
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal" style="text-align:center;">
+      <h3>📋 문자 붙여넣기로 등록</h3>
+      <div class="modal-sub">받은 오더 문자 내용을 그대로 복사해서 아래에 붙여넣고 "분석해서 자동입력"을 누르세요. 거래처명·주소·담당자·연락처·전압·사용일수·출고희망일 등을 자동으로 읽어서 출고예약 등록 화면에 채워줍니다. 분석 결과는 저장 전에 반드시 확인해주세요.</div>
+      <textarea id="f-sms-text" rows="8" style="width:100%;font-size:15px;" placeholder="여기에 문자 내용을 붙여넣으세요"></textarea>
+      <div id="f-sms-err" class="err" style="display:none;"></div>
+      <div class="modal-actions" style="justify-content:center;">
+        <button class="btn" onclick="closeModal()">취소</button>
+        <button class="btn primary" id="sms-analyze-btn" onclick="analyzeSmsText()">🔍 분석해서 자동입력</button>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('f-sms-text').focus();
+}
+async function analyzeSmsText(){
+  const textEl = document.getElementById('f-sms-text');
+  const errEl = document.getElementById('f-sms-err');
+  const btn = document.getElementById('sms-analyze-btn');
+  const smsText = textEl.value.trim();
+  errEl.style.display = 'none';
+  if(!smsText){
+    errEl.textContent = '문자 내용을 붙여넣어주세요.';
+    errEl.style.display = 'block';
+    return;
+  }
+  btn.disabled = true;
+  const origLabel = btn.textContent;
+  btn.textContent = '분석 중...';
+  try{
+    const today = todayStr();
+    const prompt = `오늘 날짜는 ${today}입니다. 아래는 발전기 임대 업체가 거래처로부터 받은 문자 원문입니다.
+
+먼저 이 문자의 종류를 판단하세요:
+- "checkout": 새로 발전기를 보내달라는 출고(도착·투입 등) 요청
+- "return": 이미 나가있는 발전기를 다시 데려오라는 회수(철수 등) 요청
+- "cancel": 이전에 요청했던 출고를 취소한다는 내용
+- "update_time": 이전에 요청했던 출고의 시간/날짜만 바뀐다는 내용 (예: "도착시간 오후 2시로 변경", "내일 말고 모레로 변경")
+- "unclear": 판단이 어려운 경우
+
+그 다음 아래 항목을 가진 JSON 객체 하나만 응답하세요. 설명, 코드블록 표시(백틱) 없이 순수 JSON만 출력하세요. 모르는 값은 null로 두세요.
+
+문자가 띄어쓰기나 줄바꿈 없이 다 붙어서 오는 경우가 많으니, customer(거래처명/현장명)와 address(주소)를 구분할 때 이렇게 판단하세요:
+- address는 보통 "○○시/도", "○○구/군", "○○동/읍/면", "○○로/길", 번지·건물번호 숫자, "공장/현장/센터/변전실" 같은 위치 단어를 포함합니다.
+- customer는 보통 회사명 패턴("건설","산업","개발","공업","종합","(주)","㈜" 등)이거나, 주소 패턴에 안 맞는 앞부분의 고유명사입니다.
+- 회사명 뒤에 바로 현장 설명이 붙어 나오는 경우("삼성물산아산공장" 등) 그 전체를 customer로 보되, 뒤에 이어지는 실제 도로명/지번 주소가 또 나오면 그건 address로 분리하세요.
+- 그래도 경계가 애매하면 억지로 나누지 말고 customer에 전체를 넣고, note에 "⚠️ 거래처명/주소 구분이 불명확하니 확인 필요"라고 남기세요.
+
+{
+  "orderType": "checkout" 또는 "return" 또는 "cancel" 또는 "update_time" 또는 "unclear",
+  "customer": "거래처명 또는 현장명",
+  "address": "현장 주소",
+  "manager": "담당자 이름",
+  "phone": "연락처 (숫자와 하이픈만, 예: 010-1234-5678)",
+  "voltage": "전압, 예: 380V 또는 220V",
+  "usageDays": 사용예정 일수(숫자, 예: 7),
+  "outDate": "출고(상차) 희망일. YYYY-MM-DD 형식. 문자의 '내일', '모레', '이번주 금요일' 같은 상대적 표현은 오늘 날짜(${today}) 기준으로 계산",
+  "arriveTime": "도착시간 언급이 있으면 그대로(예: 오후 2시), 없으면 null",
+  "fuelRequested": "연료가 '200(180)'처럼 표기되어 있으면 괄호 밖 숫자(고객 요청량), 숫자 하나만 있으면 그 값, 연료 언급이 없으면 null",
+  "fuelActual": "연료가 '200(180)'처럼 괄호가 있으면 괄호 안 숫자(실제 주입량), 괄호가 없으면 null",
+  "note": "위 항목에 안 들어가는 나머지 특이사항. 발전기 용량 언급(예: 100kW)이나 분전반·배전반·깔판·전선·휀스 같은 부자재 관련 언급이 있으면 반드시 여기에 원문 그대로 옮겨 적어서 담당자가 확인하게 하세요. 단, 차량 배차 담당자 이름·연락처 등 단체문자에 흔히 붙는, 발전기 임대와 무관한 인적사항은 절대 포함하지 마세요."
+}
+
+문자 원문:
+"""
+${smsText}
+"""`;
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const outText = (data.content||[]).map(b=>b.text||'').join('');
+    const clean = outText.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    if(parsed.orderType==='return'){
+      closeModal();
+      showInfoModal('이 문자는 "회수(철수)" 요청으로 보입니다. 출고예약에는 등록하지 않았습니다.\n해당 발전기를 찾아서 [출고중] 탭에서 직접 입고 처리해주세요.');
+      return;
+    }
+    if(parsed.orderType==='cancel'){
+      closeModal();
+      handleCancelOrderMatch(parsed.customer);
+      return;
+    }
+    if(parsed.orderType==='update_time'){
+      closeModal();
+      handleTimeUpdateMatch(parsed.customer, parsed.outDate, parsed.arriveTime);
+      return;
+    }
+    const draft = {
+      customer: parsed.customer || '',
+      site: parsed.customer || '',
+      address: parsed.address || '',
+      manager: parsed.manager || '',
+      phone: parsed.phone || '',
+      voltage: parsed.voltage || '',
+      usageDays: parsed.usageDays || null,
+      plannedOutDate: parsed.outDate || null,
+      fuelRequested: parsed.fuelRequested || null,
+      fuelActual: parsed.fuelActual || null,
+      rawText: smsText,
+      note: [parsed.orderType==='unclear'? '⚠️ 출고/회수/취소/시간변경 여부가 불명확한 문자였습니다. 내용을 꼭 확인해주세요.' : null, parsed.note, '(문자 원문: ' + smsText + ')'].filter(Boolean).join(' / ')
+    };
+    closeModal();
+    openReserveNoGenModal(null, draft);
+  }catch(e){
+    errEl.textContent = '분석에 실패했습니다. 인터넷 연결을 확인하고 다시 시도하거나, 직접 입력해주세요.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = origLabel;
+  }
+}
+function handleTimeUpdateMatch(customerName, newOutDate, newArriveTime){
+  const name = (customerName||'').trim();
+  const matches = name ? DB.reservations.filter(r=>{
+    const c = r.customer||r.site||'';
+    return c && (c.includes(name) || name.includes(c));
+  }) : [];
+  if(matches.length===0){
+    showInfoModal(`이 문자는 출고 시간 변경 요청으로 보입니다.${name? ` (거래처: ${escR(name)})` : ''}\n일치하는 출고대기 건을 찾지 못했습니다. [출고대기] 목록에서 직접 확인 후 시간을 수정해주세요.`);
+    return;
+  }
+  const rows = matches.map(r=>{
+    const curDate = r.pendingLoad ? (r.loadDate||r.outDate) : r.plannedOutDate;
+    return `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;text-align:left;">
+      <div>
+        <b>${escR(r.customer||r.site||'거래처 미기재')}</b>
+        <div class="muted" style="font-size:12px;">현재: ${curDate||'-'} ${r.arriveTime? '· '+escR(r.arriveTime):''}</div>
+        <div class="muted" style="font-size:12px;color:var(--primary-dark);font-weight:700;">변경될 값: ${newOutDate||'(날짜 그대로)'} ${newArriveTime? '· '+escR(newArriveTime):''}</div>
+      </div>
+      <button class="btn sm primary" onclick="applyTimeUpdate('${r.id}', ${newOutDate? `'${newOutDate}'`:'null'}, ${newArriveTime? `'${escR(newArriveTime).replace(/'/g,"\\'")}'`:'null'})">이 시간으로 변경</button>
+    </div>`;
+  }).join('');
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>🕐 시간 변경 요청 감지</h3>
+      <div class="modal-sub">이 문자는 출고 시간/날짜 변경 요청으로 보입니다. 해당하는 건을 찾아 적용하세요.</div>
+      ${rows}
+      <div class="modal-actions"><button class="btn" onclick="closeModal()">닫기</button></div>
+    </div>
+  </div>`;
+}
+async function applyTimeUpdate(id, newOutDate, newArriveTime){
+  const r = DB.reservations.find(x=>x.id===id);
+  if(!r) return;
+  if(newOutDate){
+    if(r.pendingLoad){ r.outDate = newOutDate; r.loadDate = newOutDate; }
+    else { r.plannedOutDate = newOutDate; }
+  }
+  if(newArriveTime) r.arriveTime = newArriveTime;
+  await saveWithRetry(saveReservations);
+  closeModal();
+  renderContent();
+  flash('출고 시간이 변경되었습니다');
+}
+function handleCancelOrderMatch(customerName){
+  const name = (customerName||'').trim();
+  const matches = name ? DB.reservations.filter(r=>{
+    const c = r.customer||r.site||'';
+    return c && (c.includes(name) || name.includes(c));
+  }) : [];
+  if(matches.length===0){
+    showInfoModal(`이 문자는 취소 요청으로 보입니다.${name? ` (거래처: ${escR(name)})` : ''}\n일치하는 출고대기 건을 찾지 못했습니다. [출고대기] 목록에서 직접 확인 후 취소해주세요.`);
+    return;
+  }
+  const rows = matches.map(r=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;text-align:left;">
+      <div>
+        <b>${escR(r.customer||r.site||'거래처 미기재')}</b>
+        <div class="muted" style="font-size:12px;">${escR(r.address||'-')} · ${r.genId===UNASSIGNED_GEN_ID? '미지정' : escR(r.genId)}${r.pendingLoad? ' · 상차대기':''}</div>
+      </div>
+      <button class="btn sm danger" onclick="deleteMatchedReservation('${r.id}')">이 건 삭제</button>
+    </div>`).join('');
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>🚫 취소 요청 감지</h3>
+      <div class="modal-sub">이 문자는 취소 요청으로 보입니다. 해당하는 건을 찾아 삭제하세요.</div>
+      ${rows}
+      <div class="modal-actions"><button class="btn" onclick="closeModal()">닫기</button></div>
+    </div>
+  </div>`;
+}
+function deleteMatchedReservation(id){
+  openConfirmModal('정말 이 출고대기 건을 삭제할까요? (취소 문자 반영, 이력에 남지 않습니다)', async function(){
+    DB.reservations = DB.reservations.filter(r=>r.id!==id);
+    await saveWithRetry(saveReservations);
+    closeModal();
+    renderContent();
+    flash('취소 처리되어 삭제되었습니다');
+  });
+}
+function openReserveNoGenModal(resId, draft){
   const existing = resId ? DB.reservations.find(x=>x.id===resId) : null;
+  const pre = existing || draft || null;
   const candidates = activeGens().filter(x=>x.status==='in' && !x.underRepair && !DB.reservations.some(r=>r.genId===x.id)).sort(sortByIdNatural);
   const genOptionsHtml = `<option value="${UNASSIGNED_GEN_ID}" selected>🅾 미지정 (나중에 발전기 배정)</option>` +
     candidates.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
   const prefillReturnDate = (()=>{
-    if(!existing || !existing.usageDays || !existing.plannedOutDate) return '';
-    const d = new Date(existing.plannedOutDate+'T00:00:00');
-    d.setDate(d.getDate()+Number(existing.usageDays));
+    if(!pre || !pre.usageDays || !pre.plannedOutDate) return '';
+    const d = new Date(pre.plannedOutDate+'T00:00:00');
+    d.setDate(d.getDate()+Number(pre.usageDays));
     return toLocalDateStr(d);
   })();
   document.getElementById('modal-root').innerHTML = `
@@ -7280,18 +7641,23 @@ function openReserveNoGenModal(resId){
     <div class="modal modal-wide" style="text-align:center;">
       <h3>📝 ${existing? '출고예약 수정' : '출고예약'}</h3>
       <div class="modal-sub">발전기를 아직 정하지 않았어도 거래처 정보를 먼저 등록해둘 수 있습니다. 나중에 [출고 대기]에서 발전기를 배정하면 정상 출고로 이어집니다.</div>
+      ${(!existing && draft) ? `<div class="hint" style="color:var(--danger);font-weight:700;background:var(--danger-tint);padding:8px 10px;border-radius:8px;margin-bottom:6px;">⚠️ 문자 내용에서 자동으로 추출한 내용입니다. 틀린 부분 없는지 꼭 확인 후 저장해주세요.</div>` : ''}
+      ${(!existing && draft && draft.rawText) ? `<details open style="text-align:left;background:var(--surface-alt,#F5F5F5);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:10px;">
+        <summary style="cursor:pointer;font-weight:700;">📄 원본 문자 내용 보기</summary>
+        <div style="white-space:pre-wrap;font-size:13.5px;margin-top:8px;color:#333;">${escR(draft.rawText)}</div>
+      </details>` : ''}
       <div class="out-row stretch">
         <div class="field f-sm"><div class="out-card"><label>발전기</label>
           <select id="f-rsv-gen" onchange="onRsvGenChange()">${genOptionsHtml}</select>
         </div></div>
         <div class="field f-sm" id="f-rsv-starthours-wrap" style="display:none;"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-rsv-starthours" value="0" min="0"><div class="hint" id="rsv-starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);"></div></div></div>
         <div class="field f-sm"><div class="out-card"><label>출고예정일</label>
-          <input type="date" id="f-rsv-outdate" value="${(existing&&existing.plannedOutDate)||todayStr()}" onchange="syncRsvReturnDateToUsageDays()">
+          <input type="date" id="f-rsv-outdate" value="${(pre&&pre.plannedOutDate)||todayStr()}" onchange="syncRsvReturnDateToUsageDays()">
         </div></div>
         <div class="field f-sm"><div class="out-card"><label>도착시간</label>
           ${(()=>{
             const opts = [...Array.from({length:7},(_,i)=>`오전 ${i+6}시`), ...Array.from({length:6},(_,i)=>`오후 ${i+1}시`)];
-            const cur = (existing&&existing.arriveTime)||'';
+            const cur = (pre&&pre.arriveTime)||'';
             const isCustom = cur && cur!=='지금즉시' && !opts.includes(cur);
             return `
             <select id="f-rsv-arrivetime-select" onchange="onRsvArriveTimeSelect()">
@@ -7305,58 +7671,58 @@ function openReserveNoGenModal(resId){
           })()}
         </div></div>
         <div class="field f-sm"><div class="out-card"><label>상차일자</label>
-          <input type="date" id="f-rsv-loaddate" value="${(existing&&existing.loadDate)||(existing&&existing.plannedOutDate)||todayStr()}">
+          <input type="date" id="f-rsv-loaddate" value="${(pre&&pre.loadDate)||(pre&&pre.plannedOutDate)||todayStr()}">
         </div></div>
         <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="f-rsv-freight">
-          <option value="우리부담" ${!existing||existing.freightBearer!=='고객부담'?'selected':''}>우리부담</option>
-          <option value="고객부담" ${existing&&existing.freightBearer==='고객부담'?'selected':''}>고객부담</option>
+          <option value="우리부담" ${!pre||pre.freightBearer!=='고객부담'?'selected':''}>우리부담</option>
+          <option value="고객부담" ${pre&&pre.freightBearer==='고객부담'?'selected':''}>고객부담</option>
         </select></div></div>
       </div>
       <div class="out-row">
         <div class="field f-lg"><label>거래처명</label>
-          <input type="text" id="f-rsv-site" list="customer-datalist" value="${((existing&&(existing.site||existing.customer))||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onRsvCustomerNameInput()">
+          <input type="text" id="f-rsv-site" list="customer-datalist" value="${((pre&&(pre.site||pre.customer))||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onRsvCustomerNameInput()">
           <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
           <div class="hint">이전에 거래한 업체명을 선택하면 담당자·연락처·주소가 자동으로 채워집니다.</div>
-          <div id="f-rsv-site-warning">${existing?customerWarningHtml((existing.site||existing.customer)||''):''}</div>
+          <div id="f-rsv-site-warning">${pre?customerWarningHtml((pre.site||pre.customer)||''):''}</div>
         </div>
         <div class="field f-xs"><label>사용일수(일)</label>
-          <input type="number" id="f-rsv-usagedays" min="0" value="${(existing&&existing.usageDays)||''}" placeholder="예: 7" oninput="syncRsvUsageDaysToReturnDate()">
+          <input type="number" id="f-rsv-usagedays" min="0" value="${(pre&&pre.usageDays)||''}" placeholder="예: 7" oninput="syncRsvUsageDaysToReturnDate()">
         </div>
         <div class="field f-xs"><label>예상가동시간(h/일)</label>
-          <input type="number" id="f-rsv-estdaily" step="0.5" min="0" value="${(existing&&existing.estDaily)||''}" placeholder="예: 8">
+          <input type="number" id="f-rsv-estdaily" step="0.5" min="0" value="${(pre&&pre.estDaily)||''}" placeholder="예: 8">
         </div>
         <div class="field f-sm"><label>반납 예정일 (선택)</label>
           <input type="date" id="f-rsv-returndate" value="${prefillReturnDate}" onchange="syncRsvReturnDateToUsageDays()">
         </div>
       </div>
       <div class="out-row">
-        <div class="field f-lg"><label>현장 주소</label><input type="text" id="f-rsv-address" value="${((existing&&existing.address)||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
-        <div class="field f-sm"><label>담당자</label><input type="text" id="f-rsv-manager" value="${((existing&&existing.manager)||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
-        <div class="field f-sm"><label>연락처</label><input type="text" id="f-rsv-phone" value="${((existing&&existing.phone)||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
+        <div class="field f-lg"><label>현장 주소</label><input type="text" id="f-rsv-address" value="${((pre&&pre.address)||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
+        <div class="field f-sm"><label>담당자</label><input type="text" id="f-rsv-manager" value="${((pre&&pre.manager)||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
+        <div class="field f-sm"><label>연락처</label><input type="text" id="f-rsv-phone" value="${((pre&&pre.phone)||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
       </div>
       <div class="out-row stretch">
         <div class="field f-eq"><div class="out-card"><label>전압</label>
-          <input type="text" id="f-rsv-voltage" value="${(existing&&existing.voltage)||''}" placeholder="예: 380V">
+          <input type="text" id="f-rsv-voltage" value="${(pre&&pre.voltage)||''}" placeholder="예: 380V">
           ${voltageButtonsHtml('f-rsv-voltage')}
         </div></div>
-        <div class="field f-eq"><div class="out-card"><label>부자재 출고</label>${suppliesPickerHtml('f-rsv-supplies', (existing&&existing.suppliesItems)||[], (existing? (existing.suppliesItems?(existing.suppliesCustom||''):(existing.supplies||'')) : ''), '')}</div></div>
-        <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-rsv-note">${(existing&&existing.note)||''}</textarea></div></div>
+        <div class="field f-eq"><div class="out-card"><label>부자재 출고</label>${suppliesPickerHtml('f-rsv-supplies', (pre&&pre.suppliesItems)||[], (pre? (pre.suppliesItems?(pre.suppliesCustom||''):(pre.supplies||'')) : ''), '')}</div></div>
+        <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-rsv-note">${(pre&&pre.note)||''}</textarea></div></div>
       </div>
       <div class="out-row">
         <div class="field f-eq">
           <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
-            <input type="checkbox" id="f-rsv-fuel-toggle" ${(existing&&(existing.fuelRequested!=null||existing.fuelActual!=null))?'checked':''} onchange="toggleFuelFields('f-rsv-fuel-toggle','f-rsv-fuel-fields-wrap')">
+            <input type="checkbox" id="f-rsv-fuel-toggle" ${(pre&&(pre.fuelRequested!=null||pre.fuelActual!=null))?'checked':''} onchange="toggleFuelFields('f-rsv-fuel-toggle','f-rsv-fuel-fields-wrap')">
             <label for="f-rsv-fuel-toggle">⛽ 연료넣고 출고</label>
           </div>
-          <div id="f-rsv-fuel-fields-wrap" style="display:${(existing&&(existing.fuelRequested!=null||existing.fuelActual!=null))?'block':'none'};margin-top:8px;">
+          <div id="f-rsv-fuel-fields-wrap" style="display:${(pre&&(pre.fuelRequested!=null||pre.fuelActual!=null))?'block':'none'};margin-top:8px;">
             <label>연료량(L)</label>
             <div class="consumable-row">
               <div style="flex:1;">
-                <input type="number" id="f-rsv-fuel-req" min="0" value="${(existing&&existing.fuelRequested)||''}" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;" onchange="if(!document.getElementById('f-rsv-fuel-actual').value) document.getElementById('f-rsv-fuel-actual').value=this.value;">
+                <input type="number" id="f-rsv-fuel-req" min="0" value="${(pre&&pre.fuelRequested)||''}" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;" onchange="if(!document.getElementById('f-rsv-fuel-actual').value) document.getElementById('f-rsv-fuel-actual').value=this.value;">
                 <div class="hint" style="margin:2px 0 0;">고객요청 (공급받는자용에 표시)</div>
               </div>
               <div style="flex:1;">
-                <input type="number" id="f-rsv-fuel-actual" min="0" value="${(existing&&existing.fuelActual)||''}" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;">
+                <input type="number" id="f-rsv-fuel-actual" min="0" value="${(pre&&pre.fuelActual)||''}" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;">
                 <div class="hint" style="margin:2px 0 0;">실제주입 (공급자용에 표시)</div>
               </div>
             </div>
@@ -7364,11 +7730,11 @@ function openReserveNoGenModal(resId){
         </div>
         <div class="field f-eq">
           <div class="field chk" style="background:var(--ok-tint);border:1px solid var(--ok);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
-            <input type="checkbox" id="f-rsv-longterm" ${existing&&existing.longTerm?'checked':''}><label for="f-rsv-longterm">장기 임대 출고</label>
+            <input type="checkbox" id="f-rsv-longterm" ${pre&&pre.longTerm?'checked':''}><label for="f-rsv-longterm">장기 임대 출고</label>
           </div>
         </div>
         <div class="field f-eq">
-          <input type="text" id="f-rsv-payment-note" value="${escR((existing&&existing.paymentNote)||'')}" placeholder="입금관련 메모">
+          <input type="text" id="f-rsv-payment-note" value="${escR((pre&&pre.paymentNote)||'')}" placeholder="입금관련 메모">
         </div>
       </div>
       <div id="f-rsv-err" class="err" style="display:none;"></div>
@@ -10015,7 +10381,7 @@ function renderUserBadge(){
 function openUserNameGate(){
   const names = [...new Set([...(DB.teamMembers||[]).filter(Boolean), '이성웅','홍승우','이영숙'])];
   const cur = DB.currentUserName;
-  const options = names.map(n=>`<button type="button" class="btn${n===cur?' primary':''}" style="font-size:16px;padding:14px 10px;" onclick="submitUserName('${n.replace(/'/g,"\\'")}')">${escR(n)}${n===cur? ' (이전 접속)':''}</button>`).join('');
+  const options = names.map(n=>`<button type="button" class="btn${n===cur?' primary':''}" style="font-size:16px;padding:14px 10px;" onclick="submitUserName('${n.replace(/'/g,"\\'")}')">${escR(n)}님${n===cur? ' (이전 접속)':''}</button>`).join('');
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay">
     <div class="modal">
@@ -10122,7 +10488,7 @@ async function syncFromStorage(){
     syncInFlight = false;
   }
 }
-setInterval(syncFromStorage, 120000);
+if(!isQuickMode()) setInterval(syncFromStorage, 120000);
 
 // ===== 음성 알림 (오늘 상차 미완료 안내) =====
 function isVoiceAlertsEnabled(){ return localStorage.getItem('voiceAlertsEnabled') !== '0'; }
@@ -10147,6 +10513,67 @@ function isWithinVoiceAlertHours(){
   const startMin = sh*60+(sm||0), endMin = eh*60+(em||0);
   if(startMin<=endMin) return cur>=startMin && cur<=endMin;
   return cur>=startMin || cur<=endMin; // 시작시간이 종료시간보다 늦으면(자정 넘김) 그 범위로 처리
+}
+function getQuickOrderUrl(){ return localStorage.getItem('quickOrderUrl') || 'https://hsw54745.github.io/hsw54745/quick-order.html'; }
+function setQuickOrderUrl(v){ localStorage.setItem('quickOrderUrl', (v||'').trim()); }
+function renderQuickOrderQr(){
+  const img = document.getElementById('quick-order-qr');
+  if(!img) return;
+  const url = getQuickOrderUrl();
+  img.src = url ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}` : '';
+}
+function printQuickOrderQr(){
+  const url = getQuickOrderUrl();
+  if(!url){ showInfoModal('먼저 간편등록 페이지 주소를 입력해주세요.'); return; }
+  const sizesMm = [70, 55, 40, 28, 18]; // 큰 것부터 작은 것까지, 각 2개씩
+  const qrSrc = (sizePx)=>`https://api.qrserver.com/v1/create-qr-code/?size=${sizePx}x${sizePx}&data=${encodeURIComponent(url)}`;
+  const rows = sizesMm.map(mm=>{
+    const px = Math.round(mm*8); // 인쇄용 QR 이미지는 넉넉한 해상도로 받아서 mm 크기로 눌러서 씁니다
+    return `
+    <div class="qr-row">
+      <div class="qr-cell"><img src="${qrSrc(px)}" style="width:${mm}mm;height:${mm}mm;"><div class="qr-label">${mm}mm</div></div>
+      <div class="qr-cell"><img src="${qrSrc(px)}" style="width:${mm}mm;height:${mm}mm;"><div class="qr-label">${mm}mm</div></div>
+    </div>`;
+  }).join('');
+  const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>간편등록 QR코드</title>
+<style>
+  @page{ size:A4 portrait; margin:15mm; }
+  *{ box-sizing:border-box; }
+  body{
+    font-family:sans-serif; margin:0; padding:15mm;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  h2{ font-size:24px; margin:0 0 4mm; text-align:center; }
+  p.sub{ font-size:13px; color:#555; margin:0 0 10mm; text-align:center; }
+  .qr-row{
+    display:flex; justify-content:center; align-items:flex-end; gap:14mm;
+    margin-bottom:10mm; width:100%;
+  }
+  .qr-cell{ display:flex; flex-direction:column; align-items:center; gap:2mm; }
+  .qr-label{ font-size:11px; color:#888; }
+  img{ display:block; }
+</style>
+</head><body>
+  <h2>📋 문자 오더 간편등록 QR코드</h2>
+  <p class="sub">카메라로 찍으면 문자 붙여넣기 화면이 바로 열립니다 · 붙일 곳에 맞는 크기로 오려서 사용하세요</p>
+  ${rows}
+</body></html>`;
+  const win = window.open('', '_blank', 'width=900,height=1000');
+  if(!win){ showInfoModal('팝업이 차단되어 인쇄 창을 열 수 없습니다. 이 사이트의 팝업을 허용해주세요.'); return; }
+  win.document.open();
+  win.document.write(doc);
+  win.document.close();
+  let imgsLoaded = 0;
+  const totalImgs = sizesMm.length*2;
+  const imgs = win.document.querySelectorAll('img');
+  imgs.forEach(im=>{
+    im.onload = im.onerror = function(){
+      imgsLoaded++;
+      if(imgsLoaded>=totalImgs){ setTimeout(()=>{ win.focus(); win.print(); }, 200); }
+    };
+  });
+  win.onafterprint = function(){ win.close(); };
 }
 function koNativeCount(n){
   // 음성 멘트에서 "일건·이건·삼건"처럼 딱딱하게 읽히지 않도록, 작은 수는 "한 건·두 건·세 건"으로 읽게 바꿔줍니다.
@@ -10188,7 +10615,7 @@ function restartVoiceAlertTimer(){
   if(voiceAlertTimer) clearInterval(voiceAlertTimer);
   voiceAlertTimer = setInterval(announceUnloadedToday, getVoiceAlertIntervalMin()*60000);
 }
-restartVoiceAlertTimer();
+if(!isQuickMode()) restartVoiceAlertTimer();
 
 // ===== 장시간 방치시 자동 새로고침 (1시간 조작 없으면) =====
 const IDLE_REFRESH_MS = 60*60*1000; // 1시간
@@ -10207,12 +10634,16 @@ function checkIdleRefresh(){
     location.reload();
   }
 }
-setInterval(checkIdleRefresh, 60000);
+if(!isQuickMode()) setInterval(checkIdleRefresh, 60000);
 document.addEventListener('visibilitychange', function(){
   if(document.visibilityState==='visible') checkIdleRefresh();
 });
 
-initPasswordGate();
+if(isQuickMode()){
+  renderQuickModeUI();
+} else {
+  initPasswordGate();
+}
 
 </script>
 </body>
