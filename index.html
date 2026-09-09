@@ -4880,8 +4880,10 @@ function tomorrowStr(){
 }
 function loadingPopupData(){
   const today = todayStr(), tomorrow = tomorrowStr();
-  const pending = (DB.reservations||[]).filter(r=>r.pendingLoad);
-  const loadDateOf = r => r.loadDate || r.outDate;
+  // 발전기가 아직 미지정인 출고예약(pendingLoad:false)도 상차 예정에 포함시킵니다.
+  // (이전엔 pendingLoad:true인 것만 걸러서, 미지정 출고예약은 이 팝업에 아예 안 떴습니다.)
+  const pending = (DB.reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID);
+  const loadDateOf = r => r.loadDate || r.outDate || r.plannedOutDate;
   const todayLoad = pending.filter(r=>loadDateOf(r)===today).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
   const tomorrowLoad = pending.filter(r=>loadDateOf(r)===tomorrow).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
   const outWithExpected = activeGens().filter(g=>g.status==='out' && g.rental && expectedInDate(g.rental));
@@ -4896,8 +4898,11 @@ function loadingListPopupHtml(){
     const g = findGen(r.genId);
     const fuel = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     const extra = [r.supplies? `부자재: ${escR(r.supplies)}` : '', r.note? `비고: ${escR(r.note)}` : ''].filter(Boolean).join(' · ');
+    const idLine = r.genId===UNASSIGNED_GEN_ID
+      ? `<b style="color:var(--warn);">🅾 미지정 (발전기 배정 필요)</b>`
+      : `<b>${escR(r.genId)}</b> ${g? escR(g.model||''):''}`;
     return `<div class="loadpop-row" style="padding:12px 0;border-bottom:1px solid var(--border);font-size:17px;">
-      <div><b>${escR(r.genId)}</b> ${g? escR(g.model||''):''}</div>
+      <div>${idLine}</div>
       <div class="muted" style="font-size:15.5px;">${escR(r.customer||'거래처 미기재')} · ${escR(r.address||'-')}</div>
       <div class="muted" style="font-size:15.5px;">전압 ${r.voltage? escR(r.voltage):'-'} · 연료 ${fuel!=null? fuel+'L':'-'}</div>
       ${extra? `<div class="muted" style="font-size:14.5px;">${extra}</div>` : ''}
@@ -4934,7 +4939,8 @@ function loadingListPopupHtml(){
   </div>`;
 }
 function showLoadingListPopup(isNewNotice){
-  if(loadingPopupData().total===0) return;
+  const data = loadingPopupData();
+  if(data.total===0) return;
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal" style="max-width:1080px;">
@@ -4947,6 +4953,10 @@ function showLoadingListPopup(isNewNotice){
       </div>
     </div>
   </div>`;
+  if(isNewNotice && data.todayLoad.length>0 && isWithinVoiceAlertHours()){
+    const first = data.todayLoad[0];
+    speakText(`새 상차 예약이 등록되었습니다. ${first.customer||'거래처 미기재'}${data.todayLoad.length>1? ` 외 ${koNativeCount(data.todayLoad.length-1)} 건`:''}`);
+  }
 }
 function showLoadingPopupOnLogin(){
   showLoadingListPopup(false);
@@ -5023,6 +5033,30 @@ function renderSettingsTab(){
         <div class="btn-row">
           <button class="btn primary" onclick="changeAppPassword()">비밀번호 변경/설정</button>
           <button class="btn danger" onclick="removeAppPassword()">비밀번호 보호 해제</button>
+        </div>
+      </div>
+
+      <div class="material-card" style="margin-top:0;flex:1;min-width:260px;">
+        <div class="section-title" style="margin-top:0;">🔊 음성 알림 (이 PC/브라우저 전용)</div>
+        <p class="muted" style="font-size:13px;margin-top:-4px;">화면을 보고 있는 동안, 다른 사람이 상차 예약을 새로 등록하면 바로, 또한 오늘 상차할 게 아직 안 끝났으면 아래 설정한 주기마다 음성으로 알려줍니다. 다른 기기/브라우저와는 별개로 이 PC에만 적용됩니다.</p>
+        <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;">
+          <input type="checkbox" id="f-voice-alerts" ${isVoiceAlertsEnabled()?'checked':''} onchange="setVoiceAlertsEnabled(this.checked)">
+          <label for="f-voice-alerts">음성 알림 사용</label>
+        </div>
+        <div class="field-row" style="margin-top:8px;">
+          <div class="field"><label>알림 주기(분)</label>
+            <input type="number" id="f-voice-interval" min="1" value="${getVoiceAlertIntervalMin()}" onchange="setVoiceAlertIntervalMin(this.value)">
+          </div>
+          <div class="field"><label>알림 가능 시작시간</label>
+            <input type="time" id="f-voice-start" value="${getVoiceAlertRange().start}" onchange="setVoiceAlertStartTime(this.value)">
+          </div>
+          <div class="field"><label>알림 가능 종료시간</label>
+            <input type="time" id="f-voice-end" value="${getVoiceAlertRange().end}" onchange="setVoiceAlertEndTime(this.value)">
+          </div>
+        </div>
+        <div class="hint" style="margin-top:2px;">설정한 시간대 안에서만 음성이 재생됩니다 (예: 08:00~18:00으로 두면 그 시간 밖에서는 조용합니다).</div>
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn sm" onclick="speakText('음성 알림 테스트입니다. 오늘 상차하실 발전기를 확인해주세요.')">🔊 테스트 재생</button>
         </div>
       </div>
 
@@ -9930,7 +9964,7 @@ async function init(){
   }
   seenNoticeIds = new Set((DB.notices||[]).map(n=>n.id));
   seenEventIds = new Set((DB.calendarEvents||[]).map(e=>e.id));
-  seenReservationIds = new Set((DB.reservations||[]).filter(r=>r.pendingLoad).map(r=>r.id));
+  seenReservationIds = new Set((DB.reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID).map(r=>r.id));
   DB.currentUserName = results.currentUserName;
   const phoneMigrationChanged = migratePhoneFieldsInPlace();
   applyCompanyBranding();
@@ -10066,10 +10100,10 @@ async function syncFromStorage(){
     if(before !== after){
       const newNotices = (notices||[]).filter(n=>n && !seenNoticeIds.has(n.id) && n.authorBy!==DB.currentUserName);
       const newEvents = (calendarEvents||[]).filter(e=>e && !seenEventIds.has(e.id) && e.authorBy!==DB.currentUserName);
-      const newReservations = (reservations||[]).filter(r=>r && r.pendingLoad && !seenReservationIds.has(r.id) && r.outProcessedBy!==DB.currentUserName);
+      const newReservations = (reservations||[]).filter(r=>r && (r.pendingLoad || r.genId===UNASSIGNED_GEN_ID) && !seenReservationIds.has(r.id) && r.outProcessedBy!==DB.currentUserName);
       seenNoticeIds = new Set((notices||[]).map(n=>n.id));
       seenEventIds = new Set((calendarEvents||[]).map(e=>e.id));
-      seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad).map(r=>r.id));
+      seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID).map(r=>r.id));
       DB.gens = gens; lastSyncedGensSnapshot = snapshotGens(DB.gens); DB.rentals = rentals; DB.maint = maint; DB.reservations = reservations;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold;
       DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.modelColors = modelColors; DB.notices = notices; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.salesEnabled = salesEnabled === true; DB.salesRecords = salesRecords || []; DB.salesManagers = salesManagers || []; if((DB.salesManagers[0]||'').trim() !== SALES_MANAGER_FIXED_NAME){ DB.salesManagers[0] = SALES_MANAGER_FIXED_NAME; saveSalesManagers(); } DB.salesPassword = salesPassword || ''; DB.salesPasswordBypass = salesPasswordBypass !== false; DB.salesBillingRecords = salesBillingRecords || []; DB.cancelOutHistory = cancelOutHistory || []; DB.palletDefaultRemoved = palletDefaultRemoved === true; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
@@ -10089,6 +10123,72 @@ async function syncFromStorage(){
   }
 }
 setInterval(syncFromStorage, 120000);
+
+// ===== 음성 알림 (오늘 상차 미완료 안내) =====
+function isVoiceAlertsEnabled(){ return localStorage.getItem('voiceAlertsEnabled') !== '0'; }
+function setVoiceAlertsEnabled(v){ localStorage.setItem('voiceAlertsEnabled', v?'1':'0'); }
+function getVoiceAlertIntervalMin(){ return Number(localStorage.getItem('voiceAlertIntervalMin')) || 30; }
+function setVoiceAlertIntervalMin(v){
+  const n = Math.max(1, Number(v)||30);
+  localStorage.setItem('voiceAlertIntervalMin', n);
+  restartVoiceAlertTimer();
+}
+function getVoiceAlertRange(){
+  return { start: localStorage.getItem('voiceAlertStartTime') || '08:00', end: localStorage.getItem('voiceAlertEndTime') || '18:00' };
+}
+function setVoiceAlertStartTime(v){ localStorage.setItem('voiceAlertStartTime', v||'08:00'); }
+function setVoiceAlertEndTime(v){ localStorage.setItem('voiceAlertEndTime', v||'18:00'); }
+function isWithinVoiceAlertHours(){
+  const {start, end} = getVoiceAlertRange();
+  const now = new Date();
+  const cur = now.getHours()*60 + now.getMinutes();
+  const [sh,sm] = start.split(':').map(Number);
+  const [eh,em] = end.split(':').map(Number);
+  const startMin = sh*60+(sm||0), endMin = eh*60+(em||0);
+  if(startMin<=endMin) return cur>=startMin && cur<=endMin;
+  return cur>=startMin || cur<=endMin; // 시작시간이 종료시간보다 늦으면(자정 넘김) 그 범위로 처리
+}
+function koNativeCount(n){
+  // 음성 멘트에서 "일건·이건·삼건"처럼 딱딱하게 읽히지 않도록, 작은 수는 "한 건·두 건·세 건"으로 읽게 바꿔줍니다.
+  const ones = ['','한','두','세','네','다섯','여섯','일곱','여덟','아홉'];
+  const tensNames = {10:'열',20:'스물',30:'서른',40:'마흔',50:'쉰'};
+  if(n<=0) return String(n);
+  if(n<10) return ones[n];
+  if(n<60){
+    const tenDigit = Math.floor(n/10)*10;
+    const oneDigit = n%10;
+    const tenWord = tensNames[tenDigit] || String(tenDigit);
+    return oneDigit===0 ? tenWord : tenWord+ones[oneDigit];
+  }
+  return String(n); // 60건 이상은 그냥 숫자로 읽습니다
+}
+function speakText(text){
+  if(!isVoiceAlertsEnabled()) return;
+  try{
+    if(!window.speechSynthesis) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR';
+    u.rate = 1;
+    u.pitch = 1;
+    window.speechSynthesis.cancel(); // 이전에 말하던 게 남아있으면 끊고 새로 말함
+    window.speechSynthesis.speak(u);
+  }catch(e){ /* 음성 지원 안 되는 환경이면 조용히 무시 */ }
+}
+function announceUnloadedToday(){
+  if(document.hidden) return; // 화면을 안 보고 있으면 말하지 않음
+  if(!isWithinVoiceAlertHours()) return; // 설정한 알림 가능 시간대가 아니면 말하지 않음
+  const {today, todayLoad} = loadingPopupData();
+  if(todayLoad.length===0) return;
+  const names = todayLoad.slice(0,3).map(r=> r.customer || '거래처 미기재').join(', ');
+  const more = todayLoad.length>3 ? ` 외 ${koNativeCount(todayLoad.length-3)} 건` : '';
+  speakText(`오늘 상차 예정 발전기가 아직 ${koNativeCount(todayLoad.length)} 건 남았습니다. ${names}${more}`);
+}
+let voiceAlertTimer = null;
+function restartVoiceAlertTimer(){
+  if(voiceAlertTimer) clearInterval(voiceAlertTimer);
+  voiceAlertTimer = setInterval(announceUnloadedToday, getVoiceAlertIntervalMin()*60000);
+}
+restartVoiceAlertTimer();
 
 // ===== 장시간 방치시 자동 새로고침 (1시간 조작 없으면) =====
 const IDLE_REFRESH_MS = 60*60*1000; // 1시간
