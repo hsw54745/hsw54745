@@ -6897,7 +6897,7 @@ function renderReserveTab(){
     if(r.genId === UNASSIGNED_GEN_ID){
       const d2 = r.plannedOutDate;
       const isDelayed2 = d2 && daysFromToday(d2)<0;
-      const fuelForList2 = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+      const fuelForList2 = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
       const suppliesCell2 = r.supplies
         ? `<button class="btn sm" style="color:var(--danger);font-weight:700;border-color:var(--danger);" onclick="showSuppliesModal('${r.id}')">부자재확인</button>`
         : `<span class="muted">부자재없음</span>`;
@@ -6910,7 +6910,7 @@ function renderReserveTab(){
           ${r.customer||r.site||'<span class="muted">미기재</span>'}
           ${r.address? `<div class="muted" style="font-size:11px;">${escR(r.address)}</div>`:''}
         </td>
-        <td class="muted">-</td>
+        <td class="muted">${dow(r.loadDate)||'-'}</td>
         <td class="muted">${dow(d2)||'-'}<div><span class="pill">출고예약</span>${isDelayed2? ' <span class="pill danger">지연</span>':''}</div></td>
         <td class="muted">${r.arriveTime||'-'}</td>
         <td class="muted">${r.freightBearer||'-'}</td>
@@ -6928,7 +6928,7 @@ function renderReserveTab(){
     const g = findGen(r.genId);
     const d = dateOf(r);
     const isDelayed = d && daysFromToday(d)<0;
-    const fuelForList = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
+    const fuelForList = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     const voltageChanged = g && g.voltage && r.voltage && g.voltage!==r.voltage;
     const vColor = voltageColor(r.voltage);
     const voltageCell = voltageChanged
@@ -6972,7 +6972,7 @@ function renderReserveTab(){
   }).join('');
   return `
     <div class="section-title">출고 대기 <span class="cnt">${list.length}건</span>${pendingCount>0? `<span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">상차대기 ${pendingCount}건</span>`:''}${delayedCount>0? `<span class="cnt" style="background:var(--danger-tint);color:var(--danger);border-color:var(--danger);">지연 ${delayedCount}건</span>`:''}</div>
-    <p class="muted" style="font-size:12.5px;margin-top:-4px;">출고하기를 하면 발전기가 여기 "상차대기"로 표시됩니다. 상차 담당자가 실제 싣고 나갈 때 "상차완료"를 누르면 그때 출고(출고중)로 처리됩니다. 연료는 실제 주입량 기준으로 표시됩니다.</p>
+    <p class="muted" style="font-size:12.5px;margin-top:-4px;">출고하기를 하면 발전기가 여기 "상차대기"로 표시됩니다. 상차 담당자가 실제 싣고 나갈 때 "상차완료"를 누르면 그때 출고(출고중)로 처리됩니다. 연료는 고객요청량이 있으면 요청량 기준으로, 없으면 실제주입량 기준으로 표시됩니다.</p>
     <div class="detail-card" style="margin:10px 0 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--primary-tint);border:1px solid var(--primary);">
       <div style="text-align:left;">
         <div style="font-weight:700;font-size:14px;">📝 출고예약</div>
@@ -7252,6 +7252,25 @@ function openReserveNoGenModal(resId){
         <div class="field f-sm"><div class="out-card"><label>출고예정일</label>
           <input type="date" id="f-rsv-outdate" value="${(existing&&existing.plannedOutDate)||todayStr()}" onchange="syncRsvReturnDateToUsageDays()">
         </div></div>
+        <div class="field f-sm"><div class="out-card"><label>도착시간</label>
+          ${(()=>{
+            const opts = [...Array.from({length:7},(_,i)=>`오전 ${i+6}시`), ...Array.from({length:6},(_,i)=>`오후 ${i+1}시`)];
+            const cur = (existing&&existing.arriveTime)||'';
+            const isCustom = cur && cur!=='지금즉시' && !opts.includes(cur);
+            return `
+            <select id="f-rsv-arrivetime-select" onchange="onRsvArriveTimeSelect()">
+              <option value="">선택 안함</option>
+              <option value="지금즉시" ${cur==='지금즉시'?'selected':''}>지금즉시</option>
+              ${opts.map(v=>`<option value="${v}" ${cur===v?'selected':''}>${v}</option>`).join('')}
+              <option value="__custom__" ${isCustom?'selected':''}>직접 입력...</option>
+            </select>
+            <input type="text" id="f-rsv-arrivetime" value="${escR(cur)}" placeholder="예: 오전 6시 30분" style="margin-top:6px;${isCustom?'':'display:none;'}">
+            `;
+          })()}
+        </div></div>
+        <div class="field f-sm"><div class="out-card"><label>상차일자</label>
+          <input type="date" id="f-rsv-loaddate" value="${(existing&&existing.loadDate)||(existing&&existing.plannedOutDate)||todayStr()}">
+        </div></div>
         <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="f-rsv-freight">
           <option value="우리부담" ${!existing||existing.freightBearer!=='고객부담'?'selected':''}>우리부담</option>
           <option value="고객부담" ${existing&&existing.freightBearer==='고객부담'?'selected':''}>고객부담</option>
@@ -7377,6 +7396,19 @@ function syncRsvReturnDateToUsageDays(){
   const days = Math.round((end-start)/86400000);
   if(days>0) daysEl.value = days;
 }
+function onRsvArriveTimeSelect(){
+  const sel = document.getElementById('f-rsv-arrivetime-select');
+  const input = document.getElementById('f-rsv-arrivetime');
+  if(!sel || !input) return;
+  if(sel.value==='__custom__'){
+    input.style.display = 'block';
+    input.value = '';
+    input.focus();
+  } else {
+    input.style.display = 'none';
+    input.value = sel.value;
+  }
+}
 function submitReserveNoGen(resId){
   const existing = resId ? DB.reservations.find(x=>x.id===resId) : null;
   const genSel = document.getElementById('f-rsv-gen').value;
@@ -7396,6 +7428,8 @@ function submitReserveNoGen(resId){
   const fuelActual = fuelEnabled ? (Number(document.getElementById('f-rsv-fuel-actual').value)|| fuelRequested || null) : null;
   const usageDays = Number(document.getElementById('f-rsv-usagedays').value)||null;
   const freightBearer = document.getElementById('f-rsv-freight').value;
+  const arriveTime = document.getElementById('f-rsv-arrivetime').value.trim() || null;
+  const loadDate = document.getElementById('f-rsv-loaddate').value || null;
   const paymentNote = document.getElementById('f-rsv-payment-note').value.trim();
   const note = document.getElementById('f-rsv-note').value.trim();
   const outDate = document.getElementById('f-rsv-outdate').value;
@@ -7424,7 +7458,7 @@ function submitReserveNoGen(resId){
     const pendingData = {
       id: existing? existing.id : uid(), genId: genSel, pendingLoad: true, batchId: (existing&&existing.batchId)||null,
       customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
-      fuelRequested, fuelActual, usageDays, loadDate: outDate, arriveTime: null, freightBearer, paymentNote, note,
+      fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
       outDate, startHours, longTerm, estDaily,
       outProcessedBy: (existing&&existing.outProcessedBy) || DB.currentUserName || null, createdAt: (existing&&existing.createdAt) || todayStr()
     };
@@ -7443,7 +7477,7 @@ function submitReserveNoGen(resId){
   const pendingData = {
     id: existing? existing.id : uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false, plannedOutDate: outDate, batchId: (existing&&existing.batchId)||null,
     customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
-    fuelRequested, fuelActual, usageDays, freightBearer, paymentNote, note,
+    fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
     longTerm, estDaily,
     outProcessedBy: (existing&&existing.outProcessedBy) || DB.currentUserName || null, createdAt: (existing&&existing.createdAt) || todayStr()
   };
