@@ -6897,7 +6897,7 @@ function renderReserveTab(){
     if(r.genId === UNASSIGNED_GEN_ID){
       const d2 = r.plannedOutDate;
       const isDelayed2 = d2 && daysFromToday(d2)<0;
-      const fuelForList2 = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
+      const fuelForList2 = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
       const suppliesCell2 = r.supplies
         ? `<button class="btn sm" style="color:var(--danger);font-weight:700;border-color:var(--danger);" onclick="showSuppliesModal('${r.id}')">부자재확인</button>`
         : `<span class="muted">부자재없음</span>`;
@@ -6919,6 +6919,7 @@ function renderReserveTab(){
         <td><div style="display:flex;flex-direction:column;align-items:center;gap:2px;">${suppliesCell2}${noteMarker2}</div></td>
         <td class="muted">${r.usageDays? r.usageDays+'일' : '-'}</td>
         <td><div class="btn-row" style="flex-wrap:nowrap;">
+          <button class="btn sm" onclick="openReserveNoGenModal('${r.id}')">내용보기/수정</button>
           <button class="btn sm primary" onclick="openAssignGenModal('${r.id}')">🔧 발전기 배정</button>
           <button class="btn sm danger" onclick="cancelReservation('${r.id}')">예약 취소</button>
         </div></td>
@@ -6927,7 +6928,7 @@ function renderReserveTab(){
     const g = findGen(r.genId);
     const d = dateOf(r);
     const isDelayed = d && daysFromToday(d)<0;
-    const fuelForList = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
+    const fuelForList = r.fuelActual!=null ? r.fuelActual : r.fuelRequested;
     const voltageChanged = g && g.voltage && r.voltage && g.voltage!==r.voltage;
     const vColor = voltageColor(r.voltage);
     const voltageCell = voltageChanged
@@ -7227,14 +7228,21 @@ function showInfoModal(message){
   document.getElementById('info-ok-btn').addEventListener('click', closeModal);
 }
 
-function openReserveNoGenModal(){
+function openReserveNoGenModal(resId){
+  const existing = resId ? DB.reservations.find(x=>x.id===resId) : null;
   const candidates = activeGens().filter(x=>x.status==='in' && !x.underRepair && !DB.reservations.some(r=>r.genId===x.id)).sort(sortByIdNatural);
   const genOptionsHtml = `<option value="${UNASSIGNED_GEN_ID}" selected>🅾 미지정 (나중에 발전기 배정)</option>` +
     candidates.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
+  const prefillReturnDate = (()=>{
+    if(!existing || !existing.usageDays || !existing.plannedOutDate) return '';
+    const d = new Date(existing.plannedOutDate+'T00:00:00');
+    d.setDate(d.getDate()+Number(existing.usageDays));
+    return toLocalDateStr(d);
+  })();
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal modal-wide" style="text-align:center;">
-      <h3>📝 출고예약</h3>
+      <h3>📝 ${existing? '출고예약 수정' : '출고예약'}</h3>
       <div class="modal-sub">발전기를 아직 정하지 않았어도 거래처 정보를 먼저 등록해둘 수 있습니다. 나중에 [출고 대기]에서 발전기를 배정하면 정상 출고로 이어집니다.</div>
       <div class="out-row stretch">
         <div class="field f-sm"><div class="out-card"><label>발전기</label>
@@ -7242,58 +7250,58 @@ function openReserveNoGenModal(){
         </div></div>
         <div class="field f-sm" id="f-rsv-starthours-wrap" style="display:none;"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-rsv-starthours" value="0" min="0"><div class="hint" id="rsv-starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);"></div></div></div>
         <div class="field f-sm"><div class="out-card"><label>출고예정일</label>
-          <input type="date" id="f-rsv-outdate" value="${todayStr()}" onchange="syncRsvReturnDateToUsageDays()">
+          <input type="date" id="f-rsv-outdate" value="${(existing&&existing.plannedOutDate)||todayStr()}" onchange="syncRsvReturnDateToUsageDays()">
         </div></div>
         <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="f-rsv-freight">
-          <option value="우리부담" selected>우리부담</option>
-          <option value="고객부담">고객부담</option>
+          <option value="우리부담" ${!existing||existing.freightBearer!=='고객부담'?'selected':''}>우리부담</option>
+          <option value="고객부담" ${existing&&existing.freightBearer==='고객부담'?'selected':''}>고객부담</option>
         </select></div></div>
       </div>
       <div class="out-row">
         <div class="field f-lg"><label>거래처명</label>
-          <input type="text" id="f-rsv-site" list="customer-datalist" placeholder="예: 00건설" oninput="onRsvCustomerNameInput()">
+          <input type="text" id="f-rsv-site" list="customer-datalist" value="${((existing&&(existing.site||existing.customer))||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onRsvCustomerNameInput()">
           <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
           <div class="hint">이전에 거래한 업체명을 선택하면 담당자·연락처·주소가 자동으로 채워집니다.</div>
-          <div id="f-rsv-site-warning"></div>
+          <div id="f-rsv-site-warning">${existing?customerWarningHtml((existing.site||existing.customer)||''):''}</div>
         </div>
         <div class="field f-xs"><label>사용일수(일)</label>
-          <input type="number" id="f-rsv-usagedays" min="0" placeholder="예: 7" oninput="syncRsvUsageDaysToReturnDate()">
+          <input type="number" id="f-rsv-usagedays" min="0" value="${(existing&&existing.usageDays)||''}" placeholder="예: 7" oninput="syncRsvUsageDaysToReturnDate()">
         </div>
         <div class="field f-xs"><label>예상가동시간(h/일)</label>
-          <input type="number" id="f-rsv-estdaily" step="0.5" min="0" placeholder="예: 8">
+          <input type="number" id="f-rsv-estdaily" step="0.5" min="0" value="${(existing&&existing.estDaily)||''}" placeholder="예: 8">
         </div>
         <div class="field f-sm"><label>반납 예정일 (선택)</label>
-          <input type="date" id="f-rsv-returndate" onchange="syncRsvReturnDateToUsageDays()">
+          <input type="date" id="f-rsv-returndate" value="${prefillReturnDate}" onchange="syncRsvReturnDateToUsageDays()">
         </div>
       </div>
       <div class="out-row">
-        <div class="field f-lg"><label>현장 주소</label><input type="text" id="f-rsv-address" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
-        <div class="field f-sm"><label>담당자</label><input type="text" id="f-rsv-manager" placeholder="예: 홍길동 과장"></div>
-        <div class="field f-sm"><label>연락처</label><input type="text" id="f-rsv-phone" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
+        <div class="field f-lg"><label>현장 주소</label><input type="text" id="f-rsv-address" value="${((existing&&existing.address)||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
+        <div class="field f-sm"><label>담당자</label><input type="text" id="f-rsv-manager" value="${((existing&&existing.manager)||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
+        <div class="field f-sm"><label>연락처</label><input type="text" id="f-rsv-phone" value="${((existing&&existing.phone)||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
       </div>
       <div class="out-row stretch">
         <div class="field f-eq"><div class="out-card"><label>전압</label>
-          <input type="text" id="f-rsv-voltage" placeholder="예: 380V">
+          <input type="text" id="f-rsv-voltage" value="${(existing&&existing.voltage)||''}" placeholder="예: 380V">
           ${voltageButtonsHtml('f-rsv-voltage')}
         </div></div>
-        <div class="field f-eq"><div class="out-card"><label>부자재 출고</label>${suppliesPickerHtml('f-rsv-supplies', [], '', '')}</div></div>
-        <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-rsv-note"></textarea></div></div>
+        <div class="field f-eq"><div class="out-card"><label>부자재 출고</label>${suppliesPickerHtml('f-rsv-supplies', (existing&&existing.suppliesItems)||[], (existing? (existing.suppliesItems?(existing.suppliesCustom||''):(existing.supplies||'')) : ''), '')}</div></div>
+        <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-rsv-note">${(existing&&existing.note)||''}</textarea></div></div>
       </div>
       <div class="out-row">
         <div class="field f-eq">
           <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
-            <input type="checkbox" id="f-rsv-fuel-toggle" onchange="toggleFuelFields('f-rsv-fuel-toggle','f-rsv-fuel-fields-wrap')">
+            <input type="checkbox" id="f-rsv-fuel-toggle" ${(existing&&(existing.fuelRequested!=null||existing.fuelActual!=null))?'checked':''} onchange="toggleFuelFields('f-rsv-fuel-toggle','f-rsv-fuel-fields-wrap')">
             <label for="f-rsv-fuel-toggle">⛽ 연료넣고 출고</label>
           </div>
-          <div id="f-rsv-fuel-fields-wrap" style="display:none;margin-top:8px;">
+          <div id="f-rsv-fuel-fields-wrap" style="display:${(existing&&(existing.fuelRequested!=null||existing.fuelActual!=null))?'block':'none'};margin-top:8px;">
             <label>연료량(L)</label>
             <div class="consumable-row">
               <div style="flex:1;">
-                <input type="number" id="f-rsv-fuel-req" min="0" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;" onchange="if(!document.getElementById('f-rsv-fuel-actual').value) document.getElementById('f-rsv-fuel-actual').value=this.value;">
+                <input type="number" id="f-rsv-fuel-req" min="0" value="${(existing&&existing.fuelRequested)||''}" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;" onchange="if(!document.getElementById('f-rsv-fuel-actual').value) document.getElementById('f-rsv-fuel-actual').value=this.value;">
                 <div class="hint" style="margin:2px 0 0;">고객요청 (공급받는자용에 표시)</div>
               </div>
               <div style="flex:1;">
-                <input type="number" id="f-rsv-fuel-actual" min="0" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;">
+                <input type="number" id="f-rsv-fuel-actual" min="0" value="${(existing&&existing.fuelActual)||''}" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;">
                 <div class="hint" style="margin:2px 0 0;">실제주입 (공급자용에 표시)</div>
               </div>
             </div>
@@ -7301,17 +7309,17 @@ function openReserveNoGenModal(){
         </div>
         <div class="field f-eq">
           <div class="field chk" style="background:var(--ok-tint);border:1px solid var(--ok);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
-            <input type="checkbox" id="f-rsv-longterm"><label for="f-rsv-longterm">장기 임대 출고</label>
+            <input type="checkbox" id="f-rsv-longterm" ${existing&&existing.longTerm?'checked':''}><label for="f-rsv-longterm">장기 임대 출고</label>
           </div>
         </div>
         <div class="field f-eq">
-          <input type="text" id="f-rsv-payment-note" placeholder="입금관련 메모">
+          <input type="text" id="f-rsv-payment-note" value="${escR((existing&&existing.paymentNote)||'')}" placeholder="입금관련 메모">
         </div>
       </div>
       <div id="f-rsv-err" class="err" style="display:none;"></div>
       <div class="modal-actions" style="justify-content:center;">
         <button class="btn" onclick="closeModal()">취소</button>
-        <button class="btn primary" onclick="submitReserveNoGen()">출고예약 등록</button>
+        <button class="btn primary" onclick="submitReserveNoGen(${existing? `'${resId}'` : 'null'})">${existing? '수정 저장' : '출고예약 등록'}</button>
       </div>
     </div>
   </div>`;
@@ -7369,7 +7377,8 @@ function syncRsvReturnDateToUsageDays(){
   const days = Math.round((end-start)/86400000);
   if(days>0) daysEl.value = days;
 }
-function submitReserveNoGen(){
+function submitReserveNoGen(resId){
+  const existing = resId ? DB.reservations.find(x=>x.id===resId) : null;
   const genSel = document.getElementById('f-rsv-gen').value;
   const customer = document.getElementById('f-rsv-site').value.trim();
   const site = customer;
@@ -7403,7 +7412,7 @@ function submitReserveNoGen(){
     errEl.style.display='block'; return;
   }
   if(genSel !== UNASSIGNED_GEN_ID){
-    // 이 자리에서 바로 발전기를 골랐으면, 일반 출고와 똑같이 상차대기로 등록합니다.
+    // 이 자리에서 발전기를 골랐으면(새로 등록이든, 수정중에 배정이든), 일반 출고와 똑같이 상차대기로 등록합니다.
     const g = findGen(genSel);
     if(!g){ errEl.textContent = '선택한 발전기를 찾을 수 없습니다.'; errEl.style.display='block'; return; }
     const startHoursEl = document.getElementById('f-rsv-starthours');
@@ -7413,13 +7422,18 @@ function submitReserveNoGen(){
       errEl.style.display='block'; return;
     }
     const pendingData = {
-      id: uid(), genId: genSel, pendingLoad: true, batchId: null,
+      id: existing? existing.id : uid(), genId: genSel, pendingLoad: true, batchId: (existing&&existing.batchId)||null,
       customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
       fuelRequested, fuelActual, usageDays, loadDate: outDate, arriveTime: null, freightBearer, paymentNote, note,
       outDate, startHours, longTerm, estDaily,
-      outProcessedBy: DB.currentUserName || null, createdAt: todayStr()
+      outProcessedBy: (existing&&existing.outProcessedBy) || DB.currentUserName || null, createdAt: (existing&&existing.createdAt) || todayStr()
     };
-    DB.reservations.push(pendingData);
+    if(existing){
+      const idx = DB.reservations.findIndex(x=>x.id===existing.id);
+      if(idx>=0) DB.reservations[idx] = pendingData;
+    } else {
+      DB.reservations.push(pendingData);
+    }
     saveWithRetry(saveReservations);
     closeModal();
     currentTab = 'reserve'; renderTabbar(); renderContent();
@@ -7427,17 +7441,22 @@ function submitReserveNoGen(){
     return;
   }
   const pendingData = {
-    id: uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false, plannedOutDate: outDate, batchId: null,
+    id: existing? existing.id : uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false, plannedOutDate: outDate, batchId: (existing&&existing.batchId)||null,
     customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
     fuelRequested, fuelActual, usageDays, freightBearer, paymentNote, note,
     longTerm, estDaily,
-    outProcessedBy: DB.currentUserName || null, createdAt: todayStr()
+    outProcessedBy: (existing&&existing.outProcessedBy) || DB.currentUserName || null, createdAt: (existing&&existing.createdAt) || todayStr()
   };
-  DB.reservations.push(pendingData);
+  if(existing){
+    const idx = DB.reservations.findIndex(x=>x.id===existing.id);
+    if(idx>=0) DB.reservations[idx] = pendingData;
+  } else {
+    DB.reservations.push(pendingData);
+  }
   saveWithRetry(saveReservations);
   closeModal();
   currentTab = 'reserve'; renderTabbar(); renderContent();
-  flash('출고예약이 등록되었습니다. [출고 대기]에서 발전기를 배정하면 출고로 이어집니다.');
+  flash(existing? '출고예약 내용이 수정되었습니다.' : '출고예약이 등록되었습니다. [출고 대기]에서 발전기를 배정하면 출고로 이어집니다.');
 }
 function syncUsageDaysToReturnDate(){
   const outEl = document.getElementById('f-outdate');
