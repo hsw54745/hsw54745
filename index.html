@@ -1969,9 +1969,13 @@ function sortByIdNatural(a, b){
 }
 function lastFuelInfo(genId){
   const g = findGen(genId);
-  const recs = DB.rentals.filter(r=>r.genId===genId && (r.measuredFuelHeightCm!=null || r.fuelNotUsed)).sort((a,b)=>(b.inDate||'').localeCompare(a.inDate||''));
+  // "가장 최근 반납 기록"을 먼저 찾고, 그 기록에 연료 측정이 있을 때만 보여줍니다.
+  // (예전 방식: 연료 측정이 "있는" 기록들 중 최신을 찾다 보니, 이번엔 연료를 안 넣고 나간 건인데도
+  //  그보다 전에 연료를 넣었던 오래된 반납 기록이 잘못 다시 표시되는 문제가 있었습니다.)
+  const recs = DB.rentals.filter(r=>r.genId===genId).sort((a,b)=>(b.inDate||'').localeCompare(a.inDate||''));
   if(recs.length===0) return null;
   const latest = recs[0];
+  if(!(latest.measuredFuelHeightCm!=null || latest.fuelNotUsed)) return null;
   if(g && g.fuelResetAt && g.fuelResetAt >= (latest.inDate||'')) return null;
   return latest;
 }
@@ -6897,7 +6901,6 @@ function renderReserveTab(){
     if(r.genId === UNASSIGNED_GEN_ID){
       const d2 = r.plannedOutDate;
       const isDelayed2 = d2 && daysFromToday(d2)<0;
-      const fuelForList2 = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
       const suppliesCell2 = r.supplies
         ? `<button class="btn sm" style="color:var(--danger);font-weight:700;border-color:var(--danger);" onclick="showSuppliesModal('${r.id}')">부자재확인</button>`
         : `<span class="muted">부자재없음</span>`;
@@ -6915,7 +6918,7 @@ function renderReserveTab(){
         <td class="muted">${r.arriveTime||'-'}</td>
         <td class="muted">${r.freightBearer||'-'}</td>
         <td class="muted">${r.voltage||'-'}</td>
-        <td class="muted">${fuelForList2!=null? `<span style="font-size:16px;font-weight:800;color:var(--primary-dark);">${fuelForList2}L</span>` : '-'}</td>
+        <td class="muted">${(r.fuelRequested!=null||r.fuelActual!=null)? `<div style="font-size:13px;font-weight:800;color:var(--primary-dark);">요청 ${r.fuelRequested!=null? r.fuelRequested+'L':'-'}</div><div class="muted" style="font-size:11px;">실제 ${r.fuelActual!=null? r.fuelActual+'L':'-'}</div>` : '-'}</td>
         <td><div style="display:flex;flex-direction:column;align-items:center;gap:2px;">${suppliesCell2}${noteMarker2}</div></td>
         <td class="muted">${r.usageDays? r.usageDays+'일' : '-'}</td>
         <td><div class="btn-row" style="flex-wrap:nowrap;">
@@ -6928,7 +6931,6 @@ function renderReserveTab(){
     const g = findGen(r.genId);
     const d = dateOf(r);
     const isDelayed = d && daysFromToday(d)<0;
-    const fuelForList = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     const voltageChanged = g && g.voltage && r.voltage && g.voltage!==r.voltage;
     const vColor = voltageColor(r.voltage);
     const voltageCell = voltageChanged
@@ -6956,7 +6958,7 @@ function renderReserveTab(){
       <td class="muted">${r.arriveTime||'-'}</td>
       <td class="muted">${r.freightBearer||'-'}</td>
       <td>${voltageCell}</td>
-      <td class="muted">${fuelForList!=null? `<span style="font-size:16px;font-weight:800;color:var(--primary-dark);">${fuelForList}L</span>` : '-'}</td>
+      <td class="muted">${(r.fuelRequested!=null||r.fuelActual!=null)? `<div style="font-size:13px;font-weight:800;color:var(--primary-dark);">요청 ${r.fuelRequested!=null? r.fuelRequested+'L':'-'}</div><div class="muted" style="font-size:11px;">실제 ${r.fuelActual!=null? r.fuelActual+'L':'-'}</div>` : '-'}</td>
       <td><div style="display:flex;flex-direction:column;align-items:center;gap:2px;">${suppliesCell}${noteMarker}</div></td>
       <td class="muted">${r.usageDays? r.usageDays+'일' : '-'}</td>
       <td><div class="btn-row" style="flex-wrap:nowrap;">
