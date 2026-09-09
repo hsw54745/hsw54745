@@ -5123,6 +5123,8 @@ function showLoadingListPopup(isNewNotice, newItems){
     const smsItems = (newItems||[]).filter(r=>r && r.smsOrder && !r.arriveTime);
     if(smsItems.length>0){
       speakText(smsItems.length>1 ? `문자오더가 등록되었습니다. ${koNativeCount(smsItems.length)}건입니다.` : `문자오더가 등록되었습니다. ${smsItems[0].customer||'거래처 미기재'}`);
+      showNewSmsOrderPopup(smsItems);
+      return; // 문자오더 새 등록은 원문 팝업만 띄우고, 상차·입고 예정 팝업(관계없는 내용)은 띄우지 않습니다
     } else if(data.todayLoad.length>0){
       const first = data.todayLoad[0];
       speakText(`새 상차 예약이 등록되었습니다. ${first.customer||'거래처 미기재'}${data.todayLoad.length>1? ` 외 ${koNativeCount(data.todayLoad.length-1)} 건`:''}`);
@@ -5138,6 +5140,21 @@ function showLoadingListPopup(isNewNotice, newItems){
       <div class="modal-actions">
         <button class="btn" style="font-size:18px;padding:11px 20px;" onclick="closeModal()">닫기</button>
         <button class="btn primary" style="font-size:18px;padding:11px 20px;" onclick="closeModal();switchTab('reserve');">출고대기 보기</button>
+      </div>
+    </div>
+  </div>`;
+}
+function showNewSmsOrderPopup(items){
+  const cards = items.map(r=>`<div style="background:#FFF8E1;border:2px solid #E8B923;border-radius:12px;padding:14px 16px;margin-bottom:10px;text-align:left;white-space:pre-wrap;font-size:15px;line-height:1.6;color:#333;">${escR(r.smsOrder||'')}</div>`).join('');
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal" style="max-width:640px;">
+      <h3 style="font-size:24px;">📩 새 문자오더 등록됨${items.length>1? ` (${items.length}건)`:''}</h3>
+      <div class="modal-sub" style="font-size:15px;">내용 확인 후 도착일을 입력하면 정식 상차 목록으로 넘어갑니다.</div>
+      ${cards}
+      <div class="modal-actions">
+        <button class="btn" style="font-size:16px;padding:10px 18px;" onclick="closeModal()">닫기</button>
+        <button class="btn primary" style="font-size:16px;padding:10px 18px;" onclick="closeModal();switchTab('reserve');">출고대기 보기</button>
       </div>
     </div>
   </div>`;
