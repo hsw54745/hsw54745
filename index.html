@@ -528,9 +528,9 @@ function renderQuickModeUI(){
         <div style="font-size:24px;font-weight:800;color:#2C6E49;">📋 문자 간편등록</div>
         <div style="font-size:15px;color:#555;margin-top:8px;line-height:1.5;">문자 앱에서 내용을 복사한 다음<br>아래 파란 버튼을 누르면 바로 채워집니다</div>
       </div>
-      <button id="qm-paste-btn" type="button" onclick="pasteFromClipboard()" style="width:100%;padding:20px;font-size:22px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:12px;">📋 복사한 문자 붙여넣기</button>
+      <button id="qm-btn" onclick="submitQuickOrder()" style="width:100%;padding:20px;font-size:22px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:12px;">등록하기</button>
       <textarea id="qm-text" rows="8" style="width:100%;font-size:20px;line-height:1.5;padding:14px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;" placeholder="여기를 길게 눌러서 직접 붙여넣기도 가능합니다"></textarea>
-      <button id="qm-btn" onclick="submitQuickOrder()" style="width:100%;margin-top:16px;padding:22px;font-size:24px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">등록하기</button>
+      <button id="qm-paste-btn" type="button" onclick="pasteFromClipboard()" style="width:100%;margin-top:16px;padding:22px;font-size:24px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;">📋 복사한 문자 붙여넣기</button>
       <div style="text-align:center;color:#777;font-size:14px;margin-top:12px;">등록 후 내용이 틀리면 사무실에서 나중에 고칠 수 있으니 걱정 안 하셔도 됩니다</div>
       <div id="qm-status" style="margin-top:16px;padding:16px;border-radius:12px;font-size:17px;font-weight:700;text-align:center;white-space:pre-line;display:none;"></div>
       <div style="margin-top:22px;border-top:2px solid #ddd;padding-top:16px;">
@@ -652,7 +652,8 @@ async function submitQuickOrder(){
     // 별도 기록(로그)에도 남겨둡니다 - 나중에 사무실에서 처리(출고완료)되어 출고대기 목록에서
     // 빠지더라도, 이영숙님 화면의 "최근 등록 내역"에서는 계속 보이게 하기 위함입니다.
     try{
-      const logCur = await window.storage.get('quickOrderLog-v1', true);
+      let logCur = null;
+      try{ logCur = await window.storage.get('quickOrderLog-v1', true); }catch(e0){ logCur = null; } // 키가 아직 없으면 여기서 실패하는 게 정상이라, 그냥 빈 목록으로 시작합니다
       let log = [];
       try{ log = logCur ? JSON.parse(logCur.value) : []; }catch(e2){ log = []; }
       if(!Array.isArray(log)) log = [];
@@ -5060,7 +5061,8 @@ function loadingPopupData(){
   const today = todayStr(), tomorrow = tomorrowStr();
   // 발전기가 아직 미지정인 출고예약(pendingLoad:false)도 상차 예정에 포함시킵니다.
   // (이전엔 pendingLoad:true인 것만 걸러서, 미지정 출고예약은 이 팝업에 아예 안 떴습니다.)
-  const pending = (DB.reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID);
+  // 단, 문자오더인데 아직 도착시간을 입력하지 않은 건은 정식 상차 예정으로 잡지 않습니다.
+  const pending = (DB.reservations||[]).filter(r=>(r.pendingLoad || r.genId===UNASSIGNED_GEN_ID) && !(r.smsOrder && !r.arriveTime));
   const loadDateOf = r => r.loadDate || r.outDate || r.plannedOutDate;
   const todayLoad = pending.filter(r=>loadDateOf(r)===today).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
   const tomorrowLoad = pending.filter(r=>loadDateOf(r)===tomorrow).sort((a,b)=>(a.genId||'').localeCompare(b.genId||''));
@@ -5118,6 +5120,15 @@ function loadingListPopupHtml(){
 }
 function showLoadingListPopup(isNewNotice, newItems){
   const data = loadingPopupData();
+  if(isNewNotice && isWithinVoiceAlertHours()){
+    const smsItems = (newItems||[]).filter(r=>r && r.smsOrder && !r.arriveTime);
+    if(smsItems.length>0){
+      speakText(smsItems.length>1 ? `문자오더가 등록되었습니다. ${koNativeCount(smsItems.length)}건입니다.` : `문자오더가 등록되었습니다. ${smsItems[0].customer||'거래처 미기재'}`);
+    } else if(data.todayLoad.length>0){
+      const first = data.todayLoad[0];
+      speakText(`새 상차 예약이 등록되었습니다. ${first.customer||'거래처 미기재'}${data.todayLoad.length>1? ` 외 ${koNativeCount(data.todayLoad.length-1)} 건`:''}`);
+    }
+  }
   if(data.total===0) return;
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
@@ -5131,15 +5142,6 @@ function showLoadingListPopup(isNewNotice, newItems){
       </div>
     </div>
   </div>`;
-  if(isNewNotice && data.todayLoad.length>0 && isWithinVoiceAlertHours()){
-    const smsItems = (newItems||[]).filter(r=>r && r.smsOrder);
-    if(smsItems.length>0){
-      speakText(smsItems.length>1 ? `문자오더가 등록되었습니다. ${koNativeCount(smsItems.length)}건입니다.` : `문자오더가 등록되었습니다. ${smsItems[0].customer||'거래처 미기재'}`);
-    } else {
-      const first = data.todayLoad[0];
-      speakText(`새 상차 예약이 등록되었습니다. ${first.customer||'거래처 미기재'}${data.todayLoad.length>1? ` 외 ${koNativeCount(data.todayLoad.length-1)} 건`:''}`);
-    }
-  }
 }
 function showLoadingPopupOnLogin(){
   showLoadingListPopup(false);
@@ -5244,6 +5246,9 @@ function renderSettingsTab(){
           </div>
           <div class="field" style="max-width:160px;"><label>안내 속도 (<span id="f-voice-rate-out">${getVoiceAlertRate()}</span>배)</label>
             <input type="range" id="f-voice-rate" min="0.5" max="1.8" step="0.1" value="${getVoiceAlertRate()}" oninput="document.getElementById('f-voice-rate-out').textContent=this.value;" onchange="setVoiceAlertRate(this.value)">
+          </div>
+          <div class="field" style="max-width:160px;"><label>볼륨 (<span id="f-voice-volume-out">${Math.round(getVoiceAlertVolume()*100)}</span>%)</label>
+            <input type="range" id="f-voice-volume" min="0" max="1" step="0.05" value="${getVoiceAlertVolume()}" oninput="document.getElementById('f-voice-volume-out').textContent=Math.round(this.value*100);" onchange="setVoiceAlertVolume(this.value)">
           </div>
         </div>
         <div class="btn-row" style="margin-top:8px;">
@@ -7130,7 +7135,9 @@ async function submitMaterials(){
 
 // ---------- 출고 예약 ----------
 function renderReserveTab(){
-  const list = [...DB.reservations].sort((a,b)=>((a.loadDate||a.outDate||a.plannedOutDate||'')).localeCompare((b.loadDate||b.outDate||b.plannedOutDate||'')));
+  const isRawSms = r => !!(r.smsOrder && !r.arriveTime);
+  const smsRawList = DB.reservations.filter(isRawSms).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
+  const list = [...DB.reservations].filter(r=>!isRawSms(r)).sort((a,b)=>((a.loadDate||a.outDate||a.plannedOutDate||'')).localeCompare((b.loadDate||b.outDate||b.plannedOutDate||'')));
   const dateOf = r => r.pendingLoad ? (r.loadDate||r.outDate) : r.plannedOutDate;
   const delayedCount = list.filter(r=>dateOf(r) && daysFromToday(dateOf(r))<0).length;
   const pendingCount = list.filter(r=>r.pendingLoad).length;
@@ -7211,10 +7218,26 @@ function renderReserveTab(){
       </div></td>
     </tr>`;
   }).join('');
+  const smsRawHtml = smsRawList.map(r=>{
+    const raw = r.smsOrder||'';
+    const snippet = raw.slice(0,80);
+    return `<div style="background:#FFF8E1;border:1px solid #E8B923;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+      <div style="font-size:12px;color:#8A6D00;font-weight:700;margin-bottom:4px;">${r.createdAtTs? fmtQmTime(r.createdAtTs) : ''}</div>
+      <div style="font-size:13.5px;color:#333;white-space:pre-wrap;margin-bottom:8px;">${escR(snippet)}${raw.length>80? '…':''}</div>
+      <div class="btn-row">
+        <button class="btn sm primary" onclick="openReserveNoGenModal('${r.id}')">내용보기/수정 (도착일 입력하면 상차목록으로 이동)</button>
+        <button class="btn sm danger" onclick="cancelReservation('${r.id}')">삭제</button>
+      </div>
+    </div>`;
+  }).join('');
   return `
+    ${smsRawList.length>0? `
+    <div class="section-title">📩 문자오더 <span class="cnt" style="background:#FFF8E1;color:#8A6D00;border-color:#E8B923;">${smsRawList.length}건</span></div>
+    <div style="margin:8px 0 18px;">${smsRawHtml}</div>
+    ` : ''}
     <div class="section-title">출고 대기 <span class="cnt">${list.length}건</span>${pendingCount>0? `<span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">상차대기 ${pendingCount}건</span>`:''}${delayedCount>0? `<span class="cnt" style="background:var(--danger-tint);color:var(--danger);border-color:var(--danger);">지연 ${delayedCount}건</span>`:''}</div>
     <p class="muted" style="font-size:12.5px;margin-top:-4px;">출고하기를 하면 발전기가 여기 "상차대기"로 표시됩니다. 상차 담당자가 실제 싣고 나갈 때 "상차완료"를 누르면 그때 출고(출고중)로 처리됩니다. 연료는 고객요청량이 있으면 요청량 기준으로, 없으면 실제주입량 기준으로 표시됩니다.</p>
-    <div class="detail-card" style="margin:10px 0 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--primary-tint);border:1px solid var(--primary);">
+    <div class="detail-card" style="margin:10px 0 14px;display:flex;align-items:center;justify-content:flex-start;gap:16px;flex-wrap:wrap;background:var(--primary-tint);border:1px solid var(--primary);">
       <button class="btn" onclick="openPasteSmsModal()">📋 문자 붙여넣기로 등록</button>
       <button class="btn primary" onclick="openReserveNoGenModal()">+ 출고예약 등록</button>
       <div style="text-align:left;">
@@ -10578,6 +10601,8 @@ function getVoiceAlertVoiceName(){ return localStorage.getItem('voiceAlertVoiceN
 function setVoiceAlertVoiceName(v){ localStorage.setItem('voiceAlertVoiceName', v||''); }
 function getVoiceAlertRate(){ return Number(localStorage.getItem('voiceAlertRate')) || 1; }
 function setVoiceAlertRate(v){ localStorage.setItem('voiceAlertRate', Math.max(0.5, Math.min(1.8, Number(v)||1))); }
+function getVoiceAlertVolume(){ const v = localStorage.getItem('voiceAlertVolume'); return v==null ? 1 : Math.max(0, Math.min(1, Number(v))); }
+function setVoiceAlertVolume(v){ localStorage.setItem('voiceAlertVolume', Math.max(0, Math.min(1, Number(v)!=null?Number(v):1))); }
 function renderVoiceSelect(){
   const sel = document.getElementById('f-voice-select');
   if(!sel || !window.speechSynthesis) return;
@@ -10698,12 +10723,13 @@ function playDingDong(){
   try{
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const now = ctx.currentTime;
+    const vol = getVoiceAlertVolume();
     const tone = (freq, start, dur)=>{
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine'; osc.frequency.value = freq;
       gain.gain.setValueAtTime(0.0001, now+start);
-      gain.gain.exponentialRampToValueAtTime(0.35, now+start+0.02);
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, 0.35*vol), now+start+0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, now+start+dur);
       osc.connect(gain); gain.connect(ctx.destination);
       osc.start(now+start); osc.stop(now+start+dur+0.05);
@@ -10723,6 +10749,7 @@ function speakText(text){
       u.lang = 'ko-KR';
       u.rate = getVoiceAlertRate();
       u.pitch = 1;
+      u.volume = getVoiceAlertVolume();
       const savedVoiceName = getVoiceAlertVoiceName();
       if(savedVoiceName){
         const match = (window.speechSynthesis.getVoices()||[]).find(v=>v.name===savedVoiceName);
