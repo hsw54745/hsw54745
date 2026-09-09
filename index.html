@@ -6918,7 +6918,7 @@ function renderReserveTab(){
         <td class="muted">${r.arriveTime||'-'}</td>
         <td class="muted">${r.freightBearer||'-'}</td>
         <td class="muted">${r.voltage||'-'}</td>
-        <td class="muted">${(r.fuelRequested!=null||r.fuelActual!=null)? `<div style="font-size:13px;font-weight:800;color:var(--primary-dark);">요청 ${r.fuelRequested!=null? r.fuelRequested+'L':'-'}</div><div class="muted" style="font-size:11px;">실제 ${r.fuelActual!=null? r.fuelActual+'L':'-'}</div>` : '-'}</td>
+        <td class="muted">${(r.fuelRequested!=null||r.fuelActual!=null)? `<div style="font-size:13px;font-weight:800;color:var(--danger);">요청 ${r.fuelRequested!=null? r.fuelRequested+'L':'-'}</div><div style="font-size:13px;font-weight:800;color:var(--danger);">실제 ${r.fuelActual!=null? r.fuelActual+'L':'-'}</div>` : '-'}</td>
         <td><div style="display:flex;flex-direction:column;align-items:center;gap:2px;">${suppliesCell2}${noteMarker2}</div></td>
         <td class="muted">${r.usageDays? r.usageDays+'일' : '-'}</td>
         <td><div class="btn-row" style="flex-wrap:nowrap;">
@@ -6958,7 +6958,7 @@ function renderReserveTab(){
       <td class="muted">${r.arriveTime||'-'}</td>
       <td class="muted">${r.freightBearer||'-'}</td>
       <td>${voltageCell}</td>
-      <td class="muted">${(r.fuelRequested!=null||r.fuelActual!=null)? `<div style="font-size:13px;font-weight:800;color:var(--primary-dark);">요청 ${r.fuelRequested!=null? r.fuelRequested+'L':'-'}</div><div class="muted" style="font-size:11px;">실제 ${r.fuelActual!=null? r.fuelActual+'L':'-'}</div>` : '-'}</td>
+      <td class="muted">${(r.fuelRequested!=null||r.fuelActual!=null)? `<div style="font-size:13px;font-weight:800;color:var(--danger);">요청 ${r.fuelRequested!=null? r.fuelRequested+'L':'-'}</div><div style="font-size:13px;font-weight:800;color:var(--danger);">실제 ${r.fuelActual!=null? r.fuelActual+'L':'-'}</div>` : '-'}</td>
       <td><div style="display:flex;flex-direction:column;align-items:center;gap:2px;">${suppliesCell}${noteMarker}</div></td>
       <td class="muted">${r.usageDays? r.usageDays+'일' : '-'}</td>
       <td><div class="btn-row" style="flex-wrap:nowrap;">
