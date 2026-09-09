@@ -7580,7 +7580,7 @@ function openOutInfoEditModal(id){
       <div class="modal-sub">${g.id} · [${displayModel(g)}]</div>
       <div class="hint" style="margin-bottom:10px;color:var(--danger);">이미 출고중인 발전기의 거래처·현장·날짜 등 정보를 직접 수정합니다. (입고 처리 없이 바로 저장됩니다)</div>
       <div class="out-row stretch">
-        ${g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-oie-starthours" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}" min="0"></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;">누적시간 확인불가 모델</div></div></div>`}
+        ${g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-oie-starthours" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}" min="0"><input type="hidden" id="f-oie-starthours-orig" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}"></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;">누적시간 확인불가 모델</div></div></div>`}
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="f-oie-outdate" value="${rt.outDate||todayStr()}">
         </div></div>
@@ -7699,9 +7699,13 @@ async function submitOutInfoEdit(id){
   const site = document.getElementById('f-oie-site').value.trim();
   if(!site){ errEl.textContent='거래처명을 입력해주세요.'; errEl.style.display='block'; return; }
   const startHoursEl = document.getElementById('f-oie-starthours');
+  const startHoursOrigEl = document.getElementById('f-oie-starthours-orig');
   const startHoursRaw = startHoursEl ? startHoursEl.value : '';
   const startHours = startHoursRaw==='' ? NaN : Number(startHoursRaw);
-  if(startHoursRaw!=='' && (isNaN(startHours) || startHours<0 || startHours < (g.lastMaintHours||0))){
+  // "출고시 누적시간"을 사용자가 직접 건드리지 않았다면(= 원래 값 그대로), 이 값에 대한 검증은 건너뜁니다.
+  // 이 필드를 안 만졌는데도 검증에 걸리면, 반납예정일 등 전혀 다른 항목만 고치려 해도 저장이 막히는 문제가 있었습니다.
+  const startHoursChanged = startHoursOrigEl ? (startHoursRaw !== startHoursOrigEl.value) : true;
+  if(startHoursChanged && startHoursRaw!=='' && (isNaN(startHours) || startHours<0 || startHours < (g.lastMaintHours||0))){
     errEl.textContent = `출고시 누적시간을 확인해주세요. (마지막 정비시 누적시간 ${(g.lastMaintHours||0).toLocaleString()}h보다 작을 수 없습니다)`;
     errEl.style.display='block'; return;
   }
