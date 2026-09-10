@@ -5172,6 +5172,10 @@ function showLoadingPopupOnLogin(){
 function showNewPostPopup(newNotices, newEvents){
   const noticeCnt = newNotices.length;
   const eventCnt = newEvents.length;
+  if(isWithinVoiceAlertHours()){
+    if(noticeCnt>0) speakText(`공지사항이 등록되었습니다. ${newNotices[0].title||'내용을 확인해주세요'}`);
+    else if(eventCnt>0) speakText(`새 일정이 등록되었습니다. ${newEvents[0].text||'내용을 확인해주세요'}`);
+  }
   let parts = '';
   if(noticeCnt>0){
     parts += `<div style="border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;margin-bottom:10px;">
