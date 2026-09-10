@@ -283,30 +283,38 @@ const FIREBASE_CONFIG = {
   authDomain: "haesung3732.firebaseapp.com",
   databaseURL: "https://haesung3732-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
-let firebaseAuthReady = null;
+let firebaseReadyFlag = false;
 if(typeof firebase === 'undefined'){
-  firebaseAuthReady = Promise.resolve(false);
+  firebaseReadyFlag = false;
 } else {
   try{
     firebase.initializeApp(FIREBASE_CONFIG);
-    firebaseAuthReady = new Promise(function(resolve){
-      let settled = false;
-      firebase.auth().onAuthStateChanged(function(user){
-        if(user && !settled){ settled = true; resolve(true); }
-      });
-      firebase.auth().signInAnonymously().catch(function(err){
-        if(!settled){ settled = true; resolve(false); }
-      });
-      setTimeout(function(){ if(!settled){ settled = true; resolve(false); } }, 8000);
-    });
+    firebase.auth().signInAnonymously().catch(function(err){ /* 실패해도 무시 - getAuthQuery 호출 시점에 다시 확인/대기함 */ });
+    firebaseReadyFlag = true;
   }catch(e){
-    firebaseAuthReady = Promise.resolve(false);
+    firebaseReadyFlag = false;
   }
+}
+function waitForAuthUser(timeoutMs){
+  return new Promise(function(resolve){
+    if(!firebaseReadyFlag || typeof firebase === 'undefined'){ resolve(null); return; }
+    const existing = firebase.auth().currentUser;
+    if(existing){ resolve(existing); return; }
+    let done = false;
+    let unsub = null;
+    unsub = firebase.auth().onAuthStateChanged(function(user){
+      if(user && !done){ done = true; if(unsub) unsub(); resolve(user); }
+    });
+    setTimeout(function(){
+      if(!done){ done = true; if(unsub) unsub(); resolve(firebase.auth().currentUser||null); }
+    }, timeoutMs);
+  });
 }
 async function getAuthQuery(){
   try{
-    await firebaseAuthReady;
-    const user = firebase.auth().currentUser;
+    // 퀵모드처럼 로그인 대기시간 없이 바로 버튼을 누르는 경우를 대비해,
+    // 호출할 때마다 최대 15초까지 인증이 끝나길 기다립니다 (이미 끝나 있으면 즉시 통과).
+    const user = await waitForAuthUser(15000);
     if(!user) return '';
     const token = await user.getIdToken();
     return 'auth='+encodeURIComponent(token);
@@ -942,18 +950,10 @@ async function loadQuickRecentList(){
   const wrap = document.getElementById('qm-recent');
   if(!wrap) return;
   try{
-    const [logCur, resCur] = await Promise.all([
-      window.storage.get('quickOrderLog-v1', true).catch(()=>null),
-      window.storage.get('gen-reservations-v1', true).catch(()=>null)
-    ]);
+    const logCur = await window.storage.get('quickOrderLog-v1', true).catch(()=>null);
     let log = [];
     try{ log = logCur ? JSON.parse(logCur.value) : []; }catch(e){ log = []; }
     if(!Array.isArray(log)) log = [];
-    let resList = [];
-    try{ resList = resCur ? JSON.parse(resCur.value) : []; }catch(e){ resList = []; }
-    if(!Array.isArray(resList)) resList = [];
-    const resById = {};
-    resList.forEach(r=>{ resById[r.id] = r; });
     const recent = [...log].sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0)).slice(0,5);
     if(!document.getElementById('qm-recent')) return; // 화면이 이미 닫혔으면 무시
     if(recent.length===0){
@@ -963,17 +963,8 @@ async function loadQuickRecentList(){
     wrap.innerHTML = recent.map(item=>{
       const raw = item.text||'';
       const snippet = raw.slice(0,45);
-      const r = resById[item.resId];
-      let statusHtml;
-      if(!r){
-        statusHtml = `<span style="color:#2C6E49;font-weight:700;">✅ 상차완료 (사무실 처리됨)</span>`;
-      } else if(r.genId && r.genId!==UNASSIGNED_GEN_ID){
-        statusHtml = `<span style="color:#8A5A00;font-weight:700;">🔧 발전기 배정됨 (상차대기)</span>`;
-      } else {
-        statusHtml = `<span style="color:#2C4A66;font-weight:700;">🅾 출고예약 등록됨 (배정 대기)</span>`;
-      }
       return `<div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 12px;margin-bottom:8px;text-align:left;">
-        <div style="font-size:12px;color:#888;margin-bottom:3px;">${fmtQmTime(item.createdAtTs)} · ${statusHtml}</div>
+        <div style="font-size:12px;color:#888;margin-bottom:3px;">${fmtQmTime(item.createdAtTs)} · <span style="color:#2C6E49;font-weight:700;">📤 발송됨</span></div>
         <div style="font-size:13.5px;color:#333;white-space:pre-wrap;">${escR(snippet)}${raw.length>45? '…':''}</div>
       </div>`;
     }).join('');
