@@ -537,9 +537,15 @@ function renderQuickModeUI(){
       </div>
       <button type="button" onclick="renderQuickModeStockList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📦 입고된 발전기 리스트 보기</button>
       <button type="button" onclick="renderQuickModePasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📋 문자 붙여넣기</button>
-      <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;">📝 출고예약 등록</button>
+      <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:18px;">📝 출고예약 등록</button>
+      <div id="qm-install-status" style="margin-bottom:8px;"></div>
+      <button type="button" onclick="triggerPwaInstall()" style="width:100%;padding:16px;font-size:16px;font-weight:700;background:#fff;color:#555;border:2px solid #ccc;border-radius:14px;cursor:pointer;">📲 홈 화면에 앱으로 추가</button>
     </div>
   `);
+  if(isRunningAsPwa()){
+    const st = document.getElementById('qm-install-status');
+    if(st) st.innerHTML = '<div style="text-align:center;color:#2C6E49;font-weight:700;font-size:13px;">✅ 이미 앱으로 실행 중입니다</div>';
+  }
 }
 function renderQuickModePasteUI(){
   pwGateShow(`
@@ -11243,6 +11249,8 @@ function speakErrorText(text){
 })();
 
 if(isQuickMode()){
+  const manifestLinkEl = document.querySelector('link[rel="manifest"]');
+  if(manifestLinkEl) manifestLinkEl.setAttribute('href', 'manifest-quick.json');
   renderQuickModeUI();
 } else {
   initPasswordGate();
@@ -11292,10 +11300,13 @@ async function triggerPwaInstall(){
 function showPwaManualGuide(){
   const ua = navigator.userAgent || '';
   const isIOS = /iPhone|iPad|iPod/.test(ua);
+  const isWhale = /Whale/.test(ua);
   if(isIOS){
-    showInfoModal(["\ud83d\udcf2 \uc544\uc774\ud3f0(\uc0ac\ud30c\ub9ac) \uc124\uce58 \ubc29\ubc95","","1. \ud654\uba74 \ud558\ub2e8(\ub610\ub294 \uc0c1\ub2e8)\uc758 \"\uacf5\uc720\" \ubc84\ud2bc(\ub124\ubaa8\uc5d0 \ud654\uc0b4\ud45c)\uc744 \ub204\ub974\uc138\uc694","2. \uc544\ub798\ub85c \ub0b4\ub824\uc11c \"\ud648 \ud654\uba74\uc5d0 \ucd94\uac00\"\ub97c \ub204\ub974\uc138\uc694","3. \"\ucd94\uac00\"\ub97c \ub204\ub974\uba74 \ud648 \ud654\uba74\uc5d0 \uc571 \uc544\uc774\ucf58\uc774 \uc0dd\uae41\ub2c8\ub2e4","","\u203b \ubc18\ub4dc\uc2dc \uc0ac\ud30c\ub9ac(Safari) \ube0c\ub77c\uc6b0\uc800\uc5d0\uc11c \ud558\uc154\uc57c \ud569\ub2c8\ub2e4. \ud06c\ub86c \ub4f1 \ub2e4\ub978 \ube0c\ub77c\uc6b0\uc800\uc5d0\uc11c\ub294 \uc774 \uba54\ub274\uac00 \uc5c6\uc744 \uc218 \uc788\uc2b5\ub2c8\ub2e4."].join(String.fromCharCode(10)));
+    showInfoModal(["\ud83d\udcf2 \uc544\uc774\ud3f0(\uc0ac\ud30c\ub9ac) \uc124\uce58 \ubc29\ubc95", "", "1. \ud654\uba74 \ud558\ub2e8(\ub610\ub294 \uc0c1\ub2e8)\uc758 \"\uacf5\uc720\" \ubc84\ud2bc(\ub124\ubaa8\uc5d0 \ud654\uc0b4\ud45c)\uc744 \ub204\ub974\uc138\uc694", "2. \uc544\ub798\ub85c \ub0b4\ub824\uc11c \"\ud648 \ud654\uba74\uc5d0 \ucd94\uac00\"\ub97c \ub204\ub974\uc138\uc694", "3. \"\ucd94\uac00\"\ub97c \ub204\ub974\uba74 \ud648 \ud654\uba74\uc5d0 \uc571 \uc544\uc774\ucf58\uc774 \uc0dd\uae41\ub2c8\ub2e4", "", "\u203b \ubc18\ub4dc\uc2dc \uc0ac\ud30c\ub9ac(Safari) \ube0c\ub77c\uc6b0\uc800\uc5d0\uc11c \ud558\uc154\uc57c \ud569\ub2c8\ub2e4. \ud06c\ub86c \ub4f1 \ub2e4\ub978 \ube0c\ub77c\uc6b0\uc800\uc5d0\uc11c\ub294 \uc774 \uba54\ub274\uac00 \uc5c6\uc744 \uc218 \uc788\uc2b5\ub2c8\ub2e4."].join(String.fromCharCode(10)));
+  } else if(isWhale){
+    showInfoModal(["\ud83d\udcf2 \ub124\uc774\ubc84 \uc6e8\uc77c \uc124\uce58 \ubc29\ubc95", "", "1. \ud654\uba74 \ud558\ub2e8(\ub610\ub294 \uc0c1\ub2e8)\uc758 \uc804\uccb4\uba54\ub274 \u2261 \ubc84\ud2bc\uc744 \ub204\ub974\uc138\uc694", "2. \uba54\ub274\uc5d0\uc11c \"\ud648 \ud654\uba74\uc5d0 \ucd94\uac00\" \ud56d\ubaa9\uc744 \ucc3e\uc544 \ub204\ub974\uc138\uc694 (\uc5c6\uc73c\uba74 \"\uacf5\uc720\" \uc548\uc5d0 \uc788\uc744 \uc218 \uc788\uc2b5\ub2c8\ub2e4)", "3. \"\ucd94\uac00\"\ub97c \ub204\ub974\uba74 \ud648 \ud654\uba74\uc5d0 \uc571 \uc544\uc774\ucf58\uc774 \uc0dd\uae41\ub2c8\ub2e4", "", "\u203b \uc6e8\uc77c\uc740 \ud06c\ub86c\uacfc \ub2ec\ub9ac \uc790\ub3d9 \uc124\uce58 \ud31d\uc5c5\uc744 \uc9c0\uc6d0\ud558\uc9c0 \uc54a\uc544, \uc704 \ubc29\ubc95\uc73c\ub85c \uc9c1\uc811 \ucd94\uac00\ud558\uc154\uc57c \ud569\ub2c8\ub2e4.", "\ud06c\ub86c \ube0c\ub77c\uc6b0\uc800\ub85c \uc5f4\uba74 \uc124\uce58 \ubc84\ud2bc \ud55c \ubc88\uc73c\ub85c \ub354 \uac04\ud3b8\ud558\uac8c \ub418\ub2c8, \ud06c\ub86c\ub3c4 \ud55c \ubc88 \uc774\uc6a9\ud574\ubcf4\uc138\uc694."].join(String.fromCharCode(10)));
   } else {
-    showInfoModal(["\ud83d\udcf2 \uc548\ub4dc\ub85c\uc774\ub4dc(\ud06c\ub86c) \uc124\uce58 \ubc29\ubc95","","1. \uc624\ub978\ucabd \uc704 \uc810 3\uac1c(\u22ee) \uba54\ub274\ub97c \ub204\ub974\uc138\uc694","2. \"\uc571 \uc124\uce58\" \ub610\ub294 \"\ud648 \ud654\uba74\uc5d0 \ucd94\uac00\"\ub97c \ub204\ub974\uc138\uc694","3. \ud655\uc778\uc744 \ub204\ub974\uba74 \ud648 \ud654\uba74\uc5d0 \uc571 \uc544\uc774\ucf58\uc774 \uc0dd\uae41\ub2c8\ub2e4","","\u203b \uc790\ub3d9\uc73c\ub85c \uc124\uce58 \ubc84\ud2bc\uc774 \ub728\uc9c0 \uc54a\ub294 \uacbd\uc6b0, \uc704 \ubc29\ubc95\uc73c\ub85c \uc9c1\uc811 \uc124\uce58\ud558\uc2e4 \uc218 \uc788\uc2b5\ub2c8\ub2e4."].join(String.fromCharCode(10)));
+    showInfoModal(["\ud83d\udcf2 \uc548\ub4dc\ub85c\uc774\ub4dc(\ud06c\ub86c) \uc124\uce58 \ubc29\ubc95", "", "1. \uc624\ub978\ucabd \uc704 \uc810 3\uac1c(\u22ee) \uba54\ub274\ub97c \ub204\ub974\uc138\uc694", "2. \"\uc571 \uc124\uce58\" \ub610\ub294 \"\ud648 \ud654\uba74\uc5d0 \ucd94\uac00\"\ub97c \ub204\ub974\uc138\uc694", "3. \ud655\uc778\uc744 \ub204\ub974\uba74 \ud648 \ud654\uba74\uc5d0 \uc571 \uc544\uc774\ucf58\uc774 \uc0dd\uae41\ub2c8\ub2e4", "", "\u203b \uc790\ub3d9\uc73c\ub85c \uc124\uce58 \ubc84\ud2bc\uc774 \ub728\uc9c0 \uc54a\ub294 \uacbd\uc6b0, \uc704 \ubc29\ubc95\uc73c\ub85c \uc9c1\uc811 \uc124\uce58\ud558\uc2e4 \uc218 \uc788\uc2b5\ub2c8\ub2e4."].join(String.fromCharCode(10)));
   }
 }
 
