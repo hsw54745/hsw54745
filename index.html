@@ -524,6 +524,19 @@ function isQuickMode(){
 function renderQuickModeUI(){
   pwGateShow(`
     <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:24px;font-weight:800;color:#2C6E49;">해성발전기</div>
+        <div style="font-size:15px;color:#555;margin-top:8px;">원하시는 메뉴를 골라주세요</div>
+      </div>
+      <button type="button" onclick="renderQuickModePasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📋 문자 복사하기</button>
+      <button type="button" onclick="renderQuickModeStockList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">📦 입고된 발전기 리스트 보기</button>
+    </div>
+  `);
+}
+function renderQuickModePasteUI(){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQuickModeUI()" style="background:none;border:none;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:4px 0 14px;">← 뒤로가기</button>
       <div style="text-align:center;margin-bottom:14px;">
         <div style="font-size:24px;font-weight:800;color:#2C6E49;">📋 문자 간편등록</div>
         <div style="font-size:15px;color:#555;margin-top:8px;line-height:1.5;">문자 앱에서 내용을 복사한 다음<br>아래 파란 버튼을 누르면 바로 채워집니다</div>
@@ -541,6 +554,38 @@ function renderQuickModeUI(){
   `);
   document.getElementById('qm-text').focus();
   loadQuickRecentList();
+}
+async function renderQuickModeStockList(){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQuickModeUI()" style="background:none;border:none;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:4px 0 14px;">← 뒤로가기</button>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:24px;font-weight:800;color:#2C6E49;">📦 입고된 발전기</div>
+        <div style="font-size:14px;color:#555;margin-top:6px;">지금 바로 나갈 수 있는 발전기 목록입니다</div>
+      </div>
+      <div id="qm-stock-list"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+    </div>
+  `);
+  const wrap = document.getElementById('qm-stock-list');
+  try{
+    const cur = await window.storage.get('gen-fleet-v2', true);
+    let gens = [];
+    try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    const inStock = gens.filter(g=>g && g.status==='in').sort((a,b)=>String(a.id).localeCompare(String(b.id), 'ko', {numeric:true}));
+    if(!document.getElementById('qm-stock-list')) return; // 화면이 이미 닫혔으면 무시
+    if(inStock.length===0){
+      wrap.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">지금 입고되어 있는 발전기가 없습니다.</div>';
+      return;
+    }
+    wrap.innerHTML = `<div style="font-size:13px;color:#888;margin-bottom:8px;text-align:right;">총 ${inStock.length}대</div>` + inStock.map(g=>`
+      <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
+        <span style="font-size:14px;color:#333;text-align:right;">${escR(g.model||'')}</span>
+      </div>`).join('');
+  }catch(e){
+    if(document.getElementById('qm-stock-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">목록을 불러오지 못했습니다.</div>';
+  }
 }
 function fmtQmTime(ts){
   if(!ts) return '';
