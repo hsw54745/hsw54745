@@ -3717,7 +3717,7 @@ function renderSettlementTab(){
   return `
     <div class="section-title">거래처별 임대 건수</div>
     ${Object.keys(byCustomer).length===0? `<div class="empty">데이터가 없습니다.</div>` : `
-    <div class="table-scroll"><table>
+    <div style="max-width:420px;"><table>
       <thead><tr><th>거래처</th><th>임대 건수</th></tr></thead>
       <tbody>${customerRows}</tbody>
     </table></div>`}
@@ -5127,7 +5127,7 @@ function showLoadingListPopup(isNewNotice, newItems){
       return; // 문자오더 새 등록은 원문 팝업만 띄우고, 상차·입고 예정 팝업(관계없는 내용)은 띄우지 않습니다
     } else if(data.todayLoad.length>0){
       const first = data.todayLoad[0];
-      speakText(`새 상차 예약이 등록되었습니다. ${first.customer||'거래처 미기재'}${data.todayLoad.length>1? ` 외 ${koNativeCount(data.todayLoad.length-1)} 건`:''}`);
+      speakText(`출고예약이 등록되었습니다. ${first.customer||'거래처 미기재'}${data.todayLoad.length>1? ` 외 ${koNativeCount(data.todayLoad.length-1)} 건`:''}`);
     }
   }
   if(data.total===0) return;
@@ -7488,6 +7488,7 @@ async function confirmLoad(resId){
   renderContent();
   closeModal();
   flash('상차 확인 완료 - 출고되었습니다');
+  if(isWithinVoiceAlertHours()) speakText('상차완료입니다.');
   printReceipt(g.id);
 }
 
@@ -9137,6 +9138,7 @@ async function submitBulkIn(){
   renderTabbar();
   renderContent();
   flash(`${gens.length}대가 입고 처리되었습니다`);
+  if(isWithinVoiceAlertHours()) speakText('입고처리되었습니다.');
 }
 
 // ---------- 인수증 출력 ----------
@@ -10050,6 +10052,7 @@ async function submitIn(id){
   closeModal();
   renderContent();
   flash(condition==='broken' ? '입고 처리되었습니다 (고장 등록 - 수리 완료 전까지 출고 불가)' : '입고 처리되었습니다');
+  if(isWithinVoiceAlertHours()) speakText('입고처리되었습니다.');
   maybeLogVoltageChange(id, oldVoltageForLog, voltage);
 }
 
@@ -10511,6 +10514,22 @@ async function submitUserName(nameArg){
   flash(`${name}님, 환영합니다`);
   saveWithRetry(saveCurrentUserName);
   showLoadingPopupOnLogin();
+  if(isWithinVoiceAlertHours()) speakText(randomLoginGreeting(name));
+}
+function randomLoginGreeting(name){
+  const list = [
+    `안녕하세요 ${name}님! 오늘도 화이팅입니다!`,
+    `${name}님 오셨네요! 오늘 하루도 힘내세요!`,
+    `${name}님, 접속을 환영합니다! 오늘도 수고 많으세요!`,
+    `어서오세요 ${name}님! 오늘도 좋은 하루 되세요!`,
+    `${name}님 왔다! 오늘도 파이팅입니다!`,
+    `${name}님! 오늘도 발전기처럼 힘차게 시동 걸어봅시다!`,
+    `${name}님 반갑습니다! 오늘 출고 물량 시원하게 처리해봐요!`,
+    `${name}님, 전기처럼 빠릿빠릿한 하루 보내세요!`,
+    `${name}님 오셨네요! 오늘도 정전 없이 무사히 끝내봐요!`,
+    `${name}님! 오늘 하루도 발전기만큼 든든하게 버텨봅시다!`
+  ];
+  return list[Math.floor(Math.random()*list.length)];
 }
 function changeUserName(){
   openUserNameGate();
@@ -10802,6 +10821,47 @@ if(!isQuickMode()) setInterval(checkIdleRefresh, 60000);
 document.addEventListener('visibilitychange', function(){
   if(document.visibilityState==='visible') checkIdleRefresh();
 });
+
+// ===== 입력 오류(빨간 안내문구) 음성으로 읽어주기 (띵동 소리 없이 바로 읽음) =====
+function speakErrorText(text){
+  if(!text || !isVoiceAlertsEnabled() || !window.speechSynthesis) return;
+  try{
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR';
+    u.rate = getVoiceAlertRate();
+    u.pitch = 1;
+    u.volume = getVoiceAlertVolume();
+    const savedVoiceName = getVoiceAlertVoiceName();
+    if(savedVoiceName){
+      const match = (window.speechSynthesis.getVoices()||[]).find(v=>v.name===savedVoiceName);
+      if(match) u.voice = match;
+    }
+    window.speechSynthesis.speak(u);
+  }catch(e){ /* 음성 지원 안 되는 환경이면 조용히 무시 */ }
+}
+(function setupErrorSpeech(){
+  let lastSpokenText = '';
+  let lastSpokenAt = 0;
+  const observer = new MutationObserver(muts=>{
+    for(const m of muts){
+      const t = m.target;
+      const el = (t.nodeType===1 && t.classList && t.classList.contains('err')) ? t
+               : (t.parentElement && t.parentElement.classList && t.parentElement.classList.contains('err')) ? t.parentElement
+               : null;
+      if(!el) continue;
+      let visible = false;
+      try{ visible = el.offsetParent !== null && getComputedStyle(el).display !== 'none'; }catch(e){ visible = false; }
+      const text = (el.textContent||'').trim();
+      if(!visible || !text) continue;
+      const now = Date.now();
+      if(text===lastSpokenText && (now-lastSpokenAt)<1500) continue; // 같은 문구가 짧은 시간에 중복으로 안 읽히게 방지
+      lastSpokenText = text; lastSpokenAt = now;
+      speakErrorText(text);
+    }
+  });
+  observer.observe(document.body, {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:['style','class']});
+})();
 
 if(isQuickMode()){
   renderQuickModeUI();
