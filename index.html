@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>해성발전기 · 입출고 관리</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B3247">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="해성발전기">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Rajdhani:wght@600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -528,8 +535,9 @@ function renderQuickModeUI(){
         <div style="font-size:24px;font-weight:800;color:#2C6E49;">해성발전기</div>
         <div style="font-size:15px;color:#555;margin-top:8px;">원하시는 메뉴를 골라주세요</div>
       </div>
-      <button type="button" onclick="renderQuickModePasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📋 문자 복사하기</button>
-      <button type="button" onclick="renderQuickModeStockList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">📦 입고된 발전기 리스트 보기</button>
+      <button type="button" onclick="renderQuickModeStockList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📦 입고된 발전기 리스트 보기</button>
+      <button type="button" onclick="renderQuickModePasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📋 문자 붙여넣기</button>
+      <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;">📝 출고예약 등록</button>
     </div>
   `);
 }
@@ -585,6 +593,302 @@ async function renderQuickModeStockList(){
       </div>`).join('');
   }catch(e){
     if(document.getElementById('qm-stock-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">목록을 불러오지 못했습니다.</div>';
+  }
+}
+function renderQuickModeReserveUI(){
+  const inputStyle = 'width:100%;font-size:20px;padding:16px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;';
+  const labelStyle = 'display:block;font-size:16px;font-weight:800;color:#333;margin-bottom:6px;';
+  const today = todayStr();
+  const tomorrow = (()=>{ const d=new Date(); d.setDate(d.getDate()+1); return toLocalDateStr(d); })();
+  const dayAfter = (()=>{ const d=new Date(); d.setDate(d.getDate()+2); return toLocalDateStr(d); })();
+  const arriveTimeOpts = [...Array.from({length:7},(_,i)=>`오전 ${i+6}시`), ...Array.from({length:6},(_,i)=>`오후 ${i+1}시`)];
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQuickModeUI()" style="background:none;border:none;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:4px 0 14px;">← 뒤로가기</button>
+      <div style="text-align:center;margin-bottom:18px;">
+        <div style="font-size:24px;font-weight:800;color:#8A5A00;">📝 출고예약 등록</div>
+        <div style="font-size:14px;color:#555;margin-top:8px;line-height:1.5;">아래 항목만 입력하면 바로 등록됩니다<br>나머지는 사무실에서 채웁니다</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:18px;">
+        <div>
+          <label style="${labelStyle}">① 발전기 선택 <span style="font-weight:500;color:#888;font-size:13px;">(모르면 그냥 두세요)</span></label>
+          <select id="qmr-gen" style="${inputStyle}">
+            <option value="${UNASSIGNED_GEN_ID}" selected>불러오는 중...</option>
+          </select>
+        </div>
+        <div><label style="${labelStyle}">② 전압</label><input id="qmr-voltage" type="text" style="${inputStyle}" placeholder="예: 380V">${voltageButtonsHtml('qmr-voltage', {big:true})}</div>
+        <div>
+          <label style="${labelStyle}">③ 출고예정일</label>
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <button type="button" id="qmr-quickdate-today" onclick="setQmrDate('${today}','qmr-quickdate-today')" style="flex:1;padding:14px 4px;font-size:16px;font-weight:800;border-radius:10px;border:2px solid #8A5A00;background:#8A5A00;color:#fff;cursor:pointer;">오늘</button>
+            <button type="button" id="qmr-quickdate-tomorrow" onclick="setQmrDate('${tomorrow}','qmr-quickdate-tomorrow')" style="flex:1;padding:14px 4px;font-size:16px;font-weight:800;border-radius:10px;border:2px solid #8A5A00;background:#fff;color:#8A5A00;cursor:pointer;">내일</button>
+            <button type="button" id="qmr-quickdate-dayafter" onclick="setQmrDate('${dayAfter}','qmr-quickdate-dayafter')" style="flex:1;padding:14px 4px;font-size:16px;font-weight:800;border-radius:10px;border:2px solid #8A5A00;background:#fff;color:#8A5A00;cursor:pointer;">모레</button>
+          </div>
+          <input id="qmr-outdate" type="date" style="${inputStyle}" value="${today}" onchange="clearQmrQuickDateHighlight();syncQmrReturnDateToUsageDays();">
+        </div>
+        <div>
+          <label style="${labelStyle}">④ 도착시간</label>
+          <select id="qmr-arrivetime-select" style="${inputStyle}" onchange="onQmrArriveTimeSelect()">
+            <option value="">선택 안함</option>
+            <option value="지금즉시">지금즉시</option>
+            ${arriveTimeOpts.map(v=>`<option value="${v}">${v}</option>`).join('')}
+            <option value="__custom__">직접 입력...</option>
+          </select>
+          <input type="text" id="qmr-arrivetime" value="" placeholder="예: 오전 6시 30분" style="${inputStyle};display:none;margin-top:8px;">
+        </div>
+        <div><label style="${labelStyle}">⑤ 운임료 부담</label>
+          <select id="qmr-freight" style="${inputStyle}">
+            <option value="우리부담">우리부담</option>
+            <option value="고객부담">고객부담</option>
+          </select>
+        </div>
+        <div><label style="${labelStyle}">⑥ 거래처명</label><input id="qmr-customer" type="text" style="${inputStyle}" placeholder="예: 00건설"></div>
+        <div><label style="${labelStyle}">⑦ 현장 주소</label><input id="qmr-address" type="text" style="${inputStyle}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
+        <div><label style="${labelStyle}">⑧ 담당자</label><input id="qmr-manager" type="text" style="${inputStyle}" placeholder="예: 홍길동 과장"></div>
+        <div><label style="${labelStyle}">⑨ 연락처</label><input id="qmr-phone" type="tel" style="${inputStyle}" placeholder="010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
+        <div>
+          <label style="${labelStyle}">⑩ 연료</label>
+          <div style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:10px;padding:12px 14px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:16px;font-weight:800;color:#333;">
+              <input type="checkbox" id="qmr-fuel-toggle" onchange="toggleFuelFields('qmr-fuel-toggle','qmr-fuel-wrap')" style="width:20px;height:20px;">
+              ⛽ 연료 넣고 출고
+            </label>
+            <div id="qmr-fuel-wrap" style="display:none;margin-top:12px;">
+              <div style="display:flex;gap:10px;">
+                <div style="flex:1;">
+                  <label style="${labelStyle}">고객요청(L)</label>
+                  <input id="qmr-fuel-req" type="number" min="0" style="${inputStyle};border-color:#2C4A66;color:#2C4A66;font-weight:700;" placeholder="예: 200" onchange="if(!document.getElementById('qmr-fuel-actual').value) document.getElementById('qmr-fuel-actual').value=this.value;">
+                </div>
+                <div style="flex:1;">
+                  <label style="${labelStyle}">실제주입(L)</label>
+                  <input id="qmr-fuel-actual" type="number" min="0" style="${inputStyle};border-color:#8A5A00;color:#8A5A00;font-weight:700;" placeholder="예: 200">
+                </div>
+              </div>
+              <div class="hint" style="margin-top:4px;">고객요청 = 공급받는자용에 표시 / 실제주입 = 공급자용에 표시. 모르면 고객요청만 입력해도 됩니다</div>
+            </div>
+          </div>
+        </div>
+        <div><label style="${labelStyle}">⑪ 비고</label><textarea id="qmr-note" style="${inputStyle}" rows="3"></textarea></div>
+      </div>
+
+      <details style="margin-top:18px;background:#fff;border:2px solid #ddd;border-radius:14px;padding:14px 16px;">
+        <summary style="cursor:pointer;font-size:15px;font-weight:800;color:#555;">➕ 상차일자·사용일수 등 더 입력하기 (선택)</summary>
+        <div style="display:flex;flex-direction:column;gap:16px;margin-top:16px;">
+          <div><label style="${labelStyle}">상차일자</label><input id="qmr-loaddate" type="date" style="${inputStyle}" value="${today}"></div>
+          <div style="display:flex;gap:10px;">
+            <div style="flex:1;"><label style="${labelStyle}">사용일수</label><input id="qmr-usagedays" type="number" min="0" style="${inputStyle}" placeholder="예: 7" oninput="syncQmrUsageDaysToReturnDate()"></div>
+            <div style="flex:1;"><label style="${labelStyle}">예상가동시간(h/일)</label><input id="qmr-estdaily" type="number" step="0.5" min="0" style="${inputStyle}" placeholder="예: 8"></div>
+          </div>
+          <div><label style="${labelStyle}">반납 예정일 (선택)</label><input id="qmr-returndate" type="date" style="${inputStyle}" onchange="syncQmrReturnDateToUsageDays()"></div>
+          <div><label style="${labelStyle}">부자재</label>${suppliesPickerHtml('qmr-supplies', [], '', '')}</div>
+        </div>
+      </details>
+
+      <button id="qmr-btn" type="button" onclick="submitQuickReserve()" style="width:100%;margin-top:20px;padding:22px;font-size:24px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;">등록하기</button>
+      <div id="qmr-status" style="margin-top:16px;padding:16px;border-radius:12px;font-size:17px;font-weight:700;text-align:center;white-space:pre-line;display:none;"></div>
+    </div>
+  `);
+  initSuppliesPicker('qmr-supplies');
+  loadQmrGenOptions();
+}
+function onQmrArriveTimeSelect(){
+  const sel = document.getElementById('qmr-arrivetime-select');
+  const input = document.getElementById('qmr-arrivetime');
+  if(!sel || !input) return;
+  if(sel.value==='__custom__'){
+    input.style.display = 'block';
+    input.value = '';
+    input.focus();
+  } else {
+    input.style.display = 'none';
+    input.value = sel.value;
+  }
+}
+function syncQmrUsageDaysToReturnDate(){
+  const outEl = document.getElementById('qmr-outdate');
+  const daysEl = document.getElementById('qmr-usagedays');
+  const retEl = document.getElementById('qmr-returndate');
+  if(!outEl || !daysEl || !retEl) return;
+  const days = Number(daysEl.value);
+  if(!outEl.value || !days || days<=0){ retEl.value = ''; return; }
+  const d = new Date(outEl.value+'T00:00:00');
+  d.setDate(d.getDate()+days);
+  retEl.value = toLocalDateStr(d);
+}
+function syncQmrReturnDateToUsageDays(){
+  const outEl = document.getElementById('qmr-outdate');
+  const daysEl = document.getElementById('qmr-usagedays');
+  const retEl = document.getElementById('qmr-returndate');
+  if(!outEl || !daysEl || !retEl) return;
+  if(!outEl.value || !retEl.value) return;
+  const start = new Date(outEl.value+'T00:00:00');
+  const end = new Date(retEl.value+'T00:00:00');
+  const days = Math.round((end-start)/86400000);
+  if(days>0) daysEl.value = days;
+}
+async function loadQmrGenOptions(){
+  const sel = document.getElementById('qmr-gen');
+  if(!sel) return;
+  try{
+    const [fleetCur, resCur] = await Promise.all([
+      window.storage.get('gen-fleet-v2', true).catch(()=>null),
+      window.storage.get('gen-reservations-v1', true).catch(()=>null)
+    ]);
+    let gens = [];
+    try{ gens = fleetCur ? JSON.parse(fleetCur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    let resList = [];
+    try{ resList = resCur ? JSON.parse(resCur.value) : []; }catch(e){ resList = []; }
+    if(!Array.isArray(resList)) resList = [];
+    const reservedGenIds = new Set(resList.map(r=>r.genId));
+    const candidates = gens
+      .filter(g=>g && !g.retired && g.status==='in' && !g.underRepair && !reservedGenIds.has(g.id))
+      .sort((a,b)=>String(a.id).localeCompare(String(b.id), 'ko', {numeric:true}));
+    if(!document.getElementById('qmr-gen')) return; // 화면이 이미 닫혔으면 무시
+    const optionsHtml = `<option value="${UNASSIGNED_GEN_ID}" selected>🅾 미지정 (사무실에서 배정)</option>` +
+      candidates.map(g=>`<option value="${escR(g.id)}">${escR(g.id)} · ${escR(g.model||'미설정')}</option>`).join('');
+    sel.innerHTML = optionsHtml;
+  }catch(e){
+    if(document.getElementById('qmr-gen')) sel.innerHTML = `<option value="${UNASSIGNED_GEN_ID}" selected>🅾 미지정 (사무실에서 배정)</option>`;
+  }
+}
+function setQmrDate(dateStr, activeBtnId){
+  const outEl = document.getElementById('qmr-outdate');
+  if(outEl) outEl.value = dateStr;
+  ['qmr-quickdate-today','qmr-quickdate-tomorrow','qmr-quickdate-dayafter'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    if(id===activeBtnId){ el.style.background='#8A5A00'; el.style.color='#fff'; }
+    else { el.style.background='#fff'; el.style.color='#8A5A00'; }
+  });
+  syncQmrReturnDateToUsageDays();
+}
+function clearQmrQuickDateHighlight(){
+  ['qmr-quickdate-today','qmr-quickdate-tomorrow','qmr-quickdate-dayafter'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.style.background='#fff'; el.style.color='#8A5A00'; }
+  });
+}
+async function submitQuickReserve(){
+  const btn = document.getElementById('qmr-btn');
+  const box = document.getElementById('qmr-status');
+  box.style.display = 'none';
+  const customer = document.getElementById('qmr-customer').value.trim();
+  const address = document.getElementById('qmr-address').value.trim();
+  const manager = document.getElementById('qmr-manager').value.trim();
+  const phone = document.getElementById('qmr-phone').value.trim();
+  const voltage = document.getElementById('qmr-voltage').value.trim();
+  const genSel = document.getElementById('qmr-gen').value;
+  const outDate = document.getElementById('qmr-outdate').value;
+  const usageDays = Number(document.getElementById('qmr-usagedays').value)||null;
+  const freightBearer = document.getElementById('qmr-freight').value;
+  const note = document.getElementById('qmr-note').value.trim();
+  const suppliesEl = document.getElementById('qmr-supplies');
+  const supplies = suppliesEl ? suppliesEl.value.trim() : '';
+  let suppliesItems = [];
+  try{ suppliesItems = JSON.parse(document.getElementById('qmr-supplies-items').value || '[]'); }catch(e){ suppliesItems = []; }
+  const suppliesCustomEl = document.getElementById('qmr-supplies-custom');
+  const suppliesCustom = suppliesCustomEl ? suppliesCustomEl.value.trim() : '';
+  const fuelEnabled = document.getElementById('qmr-fuel-toggle').checked;
+  const fuelRequested = fuelEnabled ? (Number(document.getElementById('qmr-fuel-req').value)||null) : null;
+  const fuelActual = fuelEnabled ? (Number(document.getElementById('qmr-fuel-actual').value)|| fuelRequested || null) : null;
+  const arriveTime = document.getElementById('qmr-arrivetime').value.trim() || null;
+  const loadDateEl = document.getElementById('qmr-loaddate');
+  const loadDate = (loadDateEl && loadDateEl.value) ? loadDateEl.value : outDate;
+  const estDailyRaw = Number(document.getElementById('qmr-estdaily').value||0);
+  const estDaily = estDailyRaw>0 ? estDailyRaw : null;
+
+  if(!customer || !address || !phone){
+    box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+    box.textContent = '거래처명, 현장 주소, 담당자 연락처를 모두 입력해주세요.';
+    return;
+  }
+  if(!outDate){
+    box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+    box.textContent = '출고예정일을 입력해주세요.';
+    return;
+  }
+  btn.disabled = true; btn.textContent = '등록 중...';
+  try{
+    const today = todayStr();
+    // 저장 직전에 최신 출고예약 목록을 다시 받아옵니다 (동시편집/중복배정 충돌 방지)
+    const cur = await window.storage.get('gen-reservations-v1', true);
+    let list = [];
+    try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+
+    let newItem;
+    if(genSel && genSel !== UNASSIGNED_GEN_ID){
+      // 특정 발전기를 골랐으면, 그 사이 다른 사람이 먼저 잡아갔는지 마지막으로 한 번 더 확인합니다.
+      if(list.some(r=>r.genId===genSel)){
+        box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+        box.textContent = '⚠️ 방금 다른 곳에서 같은 발전기를 먼저 배정했습니다.\n발전기를 다시 골라주세요.';
+        btn.disabled = false; btn.textContent = '등록하기';
+        loadQmrGenOptions();
+        return;
+      }
+      let startHours = 0;
+      try{
+        const fleetCur = await window.storage.get('gen-fleet-v2', true);
+        const gens = fleetCur ? JSON.parse(fleetCur.value) : [];
+        const g = Array.isArray(gens) ? gens.find(x=>x && x.id===genSel) : null;
+        if(g && g.hoursKnown) startHours = g.hours || 0;
+      }catch(e){ /* 못 가져오면 0으로 둡니다 - 사무실에서 확인 가능 */ }
+      newItem = {
+        id: uid(), genId: genSel, pendingLoad: true, batchId: null,
+        customer, site: customer,
+        manager, phone, address,
+        supplies, suppliesItems, suppliesCustom,
+        voltage, qty: 1,
+        fuelRequested, fuelActual,
+        usageDays, loadDate, arriveTime,
+        freightBearer, paymentNote: '',
+        note,
+        outDate, startHours, longTerm: false, estDaily,
+        smsOrder: null,
+        outProcessedBy: '이영숙(간편등록)', createdAt: today, createdAtTs: Date.now()
+      };
+    } else {
+      newItem = {
+        id: uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false,
+        plannedOutDate: outDate, batchId: null,
+        customer, site: customer,
+        manager, phone, address,
+        supplies, suppliesItems, suppliesCustom,
+        voltage, qty: 1,
+        fuelRequested, fuelActual,
+        usageDays, loadDate, arriveTime,
+        freightBearer, paymentNote: '',
+        note,
+        smsOrder: null,
+        longTerm: false, estDaily,
+        outProcessedBy: '이영숙(간편등록)', createdAt: today, createdAtTs: Date.now()
+      };
+    }
+    list.push(newItem);
+    await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
+
+    box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
+    box.textContent = '✅ 출고예약이 등록되었습니다!\n사무실 화면에 곧 나타납니다.';
+    ['qmr-customer','qmr-address','qmr-manager','qmr-phone','qmr-voltage','qmr-usagedays','qmr-estdaily','qmr-returndate','qmr-note','qmr-fuel-req','qmr-fuel-actual','qmr-arrivetime'].forEach(id=>{
+      const el = document.getElementById(id); if(el) el.value = '';
+    });
+    const arriveSelEl = document.getElementById('qmr-arrivetime-select'); if(arriveSelEl) arriveSelEl.value = '';
+    const arriveInputEl = document.getElementById('qmr-arrivetime'); if(arriveInputEl) arriveInputEl.style.display = 'none';
+    const fuelToggleEl = document.getElementById('qmr-fuel-toggle');
+    if(fuelToggleEl){ fuelToggleEl.checked = false; toggleFuelFields('qmr-fuel-toggle','qmr-fuel-wrap'); }
+    const outdateEl = document.getElementById('qmr-outdate'); if(outdateEl) outdateEl.value = today;
+    const loaddateEl = document.getElementById('qmr-loaddate'); if(loaddateEl) loaddateEl.value = today;
+    setQmrDate(today, 'qmr-quickdate-today');
+    const freightEl = document.getElementById('qmr-freight'); if(freightEl) freightEl.value = '우리부담';
+    const selEl = document.getElementById('qmr-supplies-selections'); if(selEl) selEl.value = '[]';
+    initSuppliesPicker('qmr-supplies');
+    loadQmrGenOptions();
+  }catch(e){
+    box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+    box.textContent = '등록에 실패했습니다. 인터넷 연결을 확인하고 다시 눌러주세요.';
+  }finally{
+    btn.disabled = false; btn.textContent = '등록하기';
   }
 }
 function fmtQmTime(ts){
@@ -5340,6 +5644,16 @@ function renderSettingsTab(){
         </div>
         <div class="btn-row" style="margin-top:10px;justify-content:center;">
           <button class="btn primary" onclick="printQuickOrderQr()">🖨 QR코드 인쇄</button>
+        </div>
+      </div>
+
+      <div class="material-card" style="margin-top:0;">
+        <div class="section-title" style="margin-top:0;">📲 앱으로 설치하기</div>
+        <p class="muted" style="font-size:13px;margin-top:-4px;">이 화면을 스마트폰 홈 화면에 앱처럼 설치할 수 있습니다. 설치해도 주소·데이터는 그대로이며, QR로 들어오는 방식과 함께 쓸 수 있습니다.</p>
+        <div id="pwa-install-status" style="margin-top:10px;"></div>
+        <div class="btn-row" style="margin-top:10px;">
+          <button class="btn primary" id="pwa-install-btn" onclick="triggerPwaInstall()" style="display:none;">⬇️ 홈 화면에 앱 설치</button>
+          <button class="btn sm" onclick="showPwaManualGuide()">📖 설치 방법 안내(아이폰 등)</button>
         </div>
       </div>
 
@@ -10933,6 +11247,64 @@ if(isQuickMode()){
 } else {
   initPasswordGate();
 }
+
+// ===== PWA 설치(홈 화면에 추가) =====
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('pwa-install-btn');
+  if(btn) btn.style.display = '';
+  const status = document.getElementById('pwa-install-status');
+  if(status) status.innerHTML = '';
+});
+
+window.addEventListener('appinstalled', ()=>{
+  deferredInstallPrompt = null;
+  const btn = document.getElementById('pwa-install-btn');
+  if(btn) btn.style.display = 'none';
+  const status = document.getElementById('pwa-install-status');
+  if(status) status.innerHTML = '<div class="hint" style="color:var(--ok);font-weight:700;">✅ 이미 앱으로 설치되어 있습니다.</div>';
+});
+
+function isRunningAsPwa(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+async function triggerPwaInstall(){
+  if(!deferredInstallPrompt){
+    showPwaManualGuide();
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  const btn = document.getElementById('pwa-install-btn');
+  if(btn) btn.style.display = 'none';
+}
+
+function showPwaManualGuide(){
+  const ua = navigator.userAgent || '';
+  const isIOS = /iPhone|iPad|iPod/.test(ua);
+  if(isIOS){
+    showInfoModal(["\ud83d\udcf2 \uc544\uc774\ud3f0(\uc0ac\ud30c\ub9ac) \uc124\uce58 \ubc29\ubc95","","1. \ud654\uba74 \ud558\ub2e8(\ub610\ub294 \uc0c1\ub2e8)\uc758 \"\uacf5\uc720\" \ubc84\ud2bc(\ub124\ubaa8\uc5d0 \ud654\uc0b4\ud45c)\uc744 \ub204\ub974\uc138\uc694","2. \uc544\ub798\ub85c \ub0b4\ub824\uc11c \"\ud648 \ud654\uba74\uc5d0 \ucd94\uac00\"\ub97c \ub204\ub974\uc138\uc694","3. \"\ucd94\uac00\"\ub97c \ub204\ub974\uba74 \ud648 \ud654\uba74\uc5d0 \uc571 \uc544\uc774\ucf58\uc774 \uc0dd\uae41\ub2c8\ub2e4","","\u203b \ubc18\ub4dc\uc2dc \uc0ac\ud30c\ub9ac(Safari) \ube0c\ub77c\uc6b0\uc800\uc5d0\uc11c \ud558\uc154\uc57c \ud569\ub2c8\ub2e4. \ud06c\ub86c \ub4f1 \ub2e4\ub978 \ube0c\ub77c\uc6b0\uc800\uc5d0\uc11c\ub294 \uc774 \uba54\ub274\uac00 \uc5c6\uc744 \uc218 \uc788\uc2b5\ub2c8\ub2e4."].join(String.fromCharCode(10)));
+  } else {
+    showInfoModal(["\ud83d\udcf2 \uc548\ub4dc\ub85c\uc774\ub4dc(\ud06c\ub86c) \uc124\uce58 \ubc29\ubc95","","1. \uc624\ub978\ucabd \uc704 \uc810 3\uac1c(\u22ee) \uba54\ub274\ub97c \ub204\ub974\uc138\uc694","2. \"\uc571 \uc124\uce58\" \ub610\ub294 \"\ud648 \ud654\uba74\uc5d0 \ucd94\uac00\"\ub97c \ub204\ub974\uc138\uc694","3. \ud655\uc778\uc744 \ub204\ub974\uba74 \ud648 \ud654\uba74\uc5d0 \uc571 \uc544\uc774\ucf58\uc774 \uc0dd\uae41\ub2c8\ub2e4","","\u203b \uc790\ub3d9\uc73c\ub85c \uc124\uce58 \ubc84\ud2bc\uc774 \ub728\uc9c0 \uc54a\ub294 \uacbd\uc6b0, \uc704 \ubc29\ubc95\uc73c\ub85c \uc9c1\uc811 \uc124\uce58\ud558\uc2e4 \uc218 \uc788\uc2b5\ub2c8\ub2e4."].join(String.fromCharCode(10)));
+  }
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  if(isRunningAsPwa()){
+    const status = document.getElementById('pwa-install-status');
+    if(status) status.innerHTML = '<div class="hint" style="color:var(--ok);font-weight:700;">✅ 지금 앱으로 실행 중입니다.</div>';
+  }
+});
 
 </script>
 </body>
