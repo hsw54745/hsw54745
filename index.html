@@ -7807,10 +7807,10 @@ function renderReserveTab(){
       <div class="section-title" style="margin-top:0;color:#8A6D00;">📩 문자오더 원문 <span class="cnt">${smsOrderCards.length}건</span></div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;">
         ${smsOrderCards.map(r=>`
-        <div style="width:170px;height:170px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
-          <div class="muted" style="font-size:11px;margin-bottom:4px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
-          <div style="font-size:11px;line-height:1.4;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;cursor:pointer;" onclick="showSmsOrderModal('${r.id}')">${escR(r.smsOrder||'')}</div>
-          <button class="btn sm primary" style="font-size:11px;padding:4px 6px;margin-top:6px;" onclick="markSmsOrderChecked('${r.id}')">✅ 확인완료</button>
+        <div style="width:170px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
+          <div class="muted" style="font-size:12px;margin-bottom:4px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
+          <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;" onclick="showSmsOrderModal('${r.id}')">${escR(r.smsOrder||'')}</div>
+          <button class="btn sm primary" style="font-size:12px;padding:4px 6px;margin-top:6px;" onclick="markSmsOrderChecked('${r.id}')">✅ 확인완료</button>
         </div>`).join('')}
       </div>
     </div>`;
