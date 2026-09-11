@@ -545,7 +545,7 @@ function pwGateHide(){
 // ===== 간편모드 (문자 붙여넣기 전용, 로그인/이름선택 없이 바로 접속) =====
 // 주소 뒤에 ?quick=1 을 붙여서 접속하면(예: https://.../index.html?quick=1) 이 화면만 뜹니다.
 function isQuickMode(){
-  try{ return new URLSearchParams(location.search).get('quick')==='1'; }catch(e){ return false; }
+  return true; // 미리보기 전용: 항상 퀵메뉴로 열림
 }
 function renderQuickModeUI(){
   pwGateShow(`
