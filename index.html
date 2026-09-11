@@ -1083,40 +1083,31 @@ async function submitQuickOrder(){
   }
   btn.disabled = true; btn.textContent = '등록 중...';
   try{
-    const today = todayStr();
-    // AI 자동분석 없이, 붙여넣은 문자 원문을 그대로 비고란에 저장합니다.
-    // 거래처/주소/연락처 등은 사무실에서 원문을 보고 직접 채워넣습니다.
-    const newItem = {
-      id: uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false,
-      plannedOutDate: today, batchId: null,
-      customer: '', site: '',
-      manager: '', phone: '', address: '',
-      supplies: '', suppliesItems: [], suppliesCustom: '',
-      voltage: '', qty: 1,
-      fuelRequested: null, fuelActual: null,
-      usageDays: null, loadDate: null, arriveTime: null,
-      freightBearer: '우리부담', paymentNote: '',
-      note: '',
-      smsOrder: text,
-      longTerm: false, estDaily: null,
-      outProcessedBy: '이영숙(문자접수)', createdAt: today, createdAtTs: Date.now()
-    };
-    // 저장 직전에 최신 목록을 다시 받아와서 그 위에 이번 건만 추가합니다 (동시편집 충돌 방지)
-    const cur = await window.storage.get('gen-reservations-v1', true);
-    let list = [];
-    try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
-    if(!Array.isArray(list)) list = [];
-    list.push(newItem);
-    await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
-    // 별도 기록(로그)에도 남겨둡니다 - 나중에 사무실에서 처리(출고완료)되어 출고대기 목록에서
-    // 빠지더라도, 이영숙님 화면의 "최근 등록 내역"에서는 계속 보이게 하기 위함입니다.
+    const nowTs = Date.now();
+    const newId = uid();
+    // AI 자동분석 없이, 붙여넣은 문자 원문을 그대로 "문자오더 대기목록"에 올립니다.
+    // 사무실에서 이 카드를 보고 "등록" 버튼을 눌러야 정식 출고대기 건으로 만들어집니다.
+    try{
+      const stageCur = await window.storage.get('gen-incoming-sms-v1', true);
+      let stageList = [];
+      try{ stageList = stageCur ? JSON.parse(stageCur.value) : []; }catch(e1){ stageList = []; }
+      if(!Array.isArray(stageList)) stageList = [];
+      stageList.push({ id: newId, text, createdAtTs: nowTs, source: '이영숙(문자접수)' });
+      await window.storage.set('gen-incoming-sms-v1', JSON.stringify(stageList), true);
+    }catch(e5){
+      box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+      box.textContent = '등록에 실패했습니다. 인터넷 연결을 확인하고 다시 눌러주세요.';
+      btn.disabled=false; btn.textContent='등록하기';
+      return;
+    }
+    // 별도 기록(로그)에도 남겨둡니다 - 이영숙님 화면의 "최근 등록 내역"에서는 계속 보이게 하기 위함입니다.
     try{
       let logCur = null;
       try{ logCur = await window.storage.get('quickOrderLog-v1', true); }catch(e0){ logCur = null; } // 키가 아직 없으면 여기서 실패하는 게 정상이라, 그냥 빈 목록으로 시작합니다
       let log = [];
       try{ log = logCur ? JSON.parse(logCur.value) : []; }catch(e2){ log = []; }
       if(!Array.isArray(log)) log = [];
-      log.push({ resId: newItem.id, text, createdAtTs: newItem.createdAtTs });
+      log.push({ resId: newId, text, createdAtTs: nowTs });
       if(log.length > 30) log = log.slice(log.length - 30);
       await window.storage.set('quickOrderLog-v1', JSON.stringify(log), true);
     }catch(e3){ /* 로그 저장 실패는 등록 자체를 막지 않습니다 */ }
@@ -1706,6 +1697,7 @@ async function saveSuppliesStock(){ await storageSetChecked('gen-supplies-stock-
 async function saveModelColors(){ await storageSetChecked('gen-model-colors-v1', JSON.stringify(DB.modelColors), true); }
 async function saveNotices(){ await storageSetChecked('gen-notices-v1', JSON.stringify(DB.notices), true); }
 async function saveReturnRequests(){ await storageSetChecked('gen-return-requests-v1', JSON.stringify(DB.returnRequests), true); }
+async function saveIncomingSmsOrders(){ await storageSetChecked('gen-incoming-sms-v1', JSON.stringify(DB.incomingSmsOrders), true); }
 async function saveCalendarEvents(){ await storageSetChecked('gen-calendar-events-v1', JSON.stringify(DB.calendarEvents), true); }
 async function saveGenColorOverrides(){ await storageSetChecked('gen-gen-color-overrides-v1', JSON.stringify(DB.genColorOverrides), true); }
 async function saveSalesEnabled(){ await storageSetChecked('gen-sales-enabled-v1', JSON.stringify(DB.salesEnabled), true); }
@@ -3821,6 +3813,7 @@ function resetEverything(){
       DB.modelColors = {};
       DB.notices = [];
       DB.returnRequests = [];
+      DB.incomingSmsOrders = [];
       DB.calendarEvents = [];
       DB.lastBackupDate = '';
       renderTabbar();
@@ -3862,7 +3855,7 @@ function buildFullBackupObject(){
     data: {
       gens: DB.gens, rentals: DB.rentals, maint: DB.maint, reservations: DB.reservations,
       materials: DB.materials, technicians: DB.technicians, teamMembers: DB.teamMembers, warnThreshold: DB.warnThreshold,
-      partsStock: DB.partsStock, partsSpecs: DB.partsSpecs, partsUnit: DB.partsUnit, partsCategory: DB.partsCategory, partsSupplier: DB.partsSupplier, partsMinStock: DB.partsMinStock, partsPurchaseLog: DB.partsPurchaseLog, consumableOrders: DB.consumableOrders, orderMarks: DB.orderMarks, improvements: DB.improvements, suppliesCatalog: DB.suppliesCatalog, suppliesStock: DB.suppliesStock, modelColors: DB.modelColors, notices: DB.notices, returnRequests: DB.returnRequests, calendarEvents: DB.calendarEvents, genColorOverrides: DB.genColorOverrides, salesEnabled: DB.salesEnabled, salesRecords: DB.salesRecords, salesManagers: DB.salesManagers, salesPassword: DB.salesPassword, salesPasswordBypass: DB.salesPasswordBypass, salesBillingRecords: DB.salesBillingRecords, cancelOutHistory: DB.cancelOutHistory, suppliesSizes: DB.suppliesSizes, suppliesSpecs: DB.suppliesSpecs, suppliesCategories: DB.suppliesCategories, customerNotes: DB.customerNotes, readMarkers: DB.readMarkers, companyInfo: DB.companyInfo
+      partsStock: DB.partsStock, partsSpecs: DB.partsSpecs, partsUnit: DB.partsUnit, partsCategory: DB.partsCategory, partsSupplier: DB.partsSupplier, partsMinStock: DB.partsMinStock, partsPurchaseLog: DB.partsPurchaseLog, consumableOrders: DB.consumableOrders, orderMarks: DB.orderMarks, improvements: DB.improvements, suppliesCatalog: DB.suppliesCatalog, suppliesStock: DB.suppliesStock, modelColors: DB.modelColors, notices: DB.notices, returnRequests: DB.returnRequests, incomingSmsOrders: DB.incomingSmsOrders, calendarEvents: DB.calendarEvents, genColorOverrides: DB.genColorOverrides, salesEnabled: DB.salesEnabled, salesRecords: DB.salesRecords, salesManagers: DB.salesManagers, salesPassword: DB.salesPassword, salesPasswordBypass: DB.salesPasswordBypass, salesBillingRecords: DB.salesBillingRecords, cancelOutHistory: DB.cancelOutHistory, suppliesSizes: DB.suppliesSizes, suppliesSpecs: DB.suppliesSpecs, suppliesCategories: DB.suppliesCategories, customerNotes: DB.customerNotes, readMarkers: DB.readMarkers, companyInfo: DB.companyInfo
     }
   };
 }
@@ -4052,6 +4045,7 @@ function handleRestoreFile(input){
       DB.modelColors = d.modelColors || {};
       DB.notices = d.notices || [];
       DB.returnRequests = d.returnRequests || [];
+      DB.incomingSmsOrders = d.incomingSmsOrders || [];
       DB.calendarEvents = d.calendarEvents || [];
       DB.genColorOverrides = d.genColorOverrides || {};
       DB.salesEnabled = d.salesEnabled === true;
@@ -7798,17 +7792,21 @@ function renderReserveTab(){
       </div></td>
     </tr>`;
   }).join('');
-  const smsOrderCards = list.filter(r=>r.smsOrder && r.smsOrder.trim());
-  const smsOrderHtml = smsOrderCards.length===0 ? '' : `
+  const incomingSms = [...(DB.incomingSmsOrders||[])].sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
+  const smsOrderHtml = `
     <div class="material-card" style="border:2px solid #E8B923;background:#FFF8E1;margin-bottom:16px;">
-      <div class="section-title" style="margin-top:0;color:#8A6D00;">📩 문자오더 원문 <span class="cnt">${smsOrderCards.length}건</span></div>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;">
-        ${smsOrderCards.map(r=>`
-        <div style="width:260px;height:260px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;box-sizing:border-box;display:flex;flex-direction:column;cursor:pointer;" onclick="showSmsOrderModal('${r.id}')">
-          <div class="muted" style="font-size:12px;margin-bottom:6px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
-          <div style="font-size:14px;line-height:1.5;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:9;-webkit-box-orient:vertical;">${escR(r.smsOrder||'')}</div>
-        </div>`).join('')}
+      <div class="section-title" style="margin-top:0;color:#8A6D00;">📩 문자오더 대기목록 <span class="cnt">${incomingSms.length}건</span>
+        <button type="button" class="btn sm" onclick="addIncomingSmsFromClipboard()" style="margin-left:8px;">+ 복사한 문자 추가</button>
       </div>
+      <details class="info-toggle"><summary></summary><p class="muted">이영숙님이 퀵메뉴에서 보낸 문자오더, 또는 여기서 직접 추가한 문자가 카드로 쌓입니다. 카드 아래 "➕ 등록"을 눌러야 정식 출고대기 건으로 만들어집니다. 등록 전까지는 아래 출고대기 목록에 나타나지 않습니다.</p></details>
+      ${incomingSms.length===0 ? `<div class="empty" style="margin-top:4px;">대기 중인 문자오더가 없습니다.</div>` : `
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">
+        ${incomingSms.map(item=>`
+        <div style="width:170px;height:170px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
+          <div style="font-size:11px;line-height:1.4;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical;cursor:pointer;" onclick="showSmsOrderText(${escR(JSON.stringify(item.text||''))}, '')">${escR(item.text||'')}</div>
+          <button class="btn sm primary" style="font-size:11px;padding:4px 6px;margin-top:6px;" onclick="registerIncomingSmsOrder('${item.id}')">➕ 등록</button>
+        </div>`).join('')}
+      </div>`}
     </div>`;
   return `
     <div class="section-title">출고 대기 <span class="cnt">${list.length}건</span>${pendingCount>0? `<span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">상차대기 ${pendingCount}건</span>`:''}${delayedCount>0? `<span class="cnt" style="background:var(--danger-tint);color:var(--danger);border-color:var(--danger);">지연 ${delayedCount}건</span>`:''}</div>
@@ -8098,6 +8096,52 @@ function showInfoModal(message){
   document.getElementById('info-ok-btn').addEventListener('click', closeModal);
 }
 
+async function addIncomingSmsFromClipboard(){
+  let text = '';
+  try{
+    text = (await navigator.clipboard.readText()).trim();
+  }catch(e){
+    flash('클립보드를 읽을 수 없습니다. 문자 내용을 먼저 복사해주세요.');
+    return;
+  }
+  if(!text){
+    flash('복사된 내용이 없습니다. 문자 내용을 먼저 복사해주세요.');
+    return;
+  }
+  // AI 분석 없이, 복사한 문자 원문을 "문자오더 대기목록"에 카드로 추가합니다.
+  // 실제 출고대기 등록은 카드 아래 "➕ 등록" 버튼을 눌러야 이뤄집니다.
+  DB.incomingSmsOrders = [...(DB.incomingSmsOrders||[]), { id: uid(), text, createdAtTs: Date.now(), source: DB.currentUserName? `${DB.currentUserName}` : '사무실' }];
+  await saveIncomingSmsOrders();
+  renderContent();
+  flash('📩 문자오더 대기목록에 추가되었습니다');
+}
+function registerIncomingSmsOrder(id){
+  const item = (DB.incomingSmsOrders||[]).find(x=>x && x.id===id);
+  if(!item) return;
+  const today = todayStr();
+  const newItem = {
+    id: uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false,
+    plannedOutDate: today, batchId: null,
+    customer: '', site: '',
+    manager: '', phone: '', address: '',
+    supplies: '', suppliesItems: [], suppliesCustom: '',
+    voltage: '', qty: 1,
+    fuelRequested: null, fuelActual: null,
+    usageDays: null, loadDate: null, arriveTime: null,
+    freightBearer: '우리부담', paymentNote: '',
+    note: '',
+    smsOrder: item.text,
+    longTerm: false, estDaily: null,
+    outProcessedBy: item.source || '문자접수', createdAt: today, createdAtTs: Date.now()
+  };
+  DB.reservations = [...DB.reservations, newItem];
+  DB.incomingSmsOrders = (DB.incomingSmsOrders||[]).filter(x=>x && x.id!==id);
+  saveReservations();
+  saveIncomingSmsOrders();
+  renderContent();
+  renderTabbar();
+  flash('✅ 출고대기에 등록되었습니다');
+}
 function openPasteSmsModal(){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
@@ -10921,6 +10965,7 @@ async function init(){
     ['modelColors', 'gen-model-colors-v1', {}, true],
     ['notices', 'gen-notices-v1', [], true],
     ['returnRequests', 'gen-return-requests-v1', [], true],
+    ['incomingSmsOrders', 'gen-incoming-sms-v1', [], true],
     ['calendarEvents', 'gen-calendar-events-v1', [], true],
     ['genColorOverrides', 'gen-gen-color-overrides-v1', {'S-14':'#808080'}, true],
     ['salesEnabled', 'gen-sales-enabled-v1', false, true],
@@ -10981,6 +11026,7 @@ async function init(){
   DB.modelColors = results.modelColors;
   DB.notices = results.notices;
   DB.returnRequests = results.returnRequests || [];
+  DB.incomingSmsOrders = results.incomingSmsOrders || [];
   DB.calendarEvents = results.calendarEvents;
   DB.genColorOverrides = results.genColorOverrides;
   DB.salesEnabled = results.salesEnabled === true;
@@ -11039,7 +11085,7 @@ async function saveAllNow(){
     ['발전기 목록', saveGens], ['임대 이력', saveRentals], ['정비 이력', saveMaint],
     ['출고 대기', saveReservations], ['자재 정보', saveMaterials], ['정비사 목록', saveTechnicians],
     ['정비 경고 기준', saveWarnThreshold], ['부품 재고', savePartsStock], ['부품 규격', savePartsSpecs], ['부품 공급업체', savePartsSupplier],
-    ['부품 최소재고', savePartsMinStock], ['부품 입고내역', savePartsPurchaseLog], ['소모품주문', saveConsumableOrders], ['발주 완료표시', saveOrderMarks], ['보완요청', saveImprovements], ['팀원 목록', saveTeamMembers], ['부자재 목록', saveSuppliesCatalog], ['부자재 재고', saveSuppliesStock], ['모델 색상', saveModelColors], ['공지사항', saveNotices], ['철수요청', saveReturnRequests], ['일정표', saveCalendarEvents], ['발전기별 색상', saveGenColorOverrides], ['부자재 크기', saveSuppliesSizes], ['부자재 규격', saveSuppliesSpecs], ['업체 정보', saveCompanyInfo],
+    ['부품 최소재고', savePartsMinStock], ['부품 입고내역', savePartsPurchaseLog], ['소모품주문', saveConsumableOrders], ['발주 완료표시', saveOrderMarks], ['보완요청', saveImprovements], ['팀원 목록', saveTeamMembers], ['부자재 목록', saveSuppliesCatalog], ['부자재 재고', saveSuppliesStock], ['모델 색상', saveModelColors], ['공지사항', saveNotices], ['철수요청', saveReturnRequests], ['문자오더 대기목록', saveIncomingSmsOrders], ['일정표', saveCalendarEvents], ['발전기별 색상', saveGenColorOverrides], ['부자재 크기', saveSuppliesSizes], ['부자재 규격', saveSuppliesSpecs], ['업체 정보', saveCompanyInfo],
     ['부품 단위', savePartsUnit], ['부품 카테고리', savePartsCategory], ['부자재 카테고리', saveSuppliesCategories], ['고객 메모', saveCustomerNotes], ['읽음 표시', saveReadMarkers],
     ['매출관리 사용여부', saveSalesEnabled], ['매출 청구내역', saveSalesRecords], ['매출관리자', saveSalesManagers], ['매출관리 비밀번호', saveSalesPassword], ['매출관리 비밀번호 우회', saveSalesPasswordBypass], ['매출 기록', saveSalesBillingRecords], ['출고취소 이력', saveCancelOutHistory], ['깔판 초기화 플래그', savePalletDefaultRemoved]
   ];
@@ -11111,7 +11157,7 @@ async function syncFromStorage(){
   if(shouldSkipSync()) return;
   syncInFlight = true;
   try{
-    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, modelColors, notices, returnRequests, calendarEvents, genColorOverrides, salesEnabled, salesRecords, salesManagers, salesPassword, salesPasswordBypass, salesBillingRecords, cancelOutHistory, palletDefaultRemoved, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
+    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, modelColors, notices, returnRequests, incomingSmsOrders, calendarEvents, genColorOverrides, salesEnabled, salesRecords, salesManagers, salesPassword, salesPasswordBypass, salesBillingRecords, cancelOutHistory, palletDefaultRemoved, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
       peekStorage('gen-fleet-v2', DB.gens),
       peekStorage('gen-rentals-v2', DB.rentals),
       peekStorage('gen-maintenance-v2', DB.maint),
@@ -11135,6 +11181,7 @@ async function syncFromStorage(){
       peekStorage('gen-model-colors-v1', DB.modelColors),
       peekStorage('gen-notices-v1', DB.notices),
       peekStorage('gen-return-requests-v1', DB.returnRequests),
+      peekStorage('gen-incoming-sms-v1', DB.incomingSmsOrders),
       peekStorage('gen-calendar-events-v1', DB.calendarEvents),
       peekStorage('gen-gen-color-overrides-v1', DB.genColorOverrides),
       peekStorage('gen-sales-enabled-v1', DB.salesEnabled),
@@ -11153,8 +11200,8 @@ async function syncFromStorage(){
       peekStorage('gen-company-info-v1', DB.companyInfo),
       peekStorage('gen-last-backup-date-v1', DB.lastBackupDate)
     ]);
-    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,modelColors:DB.modelColors,notices:DB.notices,returnRequests:DB.returnRequests,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,salesEnabled:DB.salesEnabled,salesRecords:DB.salesRecords,salesManagers:DB.salesManagers,salesPassword:DB.salesPassword,salesPasswordBypass:DB.salesPasswordBypass,salesBillingRecords:DB.salesBillingRecords,cancelOutHistory:DB.cancelOutHistory,palletDefaultRemoved:DB.palletDefaultRemoved,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
-    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,modelColors,notices,returnRequests,calendarEvents,genColorOverrides,salesEnabled,salesRecords,salesManagers,salesPassword,salesPasswordBypass,salesBillingRecords,cancelOutHistory,palletDefaultRemoved,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate});
+    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,modelColors:DB.modelColors,notices:DB.notices,returnRequests:DB.returnRequests,incomingSmsOrders:DB.incomingSmsOrders,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,salesEnabled:DB.salesEnabled,salesRecords:DB.salesRecords,salesManagers:DB.salesManagers,salesPassword:DB.salesPassword,salesPasswordBypass:DB.salesPasswordBypass,salesBillingRecords:DB.salesBillingRecords,cancelOutHistory:DB.cancelOutHistory,palletDefaultRemoved:DB.palletDefaultRemoved,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
+    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,modelColors,notices,returnRequests,incomingSmsOrders,calendarEvents,genColorOverrides,salesEnabled,salesRecords,salesManagers,salesPassword,salesPasswordBypass,salesBillingRecords,cancelOutHistory,palletDefaultRemoved,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate});
     if(before !== after){
       const newNotices = (notices||[]).filter(n=>n && !seenNoticeIds.has(n.id) && n.authorBy!==DB.currentUserName);
       const newEvents = (calendarEvents||[]).filter(e=>e && !seenEventIds.has(e.id) && e.authorBy!==DB.currentUserName);
@@ -11164,7 +11211,7 @@ async function syncFromStorage(){
       seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID).map(r=>r.id));
       DB.gens = gens; lastSyncedGensSnapshot = snapshotGens(DB.gens); DB.rentals = rentals; DB.maint = maint; DB.reservations = reservations;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold;
-      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.modelColors = modelColors; DB.notices = notices; DB.returnRequests = returnRequests || []; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.salesEnabled = salesEnabled === true; DB.salesRecords = salesRecords || []; DB.salesManagers = salesManagers || []; if((DB.salesManagers[0]||'').trim() !== SALES_MANAGER_FIXED_NAME){ DB.salesManagers[0] = SALES_MANAGER_FIXED_NAME; saveSalesManagers(); } DB.salesPassword = salesPassword || ''; DB.salesPasswordBypass = salesPasswordBypass !== false; DB.salesBillingRecords = salesBillingRecords || []; DB.cancelOutHistory = cancelOutHistory || []; DB.palletDefaultRemoved = palletDefaultRemoved === true; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
+      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.modelColors = modelColors; DB.notices = notices; DB.returnRequests = returnRequests || []; DB.incomingSmsOrders = incomingSmsOrders || []; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.salesEnabled = salesEnabled === true; DB.salesRecords = salesRecords || []; DB.salesManagers = salesManagers || []; if((DB.salesManagers[0]||'').trim() !== SALES_MANAGER_FIXED_NAME){ DB.salesManagers[0] = SALES_MANAGER_FIXED_NAME; saveSalesManagers(); } DB.salesPassword = salesPassword || ''; DB.salesPasswordBypass = salesPasswordBypass !== false; DB.salesBillingRecords = salesBillingRecords || []; DB.cancelOutHistory = cancelOutHistory || []; DB.palletDefaultRemoved = palletDefaultRemoved === true; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
       applyCompanyBranding();
       if(!shouldSkipSync()){
         renderTabbar();
