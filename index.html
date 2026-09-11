@@ -599,7 +599,7 @@ function renderQuickModeReturnPasteUI(){
       <button id="qmret-paste-btn" type="button" onclick="pasteFromClipboardReturn()" style="width:100%;padding:22px;font-size:24px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:16px;">📋 복사한 문자 붙여넣기</button>
       <textarea id="qmret-text" rows="8" style="width:100%;font-size:20px;line-height:1.5;padding:14px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;" placeholder="여기를 길게 눌러서 직접 붙여넣기도 가능합니다"></textarea>
       <button id="qmret-btn" onclick="submitQuickReturnOrder()" style="width:100%;margin-top:16px;padding:20px;font-size:22px;font-weight:800;background:#8A2020;color:#fff;border:none;border-radius:16px;cursor:pointer;">등록하기</button>
-      <div style="text-align:center;color:#777;font-size:14px;margin-top:12px;">등록하면 사무실 전체 화면에 공지사항(알림음+음성)으로 바로 뜹니다</div>
+      <div style="text-align:center;color:#777;font-size:14px;margin-top:12px;">등록하면 사무실 [출고중] 화면 상단에 바로 뜹니다</div>
       <div id="qmret-status" style="margin-top:16px;padding:16px;border-radius:12px;font-size:17px;font-weight:700;text-align:center;white-space:pre-line;display:none;"></div>
       <div style="margin-top:22px;border-top:2px solid #ddd;padding-top:16px;">
         <div style="font-size:15px;font-weight:800;color:#444;margin-bottom:10px;">📨 최근 내가 등록한 철수요청</div>
@@ -1144,28 +1144,24 @@ async function submitQuickReturnOrder(){
   btn.disabled = true; btn.textContent = '등록 중...';
   try{
     const today = todayStr();
-    // AI 자동분석 없이, 철수(회수) 요청 문자 원문을 공지사항으로 그대로 올립니다.
+    // AI 자동분석 없이, 철수(회수) 요청 문자 원문을 그대로 저장합니다.
     // 출고 건과 달리 새로 발전기를 배정하는 게 아니라 이미 나가있는 발전기를 회수하는 요청이라,
-    // 출고대기 목록에 넣지 않고 사무실 전체에 알림(공지사항+음성)으로만 바로 알립니다.
-    const newNotice = {
-      id: uid(), title: '🔻 철수(회수) 요청 - 이영숙', content: text,
-      authorBy: '이영숙(철수요청)', createdDate: today, comments: []
-    };
-    const cur = await window.storage.get('gen-notices-v1', true);
-    let list = [];
-    try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
-    if(!Array.isArray(list)) list = [];
-    list.push(newNotice);
-    await window.storage.set('gen-notices-v1', JSON.stringify(list), true);
-    // 출고중 탭 상단에 처리 전까지 계속 보이는 목록에도 등록합니다.
+    // 출고대기 목록에는 넣지 않고 [출고중] 탭 상단의 철수요청 카드로만 보여줍니다.
+    let newId;
     try{
       const rrCur = await window.storage.get('gen-return-requests-v1', true);
       let rrList = [];
       try{ rrList = rrCur ? JSON.parse(rrCur.value) : []; }catch(e4){ rrList = []; }
       if(!Array.isArray(rrList)) rrList = [];
-      rrList.push({ id: uid(), text, handled: false, createdAt: today, createdAtTs: Date.now() });
+      newId = uid();
+      rrList.push({ id: newId, text, handled: false, createdAt: today, createdAtTs: Date.now() });
       await window.storage.set('gen-return-requests-v1', JSON.stringify(rrList), true);
-    }catch(e5){ /* 실패해도 공지사항 알림은 이미 갔으므로 등록 자체는 막지 않습니다 */ }
+    }catch(e5){
+      box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+      box.textContent = '등록에 실패했습니다. 인터넷 연결을 확인하고 다시 눌러주세요.';
+      btn.disabled=false; btn.textContent='등록하기';
+      return;
+    }
     // 이영숙님 화면의 "최근 등록 내역"용 별도 로그
     try{
       let logCur = null;
@@ -1173,13 +1169,13 @@ async function submitQuickReturnOrder(){
       let log = [];
       try{ log = logCur ? JSON.parse(logCur.value) : []; }catch(e2){ log = []; }
       if(!Array.isArray(log)) log = [];
-      log.push({ noticeId: newNotice.id, text, createdAtTs: Date.now() });
+      log.push({ noticeId: newId, text, createdAtTs: Date.now() });
       if(log.length > 30) log = log.slice(log.length - 30);
       await window.storage.set('quickReturnLog-v1', JSON.stringify(log), true);
     }catch(e3){ /* 로그 저장 실패는 등록 자체를 막지 않습니다 */ }
 
     box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
-    box.textContent = '✅ 철수요청이 등록되었습니다!\n사무실 전체 화면에 알림으로 뜹니다.';
+    box.textContent = '✅ 철수요청이 등록되었습니다!\n사무실 [출고중] 화면에 곧 나타납니다.';
     textEl.value = '';
     loadQuickRecentList('quickReturnLog-v1','qmret-recent');
   }catch(e){
@@ -2469,7 +2465,7 @@ function renderDashboard(){
   const reserveSummaryRows = reserveSummary.map(r=>{
     const g = findGen(r.genId);
     return `<tr>
-      <td class="gid">${r.genId}</td>
+      <td class="gid">${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)}</td>
       <td class="wrap-ok">${g? displayModel(g): '-'}</td>
       <td class="wrap-ok">${r.customer||r.site||'<span class="muted">미기재</span>'}</td>
       <td>${r.pendingLoad? '<span class="pill warn">상차대기</span>' : '<span class="pill gray">출고예정</span>'}</td>
@@ -2976,12 +2972,14 @@ function renderOutList(){
   const returnReqHtml = pendingReturns.length===0 ? '' : `
     <div class="material-card" style="border:2px solid var(--danger);background:var(--danger-tint);margin-bottom:16px;">
       <div class="section-title" style="margin-top:0;color:var(--danger);">🔻 철수(회수) 요청 <span class="cnt">${pendingReturns.length}건</span></div>
-      ${pendingReturns.map(r=>`
-        <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
-          <div class="muted" style="font-size:12px;margin-bottom:4px;">${escR(r.createdAt||'')}</div>
-          <div style="font-size:13.5px;white-space:pre-wrap;margin-bottom:8px;">${escR(r.text||'')}</div>
-          <button class="btn sm primary" onclick="markReturnRequestHandled('${r.id}')">✅ 처리완료 (해당 발전기는 아래에서 입고 처리해주세요)</button>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;">
+        ${pendingReturns.map(r=>`
+        <div style="width:150px;height:150px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
+          <div class="muted" style="font-size:11px;margin-bottom:4px;">${escR(r.createdAt||'')}</div>
+          <div style="font-size:12px;line-height:1.4;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;cursor:pointer;" onclick="viewReturnRequestText('${r.id}')">${escR(r.text||'')}</div>
+          <button class="btn sm primary" style="font-size:11px;padding:4px 6px;margin-top:6px;" onclick="markReturnRequestHandled('${r.id}')">✅ 처리완료</button>
         </div>`).join('')}
+      </div>
     </div>`;
   return `
     ${returnReqHtml}
@@ -3004,6 +3002,11 @@ function renderOutList(){
     </table></div>`}
     `}
   `;
+}
+function viewReturnRequestText(id){
+  const r = (DB.returnRequests||[]).find(x=>x && x.id===id);
+  if(!r) return;
+  showInfoModal(r.text||'');
 }
 function markReturnRequestHandled(id){
   const r = (DB.returnRequests||[]).find(x=>x && x.id===id);
@@ -7763,7 +7766,7 @@ function renderReserveTab(){
     const noteMarker = (r.note && r.note.trim()) ? `<button class="btn sm" style="color:var(--primary-dark);font-weight:700;border-color:var(--primary);text-align:center;margin-top:4px;" onclick="showNoteModal('${r.id}')">비고확인</button>` : '';
     const smsMarker = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 문자오더확인</button>` : '';
     return `<tr${isDelayed? ` style="background:var(--danger-tint);"`:''}>
-      <td class="gid">${r.genId}</td>
+      <td class="gid">${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)}</td>
       <td class="wrap-ok" style="max-width:130px;">${g? displayModel(g): '-'}</td>
       <td class="muted" style="font-size:11px;">${r.outProcessedBy? escR(r.outProcessedBy) : '-'}</td>
       <td class="wrap-ok" style="font-size:12px;">
@@ -11067,25 +11070,13 @@ async function submitUserName(nameArg){
   closeModal();
   renderUserBadge();
   renderTabbar();
-  flash(`${name}님, 환영합니다`);
+  flash(`${name}님 어서오세요`);
   saveWithRetry(saveCurrentUserName);
   showLoadingPopupOnLogin();
   if(isWithinVoiceAlertHours()) speakText(randomLoginGreeting(name));
 }
 function randomLoginGreeting(name){
-  const list = [
-    `안녕하세요 ${name}님! 오늘도 화이팅입니다!`,
-    `${name}님 오셨네요! 오늘 하루도 힘내세요!`,
-    `${name}님, 접속을 환영합니다! 오늘도 수고 많으세요!`,
-    `어서오세요 ${name}님! 오늘도 좋은 하루 되세요!`,
-    `${name}님 왔다! 오늘도 파이팅입니다!`,
-    `${name}님! 오늘도 발전기처럼 힘차게 시동 걸어봅시다!`,
-    `${name}님 반갑습니다! 오늘 출고 물량 시원하게 처리해봐요!`,
-    `${name}님, 전기처럼 빠릿빠릿한 하루 보내세요!`,
-    `${name}님 오셨네요! 오늘도 정전 없이 무사히 끝내봐요!`,
-    `${name}님! 오늘 하루도 발전기만큼 든든하게 버텨봅시다!`
-  ];
-  return list[Math.floor(Math.random()*list.length)];
+  return `${name}님 어서오세요`;
 }
 function changeUserName(){
   openUserNameGate();
