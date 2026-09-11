@@ -764,7 +764,7 @@ function renderQuickModeReserveUI(){
         </div>
       </details>
 
-      <button id="qmr-btn" type="button" onclick="submitQuickReserve()" style="width:100%;margin-top:20px;padding:22px;font-size:24px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;">등록하기 + 문자발송</button>
+      <button id="qmr-btn" type="button" onclick="submitQuickReserve()" style="width:100%;margin-top:20px;padding:22px;font-size:24px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;">등록하기</button>
       <div id="qmr-status" style="margin-top:16px;padding:16px;border-radius:12px;font-size:17px;font-weight:700;text-align:center;white-space:pre-line;display:none;"></div>
     </div>
   `);
@@ -927,7 +927,7 @@ async function submitQuickReserve(){
       if(list.some(r=>r.genId===genSel)){
         box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
         box.textContent = '⚠️ 방금 다른 곳에서 같은 발전기를 먼저 배정했습니다.\n발전기를 다시 골라주세요.';
-        btn.disabled = false; btn.textContent = '등록하기 + 문자발송';
+        btn.disabled = false; btn.textContent = '등록하기';
         loadQmrGenOptions();
         return;
       }
@@ -974,7 +974,9 @@ async function submitQuickReserve(){
 
     box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
     box.textContent = '✅ 출고예약이 등록되었습니다!\n사무실 화면에 곧 나타납니다.';
-    openQmrSmsCompose({customer, address, manager, phone, voltage, outDate, arriveTime, freightBearer, fuelRequested, fuelActual, note});
+    openConfirmModal('문자로도 발송하시겠습니까?', function(){
+      openQmrSmsCompose({customer, address, manager, phone, voltage, outDate, arriveTime, freightBearer, fuelRequested, fuelActual, note});
+    }, '예', '아니오');
     ['qmr-customer','qmr-address','qmr-manager','qmr-phone','qmr-voltage','qmr-usagedays','qmr-estdaily','qmr-returndate','qmr-note','qmr-fuel-req','qmr-fuel-actual','qmr-arrivetime'].forEach(id=>{
       const el = document.getElementById(id); if(el) el.value = '';
     });
@@ -993,7 +995,7 @@ async function submitQuickReserve(){
     box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
     box.textContent = '등록에 실패했습니다. 인터넷 연결을 확인하고 다시 눌러주세요.';
   }finally{
-    btn.disabled = false; btn.textContent = '등록하기 + 문자발송';
+    btn.disabled = false; btn.textContent = '등록하기';
   }
 }
 function fmtQmTime(ts){
