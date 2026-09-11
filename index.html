@@ -2974,10 +2974,10 @@ function renderOutList(){
       <div class="section-title" style="margin-top:0;color:var(--danger);">🔻 철수(회수) 요청 <span class="cnt">${pendingReturns.length}건</span></div>
       <div style="display:flex;flex-wrap:wrap;gap:10px;">
         ${pendingReturns.map(r=>`
-        <div style="width:150px;height:150px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
-          <div class="muted" style="font-size:11px;margin-bottom:4px;">${escR(r.createdAt||'')}</div>
-          <div style="font-size:12px;line-height:1.4;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;cursor:pointer;" onclick="viewReturnRequestText('${r.id}')">${escR(r.text||'')}</div>
-          <button class="btn sm primary" style="font-size:11px;padding:4px 6px;margin-top:6px;" onclick="markReturnRequestHandled('${r.id}')">✅ 처리완료</button>
+        <div style="width:260px;height:260px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:14px;box-sizing:border-box;display:flex;flex-direction:column;">
+          <div class="muted" style="font-size:12px;margin-bottom:6px;">${escR(r.createdAt||'')}</div>
+          <div style="font-size:14px;line-height:1.5;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:9;-webkit-box-orient:vertical;cursor:pointer;" onclick="viewReturnRequestText('${r.id}')">${escR(r.text||'')}</div>
+          <button class="btn sm primary" style="font-size:12px;padding:6px 8px;margin-top:8px;" onclick="markReturnRequestHandled('${r.id}')">✅ 처리완료</button>
         </div>`).join('')}
       </div>
     </div>`;
