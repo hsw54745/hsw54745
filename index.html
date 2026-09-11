@@ -2995,6 +2995,7 @@ function renderOutList(){
           <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}</div>
           <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;" onclick="viewReturnRequestText('${r.id}')">${escR(r.text||'')}</div>
           <button class="btn sm primary" style="font-size:12px;padding:4px 6px;margin-top:6px;" onclick="markReturnRequestHandled('${r.id}')">✅ 처리완료</button>
+          <button class="btn sm danger" style="font-size:12px;padding:4px 6px;margin-top:4px;" onclick="deleteReturnRequestCard('${r.id}')">🗑 삭제</button>
         </div>`).join('')}
       </div>`}
       ${handledReturns.length===0 ? '' : `
@@ -3005,6 +3006,7 @@ function renderOutList(){
           <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}</div>
           <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;" onclick="viewReturnRequestText('${r.id}')">${escR(r.text||'')}</div>
           <button class="btn sm" style="font-size:12px;padding:4px 6px;margin-top:6px;" onclick="unmarkReturnRequestHandled('${r.id}')">↩️ 다시 표시</button>
+          <button class="btn sm danger" style="font-size:12px;padding:4px 6px;margin-top:4px;" onclick="deleteReturnRequestCard('${r.id}')">🗑 삭제</button>
         </div>`).join('')}
       </div>
       </details>`}
@@ -3049,6 +3051,15 @@ function unmarkReturnRequestHandled(id){
   r.handled = false;
   saveReturnRequests();
   renderContent();
+}
+function deleteReturnRequestCard(id){
+  openConfirmModal('이 철수요청을 완전히 삭제할까요? 되돌릴 수 없습니다.', async function(){
+    DB.returnRequests = (DB.returnRequests||[]).filter(x=>x && x.id!==id);
+    await saveWithRetry(saveReturnRequests);
+    closeModal();
+    renderContent();
+    flash('삭제되었습니다');
+  });
 }
 
 function toggleLongterm(id){
@@ -7840,6 +7851,7 @@ function renderReserveTab(){
           <div class="muted" style="font-size:12px;margin-bottom:4px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
           <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;" onclick="showSmsOrderModal('${r.id}')">${escR(r.smsOrder||'')}</div>
           <button class="btn sm primary" style="font-size:12px;padding:4px 6px;margin-top:6px;" onclick="markSmsOrderChecked('${r.id}')">✅ 확인완료</button>
+          <button class="btn sm danger" style="font-size:12px;padding:4px 6px;margin-top:4px;" onclick="deleteSmsOrderCard('${r.id}')">🗑 삭제</button>
         </div>`).join('')}
       </div>`}
       ${smsOrderHidden.length===0 ? '' : `
@@ -7851,6 +7863,7 @@ function renderReserveTab(){
           <div class="muted" style="font-size:12px;margin-bottom:4px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
           <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;" onclick="showSmsOrderModal('${r.id}')">${escR(r.smsOrder||'')}</div>
           <button class="btn sm" style="font-size:12px;padding:4px 6px;margin-top:6px;" onclick="unmarkSmsOrderChecked('${r.id}')">↩️ 다시 표시</button>
+          <button class="btn sm danger" style="font-size:12px;padding:4px 6px;margin-top:4px;" onclick="deleteSmsOrderCard('${r.id}')">🗑 삭제</button>
         </div>`).join('')}
       </div>
       </details>`}
@@ -7916,6 +7929,16 @@ function unmarkSmsOrderChecked(resId){
   r.smsOrderChecked = false;
   saveReservations();
   renderContent();
+}
+function deleteSmsOrderCard(resId){
+  openConfirmModal('이 문자오더 건을 완전히 삭제할까요? 출고대기 목록에서도 함께 삭제되며, 되돌릴 수 없습니다.', async function(){
+    DB.reservations = DB.reservations.filter(r=>r.id!==resId);
+    await saveWithRetry(saveReservations);
+    closeModal();
+    renderContent();
+    renderTabbar();
+    flash('삭제되었습니다');
+  });
 }
 function showSmsOrderModal(resId){
   const r = DB.reservations.find(x=>x.id===resId);
