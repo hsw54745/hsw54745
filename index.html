@@ -580,6 +580,12 @@ function renderQuickModePasteUI(){
       </div>
       <button id="qm-paste-btn" type="button" onclick="pasteFromClipboard()" style="width:100%;padding:22px;font-size:24px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:16px;">📋 복사한 문자 붙여넣기</button>
       <textarea id="qm-text" rows="8" style="width:100%;font-size:20px;line-height:1.5;padding:14px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;" placeholder="여기를 길게 눌러서 직접 붙여넣기도 가능합니다"></textarea>
+      <div style="margin-top:14px;background:#fff;border:2px solid #ccc;border-radius:14px;padding:12px 14px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:#333;cursor:pointer;">
+          <input type="checkbox" id="qm-sms-toggle" style="width:22px;height:22px;">
+          등록 후 문자로도 보내기 (문자 앱에서 단체문자 선택)
+        </label>
+      </div>
       <button id="qm-btn" onclick="submitQuickOrder()" style="width:100%;margin-top:16px;padding:20px;font-size:22px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">등록하기</button>
       <div style="text-align:center;color:#777;font-size:14px;margin-top:12px;">등록 후 내용이 틀리면 사무실에서 나중에 고칠 수 있으니 걱정 안 하셔도 됩니다</div>
       <div id="qm-status" style="margin-top:16px;padding:16px;border-radius:12px;font-size:17px;font-weight:700;text-align:center;white-space:pre-line;display:none;"></div>
@@ -601,6 +607,12 @@ function renderQuickModeReturnPasteUI(){
       </div>
       <button id="qmret-paste-btn" type="button" onclick="pasteFromClipboardReturn()" style="width:100%;padding:22px;font-size:24px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:16px;">📋 복사한 문자 붙여넣기</button>
       <textarea id="qmret-text" rows="8" style="width:100%;font-size:20px;line-height:1.5;padding:14px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;" placeholder="여기를 길게 눌러서 직접 붙여넣기도 가능합니다"></textarea>
+      <div style="margin-top:14px;background:#fff;border:2px solid #ccc;border-radius:14px;padding:12px 14px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:#333;cursor:pointer;">
+          <input type="checkbox" id="qmret-sms-toggle" style="width:22px;height:22px;">
+          등록 후 문자로도 보내기 (문자 앱에서 단체문자 선택)
+        </label>
+      </div>
       <button id="qmret-btn" onclick="submitQuickReturnOrder()" style="width:100%;margin-top:16px;padding:20px;font-size:22px;font-weight:800;background:#8A2020;color:#fff;border:none;border-radius:16px;cursor:pointer;">등록하기</button>
       <div style="text-align:center;color:#777;font-size:14px;margin-top:12px;">등록하면 사무실 [출고중] 화면 상단에 바로 뜹니다</div>
       <div id="qmret-status" style="margin-top:16px;padding:16px;border-radius:12px;font-size:17px;font-weight:700;text-align:center;white-space:pre-line;display:none;"></div>
@@ -1046,6 +1058,7 @@ async function loadQuickRecentList(storageKey, wrapId){
   }
 }
 const QM_ORDER_PREFIX = '★★★해성발전기 출고요청★★★\n';
+const QM_RETURN_PREFIX = '★★★해성발전기 철수요청★★★\n';
 async function pasteFromClipboard(){
   const textEl = document.getElementById('qm-text');
   const box = document.getElementById('qm-status');
@@ -1058,7 +1071,6 @@ async function pasteFromClipboard(){
       return;
     }
     textEl.value = QM_ORDER_PREFIX + text;
-    textEl.focus();
   }catch(e){
     box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
     box.textContent = '자동 붙여넣기가 안 됩니다.\n아래 박스를 길게 눌러 "붙여넣기"를 선택해주세요.';
@@ -1075,12 +1087,17 @@ async function pasteFromClipboardReturn(){
       box.textContent = '복사된 내용이 없습니다. 문자 내용을 먼저 복사해주세요.';
       return;
     }
-    textEl.value = text;
-    textEl.focus();
+    textEl.value = QM_RETURN_PREFIX + text;
   }catch(e){
     box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
     box.textContent = '자동 붙여넣기가 안 됩니다.\n아래 박스를 길게 눌러 "붙여넣기"를 선택해주세요.';
   }
+}
+// 문자 앱으로 바로 연결하는 sms: 링크를 만듭니다 (수신자는 비워두어 문자 앱에서 단체문자 등 직접 선택, iOS/Android 구분자가 다릅니다)
+function buildSmsHref(body){
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const sep = isIOS ? '&' : '?';
+  return `sms:${sep}body=${encodeURIComponent(body)}`;
 }
 async function submitQuickOrder(){
   const textEl = document.getElementById('qm-text');
@@ -1135,6 +1152,11 @@ async function submitQuickOrder(){
 
     box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
     box.textContent = '✅ 등록 완료되었습니다!\n사무실 화면에 곧 나타납니다.';
+    const smsToggle = document.getElementById('qm-sms-toggle');
+    if(smsToggle && smsToggle.checked){
+      const smsBody = text.startsWith(QM_ORDER_PREFIX) ? text : (QM_ORDER_PREFIX + text);
+      location.href = buildSmsHref(smsBody);
+    }
     textEl.value = '';
     loadQuickRecentList();
   }catch(e){
@@ -1190,6 +1212,11 @@ async function submitQuickReturnOrder(){
 
     box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
     box.textContent = '✅ 철수요청이 등록되었습니다!\n사무실 [출고중] 화면에 곧 나타납니다.';
+    const smsToggleRet = document.getElementById('qmret-sms-toggle');
+    if(smsToggleRet && smsToggleRet.checked){
+      const smsBody = text.startsWith(QM_RETURN_PREFIX) ? text : (QM_RETURN_PREFIX + text);
+      location.href = buildSmsHref(smsBody);
+    }
     textEl.value = '';
     loadQuickRecentList('quickReturnLog-v1','qmret-recent');
   }catch(e){
