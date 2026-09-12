@@ -39,7 +39,7 @@
     --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;padding-bottom:60px;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;padding-bottom:60px;}
   header{background:var(--primary-dark);color:#fff;padding:22px 20px 18px;}
   .brand-row{display:flex;align-items:center;gap:10px;}
   .brand-mark{width:34px;height:34px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:16px;flex-shrink:0;}
@@ -70,8 +70,9 @@
   .gid{font-family:var(--mono);font-weight:700;color:var(--primary-dark);white-space:nowrap!important;}
   .table-scroll td.gid{white-space:nowrap!important;}
   .muted{color:var(--ink-faint);}
-  .settings-block .material-card{padding:12px 14px;}
-  .settings-block .section-title{font-size:15px;margin:0 0 6px;}
+  .settings-block .material-card{padding:7px 14px;}
+  .settings-block .section-title{font-size:18px;margin:0 0 6px;}
+  .settings-block input[type=text],.settings-block input[type=number],.settings-block input[type=date],.settings-block input[type=time],.settings-block input[type=password],.settings-block select,.settings-block textarea{font-size:14px;}
   .info-toggle{margin-top:4px;}
   .info-toggle summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--primary);list-style:none;}
   .info-toggle summary::-webkit-details-marker{display:none;}
@@ -101,12 +102,12 @@
   .empty{padding:34px 14px;text-align:center;color:var(--ink-faint);font-size:13px;background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);}
   .overlay{position:fixed;inset:0;background:rgba(20,22,26,.5);display:flex;align-items:flex-end;justify-content:center;z-index:100;}
   @media(min-width:640px){.overlay{align-items:center;}}
-  .modal{background:#fff;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;border-radius:16px 16px 0 0;padding:20px 20px 24px;}
+  .modal{background:#fff;width:100%;max-width:460px;max-height:88vh;overflow-y:auto;border-radius:16px 16px 0 0;padding:20px 20px 24px;text-align:center;}
   @media(min-width:640px){.modal{border-radius:16px;}}
   @media(min-width:760px){.modal.modal-wide{max-width:960px;}}
   .out-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:flex-start;}
   .out-row.stretch{align-items:stretch;}
-  .out-card{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;background:var(--surface);height:100%;box-sizing:border-box;}
+  .out-card{border:1px solid var(--border);border-radius:var(--radius);padding:6px 12px;background:var(--surface);height:100%;box-sizing:border-box;}
   .out-row>.field{margin-bottom:0;min-width:0;}
   .out-row>.field.f-xs{flex:1 1 85px;}
   .out-row>.field.f-sm{flex:1 1 125px;}
@@ -122,10 +123,10 @@
   .field{margin-bottom:14px;}
   .field-row{display:flex;gap:10px;margin-bottom:14px;}
   .field-row .field{margin-bottom:0;flex:1;min-width:0;}
-  .field label{display:block;font-size:13.5px;font-weight:700;color:var(--primary);margin-bottom:5px;}
-  .field input[type=text],.field input[type=number],.field input[type=date],.field input[type=password],.field select,.field textarea{width:100%;padding:9px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:16px;background:#fff;color:var(--ink);box-sizing:border-box;}
+  .field label{display:block;font-size:14px;font-weight:700;color:var(--primary);margin-bottom:5px;}
+  .field input[type=text],.field input[type=number],.field input[type=date],.field input[type=password],.field select,.field textarea{width:100%;padding:9px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:14px;background:#fff;color:var(--ink);box-sizing:border-box;}
   .field textarea{resize:vertical;min-height:60px;}
-  input::placeholder,textarea::placeholder{color:var(--ink-faint)!important;font-weight:400!important;opacity:.8;}
+  input::placeholder,textarea::placeholder{color:var(--ink-faint)!important;font-weight:400!important;opacity:.5;font-size:13px;}
   .sales-table input[type=number],.sales-table input[type=date],.sales-table input[type=text]{font-size:13px;padding:6px 6px;border:1px solid var(--border-strong);border-radius:8px;}
   .sales-table label{font-size:14px;}
   .sales-table input[type=checkbox]{width:19px;height:19px;}
@@ -179,7 +180,7 @@
   .consumable-row{display:flex;gap:6px;margin-bottom:6px;align-items:center;}
   .consumable-row input{flex:1;}
   .consumable-row input.qty{flex:0 0 60px;}
-  .material-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;}
+  .material-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:7px 14px;margin-bottom:10px;}
   .material-card .m-title{font-weight:700;font-size:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
   .tag-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;}
   .tag{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:2px 7px;font-size:11px;}
@@ -1352,7 +1353,7 @@ function adminModeSectionHtml(){
   if(!isAdminModeUnlocked()){
     return `
     <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">🔐 관리자 모드</div>
+      <div class="section-title" style="margin-top:0;text-align:center;">🔐 관리자 모드</div>
       <details class="info-toggle"><summary></summary><p class="muted">업체 정보 수정, 위험 구역(초기화) 작업은 관리자 모드에서만 할 수 있습니다. 사이트 접속 비밀번호와는 별개인 전용 관리자 비밀번호를 입력하면 ${Math.round(ADMIN_MODE_DURATION_MS/60000)}분 동안 열리고, 시간이 지나면 자동으로 다시 잠깁니다.</p></details>
       <div class="field" style="max-width:320px;">
         <input type="password" id="f-admin-pw" placeholder="관리자 비밀번호" onkeydown="if(event.key==='Enter')submitAdminModeUnlock()">
@@ -1376,7 +1377,7 @@ function adminModeSectionHtml(){
       <div id="company-contact-wrap"></div>
     </div>
     <div style="border:1px solid var(--danger);border-radius:var(--radius);padding:14px 16px;margin-top:20px;background:var(--danger-tint);">
-      <div class="section-title" style="margin-top:0;color:var(--danger);">위험 구역</div>
+      <div class="section-title" style="margin-top:0;color:var(--danger);">⚠️ 위험 구역</div>
       <details class="info-toggle"><summary></summary><p class="muted">아래 작업들은 모두 되돌릴 수 없습니다. 실행 전 먼저 백업을 받아두시길 권장합니다. 각 버튼에 마우스를 올리면 무엇이 지워지는지 설명이 나옵니다.</p></details>
       <div class="btn-row" style="flex-wrap:wrap;">
         <button class="btn danger" onclick="resetAllToIn()" title="현재 출고중인 발전기를 포함해 전체 발전기를 입고 상태로 되돌립니다. 임대 정보·출고 대기는 사라지고, 임대·정비 이력 자체는 남습니다.">입고로 초기화</button>
@@ -2546,7 +2547,7 @@ function renderDashboard(){
       <div class="card danger" style="cursor:pointer;" onclick="switchTab('out')"><div class="num">${forcedOutCount}</div><div class="lbl">🚨 미입금 출고</div></div>
       <div class="card" style="cursor:pointer;" onclick="switchTab('reserve')"><div class="num">${resCount}</div><div class="lbl">출고 대기</div></div>
     </div>
-    <div class="section-title">지역별 출고 현황 <span class="cnt">${outGens.length}대</span></div>
+    <div class="section-title">🗺️ 지역별 출고 현황 <span class="cnt">${outGens.length}대</span></div>
     ${regionEntries.length===0? `<div class="empty">현재 출고중인 발전기가 없습니다.</div>` : `
     <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(90px,1fr));">
       ${regionEntries.map(([region,count])=>`
@@ -2556,7 +2557,7 @@ function renderDashboard(){
         </div>
       `).join('')}
     </div>`}
-    <div class="section-title">정비 임박 / 필요 <span class="cnt">${urgent.length}대</span></div>
+    <div class="section-title">🔧 정비 임박 / 필요 <span class="cnt">${urgent.length}대</span></div>
     <div class="table-scroll"><table>
       <thead><tr><th>번호</th><th>모델</th><th>상태</th><th>정비 주기</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
@@ -2574,7 +2575,7 @@ function renderDashboard(){
     </table></div>`}
 
     <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-      <span>입고 예정 (5일 이내) <span class="cnt">최근 5대</span></span>
+      <span>📅 입고 예정 (5일 이내) <span class="cnt">최근 5대</span></span>
       <button class="btn sm" onclick="switchTab('in')">전체보기</button>
     </div>
     ${soonList.length===0? `<div class="empty">5일 이내 입고 예정인 발전기가 없습니다.</div>` : `
@@ -2584,7 +2585,7 @@ function renderDashboard(){
     </table></div>`}
 
     <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-      <span>출고 대기 최근 요약 <span class="cnt">${resCount}건</span></span>
+      <span>⏳ 출고 대기 최근 요약 <span class="cnt">${resCount}건</span></span>
       <button class="btn sm" onclick="switchTab('reserve')">전체보기</button>
     </div>
     ${reserveSummary.length===0? `<div class="empty">등록된 출고 대기가 없습니다.</div>` : `
@@ -2594,7 +2595,7 @@ function renderDashboard(){
     </table></div>`}
 
     <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-      <span>출고중 최근 요약 <span class="cnt">${outGens.length}대</span></span>
+      <span>📤 출고중 최근 요약 <span class="cnt">${outGens.length}대</span></span>
       <button class="btn sm" onclick="switchTab('out')">전체보기</button>
     </div>
     ${outSummary.length===0? `<div class="empty">현재 출고중인 발전기가 없습니다.</div>` : `
@@ -2603,11 +2604,11 @@ function renderDashboard(){
       <tbody>${outSummaryRows}</tbody>
     </table></div>`}
 
-    <div class="section-title">최근 정비 이력 (전체 발전기)</div>
+    <div class="section-title">🔧 최근 정비 이력 (전체 발전기)</div>
     <div id="recent-maint-wrap"></div>
 
     <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-      <span>소모품주문내역 요약 <span class="cnt">${coList.length}건</span>${coPendingCount>0? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">미구입 ${coPendingCount}건</span>`:''}</span>
+      <span>🛒 소모품주문내역 요약 <span class="cnt">${coList.length}건</span>${coPendingCount>0? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">미구입 ${coPendingCount}건</span>`:''}</span>
       <button class="btn sm" onclick="switchTab('consumable-order')">전체보기</button>
     </div>
     ${coSummary.length===0? `<div class="empty">등록된 소모품주문 항목이 없습니다.</div>` : `
@@ -2617,7 +2618,7 @@ function renderDashboard(){
     </table></div>`}
 
     <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-      <span>보완요청 요약 <span class="cnt">${impList.length}건</span>${impOpenCount>0? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">미해결 ${impOpenCount}건</span>`:''}</span>
+      <span>🛠 보완요청 요약 <span class="cnt">${impList.length}건</span>${impOpenCount>0? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">미해결 ${impOpenCount}건</span>`:''}</span>
       <button class="btn sm" onclick="switchTab('improvements')">전체보기</button>
     </div>
     ${impSummary.length===0? `<div class="empty">등록된 보완요청이 없습니다.</div>` : `
@@ -2793,9 +2794,9 @@ function renderInList(){
     </div>`;
 
   return `
-    <div class="section-title" style="margin-top:0;">입고 발전기 <span class="cnt">${list.length}대</span>${brokenCount>0? ` <span class="cnt" style="background:var(--danger-tint);color:var(--danger);border-color:var(--danger);">고장/수리중 ${brokenCount}대</span>`:''}${inCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${inCapacityFilter}kW <button onclick="clearInCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}
+    <div class="section-title" style="margin-top:0;">📥 입고 발전기 <span class="cnt">${list.length}대</span>${brokenCount>0? ` <span class="cnt" style="background:var(--danger-tint);color:var(--danger);border-color:var(--danger);">고장/수리중 ${brokenCount}대</span>`:''}${inCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${inCapacityFilter}kW <button onclick="clearInCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}
       <button class="btn sm" style="margin-left:8px;vertical-align:middle;" onclick="downloadInGensPrintFile()">🖨 인쇄</button>
-      <button class="btn sm" style="margin-left:6px;vertical-align:middle;" onclick="openBorrowGenModal()" title="협력업체에서 급하게 빌려온 발전기를 임시로 등록합니다. 자재는 관리하지 않고 정비주기만 관리하며, 다 쓰면 반납 처리로 목록에서 뺄 수 있습니다.">🤝 발전기 임의추가</button>
+      <button class="btn sm" style="margin-left:6px;vertical-align:middle;background:#FFF3E0;border-color:#E68A00;color:#B35F00;font-weight:800;" onclick="openBorrowGenModal()" title="협력업체에서 급하게 빌려온 발전기를 임시로 등록합니다. 자재는 관리하지 않고 정비주기만 관리하며, 다 쓰면 반납 처리로 목록에서 뺄 수 있습니다.">🤝 발전기 임의추가</button>
     </div>
     ${capacityButtonsHtml}
     <details class="info-toggle"><summary></summary><p class="muted">같은 거래처에 여러 대를 한 번에 내보낼 때는 왼쪽 체크박스로 여러 대를 선택한 뒤 "한번에 출고" 버튼을 눌러주세요.</p></details>
@@ -2904,7 +2905,7 @@ function longtermPrepListHtml(){
     </div>`;
   }).join('');
   return `
-    <div class="section-title">장기임대 정비 준비 리스트 <span class="cnt">${ltList.length}대</span>${ltList.length>0? ` <button type="button" class="btn sm" onclick="downloadLongtermPrepFile()">🖨 인쇄</button>`:''}</div>
+    <div class="section-title">🔧 장기임대 정비 준비 리스트 <span class="cnt">${ltList.length}대</span>${ltList.length>0? ` <button type="button" class="btn sm" onclick="downloadLongtermPrepFile()">🖨 인쇄</button>`:''}</div>
     <details class="info-toggle"><summary></summary><p class="muted">현장에서 실사용 시간을 바로 알 수 없는 장기임대 발전기를, 예상 사용시간을 기준으로 정비 임박 순으로 정렬했습니다. 방문 정비시 챙길 자재(엔진오일량·필터 품명/규격/수량)가 함께 표시됩니다.</p></details>
     ${ltList.length===0? `<div class="empty">장기임대 중인 발전기가 없습니다.</div>` : ltHtml}
   `;
@@ -2944,7 +2945,7 @@ function renderOutList(){
         ${rt.smsOrder? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;margin-top:4px;" onclick="showSmsOrderForGen('${g.id}')">📩 문자오더확인</button>`:''}
       </td>
       <td class="muted">${dow(rt.outDate)||'-'}</td>
-      <td>${isLT? gaugeHtml(el,rem,getCycle(g)) : (g.hoursKnown? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--warn);">누적시간 확인불가 모델</span>')}</td>
+      <td>${isLT? gaugeHtml(el,rem,getCycle(g)) : (g.hoursKnown? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</span>')}</td>
       <td style="font-size:12px;">${predTxt}</td>
       <td style="font-size:12px;">${expIn? (()=>{ const diff = daysFromToday(expIn); const isLate = diff!=null && diff<0; const cls = isLate?'danger':(diff<=1?'danger':(diff<=3?'warn':'gray')); return `<span class="pill ${cls}">📅 ${inDateLabelFull(expIn)}</span>`; })() : '<span class="muted">-</span>'}</td>
       <td>
@@ -2991,11 +2992,13 @@ function renderOutList(){
       ${pendingReturns.length===0 ? `<div class="empty" style="margin-top:4px;">처리할 철수요청이 없습니다.</div>` : `
       <div style="display:flex;flex-wrap:wrap;gap:8px;">
         ${pendingReturns.map(r=>`
-        <div style="width:170px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
+        <div style="width:170px;height:210px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
           <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}</div>
-          <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;" onclick="viewReturnRequestText('${r.id}')">${escR(r.text||'')}</div>
-          <button class="btn sm primary" style="font-size:12px;padding:4px 6px;margin-top:6px;" onclick="markReturnRequestHandled('${r.id}')">✅ 처리완료</button>
-          <button class="btn sm danger" style="font-size:12px;padding:4px 6px;margin-top:4px;" onclick="deleteReturnRequestCard('${r.id}')">🗑 삭제</button>
+          <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;flex:1;overflow:hidden;" onclick="viewReturnRequestText('${r.id}')">${escR(r.text||'')}</div>
+          <div style="display:flex;gap:4px;margin-top:6px;">
+            <button class="btn sm primary" style="flex:1;font-size:10px;padding:2px 4px;" onclick="markReturnRequestHandled('${r.id}')">✅ 처리완료</button>
+            <button class="btn sm danger" style="flex:1;font-size:10px;padding:2px 4px;" onclick="deleteReturnRequestCard('${r.id}')">🗑 삭제</button>
+          </div>
         </div>`).join('')}
       </div>`}
       ${handledReturns.length===0 ? '' : `
@@ -3013,18 +3016,18 @@ function renderOutList(){
     </div>`;
   return `
     ${returnReqHtml}
-    <div class="section-title">출고중 발전기 <span class="cnt">${list.length}대</span>${outRegionFilter? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">지역: ${escR(outRegionFilter)} <button onclick="clearOutRegionFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}${outCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${outCapacityFilter}kW <button onclick="clearOutCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''} <button type="button" class="btn sm" onclick="downloadOutFieldListFile()">🖨 출고 리스트 인쇄(단기/장기)</button></div>
+    <div class="section-title">📤 출고중 발전기 <span class="cnt">${list.length}대</span>${outRegionFilter? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">지역: ${escR(outRegionFilter)} <button onclick="clearOutRegionFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}${outCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${outCapacityFilter}kW <button onclick="clearOutCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''} <button type="button" class="btn sm" onclick="downloadOutFieldListFile()">🖨 출고 리스트 인쇄(단기/장기)</button></div>
     ${capacityButtonsHtml}
     <details class="info-toggle"><summary></summary><p class="muted">같은 거래처에서 여러 대를 한 번에 반납받을 때는 왼쪽 체크박스로 여러 대를 선택한 뒤 "한번에 입고" 버튼을 눌러주세요. 현장 정기 점검 출장 전에는 위 "출고 리스트 인쇄" 버튼으로 단기 1장·장기 1장짜리 리스트를 뽑을 수 있습니다.</p></details>
     <div id="bulk-in-bar">${bulkInBarHtml()}</div>
     ${list.length===0? `<div class="empty">${outRegionFilter||outCapacityFilter!=null? `조건에 맞는 출고중인 발전기가 없습니다.`:'출고중인 발전기가 없습니다.'}</div>` : `
-    <div class="section-title" style="font-size:14px;margin-top:14px;">단기임대 <span class="cnt">${shortList.length}대</span></div>
+    <div class="section-title" style="font-size:14px;margin-top:14px;">📅 단기임대 <span class="cnt">${shortList.length}대</span></div>
     ${shortList.length===0? `<div class="empty">단기임대 중인 발전기가 없습니다.</div>` : `
     <div class="table-scroll"><table>
       ${theadHtml}
       <tbody>${shortRows}</tbody>
     </table></div>`}
-    <div class="section-title" style="font-size:14px;margin-top:20px;">장기임대 <span class="cnt">${longList.length}대</span></div>
+    <div class="section-title" style="font-size:14px;margin-top:20px;">📅 장기임대 <span class="cnt">${longList.length}대</span></div>
     ${longList.length===0? `<div class="empty">장기임대 중인 발전기가 없습니다.</div>` : `
     <div class="table-scroll"><table>
       ${theadHtml}
@@ -3081,8 +3084,8 @@ function openLongtermConvertModal(id){
   const g = findGen(id);
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
-      <h3>장기임대로 변경</h3>
+    <div class="modal" style="text-align:center;">
+      <h3>📅 장기임대로 변경</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
       <div class="field"><label>예상 일일 사용시간(h/일)</label><input type="number" id="f-ltdaily" step="0.5" placeholder="예: 8"></div>
       <div id="f-err" class="err" style="display:none;"></div>
@@ -3110,28 +3113,28 @@ function renderMaintTab(){
   return `
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
       <div style="flex:1;min-width:200px;">
-        <div class="section-title" style="margin:0 0 10px;">발전기별 정비 이력</div>
+        <div class="section-title" style="margin:0 0 10px;">🔧 발전기별 정비 이력</div>
         <select id="maint-gen-filter" onchange="renderMaintByGen()" style="width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:13px;background:#fff;">
           <option value="">번호 선택</option>
           ${[...new Set(DB.gens.map(g=>g.id))].sort().map(id=>`<option value="${id}">${id}</option>`).join('')}
         </select>
       </div>
       <div style="flex:1;min-width:200px;">
-        <div class="section-title" style="margin:0 0 10px;">모델별 정비 이력</div>
+        <div class="section-title" style="margin:0 0 10px;">🔧 모델별 정비 이력</div>
         <select id="maint-model-filter" onchange="renderMaintByModel()" style="width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:13px;background:#fff;">
           <option value="">모델 선택</option>
           ${[...new Set(DB.gens.map(g=>g.model).filter(Boolean))].map(m=>`<option value="${m}">${m}</option>`).join('')}
         </select>
       </div>
       <div style="flex:1;min-width:200px;">
-        <div class="section-title" style="margin:0 0 10px;">정비 임박 경고 기준</div>
-        <input type="number" id="f-warn-threshold" min="1" value="${DB.warnThreshold||50}" onchange="updateWarnThreshold(this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:13px;background:#fff;box-sizing:border-box;">
+        <div class="section-title" style="margin:0 0 10px;">⏰ 정비 임박 경고 기준</div>
+        <input type="number" id="f-warn-threshold" min="1" value="${DB.warnThreshold||50}" onchange="updateWarnThreshold(this.value)" style="width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:14px;background:#fff;box-sizing:border-box;">
       </div>
     </div>
     <div id="maint-gen-result"></div>
     <div id="maint-model-result"></div>
     ${longtermPrepListHtml()}
-    <div class="section-title">정비 주기 현황 <span class="cnt" id="maint-list-cnt"></span></div>
+    <div class="section-title">🔧 정비 주기 현황 <span class="cnt" id="maint-list-cnt"></span></div>
     <div id="maint-list-wrap"></div>
   `;
 }
@@ -3232,8 +3235,8 @@ function openAdjustModal(id){
   const g = findGen(id);
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal modal-wide">
-      <h3>정보 직접 수정</h3>
+    <div class="modal modal-wide" style="text-align:left;">
+      <h3 style="text-align:center;">✏️ 정보 직접 수정</h3>
       <div class="modal-sub">${g.id} · 오류 수정, 임의 조정 등에 사용하세요.</div>
       ${g.hoursUpdatedAt? `<div class="hint" style="background:var(--warn-tint);border:1px solid var(--warn);border-radius:8px;padding:8px 10px;margin-bottom:12px;color:var(--warn);font-weight:700;">⏱ 마지막 수정: ${escR(g.hoursUpdatedAt)}${g.hoursUpdatedBy? ` (${escR(g.hoursUpdatedBy)})`:''}</div>` : ''}
       <div class="out-row stretch">
@@ -3323,7 +3326,7 @@ function openBulkCycleModal(){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>정비 주기 일괄변경</h3>
+      <h3>🔧 정비 주기 일괄변경</h3>
       <div class="modal-sub">${escR(label)} · ${ids.length}대에 한 번에 적용됩니다</div>
       <div class="field"><label>정비 주기(h)</label><input type="number" id="f-bulk-cycle" min="1" step="1" placeholder="예: 400">
         <div class="btn-row" style="margin-top:8px;" id="bulk-cycle-quick-buttons">
@@ -3372,7 +3375,7 @@ function openCycleModal(id){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>정비 주기 설정</h3>
+      <h3>🔧 정비 주기 설정</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
       <div class="field"><label>정비 주기(h)</label><input type="number" id="f-cycle" min="1" step="1" value="${getCycle(g)}" oninput="syncCycleQuickButtons(this.value)"><div class="hint">기본값은 400h입니다. 이 발전기(모델이 아닌 개별 호기)에만 적용됩니다.</div>
         <div class="btn-row" id="cycle-quick-buttons" style="margin-top:8px;">
@@ -3470,13 +3473,13 @@ function renderHistoryTab(){
       <button class="btn sm${historyViewMode==='customer'?' primary':''}" onclick="switchHistoryView('customer')">거래처별 이력</button>
     </div>
     ${historyViewMode==='gen' ? `
-    <div class="section-title" style="margin-top:0;">발전기별 이력 조회</div>
+    <div class="section-title" style="margin-top:0;">🔍 발전기별 이력 조회</div>
     <div class="toolbar">
       <select id="hist-select" onchange="renderGenHistory()"></select>
     </div>
     <div id="hist-result"></div>
     ` : `
-    <div class="section-title" style="margin-top:0;">거래처별 이력 · 주의사항</div>
+    <div class="section-title" style="margin-top:0;">🏢 거래처별 이력 · 주의사항</div>
     <div id="customer-history-wrap"></div>
     `}
   `;
@@ -3550,8 +3553,8 @@ function openCustomerNotesModal(customer){
   const histHtml = rentals.length>0 ? `<div style="max-height:400px;overflow-y:auto;margin-top:6px;">${rentals.map(cardHtml).join('')}</div>` : `<div class="hint">임대 이력이 없습니다.</div>`;
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:820px;">
-      <h3>거래처 주의사항</h3>
+    <div class="modal" style="max-width:820px;text-align:left;">
+      <h3 style="text-align:center;">⚠️ 거래처 주의사항</h3>
       <div class="modal-sub">${escR(customer)}</div>
       <div class="field">
         <label>주의 태그 (여러 개 선택 가능)</label>
@@ -3563,7 +3566,7 @@ function openCustomerNotesModal(customer){
       </div>
       <div class="field"><label>주의사항 (자유 입력)</label><textarea id="cn-note" placeholder="예: 2026년 3월 대금 3주 지연 지급됨" style="min-height:110px;">${escR(notes.note||'')}</textarea></div>
       <div class="section-title" style="font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-        <span>이 거래처 임대 이력 <span class="cnt">${rentals.length}건</span></span>
+        <span>📜 이 거래처 임대 이력 <span class="cnt">${rentals.length}건</span></span>
         <button type="button" class="btn sm" onclick="downloadCustomerHistoryPrintFile('${customer.replace(/'/g,"\\'")}')">🖨 인쇄</button>
       </div>
       ${histHtml}
@@ -4200,7 +4203,7 @@ function renderGenHistory(){
         ${g.underRepair? `<div class="item"><div class="k">고장 내용</div><div class="v" style="font-size:13px;font-weight:400;color:var(--danger);">${escR(g.repairNote||'-')}${g.repairSince? ` (${g.repairSince} 접수)`:''}${g.repairPhoto? ` <img src="${g.repairPhoto}" style="width:28px;height:28px;object-fit:cover;border-radius:6px;vertical-align:middle;cursor:pointer;" onclick="openImageViewModal('${g.repairPhoto}','고장 사진')">`:''}</div></div>`:''}
       </div>
     </div>
-    <div class="section-title">누적 임대 이력 <span class="cnt">${rentals.length}건</span>${rentals.length>0?` <button class="btn sm" onclick="exportRentalsCsv('${id}')">CSV 내보내기</button>`:''}</div>
+    <div class="section-title">📜 누적 임대 이력 <span class="cnt">${rentals.length}건</span>${rentals.length>0?` <button class="btn sm" onclick="exportRentalsCsv('${id}')">CSV 내보내기</button>`:''}</div>
     ${rentals.length===0? `<div class="empty">임대 이력이 없습니다.</div>` : `
     <div class="table-scroll"><table>
       <thead><tr><th>도착일</th><th>입고일</th><th>거래처</th><th>현장</th><th>임대사용시간</th><th>구분</th><th></th></tr></thead>
@@ -4214,7 +4217,7 @@ function renderGenHistory(){
         <td><button class="btn sm danger" onclick="deleteRental('${r.id}','${id}')">삭제</button></td>
       </tr>`).join('')}</tbody>
     </table></div>`}
-    <div class="section-title">정비 이력 <span class="cnt">${maints.length}건</span>${maints.length>0?` <button class="btn sm" onclick="exportMaintCsv('${id}')">CSV 내보내기</button>`:''}</div>
+    <div class="section-title">🔧 정비 이력 <span class="cnt">${maints.length}건</span>${maints.length>0?` <button class="btn sm" onclick="exportMaintCsv('${id}')">CSV 내보내기</button>`:''}</div>
     ${maints.length===0? `<div class="empty">정비 이력이 없습니다.</div>` : `
     <div class="table-scroll"><table>
       <thead><tr><th>정비일</th><th>정비시 누적시간</th><th>구분</th><th>정비자</th><th>사용부품</th><th>정비 내용</th><th>사진</th><th></th></tr></thead>
@@ -4311,7 +4314,7 @@ function renderSettlementTab(){
     </table>`;
 
   return `
-    <div class="section-title">발전기별 가동률 (최근 90일)</div>
+    <div class="section-title">📊 발전기별 가동률 (최근 90일)</div>
     <details class="info-toggle"><summary></summary><p class="muted">최근 90일 중 출고(임대)되어 있던 일수 비율입니다. 낮은 순으로 확인하면 놀고 있는 장비를 파악할 수 있습니다.</p></details>
     <div class="util-two-col">
       <div class="util-table"><table>
@@ -4324,7 +4327,7 @@ function renderSettlementTab(){
       </table></div>
     </div>
 
-    <div class="section-title" style="margin-top:24px;">거래처별 임대 건수</div>
+    <div class="section-title" style="margin-top:24px;">📊 거래처별 임대 건수</div>
     ${Object.keys(byCustomer).length===0? `<div class="empty">데이터가 없습니다.</div>` : `
     <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:16px;">
       <div>${custTableHtml(custChunks[0])}</div>
@@ -4336,7 +4339,7 @@ function renderSettlementTab(){
 function renderConsumableOrderTab(){
   const cnt = (DB.consumableOrders||[]).length;
   return `
-    <div class="section-title">소모품주문 <span class="cnt">${cnt}건</span></div>
+    <div class="section-title">🛒 소모품주문 <span class="cnt">${cnt}건</span></div>
     <details class="info-toggle"><summary></summary><p class="muted">자주 주문하는 소모품의 품명·규격과 구매 사이트 링크를 등록해두면, 링크를 눌러 바로 주문 페이지로 이동할 수 있습니다.</p></details>
     <div class="field" style="max-width:100%;margin-top:6px;">
       <label>소모품 추가</label>
@@ -4411,7 +4414,7 @@ function openConsumableOrderEditModal(id){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>소모품주문 수정</h3>
+      <h3>🛒 소모품주문 수정</h3>
       <div class="field"><label>품명</label><input type="text" id="f-coe-name" value="${(item.name||'').replace(/"/g,'&quot;')}"></div>
       <div class="field-row">
         <div class="field"><label>규격1</label><input type="text" id="f-coe-spec1" value="${(item.spec1||'').replace(/"/g,'&quot;')}"></div>
@@ -4677,7 +4680,7 @@ function renderSalesPasswordGate(){
     <div class="section-title">💰 업체별 매출현황</div>
     <div class="detail-card" style="padding:24px;max-width:360px;">
       <p class="muted" style="font-size:13px;margin-top:0;">매출관리에 설정된 비밀번호를 입력해주세요.</p>
-      <input type="password" id="f-sales-unlock-pw" placeholder="비밀번호" style="font-size:16px;padding:10px 12px;width:100%;box-sizing:border-box;margin-bottom:8px;" onkeydown="if(event.key==='Enter')submitSalesUnlock()">
+      <input type="password" id="f-sales-unlock-pw" placeholder="비밀번호" style="font-size:14px;padding:10px 12px;width:100%;box-sizing:border-box;margin-bottom:8px;" onkeydown="if(event.key==='Enter')submitSalesUnlock()">
       <div id="f-sales-unlock-err" class="err" style="display:none;margin-bottom:8px;"></div>
       <button class="btn primary" onclick="submitSalesUnlock()">열기</button>
     </div>`;
@@ -4780,7 +4783,7 @@ function hideBillingRecord(recId){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>이 매출 숨기기</h3>
+      <h3>🙈 이 매출 숨기기</h3>
       <div class="modal-sub">기록은 지워지지 않고 "숨김매출"에서 다시 볼 수 있습니다. 숨기는 이유를 남겨주세요.</div>
       <div class="field"><label>숨기는 이유</label><textarea id="f-hide-reason" placeholder="예: 출고 취소, 중복 입력 등"></textarea></div>
       <div id="f-hide-reason-err" class="err" style="display:none;"></div>
@@ -5046,12 +5049,12 @@ function renderSalesTab(){
         <label style="display:block;font-size:14px;font-weight:700;margin-bottom:6px;white-space:nowrap;">매출번호로 보기</label>
         <div style="display:flex;align-items:center;gap:4px;">
           <span style="font-size:15px;font-weight:700;color:var(--primary-dark);">HS-</span>
-          <input type="number" min="1" placeholder="번호" value="${salesFilterBillNo}" onchange="setSalesFilterBillNo(this.value)" style="font-size:16px;padding:9px 10px;border:1px solid var(--border-strong);border-radius:8px;width:90px;">
+          <input type="number" min="1" placeholder="번호" value="${salesFilterBillNo}" onchange="setSalesFilterBillNo(this.value)" style="font-size:14px;padding:9px 10px;border:1px solid var(--border-strong);border-radius:8px;width:90px;">
         </div>
       </div>
       <div class="detail-card" style="padding:14px 16px;flex:none;">
         <label style="display:block;font-size:14px;font-weight:700;margin-bottom:6px;white-space:nowrap;">월별 선택보기</label>
-        <input type="month" value="${salesFilterMonth}" onchange="setSalesFilterMonth(this.value)" style="font-size:16px;padding:9px 12px;border:1px solid var(--border-strong);border-radius:8px;">
+        <input type="month" value="${salesFilterMonth}" onchange="setSalesFilterMonth(this.value)" style="font-size:14px;padding:9px 12px;border:1px solid var(--border-strong);border-radius:8px;">
       </div>
       <div class="detail-card" style="padding:14px 16px;flex:none;">
         <label style="display:block;font-size:14px;font-weight:700;margin-bottom:6px;white-space:nowrap;">업체별 보기</label>
@@ -5370,9 +5373,9 @@ function renderImprovementsList(){
     return (b.createdDate||'').localeCompare(a.createdDate||'');
   });
   if(list.length===0){ wrap.innerHTML = `<div class="empty">등록된 보완요청이 없습니다.</div>`; return; }
-  wrap.innerHTML = list.map(item=>{
+  wrap.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">` + list.map(item=>{
     const done = !!item.completedBy;
-    return `<div class="material-card" style="${done? 'opacity:.72;':''}">
+    return `<div class="material-card" style="margin-bottom:0;${done? 'opacity:.72;':''}">
       <div class="m-title" style="align-items:flex-start;">
         <span class="muted" style="font-size:11.5px;">✍ ${escR(item.authorBy||'이름미상')} · ${dow(item.createdDate)||'-'}</span>
         <div class="btn-row" style="flex-wrap:nowrap;">
@@ -5385,7 +5388,7 @@ function renderImprovementsList(){
       <div style="font-size:13.5px;white-space:pre-wrap;line-height:1.5;">${escR(item.content)}</div>
       ${done? `<div style="margin-top:8px;"><span class="pill ok">✅ 개선완료</span> <span class="muted" style="font-size:11.5px;">${escR(item.completedBy)} · ${dow(item.completedDate)}</span></div>` : ''}
     </div>`;
-  }).join('');
+  }).join('') + `</div>`;
 }
 async function addImprovement(){
   const ta = document.getElementById('f-imp-content');
@@ -5617,7 +5620,7 @@ function openCalendarDayModal(dateStr){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>${dow(dateStr)}</h3>
+      <h3>🗓️ ${dow(dateStr)}</h3>
       <div class="modal-sub">일정 등록 (작성자: ${escR(DB.currentUserName||'이름 미선택')})</div>
       <div class="field">
         <textarea id="f-cal-event-text" placeholder="일정 내용 입력" style="min-height:60px;"></textarea>
@@ -5730,8 +5733,8 @@ function showLoadingListPopup(isNewNotice, newItems){
   if(data.total===0) return;
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:1080px;">
-      <h3 style="font-size:26px;">📥 상차·입고 예정 안내${isNewNotice? ' <span class="pill" style="font-size:15px;background:var(--primary-tint);color:var(--primary-dark);">새 등록</span>':''}</h3>
+    <div class="modal" style="max-width:1080px;text-align:left;">
+      <h3 style="font-size:26px;text-align:center;">📥 상차·입고 예정 안내${isNewNotice? ' <span class="pill" style="font-size:15px;background:var(--primary-tint);color:var(--primary-dark);">새 등록</span>':''}</h3>
       <div class="modal-sub" style="font-size:17px;">상차 전체 목록은 [출고대기] 탭, 입고예정 전체 목록은 [출고중] 탭에서 확인할 수 있습니다.</div>
       ${loadingListPopupHtml()}
       <div class="modal-actions">
@@ -5825,7 +5828,7 @@ function renderSettingsTab(){
     <div class="settings-block">
     <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:16px;align-items:stretch;">
       <div class="material-card" style="margin-top:0;">
-        <div class="section-title" style="margin-top:0;">🔒 접속 비밀번호</div>
+        <div class="section-title" style="margin-top:0;text-align:center;">🔒 접속 비밀번호</div>
         <details class="info-toggle"><summary></summary><p class="muted">이 화면을 여는 모든 사람이 공통으로 쓰는 비밀번호입니다. 여기서 언제든 바꾸거나 아예 해제할 수 있습니다. (브라우저 안에서만 확인하는 방식이라 완전한 보안은 아니고, 팀 외 사람이 실수로 들어오는 걸 막는 용도입니다)</p></details>
         <div style="margin-top:8px;">
           <div class="field"><label>현재 비밀번호</label><input type="password" id="f-pw-current" placeholder="비밀번호가 없으면 비워두세요"></div>
@@ -5840,7 +5843,7 @@ function renderSettingsTab(){
       </div>
 
       <div class="material-card" style="margin-top:0;">
-        <div class="section-title" style="margin-top:0;">🔊 음성 알림 (이 PC/브라우저 전용)</div>
+        <div class="section-title" style="margin-top:0;text-align:center;">🔊 음성 알림 (이 PC/브라우저 전용)</div>
         <details class="info-toggle"><summary></summary><p class="muted">화면을 보고 있는 동안, 다른 사람이 상차 예약을 새로 등록하면 바로, 또한 오늘 상차할 게 아직 안 끝났으면 아래 설정한 주기마다 음성으로 알려줍니다. 다른 기기/브라우저와는 별개로 이 PC에만 적용됩니다.</p></details>
         <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;margin-top:8px;">
           <input type="checkbox" id="f-voice-alerts" ${isVoiceAlertsEnabled()?'checked':''} onchange="setVoiceAlertsEnabled(this.checked)">
@@ -5876,21 +5879,21 @@ function renderSettingsTab(){
       </div>
 
       <div class="material-card" style="margin-top:0;">
-        <div class="section-title" style="margin-top:0;">📱 문자 간편등록 QR코드</div>
+        <div class="section-title" style="margin-top:0;text-align:center;">📱 문자 간편등록 QR코드</div>
         <details class="info-toggle"><summary></summary><p class="muted">문자로 오더를 주시는 분(예: 이영숙님)이 카메라로 QR을 찍으면 문자 붙여넣기 전용 간편등록 화면이 바로 열립니다. 아래 주소는 메인 앱 주소 뒤에 <code>?quick=1</code>을 붙인 형태여야 합니다.</p></details>
         <div class="field" style="margin-top:8px;"><label>간편등록 페이지 주소</label>
           <input type="text" id="f-quickorder-url" value="${escR(getQuickOrderUrl())}" oninput="setQuickOrderUrl(this.value);renderQuickOrderQr();">
         </div>
-        <div style="text-align:center;margin-top:10px;">
-          <img id="quick-order-qr" src="" alt="QR" width="220" height="220" style="border:6px solid #fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);">
+        <div style="text-align:center;margin-top:6px;">
+          <img id="quick-order-qr" src="" alt="QR" width="130" height="130" style="border:4px solid #fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.15);">
         </div>
-        <div class="btn-row" style="margin-top:10px;justify-content:center;">
+        <div class="btn-row" style="margin-top:6px;justify-content:center;">
           <button class="btn primary" onclick="printQuickOrderQr()">🖨 QR코드 인쇄</button>
         </div>
       </div>
 
       <div class="material-card" style="margin-top:0;">
-        <div class="section-title" style="margin-top:0;">💾 데이터 백업</div>
+        <div class="section-title" style="margin-top:0;text-align:center;">💾 데이터 백업</div>
         <details class="info-toggle"><summary></summary><p class="muted">발전기 목록, 임대·정비 이력, 예약, 자재정보, 부품재고 등 모든 데이터를 파일 하나로 내려받거나 복원할 수 있습니다. 정기적으로 백업 파일을 받아두시길 권장합니다.</p></details>
         <div class="btn-row" style="margin-top:8px;">
           <button class="btn primary" onclick="downloadFullBackup()">전체 백업 다운로드</button>
@@ -5903,52 +5906,48 @@ function renderSettingsTab(){
         </div>
       </div>
     </div>
-    </div>
-
 
     ${!isAdminModeUnlocked() ? `
-    <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:20px;align-items:stretch;margin-top:20px;">
+    <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:20px;align-items:stretch;margin-top:20px;">
       <div class="material-card" style="margin-top:0;">
-        <div class="section-title" style="margin-top:0;">🔐 관리자 모드</div>
+        <div class="section-title" style="margin-top:0;text-align:center;">🔐 관리자 모드</div>
         <details class="info-toggle"><summary></summary><p class="muted">업체 정보 수정, 위험 구역(초기화) 작업은 관리자 모드에서만 할 수 있습니다. 사이트 접속 비밀번호와는 별개인 전용 관리자 비밀번호를 입력하면 ${Math.round(ADMIN_MODE_DURATION_MS/60000)}분 동안 열리고, 시간이 지나면 자동으로 다시 잠깁니다.</p></details>
         <div class="field" style="max-width:220px;">
           <input type="password" id="f-admin-pw" placeholder="관리자 비밀번호" onkeydown="if(event.key==='Enter')submitAdminModeUnlock()">
           <div id="f-admin-pw-err" class="err" style="display:none;"></div>
         </div>
         <button class="btn primary" onclick="submitAdminModeUnlock()">관리자 모드 열기</button>
-
-        <div class="section-title" style="margin-top:18px;">💰 매출관리자 지정</div>
+      </div>
+      <div class="material-card" style="margin-top:0;">
+        <div class="section-title" style="margin-top:0;text-align:center;">💰 매출관리자 지정</div>
         <details class="info-toggle"><summary></summary><p class="muted">출고중인 발전기를 업체별로 묶어서 청구·입금 현황을 보여주는 매출관리 탭입니다. 안 쓰시면 꺼두시면 상단 탭에서 아예 안 보입니다.</p></details>
         <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-enabled" ${DB.salesEnabled?'checked':''} onchange="toggleSalesEnabled(this.checked)"><label for="f-sales-enabled">매출관리 사용</label></div>
 
-        <div class="util-two-col" style="align-items:flex-start;margin-top:14px;">
-          <div style="flex:1;min-width:0;">
-            <div class="section-title" style="margin-top:0;font-size:14px;">관리자</div>
-            <details class="info-toggle"><summary></summary><p class="muted">관리자 이름은 "${salesManagerSet}"으로 고정되어 있습니다. 등록된 이름으로 접속한 사람만 매출관리 탭을 볼 수 있습니다.</p></details>
+        <div class="util-two-col" style="align-items:flex-start;margin-top:10px;gap:8px;">
+          <div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:8px;padding:8px;">
+            <div class="section-title" style="margin-top:0;font-size:12px;text-align:center;">👤 관리자</div>
             ${salesManagerInput}
           </div>
-          <div style="flex:1;min-width:0;">
-            <div class="section-title" style="margin-top:0;font-size:14px;">비밀번호</div>
+          <div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:8px;padding:8px;">
+            <div class="section-title" style="margin-top:0;font-size:12px;text-align:center;">🔑 비밀번호</div>
             ${isSalesManagerViewing ? `
-            <details class="info-toggle"><summary></summary><p class="muted">설정해두면 매출관리 탭에 들어갈 때 비밀번호를 입력해야 합니다. 비워두면 바로 들어갈 수 있습니다.</p></details>
-            <div class="consumable-row" style="flex-wrap:wrap;align-items:center;margin-bottom:8px;">
-              <input type="password" id="f-sales-password" placeholder="비밀번호" value="${(DB.salesPassword||'').replace(/"/g,'&quot;')}" style="width:140px;flex:none;">
+            <div class="consumable-row" style="flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+              <input type="password" id="f-sales-password" placeholder="비밀번호" value="${(DB.salesPassword||'').replace(/"/g,'&quot;')}" style="width:90px;flex:none;font-size:14px;padding:6px 8px;">
               <button type="button" class="btn sm primary" onclick="saveSalesPasswordFromInput()">저장</button>
             </div>
-            <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-password-bypass" ${DB.salesPasswordBypass?'checked':''} onchange="toggleSalesPasswordBypass(this.checked)"><label for="f-sales-password-bypass" style="font-size:12.5px;">비밀번호 없이 사용 (수정 중엔 켜두세요)</label></div>
-            <details class="info-toggle"><summary></summary><p class="muted">※ 비밀번호를 바꾸면 다른 기기·다른 창은 다음 동기화(최대 2분) 때 자동으로 다시 잠깁니다.</p></details>
+            <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-password-bypass" ${DB.salesPasswordBypass?'checked':''} onchange="toggleSalesPasswordBypass(this.checked)"><label for="f-sales-password-bypass" style="font-size:11px;">비밀번호 없이 사용</label></div>
             ` : `
-            <details class="info-toggle"><summary></summary><p class="muted">"${salesManagerSet}"님으로 접속했을 때만 여기서 비밀번호를 설정할 수 있습니다.</p></details>
+            <div class="hint" style="text-align:center;">"${salesManagerSet}"님만 설정 가능</div>
             `}
           </div>
         </div>
       </div>
       <div class="material-card" style="margin-top:0;">
-        <div class="section-title" style="margin-top:0;">사용자(팀원) 목록 (최대 3명)</div>
+        <div class="section-title" style="margin-top:0;text-align:center;">👥 사용자(팀원) 목록 (최대 3명)</div>
         <details class="info-toggle"><summary></summary><p class="muted">접속시 이름 선택 화면에 나오는 팀원 목록입니다.</p></details>
         <div class="tech-grid-3">${teamMemberInputs}</div>
 
-        <div class="section-title" style="margin-top:18px;">정비사 목록 (최대 3명)</div>
+        <div class="section-title" style="margin-top:18px;text-align:center;">🔧 정비사 목록 (최대 3명)</div>
         <details class="info-toggle"><summary></summary><p class="muted">정비 등록·수정 같은 작업을 할 때 본인 확인용으로 쓰입니다.</p></details>
         <div class="tech-grid-3">${techInputs}</div>
       </div>
@@ -5957,34 +5956,35 @@ function renderSettingsTab(){
     ${adminModeSectionHtml()}
     <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:20px;align-items:stretch;margin-top:20px;">
       <div class="material-card" style="margin-top:0;">
-        <div class="section-title" style="margin-top:0;">💰 매출관리자 지정</div>
+        <div class="section-title" style="margin-top:0;text-align:center;">💰 매출관리자 지정</div>
         <details class="info-toggle"><summary></summary><p class="muted">출고중인 발전기를 업체별로 묶어서 청구·입금 현황을 보여주는 매출관리 탭입니다. 안 쓰시면 꺼두시면 상단 탭에서 아예 안 보입니다.</p></details>
         <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-enabled" ${DB.salesEnabled?'checked':''} onchange="toggleSalesEnabled(this.checked)"><label for="f-sales-enabled">매출관리 사용</label></div>
 
-        <div class="section-title" style="margin-top:18px;font-size:14px;">관리자</div>
-        <details class="info-toggle"><summary></summary><p class="muted">관리자 이름은 "${salesManagerSet}"으로 고정되어 있습니다. 등록된 이름으로 접속한 사람만 매출관리 탭을 볼 수 있고 사용할 수 있습니다.</p></details>
-        ${salesManagerInput}
-
-        <div class="section-title" style="margin-top:18px;font-size:14px;">비밀번호</div>
-        ${isSalesManagerViewing ? `
-        <details class="info-toggle"><summary></summary><p class="muted">비밀번호를 설정해두면 관리자로 등록된 사람도 매출관리 탭에 들어갈 때 비밀번호를 한 번 더 입력해야 합니다. 비워두면 비밀번호 없이 바로 들어갈 수 있습니다.</p></details>
-        <div class="consumable-row" style="flex-wrap:wrap;align-items:center;margin-bottom:8px;">
-          <input type="password" id="f-sales-password" placeholder="비밀번호" value="${(DB.salesPassword||'').replace(/"/g,'&quot;')}" style="width:160px;flex:none;">
-          <button type="button" class="btn sm primary" onclick="saveSalesPasswordFromInput()">저장</button>
+        <div class="util-two-col" style="align-items:flex-start;margin-top:10px;gap:8px;">
+          <div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:8px;padding:8px;">
+            <div class="section-title" style="margin-top:0;font-size:12px;text-align:center;">👤 관리자</div>
+            ${salesManagerInput}
+          </div>
+          <div style="flex:1;min-width:0;border:1px solid var(--border);border-radius:8px;padding:8px;">
+            <div class="section-title" style="margin-top:0;font-size:12px;text-align:center;">🔑 비밀번호</div>
+            ${isSalesManagerViewing ? `
+            <div class="consumable-row" style="flex-wrap:wrap;align-items:center;margin-bottom:6px;">
+              <input type="password" id="f-sales-password" placeholder="비밀번호" value="${(DB.salesPassword||'').replace(/"/g,'&quot;')}" style="width:90px;flex:none;font-size:14px;padding:6px 8px;">
+              <button type="button" class="btn sm primary" onclick="saveSalesPasswordFromInput()">저장</button>
+            </div>
+            <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-password-bypass" ${DB.salesPasswordBypass?'checked':''} onchange="toggleSalesPasswordBypass(this.checked)"><label for="f-sales-password-bypass" style="font-size:11px;">비밀번호 없이 사용</label></div>
+            ` : `
+            <div class="hint" style="text-align:center;">"${salesManagerSet}"님만 설정 가능</div>
+            `}
+          </div>
         </div>
-        <div class="field chk" style="margin-top:2px;"><input type="checkbox" id="f-sales-password-bypass" ${DB.salesPasswordBypass?'checked':''} onchange="toggleSalesPasswordBypass(this.checked)"><label for="f-sales-password-bypass">비밀번호 없이 사용 (수정 작업 중일 때 켜두세요)</label></div>
-        <details class="info-toggle"><summary></summary><p class="muted">체크되어 있으면 비밀번호를 설정해도 물어보지 않고 바로 들어갑니다. 매출관리 작업이 끝나면 체크를 해제해서 비밀번호를 실제로 적용하세요.</p></details>
-        <details class="info-toggle"><summary></summary><p class="muted">※ 비밀번호를 바꾸면 다른 기기·다른 창은 다음 동기화(최대 2분) 때 자동으로 다시 잠깁니다.</p></details>
-        ` : `
-        <details class="info-toggle"><summary></summary><p class="muted">"${salesManagerSet}"님으로 접속했을 때만 여기서 비밀번호를 설정할 수 있습니다.</p></details>
-        `}
       </div>
       <div class="material-card" style="margin-top:0;">
-        <div class="section-title" style="margin-top:0;">사용자(팀원) 목록 (최대 3명)</div>
+        <div class="section-title" style="margin-top:0;text-align:center;">👥 사용자(팀원) 목록 (최대 3명)</div>
         <details class="info-toggle"><summary></summary><p class="muted">접속시 이름 선택 화면에 나오는 팀원 목록입니다.</p></details>
         <div class="tech-grid-3">${teamMemberInputs}</div>
 
-        <div class="section-title" style="margin-top:18px;">정비사 목록 (최대 3명)</div>
+        <div class="section-title" style="margin-top:18px;text-align:center;">🔧 정비사 목록 (최대 3명)</div>
         <details class="info-toggle"><summary></summary><p class="muted">정비 등록·수정 같은 작업을 할 때 본인 확인용으로 쓰입니다.</p></details>
         <div class="tech-grid-3">${techInputs}</div>
       </div>
@@ -5992,7 +5992,7 @@ function renderSettingsTab(){
     `}
 
     <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">발전기 모델 설정 <span class="cnt">${activeList.length}대</span></div>
+      <div class="section-title" style="margin-top:0;">⚙️ 발전기 모델 설정 <span class="cnt">${activeList.length}대</span></div>
       <details class="info-toggle"><summary></summary><p class="muted">각 발전기 번호에 맞는 모델(용량), 년식, 정격 대비 실사용 비율을 입력해두면 목록과 이력에서 바로 확인할 수 있습니다.</p></details>
       <div class="btn-row" style="margin-bottom:14px;">
         <button class="btn primary" onclick="openAddGenModal()">+ 새 발전기 등록</button>
@@ -6039,7 +6039,7 @@ function renderSettingsTab(){
     </div>
 
     <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">모델별 색상 설정</div>
+      <div class="section-title" style="margin-top:0;">🎨 모델별 색상 설정</div>
       <details class="info-toggle"><summary></summary><p class="muted">모델마다 색상을 지정해두면, 발전기 목록(입고/출고중/출고대기 등)에서 모델 이름 옆에 작은 색상 점으로 표시되어 한눈에 구분할 수 있습니다. 용량대(발전기 종류)별로 묶어서 보여드립니다.</p></details>
       ${(()=>{
         const models = sortModelsByCapacity([...new Set(activeList.map(g=>g.model).filter(Boolean))]);
@@ -6076,25 +6076,30 @@ function renderSettingsTab(){
       })()}
     </div>
 
-    <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">발전기별 색상 고정 <span class="cnt">${Object.keys(DB.genColorOverrides||{}).length}대</span></div>
-      <details class="info-toggle"><summary></summary><p class="muted">특정 발전기 번호에 색상을 고정해두면, 그 발전기의 모델명이 바뀌거나 모델 색상이 바뀌어도 이 발전기만은 항상 지정한 색으로 표시됩니다. (모델별 색상 설정보다 우선 적용됩니다)</p></details>
-      <div class="field-row" style="align-items:flex-end;flex-wrap:wrap;">
-        <div class="field" style="max-width:140px;">
-          <label>발전기 번호</label>
-          <input type="text" id="f-gencolor-id" placeholder="예: S-14">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:stretch;margin-top:20px;">
+      <div class="material-card" style="margin-top:0;">
+        <div class="section-title" style="margin-top:0;">🖌️ 발전기별 색상 고정</div>
+        <details class="info-toggle"><summary></summary><p class="muted">특정 발전기 번호에 색상을 고정해두면, 그 발전기의 모델명이 바뀌거나 모델 색상이 바뀌어도 이 발전기만은 항상 지정한 색으로 표시됩니다. (모델별 색상 설정보다 우선 적용됩니다)</p></details>
+        <div class="field-row" style="align-items:flex-end;flex-wrap:wrap;">
+          <div class="field" style="max-width:140px;">
+            <label>발전기 번호</label>
+            <input type="text" id="f-gencolor-id" placeholder="예: S-14">
+          </div>
+          <div class="field" style="max-width:60px;">
+            <label>색상</label>
+            <input type="color" id="f-gencolor-value" value="#808080" style="width:100%;height:37px;padding:0;border:1px solid var(--border-strong);border-radius:6px;cursor:pointer;">
+          </div>
+          <button class="btn sm primary" style="margin-bottom:1px;" onclick="addGenColorOverride()">고정하기</button>
         </div>
-        <div class="field" style="max-width:60px;">
-          <label>색상</label>
-          <input type="color" id="f-gencolor-value" value="#808080" style="width:100%;height:37px;padding:0;border:1px solid var(--border-strong);border-radius:6px;cursor:pointer;">
-        </div>
-        <button class="btn sm primary" style="margin-bottom:1px;" onclick="addGenColorOverride()">고정하기</button>
       </div>
-      <div id="gen-color-override-wrap" style="margin-top:10px;"></div>
+      <div class="material-card" style="margin-top:0;">
+        <div class="section-title" style="margin-top:0;">📋 색상 지정된 발전기 <span class="cnt">${Object.keys(DB.genColorOverrides||{}).length}대</span></div>
+        <div id="gen-color-override-wrap" style="margin-top:10px;"></div>
+      </div>
     </div>
 
     <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">연료탱크 규격 · 전압 설정 방법 <span class="cnt">${[...new Set(activeList.map(g=>g.model).filter(Boolean))].length}종</span></div>
+      <div class="section-title" style="margin-top:0;">⛽ 연료탱크 규격 · 전압 설정 방법 <span class="cnt">${[...new Set(activeList.map(g=>g.model).filter(Boolean))].length}종</span></div>
       <details class="info-toggle"><summary></summary><p class="muted">모델별로 한 번만 입력하면, 그 모델을 쓰는 모든 발전기에 동일하게 적용됩니다. 탱크 내부 가로·세로(cm)를 입력해두면 입고 처리시 기름 높이만 재서 남은 연료량(L)을 자동으로 계산합니다. (직육면체 탱크 기준) 220V/380V/380V 이상 출력 셋팅방법을 각각 사진으로 등록해두면 입고/출고 처리 화면에서 누구나 클릭해서 볼 수 있습니다.</p></details>
       ${(()=>{
         const models = sortModelsByCapacity([...new Set(activeList.map(g=>g.model).filter(Boolean))]);
@@ -6119,7 +6124,7 @@ function renderSettingsTab(){
           const escM = model.replace(/'/g,"\\'");
           const dimInput = (val, field, ph)=>{
             const empty = !(val>0);
-            const style = `width:56px;padding:6px 6px;text-align:center;flex:none;border:1px solid ${empty?'var(--warn)':'var(--border-strong)'};border-radius:6px;font-size:13px;font-family:var(--sans);background:${empty?'var(--warn-tint)':'#fff'};color:var(--ink);`;
+            const style = `width:56px;padding:6px 6px;text-align:center;flex:none;border:1px solid ${empty?'var(--warn)':'var(--border-strong)'};border-radius:6px;font-size:14px;font-family:var(--sans);background:${empty?'var(--warn-tint)':'#fff'};color:var(--ink);`;
             return `<input type="number" min="0" value="${val||''}" placeholder="${ph}" style="${style}" onchange="updateModelTankDim('${escM}','${field}', this.value)">`;
           };
           const tankRow = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12.5px;">
@@ -6134,7 +6139,7 @@ function renderSettingsTab(){
           const baselineEmpty = !(m.fuelBaselineHeight>0);
           const baselineRow = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12.5px;margin-top:6px;">
               <span style="font-weight:700;color:var(--primary-dark);white-space:nowrap;">📏 연료통 기준높이 (모델 기본값)</span>
-              <input type="number" min="0" step="0.5" value="${m.fuelBaselineHeight||''}" placeholder="0" style="width:56px;padding:6px 6px;text-align:center;flex:none;border:1px solid ${baselineEmpty?'var(--warn)':'var(--border-strong)'};border-radius:6px;font-size:13px;font-family:var(--sans);background:${baselineEmpty?'var(--warn-tint)':'#fff'};color:var(--ink);" onchange="updateModelTankDim('${escM}','fuelBaselineHeight', this.value)">
+              <input type="number" min="0" step="0.5" value="${m.fuelBaselineHeight||''}" placeholder="0" style="width:56px;padding:6px 6px;text-align:center;flex:none;border:1px solid ${baselineEmpty?'var(--warn)':'var(--border-strong)'};border-radius:6px;font-size:14px;font-family:var(--sans);background:${baselineEmpty?'var(--warn-tint)':'#fff'};color:var(--ink);" onchange="updateModelTankDim('${escM}','fuelBaselineHeight', this.value)">
               <span class="muted">cm</span>
               <span class="muted" style="white-space:nowrap;">— 탱크 바닥에 항상 남아있는 기름 높이. 개별 발전기가 다르면 아래 "발전기별 탱크 규격 · 기준높이"에서 따로 설정하세요.</span>
             </div>`;
@@ -6149,61 +6154,88 @@ function renderSettingsTab(){
             ${guideRow}
           </div>`;
         }).join('');
-        return cards;
+        return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;">${cards}</div>`;
       })()}
     </div>
 
 
-    <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">발전기별 탱크 규격 · 기준높이 (개별 설정)</div>
-      <details class="info-toggle"><summary></summary><p class="muted">연료탱크 크기가 다른 경우, 번호를 선택해 탱크 크기와 바닥 기준높이를 함께 입력하세요. 비워두면 모델 기본값을 사용합니다.</p></details>
-      <div class="field" style="max-width:220px;">
-        <label>번호로 찾기</label>
-        <select id="f-tankdim-filter-id" onchange="onTankDimFilterIdChange(this.value)">
-          <option value="">번호를 선택하세요</option>
-          ${[...activeList].sort(sortByIdNatural).map(g=>
-            `<option value="${escR(g.id)}" ${tankDimFilterId===g.id?'selected':''}>${escR(g.id)}</option>`
-          ).join('')}
-        </select>
-      </div>
-      ${(()=>{
-        const rowHtml = g=>{
-          const m = DB.materials && DB.materials[g.model];
-          const defW = (m && m.tankWidth) || '', defD = (m && m.tankDepth) || '', defH = (m && m.tankHeight) || '';
-          const modelBaselineDefault = (m && m.fuelBaselineHeight>0) ? m.fuelBaselineHeight : '';
-          const hasOverride = g.tankWidth>0||g.tankDepth>0||g.tankHeight>0||g.fuelBaselineHeight>0;
-          const suspicious = g.tankWidth>0 && g.tankDepth>0 && g.tankHeight>0 && g.tankHeight < g.tankDepth*0.6;
-          return `<div style="display:flex;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--border);flex-wrap:wrap;${suspicious? 'background:var(--danger-tint);border-radius:6px;':''}">
-          ${genColorDot(g)}
-          <span style="flex:1;font-size:13px;min-width:90px;">${escR(g.id)} <span class="muted" style="font-size:11.5px;">${escR(g.model||'모델 미등록')}</span></span>
-          <span class="muted" style="font-size:10.5px;white-space:nowrap;">⛽ 탱크</span>
-          <input type="number" min="0" value="${g.tankWidth||''}" placeholder="${defW||'가로'}" title="가로(cm) - 비우면 모델 기본값(${defW||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankWidth',this.value)">
-          <span class="muted" style="font-size:11px;">×</span>
-          <input type="number" min="0" value="${g.tankDepth||''}" placeholder="${defD||'세로'}" title="세로(cm) - 비우면 모델 기본값(${defD||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankDepth',this.value)">
-          <span class="muted" style="font-size:11px;">×</span>
-          <input type="number" min="0" value="${g.tankHeight||''}" placeholder="${defH||'높이'}" title="높이(cm) - 비우면 모델 기본값(${defH||'미등록'}) 사용" style="width:56px;padding:5px 4px;${suspicious?'border-color:var(--danger);':''}" onchange="updateGenTankDim('${g.id}','tankHeight',this.value)">
-          <span class="muted" style="font-size:11px;">cm</span>
-          <span class="muted" style="font-size:10.5px;white-space:nowrap;margin-left:8px;">📏 기준높이</span>
-          <input type="number" min="0" step="0.5" value="${g.fuelBaselineHeight||''}" placeholder="${modelBaselineDefault||'0'}" title="비우면 모델 기본값(${modelBaselineDefault||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenFuelBaseline('${g.id}', this.value)">
-          <span class="muted" style="font-size:11px;">cm</span>
-          ${hasOverride? `<button type="button" class="btn sm danger" onclick="clearGenTankOverride('${g.id}')" title="개별 설정 삭제">삭제</button>` : ''}
-          ${suspicious? `<div style="flex-basis:100%;color:var(--danger);font-weight:700;font-size:11.5px;">⚠️ 높이가 가로·세로에 비해 너무 낮습니다 — 세로·높이 순서가 바뀌지 않았는지 확인해주세요.</div>`:''}
-        </div>`;
-        };
-        if(tankDimFilterId){
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:stretch;margin-top:20px;">
+      <div class="material-card" style="margin-top:0;">
+        <div class="section-title" style="margin-top:0;">📏 발전기별 탱크 규격 · 기준높이 (개별 설정)</div>
+        <details class="info-toggle"><summary></summary><p class="muted">연료탱크 크기가 다른 경우, 번호를 선택해 탱크 크기와 바닥 기준높이를 함께 입력하세요. 비워두면 모델 기본값을 사용합니다.</p></details>
+        <div class="field" style="max-width:220px;">
+          <label>번호로 찾기</label>
+          <select id="f-tankdim-filter-id" onchange="onTankDimFilterIdChange(this.value)">
+            <option value="">번호를 선택하세요</option>
+            ${[...activeList].sort(sortByIdNatural).map(g=>
+              `<option value="${escR(g.id)}" ${tankDimFilterId===g.id?'selected':''}>${escR(g.id)}</option>`
+            ).join('')}
+          </select>
+        </div>
+        ${(()=>{
+          if(!tankDimFilterId) return '';
+          const rowHtml = g=>{
+            const m = DB.materials && DB.materials[g.model];
+            const defW = (m && m.tankWidth) || '', defD = (m && m.tankDepth) || '', defH = (m && m.tankHeight) || '';
+            const modelBaselineDefault = (m && m.fuelBaselineHeight>0) ? m.fuelBaselineHeight : '';
+            const hasOverride = g.tankWidth>0||g.tankDepth>0||g.tankHeight>0||g.fuelBaselineHeight>0;
+            const suspicious = g.tankWidth>0 && g.tankDepth>0 && g.tankHeight>0 && g.tankHeight < g.tankDepth*0.6;
+            return `<div style="display:flex;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--border);flex-wrap:wrap;${suspicious? 'background:var(--danger-tint);border-radius:6px;':''}">
+            ${genColorDot(g)}
+            <span style="font-size:13px;min-width:90px;">${escR(g.id)} <span class="muted" style="font-size:11.5px;">${escR(g.model||'모델 미등록')}</span></span>
+            <span class="muted" style="font-size:10.5px;white-space:nowrap;">⛽ 탱크</span>
+            <input type="number" min="0" value="${g.tankWidth||''}" placeholder="${defW||'가로'}" title="가로(cm) - 비우면 모델 기본값(${defW||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankWidth',this.value)">
+            <span class="muted" style="font-size:11px;">×</span>
+            <input type="number" min="0" value="${g.tankDepth||''}" placeholder="${defD||'세로'}" title="세로(cm) - 비우면 모델 기본값(${defD||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankDepth',this.value)">
+            <span class="muted" style="font-size:11px;">×</span>
+            <input type="number" min="0" value="${g.tankHeight||''}" placeholder="${defH||'높이'}" title="높이(cm) - 비우면 모델 기본값(${defH||'미등록'}) 사용" style="width:56px;padding:5px 4px;${suspicious?'border-color:var(--danger);':''}" onchange="updateGenTankDim('${g.id}','tankHeight',this.value)">
+            <span class="muted" style="font-size:11px;">cm</span>
+            <span class="muted" style="font-size:10.5px;white-space:nowrap;margin-left:8px;">📏 기준높이</span>
+            <input type="number" min="0" step="0.5" value="${g.fuelBaselineHeight||''}" placeholder="${modelBaselineDefault||'0'}" title="비우면 모델 기본값(${modelBaselineDefault||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenFuelBaseline('${g.id}', this.value)">
+            <span class="muted" style="font-size:11px;">cm</span>
+            ${hasOverride? `<button type="button" class="btn sm danger" onclick="clearGenTankOverride('${g.id}')" title="개별 설정 삭제">삭제</button>` : ''}
+            ${suspicious? `<div style="flex-basis:100%;color:var(--danger);font-weight:700;font-size:11.5px;">⚠️ 높이가 가로·세로에 비해 너무 낮습니다 — 세로·높이 순서가 바뀌지 않았는지 확인해주세요.</div>`:''}
+          </div>`;
+          };
           const g = activeList.find(g=>g.id===tankDimFilterId);
           if(!g) return `<div class="hint" style="margin-top:10px;">해당 번호의 발전기를 찾을 수 없습니다.</div>`;
           return `<div style="margin-top:14px;">
             <div class="settings-table">${rowHtml(g)}</div>
           </div>`;
-        }
-        const overridden = activeList.filter(g=>g.tankWidth>0||g.tankDepth>0||g.tankHeight>0||g.fuelBaselineHeight>0).sort(sortByIdNatural);
-        if(overridden.length===0) return `<div class="hint" style="margin-top:10px;">위에서 번호를 선택하면 해당 발전기가 나타납니다. (현재 개별 설정된 발전기가 없습니다)</div>`;
-        return `<div style="margin-top:14px;">
-          <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:6px;">개별 설정된 발전기 <span class="muted" style="font-weight:400;font-size:11.5px;">(${overridden.length}대)</span></div>
-          <div class="settings-table">${overridden.map(rowHtml).join('')}</div>
-        </div>`;
-      })()}
+        })()}
+      </div>
+      <div class="material-card" style="margin-top:0;">
+        <div class="section-title" style="margin-top:0;">📋 개별 설정된 발전기 <span class="cnt">${activeList.filter(g=>g.tankWidth>0||g.tankDepth>0||g.tankHeight>0||g.fuelBaselineHeight>0).length}대</span></div>
+        ${(()=>{
+          const rowHtml = g=>{
+            const m = DB.materials && DB.materials[g.model];
+            const defW = (m && m.tankWidth) || '', defD = (m && m.tankDepth) || '', defH = (m && m.tankHeight) || '';
+            const modelBaselineDefault = (m && m.fuelBaselineHeight>0) ? m.fuelBaselineHeight : '';
+            const hasOverride = g.tankWidth>0||g.tankDepth>0||g.tankHeight>0||g.fuelBaselineHeight>0;
+            const suspicious = g.tankWidth>0 && g.tankDepth>0 && g.tankHeight>0 && g.tankHeight < g.tankDepth*0.6;
+            return `<div style="display:flex;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--border);flex-wrap:wrap;${suspicious? 'background:var(--danger-tint);border-radius:6px;':''}">
+            ${genColorDot(g)}
+            <span style="font-size:13px;min-width:90px;">${escR(g.id)} <span class="muted" style="font-size:11.5px;">${escR(g.model||'모델 미등록')}</span></span>
+            <span class="muted" style="font-size:10.5px;white-space:nowrap;">⛽ 탱크</span>
+            <input type="number" min="0" value="${g.tankWidth||''}" placeholder="${defW||'가로'}" title="가로(cm) - 비우면 모델 기본값(${defW||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankWidth',this.value)">
+            <span class="muted" style="font-size:11px;">×</span>
+            <input type="number" min="0" value="${g.tankDepth||''}" placeholder="${defD||'세로'}" title="세로(cm) - 비우면 모델 기본값(${defD||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankDepth',this.value)">
+            <span class="muted" style="font-size:11px;">×</span>
+            <input type="number" min="0" value="${g.tankHeight||''}" placeholder="${defH||'높이'}" title="높이(cm) - 비우면 모델 기본값(${defH||'미등록'}) 사용" style="width:56px;padding:5px 4px;${suspicious?'border-color:var(--danger);':''}" onchange="updateGenTankDim('${g.id}','tankHeight',this.value)">
+            <span class="muted" style="font-size:11px;">cm</span>
+            <span class="muted" style="font-size:10.5px;white-space:nowrap;margin-left:8px;">📏 기준높이</span>
+            <input type="number" min="0" step="0.5" value="${g.fuelBaselineHeight||''}" placeholder="${modelBaselineDefault||'0'}" title="비우면 모델 기본값(${modelBaselineDefault||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenFuelBaseline('${g.id}', this.value)">
+            <span class="muted" style="font-size:11px;">cm</span>
+            ${hasOverride? `<button type="button" class="btn sm danger" onclick="clearGenTankOverride('${g.id}')" title="개별 설정 삭제">삭제</button>` : ''}
+            ${suspicious? `<div style="flex-basis:100%;color:var(--danger);font-weight:700;font-size:11.5px;">⚠️ 높이가 가로·세로에 비해 너무 낮습니다 — 세로·높이 순서가 바뀌지 않았는지 확인해주세요.</div>`:''}
+          </div>`;
+          };
+          const overridden = activeList.filter(g=>g.tankWidth>0||g.tankDepth>0||g.tankHeight>0||g.fuelBaselineHeight>0).sort(sortByIdNatural);
+          if(overridden.length===0) return `<div class="hint" style="margin-top:10px;">현재 개별 설정된 발전기가 없습니다.</div>`;
+          return `<div class="settings-table">${overridden.map(rowHtml).join('')}</div>`;
+        })()}
+      </div>
+    </div>
     </div>
   `;
 }
@@ -6266,7 +6298,7 @@ function openGenManageModal(id){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>발전기 관리</h3>
+      <h3>⚙️ 발전기 관리</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
       <div class="btn-row" style="flex-direction:column;align-items:stretch;gap:8px;">
         <button class="btn" onclick="openRenameGenModal('${g.id}')">✏️ 번호(ID) 수정</button>
@@ -6285,7 +6317,7 @@ function openRenameGenModal(id){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>발전기 번호 수정</h3>
+      <h3>✏️ 발전기 번호 수정</h3>
       <div class="modal-sub">잘못 등록된 번호를 바로잡을 때 사용하세요. 정비·임대 이력은 새 번호로 그대로 이어집니다.</div>
       <div class="field"><label>새 번호</label><input type="text" id="f-rename-id" value="${id}"></div>
       <div id="f-err" class="err" style="display:none;"></div>
@@ -6363,8 +6395,8 @@ function openRetireDetailModal(id, label){
     `;
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
-      <h3>${label} 처리</h3>
+    <div class="modal" style="text-align:left;">
+      <h3 style="text-align:center;">🔧 ${label} 처리</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
       ${fieldsHtml}
       <div id="f-err" class="err" style="display:none;"></div>
@@ -6424,8 +6456,8 @@ function showRetireDetail(id){
   ];
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
-      <h3>${escR(g.retiredReason||'폐기')} 상세정보</h3>
+    <div class="modal" style="text-align:left;">
+      <h3 style="text-align:center;">📄 ${escR(g.retiredReason||'폐기')} 상세정보</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
       <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:14px;margin:10px 0;">
         ${rows.map(([k,v])=>`<div class="muted">${k}</div><div>${escR(v)}</div>`).join('')}
@@ -6573,7 +6605,7 @@ function openVoltageGuidePicker(model){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal" style="max-width:460px;">
-      <h3>전압 설정 방법</h3>
+      <h3>⚡ 전압 설정 방법</h3>
       <div class="modal-sub">${escR(model)}</div>
       <div class="hint" style="margin:0 0 6px;">사진을 보시려면 글자 클릭</div>
       <div>${rows}</div>
@@ -6594,7 +6626,7 @@ function viewVoltageGuidePhoto(model, kind, idx){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal" style="max-width:820px;">
-      <h3>${VOLTAGE_GUIDE_LABELS[kind]||'전압 설정'}</h3>
+      <h3>⚡ ${VOLTAGE_GUIDE_LABELS[kind]||'전압 설정'}</h3>
       <div class="modal-sub">${escR(model)}${photos.length>1? ` (${idx+1}/${photos.length})`:''}</div>
       <img src="${photo}" alt="" style="width:100%;border-radius:10px;border:1px solid var(--border-strong);margin-bottom:10px;">
       ${note? `<div style="font-size:14px;white-space:pre-wrap;line-height:1.6;">${escR(note)}</div>` : ''}
@@ -6613,7 +6645,7 @@ function openVoltageGuideUpload(model, kind){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal" style="max-width:480px;">
-      <h3>${VOLTAGE_GUIDE_LABELS[kind]||'전압 설정'} 사진 추가</h3>
+      <h3>📷 ${VOLTAGE_GUIDE_LABELS[kind]||'전압 설정'} 사진 추가</h3>
       <div class="modal-sub">${escR(model)} · 현재 ${photos.length}/3장</div>
       <div class="field">
         <label>사진</label>
@@ -6746,7 +6778,7 @@ function openVoltageModal(id){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal" style="max-width:360px;">
-      <h3>전압 수정</h3>
+      <h3>⚡ 전압 수정</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
       <div class="field">
         <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><span>셋팅 전압</span>${lastInfo}</label>
@@ -6803,7 +6835,7 @@ function openBulkUsageRatioModal(){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>정격대비사용 일괄변경</h3>
+      <h3>⚙️ 정격대비사용 일괄변경</h3>
       <div class="modal-sub">선택한 범위의 발전기에 정격 대비 실사용 비율을 한 번에 적용합니다.</div>
       <div class="field"><label>대상</label><select id="f-bulk-ratio-scope">${scopeOptions}</select></div>
       <div class="field"><label>정격대비사용(%)</label><select id="f-bulk-ratio-value">
@@ -6854,7 +6886,7 @@ function openAddGenModal(){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>새 발전기 등록</h3>
+      <h3>➕ 새 발전기 등록</h3>
       <div class="field"><label>발전기 번호</label><input type="text" id="f-newgen-id" placeholder="예: S-61"></div>
       <div class="field"><label>모델 / 용량</label><input type="text" id="f-newgen-model" placeholder="예: 위차이(4DX) 50kW"></div>
       <div class="field"><label>년식</label><input type="number" min="1980" max="2100" step="1" id="f-newgen-mfgdate" placeholder="예: 2020"></div>
@@ -6934,7 +6966,7 @@ async function returnBorrowedGen(id){
 function renderMaterialsTab(){
   const models = sortModelsByCapacity([...new Set(DB.gens.map(g=>g.model).filter(Boolean))]);
   if(models.length===0){
-    return `<div class="section-title">자재 관리</div><div class="empty">먼저 [설정] 탭에서 발전기 모델을 입력해주세요.</div>`;
+    return `<div class="section-title">🧰 자재 관리</div><div class="empty">먼저 [설정] 탭에서 발전기 모델을 입력해주세요.</div>`;
   }
   const cards = models.map(model=>{
     const m = DB.materials[model];
@@ -6946,29 +6978,32 @@ function renderMaterialsTab(){
     </div>`;
   }).join('');
   return `
-    <div class="section-title">모델별 정비 자재 <span class="cnt">${models.length}개 모델</span></div>
+    <div class="section-title">🧰 모델별 정비 자재 <span class="cnt">${models.length}개 모델</span></div>
     <details class="info-toggle"><summary></summary><p class="muted">모델별로 엔진오일량, 오일필터, 연료필터, 에어필터, 팬벨트, 기타 소모품을 등록해두면 정비 등록시 바로 확인·선택할 수 있습니다.</p></details>
     <div class="model-cards-grid">${cards}</div>
-    <div class="section-title">부품 재고 관리</div>
+    <div class="section-title">🧰 부품 재고 관리</div>
     <details class="info-toggle"><summary></summary><p class="muted">정비 등록시 사용 부품을 체크하면 아래 재고에서 자동 차감됩니다. 재고가 0 이하이면 빨간색으로 표시됩니다.</p></details>
     <div class="btn-row" style="margin-bottom:10px;">
       <button type="button" class="btn sm primary" onclick="openPartsOrderListModal()">📋 발주 리스트 생성</button>
     </div>
     <div id="parts-stock-wrap"></div>
-    <div class="field" style="max-width:600px;margin-top:10px;">
-      <label>부품(자재) 추가 — 구분 · 품명 · 규격 · 수량</label>
-      <div class="consumable-row" style="flex-wrap:wrap;">
-        <input type="text" id="f-newpart-category" list="parts-category-datalist" placeholder="구분 (예: 발전기전체사용, 120K용)" style="flex:1;min-width:140px;">
-        <datalist id="parts-category-datalist">${[...new Set(Object.values(DB.partsCategory||{}))].map(c=>`<option value="${escR(c)}">`).join('')}</datalist>
-        <input type="text" id="f-newpart-name" placeholder="품명 (예: 엔진오일)" style="flex:1;min-width:100px;">
-        <input type="text" id="f-newpart-spec" placeholder="규격/사이즈 (예: 소형, 중형, 15W-40)" style="flex:1;min-width:100px;">
-        <input type="number" id="f-newpart-qty" class="qty" min="0" step="0.1" placeholder="수량" value="0">
-        <button type="button" class="btn sm primary" onclick="addStockPart()">추가</button>
+    <div class="material-card" style="margin-top:16px;">
+      <div class="field" style="max-width:600px;">
+        <label>부품(자재) 추가 — 구분 · 품명 · 규격 · 수량</label>
+        <div class="consumable-row" style="flex-wrap:wrap;">
+          <input type="text" id="f-newpart-category" list="parts-category-datalist" placeholder="구분 (예: 발전기전체사용, 120K용)" style="flex:1;min-width:140px;">
+          <datalist id="parts-category-datalist">${[...new Set(Object.values(DB.partsCategory||{}))].map(c=>`<option value="${escR(c)}">`).join('')}</datalist>
+          <input type="text" id="f-newpart-name" placeholder="품명 (예: 엔진오일)" style="flex:1;min-width:100px;">
+          <input type="text" id="f-newpart-spec" placeholder="규격/사이즈 (예: 소형, 중형, 15W-40)" style="flex:1;min-width:100px;">
+          <input type="number" id="f-newpart-qty" class="qty" min="0" step="0.1" placeholder="수량" value="0">
+          <button type="button" class="btn sm primary" onclick="addStockPart()">추가</button>
+        </div>
+        <details class="info-toggle"><summary></summary><p class="muted">품명을 같게 입력하고 규격만 다르게(예: 품명 "오일필터" + 규격 "소형"·"중형") 여러 번 등록하면 서로 다른 항목으로 각각 저장됩니다. 엔진오일·부동액 등 액체류는 단위가 자동으로 "리터"로 설정되고, 필터 등 나머지는 단위 없이 개수로만 관리됩니다. 같은 구분끼리 묶여서 아래 리스트에 나오므로, 발전기별 소요자재 입력시 쉽게 찾을 수 있습니다.</p></details>
       </div>
-      <div class="hint" style="margin-top:4px;">품명을 같게 입력하고 규격만 다르게(예: 품명 "오일필터" + 규격 "소형"·"중형") 여러 번 등록하면 서로 다른 항목으로 각각 저장됩니다. 엔진오일·부동액 등 액체류는 단위가 자동으로 "리터"로 설정되고, 필터 등 나머지는 단위 없이 개수로만 관리됩니다. 같은 구분끼리 묶여서 아래 리스트에 나오므로, 발전기별 소요자재 입력시 쉽게 찾을 수 있습니다.</div>
+      <div id="parts-purchase-log-wrap" style="margin-top:16px;"></div>
     </div>
     <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">부자재 목록 · 재고 관리</div>
+      <div class="section-title" style="margin-top:0;">📦 부자재 목록 · 재고 관리</div>
       <details class="info-toggle"><summary></summary><p class="muted">출고 처리시 선택할 수 있는 부자재 목록입니다 (예: 깔판, 전선규격, 분전함 등). 출고(상차완료) 시 선택한 수량만큼 재고에서 자동 차감되고, 입고 처리시 "회수됨"으로 확인하면 재고가 다시 복구됩니다. 품명을 같게 입력하고 규격/사이즈만 다르게(예: 품명 "분전함" + 규격 "대"·"중"·"소") 각각 수량을 등록하면, 같은 품명끼리 묶여서 리스트에 나란히 나옵니다.</p></details>
       <div id="supplies-catalog-wrap"></div>
       <div class="field" style="max-width:460px;margin-top:8px;">
@@ -7065,8 +7100,8 @@ function openPartsOrderListModal(){
       </div>`).join('');
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
-      <h3>부품 발주 리스트</h3>
+    <div class="modal" style="text-align:left;">
+      <h3 style="text-align:center;">📋 부품 발주 리스트</h3>
       <div class="modal-sub">${dateLabel} · 최소재고 미달 부품 ${needed.length}건 (미구매 ${pendingCount}건) · 공급업체 ${supplierNames.length}곳</div>
       <div style="max-height:50vh;overflow-y:auto;margin-top:6px;">${previewHtml}</div>
       <textarea id="f-order-text" readonly style="position:absolute;left:-9999px;top:-9999px;">${text}</textarea>
@@ -7398,7 +7433,12 @@ function renderPartsStockTable(){
   const wrap = document.getElementById('parts-stock-wrap');
   if(!wrap) return;
   const names = allKnownPartNames();
-  if(names.length===0){ wrap.innerHTML = `<div class="empty">등록된 부품이 없습니다. 모델별 자재정보를 입력하거나 아래에서 직접 추가해주세요.</div>`; return; }
+  if(names.length===0){
+    wrap.innerHTML = `<div class="empty">등록된 부품이 없습니다. 모델별 자재정보를 입력하거나 아래에서 직접 추가해주세요.</div>`;
+    const logWrap0 = document.getElementById('parts-purchase-log-wrap');
+    if(logWrap0) logWrap0.innerHTML = '<div class="hint">아직 입고 내역이 없습니다.</div>';
+    return;
+  }
   const catOf = n => (DB.partsCategory && DB.partsCategory[n]) || n;
   const groups = {};
   names.forEach(n=>{ const c = catOf(n); (groups[c]=groups[c]||[]).push(n); });
@@ -7428,7 +7468,7 @@ function renderPartsStockTable(){
     return `<tr${isLow? ` style="background:var(--danger-tint);"`:''}>
       <td class="wrap-ok">
         ${escR(baseName)}
-        <input type="text" value="${escR(category)}" list="parts-category-datalist" placeholder="구분 이동" style="width:100%;font-size:11px;margin-top:3px;" onchange="updatePartCategory('${escN}', this.value)">
+        <input type="text" value="${escR(category)}" list="parts-category-datalist" placeholder="구분 이동" style="width:100%;font-size:14px;margin-top:3px;" onchange="updatePartCategory('${escN}', this.value)">
       </td>
       <td><input type="text" value="${spec.replace(/"/g,'&quot;')}" placeholder="예: 15W-40" onchange="updatePartSpec('${escN}', this.value)"></td>
       <td>
@@ -7446,7 +7486,7 @@ function renderPartsStockTable(){
     </tr>`;
   };
   const bodyRows = catNames.map(cat=>`<div class="material-card" style="margin-bottom:0;">
-    <div class="section-title" style="margin-top:0;font-size:14px;">${escR(cat)} <span class="cnt">${groups[cat].length}종${groupHasLiquid(cat)? ' · 액체':''}</span></div>
+    <div class="section-title" style="margin-top:0;font-size:14px;">📦 ${escR(cat)} <span class="cnt">${groups[cat].length}종${groupHasLiquid(cat)? ' · 액체':''}</span></div>
     <div class="table-scroll"><table class="settings-table">
       <thead><tr><th>품명</th><th style="width:110px;">규격</th><th style="width:80px;">현재고</th><th style="width:100px;">입고 추가</th><th style="width:100px;">공급업체</th><th style="width:80px;">최소재고</th><th style="width:60px;"></th></tr></thead>
       <tbody>${[...groups[cat]].sort((a,b)=>a.localeCompare(b,'ko')).map(rowHtml).join('')}</tbody>
@@ -7455,17 +7495,29 @@ function renderPartsStockTable(){
   const tableHtml = `<div class="model-cards-grid">${bodyRows}</div>`;
   const recentLog = [...(DB.partsPurchaseLog||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,10);
   const logHtml = recentLog.length>0 ? `
-    <div class="section-title" style="font-size:13px;margin-top:16px;">최근 재고 입고 내역 <span class="muted" style="font-weight:400;font-size:11px;">(최근 10건)</span></div>
+    <div class="section-title" style="font-size:13px;margin-top:0;">🧾 최근 재고 입고 내역 <span class="muted" style="font-weight:400;font-size:11px;">(최근 10건)</span></div>
     <details class="info-toggle"><summary></summary><p class="muted">잘못 입력된 항목은 "삭제"를 누르면 내역에서 지워지고 추가된 수량만큼 재고에서도 다시 차감됩니다.</p></details>
-    <div class="table-scroll"><table class="settings-table">
-      <thead><tr><th style="width:90px;">일자</th><th>품명</th><th style="width:100px;">구분</th><th style="width:100px;">규격</th><th style="width:70px;">추가</th><th style="width:60px;"></th></tr></thead>
-      <tbody>${recentLog.map(l=>{
-        const cat = (DB.partsCategory && DB.partsCategory[l.partName]) || '-';
-        const spec = (DB.partsSpecs && DB.partsSpecs[l.partName]) || '-';
-        return `<tr><td class="muted">${dow(l.date)}</td><td class="wrap-ok">${escR(l.partName)}</td><td class="muted">${escR(cat)}</td><td class="muted">${escR(spec)}</td><td style="color:var(--primary-dark);font-weight:700;">+${l.qty}</td><td>${l.id? `<button class="btn sm danger" onclick="deletePartsPurchaseLogEntry('${l.id}')">삭제</button>`:''}</td></tr>`;
-      }).join('')}</tbody>
-    </table></div>` : '';
-  wrap.innerHTML = tableHtml + logHtml;
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+    ${recentLog.map(l=>{
+      const cat = (DB.partsCategory && DB.partsCategory[l.partName]) || '-';
+      const spec = (DB.partsSpecs && DB.partsSpecs[l.partName]) || '-';
+      return `<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;">
+          <span style="font-weight:700;font-size:13px;">${escR(l.partName)}</span>
+          <span class="muted" style="font-size:11px;white-space:nowrap;">${dow(l.date)}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="muted" style="font-size:11.5px;">구분 ${escR(cat)}</span>
+          <span class="muted" style="font-size:11.5px;">규격 ${escR(spec)}</span>
+          <span style="color:var(--primary-dark);font-weight:700;font-size:12.5px;">+${l.qty}</span>
+          ${l.id? `<button class="btn sm danger" style="margin-left:auto;" onclick="deletePartsPurchaseLogEntry('${l.id}')">삭제</button>`:''}
+        </div>
+      </div>`;
+    }).join('')}
+    </div>` : '<div class="hint">아직 입고 내역이 없습니다.</div>';
+  wrap.innerHTML = tableHtml;
+  const logWrap = document.getElementById('parts-purchase-log-wrap');
+  if(logWrap) logWrap.innerHTML = logHtml;
 }
 function safeIdFrag(s){
   return String(s).replace(/[\s"'<>&]/g, '_');
@@ -7562,7 +7614,7 @@ function editStockQtyInline(name){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal" style="max-width:340px;">
-      <h3>재고 수정</h3>
+      <h3>📦 재고 수정</h3>
       <div class="modal-sub">${escR(name)}</div>
       <div class="field"><label>현재고</label><input type="number" id="f-editstock-qty" step="0.1" value="${current}" autofocus></div>
       <div class="modal-actions">
@@ -7656,8 +7708,8 @@ function openMaterialsModal(model){
   materialsModalState = {model, consumables: migrateLegacyConsumables(m)};
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:680px;">
-      <h3>소요자재입력</h3>
+    <div class="modal" style="max-width:680px;text-align:left;">
+      <h3 style="text-align:center;">🧰 소요자재입력</h3>
       <div class="modal-sub">${model}</div>
       <datalist id="mm-category-list">${[...new Set(Object.values(DB.partsCategory||{}))].map(c=>`<option value="${escR(c)}">`).join('')}</datalist>
       <div class="field">
@@ -7846,12 +7898,14 @@ function renderReserveTab(){
       ${smsOrderCards.length===0 ? `<div class="empty" style="margin-top:4px;">확인할 문자오더가 없습니다.</div>` : `
       <div style="display:flex;flex-wrap:wrap;gap:8px;">
         ${smsOrderCards.map(r=>`
-        <div style="width:170px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
+        <div style="width:170px;height:220px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
           <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}</div>
           <div class="muted" style="font-size:12px;margin-bottom:4px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
-          <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;" onclick="showSmsOrderModal('${r.id}')">${escR(r.smsOrder||'')}</div>
-          <button class="btn sm primary" style="font-size:12px;padding:4px 6px;margin-top:6px;" onclick="markSmsOrderChecked('${r.id}')">✅ 확인완료</button>
-          <button class="btn sm danger" style="font-size:12px;padding:4px 6px;margin-top:4px;" onclick="deleteSmsOrderCard('${r.id}')">🗑 삭제</button>
+          <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;flex:1;overflow:hidden;" onclick="showSmsOrderModal('${r.id}')">${escR(r.smsOrder||'')}</div>
+          <div style="display:flex;gap:4px;margin-top:6px;">
+            <button class="btn sm primary" style="flex:1;font-size:10px;padding:2px 4px;" onclick="markSmsOrderChecked('${r.id}')">✅ 확인완료</button>
+            <button class="btn sm danger" style="flex:1;font-size:10px;padding:2px 4px;" onclick="deleteSmsOrderCard('${r.id}')">🗑 삭제</button>
+          </div>
         </div>`).join('')}
       </div>`}
       ${smsOrderHidden.length===0 ? '' : `
@@ -7869,7 +7923,7 @@ function renderReserveTab(){
       </details>`}
     </div>`;
   return `
-    <div class="section-title">출고 대기 <span class="cnt">${list.length}건</span>${pendingCount>0? `<span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">상차대기 ${pendingCount}건</span>`:''}${delayedCount>0? `<span class="cnt" style="background:var(--danger-tint);color:var(--danger);border-color:var(--danger);">지연 ${delayedCount}건</span>`:''}</div>
+    <div class="section-title">⏳ 출고 대기 <span class="cnt">${list.length}건</span>${pendingCount>0? `<span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">상차대기 ${pendingCount}건</span>`:''}${delayedCount>0? `<span class="cnt" style="background:var(--danger-tint);color:var(--danger);border-color:var(--danger);">지연 ${delayedCount}건</span>`:''}</div>
     <details class="info-toggle"><summary></summary><p class="muted">출고하기를 하면 발전기가 여기 "상차대기"로 표시됩니다. 상차 담당자가 실제 싣고 나갈 때 "상차완료"를 누르면 그때 출고(출고중)로 처리됩니다. 연료는 고객요청량이 있으면 요청량 기준으로, 없으면 실제주입량 기준으로 표시됩니다.</p></details>
     ${smsOrderHtml}
     <div class="detail-card" style="margin:10px 0 14px;display:flex;align-items:center;justify-content:flex-start;gap:16px;flex-wrap:wrap;background:var(--primary-tint);border:1px solid var(--primary);">
@@ -8059,7 +8113,7 @@ function confirmLoadPrompt(resId){
   ].filter(([k,v])=>v).map(([k,v])=>`<div class="k">${k}</div><div class="v" style="font-size:13px;font-weight:400;">${escR(v)}</div>`).join('');
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
+    <div class="modal" style="text-align:left;">
       <h3>🚚 상차 완료 확인</h3>
       <div class="modal-sub">${escR(r.genId)}${g? ` · ${escR(g.model||'')}`:''}</div>
       <div class="detail-card" style="margin-bottom:14px;padding:12px 14px;">
@@ -8150,8 +8204,8 @@ function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
 function openConfirmModal(message, onConfirm, okLabel, cancelLabel){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay">
-    <div class="modal">
-      <h3>확인</h3>
+    <div class="modal" style="text-align:center;">
+      <h3>❓ 확인</h3>
       <div class="modal-sub" style="white-space:pre-line;">${escR(message)}</div>
       <div class="modal-actions">
         <button class="btn" id="confirm-cancel-btn">${escR(cancelLabel||'취소')}</button>
@@ -8169,7 +8223,7 @@ function showInfoModal(message){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay">
     <div class="modal">
-      <h3>안내</h3>
+      <h3>ℹ️ 안내</h3>
       <div class="modal-sub" style="white-space:pre-line;">${escR(message)}</div>
       <div class="modal-actions">
         <button class="btn primary" id="info-ok-btn">확인</button>
@@ -8192,8 +8246,8 @@ function openReserveNoGenModal(resId, draft){
   })();
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal modal-wide" style="text-align:center;">
-      <h3>📝 ${existing? '출고예약 수정' : '출고예약'}</h3>
+    <div class="modal modal-wide" style="text-align:left;">
+      <h3 style="text-align:center;">📝 ${existing? '출고예약 수정' : '출고예약'}</h3>
       <div class="modal-sub">발전기를 아직 정하지 않았어도 거래처 정보를 먼저 등록해둘 수 있습니다. 나중에 [출고 대기]에서 발전기를 배정하면 정상 출고로 이어집니다.</div>
       ${(!existing && draft) ? `<div class="hint" style="color:var(--danger);font-weight:700;background:var(--danger-tint);padding:8px 10px;border-radius:8px;margin-bottom:6px;">⚠️ 문자 내용에서 자동으로 추출한 내용입니다. 틀린 부분 없는지 꼭 확인 후 저장해주세요.</div>` : ''}
       ${(!existing && draft && draft.rawText) ? `<details open style="text-align:left;background:var(--surface-alt,#F5F5F5);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:10px;">
@@ -8234,9 +8288,8 @@ function openReserveNoGenModal(resId, draft){
       </div>
       <div class="out-row">
         <div class="field f-lg"><label>거래처명</label>
-          <input type="text" id="f-rsv-site" list="customer-datalist" value="${((pre&&(pre.site||pre.customer))||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onRsvCustomerNameInput()">
+          <input type="text" id="f-rsv-site" list="customer-datalist" value="${((pre&&(pre.site||pre.customer))||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onRsvCustomerNameInput()" style="font-size:14px;">
           <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
-          <div class="hint">이전에 거래한 업체명을 선택하면 담당자·연락처·주소가 자동으로 채워집니다.</div>
           <div id="f-rsv-site-warning">${pre?customerWarningHtml((pre.site||pre.customer)||''):''}</div>
         </div>
         <div class="field f-xs"><label>사용일수(일)</label>
@@ -8263,7 +8316,7 @@ function openReserveNoGenModal(resId, draft){
         <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-rsv-note">${(pre&&pre.note)||''}</textarea></div></div>
       </div>
       <div class="out-row">
-        <div class="field f-eq">
+        <div class="field f-lg">
           <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
             <input type="checkbox" id="f-rsv-fuel-toggle" ${(pre&&(pre.fuelRequested!=null||pre.fuelActual!=null))?'checked':''} onchange="toggleFuelFields('f-rsv-fuel-toggle','f-rsv-fuel-fields-wrap')">
             <label for="f-rsv-fuel-toggle">⛽ 연료넣고 출고</label>
@@ -8271,13 +8324,13 @@ function openReserveNoGenModal(resId, draft){
           <div id="f-rsv-fuel-fields-wrap" style="display:${(pre&&(pre.fuelRequested!=null||pre.fuelActual!=null))?'block':'none'};margin-top:8px;">
             <label>연료량(L)</label>
             <div class="consumable-row">
-              <div style="flex:1;">
+              <div style="flex:1;min-width:0;">
                 <input type="number" id="f-rsv-fuel-req" min="0" value="${(pre&&pre.fuelRequested)||''}" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;" onchange="if(!document.getElementById('f-rsv-fuel-actual').value) document.getElementById('f-rsv-fuel-actual').value=this.value;">
-                <div class="hint" style="margin:2px 0 0;">고객요청 (공급받는자용에 표시)</div>
+                <div class="hint" style="margin:2px 0 0;white-space:nowrap;">고객요청 (공급받는자용에 표시)</div>
               </div>
-              <div style="flex:1;">
+              <div style="flex:1;min-width:0;">
                 <input type="number" id="f-rsv-fuel-actual" min="0" value="${(pre&&pre.fuelActual)||''}" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;">
-                <div class="hint" style="margin:2px 0 0;">실제주입 (공급자용에 표시)</div>
+                <div class="hint" style="margin:2px 0 0;white-space:nowrap;">실제주입 (공급자용에 표시)</div>
               </div>
             </div>
           </div>
@@ -8537,12 +8590,12 @@ function openOutInfoEditModal(id){
   }
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal modal-wide" style="text-align:center;">
-      <h3>출고 정보 수정</h3>
+    <div class="modal modal-wide" style="text-align:left;">
+      <h3 style="text-align:center;">📤 출고 정보 수정</h3>
       <div class="modal-sub">${g.id} · [${displayModel(g)}]</div>
       <div class="hint" style="margin-bottom:10px;color:var(--danger);">이미 출고중인 발전기의 거래처·현장·날짜 등 정보를 직접 수정합니다. (입고 처리 없이 바로 저장됩니다)</div>
       <div class="out-row stretch">
-        ${g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-oie-starthours" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}" min="0"><input type="hidden" id="f-oie-starthours-orig" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}"></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;">누적시간 확인불가 모델</div></div></div>`}
+        ${g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-oie-starthours" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}" min="0"><input type="hidden" id="f-oie-starthours-orig" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}"></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</div></div></div>`}
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="f-oie-outdate" value="${rt.outDate||todayStr()}">
         </div></div>
@@ -8568,7 +8621,6 @@ function openOutInfoEditModal(id){
         </div>
         <div class="field f-xs"><label>예상가동시간(h/일)</label>
           <input type="number" id="f-oie-estdaily" step="0.5" min="0" value="${rt.estDaily||''}" placeholder="예: 8">
-          <div class="hint">입력하면 정비 도래 시점을 미리 추정해 보여줍니다.</div>
         </div>
         <div class="field f-sm"><label>반납 예정일 (선택)</label>
           <input type="date" id="f-oie-returndate" value="${oiePrefillReturnDate}" onchange="syncOieReturnDateToUsageDays()">
@@ -8779,7 +8831,7 @@ function cancelOutPrompt(id){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>${g.id} 출고취소</h3>
+      <h3>❌ ${g.id} 출고취소</h3>
       <div class="modal-sub">이번 출고 이력(임대 기록)은 남기지 않고 바로 창고 재고로 전환됩니다. 취소 사유와 비용 발생 여부를 남겨주세요.</div>
       <div class="field"><label>취소 사유</label><textarea id="f-cancelout-reason" placeholder="예: 고객 단순 변심, 중복 출고 등"></textarea></div>
       <div id="f-cancelout-err" class="err" style="display:none;"></div>
@@ -8866,8 +8918,8 @@ function openOutModal(id, reservationId){
   })();
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal modal-wide" style="text-align:center;${isEditingPending? 'max-height:96vh;':''}">
-      <h3>${isEditingPending? '상차대기 내용 수정' : '출고하기'}</h3>
+    <div class="modal modal-wide" style="text-align:left;${isEditingPending? 'max-height:96vh;':''}">
+      <h3 style="text-align:center;">${isEditingPending? '✏️ 상차대기 내용 수정' : '📤 출고하기'}</h3>
       <div class="modal-sub" id="out-modal-sub">${g.id} · [${displayModel(g)}]</div>
       ${isEditingPending? `<div class="field" style="background:var(--warn-tint);border:1px solid var(--warn);border-radius:var(--radius);padding:10px 12px;text-align:left;">
         <label>발전기 번호 (변경 가능)</label>
@@ -8876,7 +8928,7 @@ function openOutModal(id, reservationId){
       </div>` : ''}
       ${isEditingPending? `<div class="hint" style="margin-bottom:10px;color:var(--danger);">이 발전기는 이미 [출고 대기]에 상차대기로 등록되어 있습니다. 여기서 수정하면 상차대기 내용이 갱신됩니다.</div>` : ''}
       <div class="out-row stretch">
-        ${g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}"><div class="hint" id="starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 누적: ${(g.hours||0).toLocaleString()}h</div></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;">누적시간 확인불가 모델</div></div></div>`}
+        ${g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}"><div class="hint" id="starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 누적: ${(g.hours||0).toLocaleString()}h</div></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</div></div></div>`}
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="f-outdate" value="${(res&&(res.outDate||res.plannedOutDate))||todayStr()}" onchange="syncReturnDateToUsageDays()">
         </div></div>
@@ -8908,7 +8960,6 @@ function openOutModal(id, reservationId){
         <div class="field f-lg"><label>거래처명</label>
           <input type="text" id="f-site" list="customer-datalist" value="${(res&&(res.site||res.customer)||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onCustomerNameInput()">
           <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
-          <div class="hint">이전에 거래한 업체명을 선택하면 담당자·연락처·주소가 자동으로 채워집니다.</div>
           <div id="f-site-warning">${customerWarningHtml((res&&(res.site||res.customer))||'')}</div>
         </div>
         <div class="field f-xs"><label>사용일수(일)</label>
@@ -8916,7 +8967,6 @@ function openOutModal(id, reservationId){
         </div>
         <div class="field f-xs"><label>예상가동시간(h/일)</label>
           <input type="number" id="f-estdaily" step="0.5" min="0" value="${(res&&res.estDaily)||''}" placeholder="예: 8">
-          <div class="hint">입력하면 출고중 목록에 정비 도래 시점을 미리 추정해 보여줍니다.</div>
         </div>
         <div class="field f-sm"><label>반납 예정일 (선택)</label>
           <input type="date" id="f-returndate" value="${prefillReturnDate}" onchange="syncReturnDateToUsageDays()">
@@ -8936,7 +8986,7 @@ function openOutModal(id, reservationId){
         <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-note">${(res&&res.note)||''}</textarea></div></div>
       </div>
       <div class="out-row">
-        <div class="field f-eq">
+        <div class="field f-lg">
           <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
             <input type="checkbox" id="f-fuel-toggle" ${(res&&(res.fuelRequested!=null||res.fuelActual!=null))?'checked':''} onchange="toggleFuelFields('f-fuel-toggle','f-fuel-fields-wrap')">
             <label for="f-fuel-toggle">⛽ 연료넣고 출고</label>
@@ -8944,13 +8994,13 @@ function openOutModal(id, reservationId){
           <div id="f-fuel-fields-wrap" style="display:${(res&&(res.fuelRequested!=null||res.fuelActual!=null))?'block':'none'};margin-top:8px;">
             <label>연료량(L)</label>
             <div class="consumable-row">
-              <div style="flex:1;">
+              <div style="flex:1;min-width:0;">
                 <input type="number" id="f-fuel-req" min="0" value="${(res&&res.fuelRequested)||''}" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;" onchange="if(!document.getElementById('f-fuel-actual').value) document.getElementById('f-fuel-actual').value=this.value;">
-                <div class="hint" style="margin:2px 0 0;">고객요청 (공급받는자용에 표시)</div>
+                <div class="hint" style="margin:2px 0 0;white-space:nowrap;">고객요청 (공급받는자용에 표시)</div>
               </div>
-              <div style="flex:1;">
+              <div style="flex:1;min-width:0;">
                 <input type="number" id="f-fuel-actual" min="0" value="${(res&&res.fuelActual)||''}" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;">
-                <div class="hint" style="margin:2px 0 0;">실제주입 (공급자용에 표시)</div>
+                <div class="hint" style="margin:2px 0 0;white-space:nowrap;">실제주입 (공급자용에 표시)</div>
               </div>
             </div>
           </div>
@@ -8959,7 +9009,6 @@ function openOutModal(id, reservationId){
           <div class="field chk" style="background:var(--ok-tint);border:1px solid var(--ok);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
             <input type="checkbox" id="f-longterm"><label for="f-longterm">장기 임대 출고</label>
           </div>
-          <div class="hint" style="margin-top:8px;">예상가동시간은 위 "사용일수" 옆에 입력합니다. 장기임대 체크는 목록 구분·방문정비 준비 리스트용입니다.</div>
         </div>
         <div class="field f-eq">
           <input type="text" id="f-payment-note" value="${escR(res&&res.paymentNote||'')}" placeholder="입금관련 메모">
@@ -9084,8 +9133,8 @@ function showOutSubmitPreview(g, pendingData){
   const previewHtml = receiptCopyHtml(g, '공급받는자용', pendingData);
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,cancelOutSubmitPreview)">
-    <div class="modal" style="max-width:640px;">
-      <h3>출고 내용 확인</h3>
+    <div class="modal" style="max-width:640px;text-align:left;">
+      <h3 style="text-align:center;">📋 출고 내용 확인</h3>
       <div class="modal-sub">인쇄용이 아니라, 입력한 내용이 맞는지 한 번 더 확인하는 미리보기입니다.</div>
       <div style="max-height:55vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">${previewHtml}</div>
       <div id="f-preview-err" class="err" style="display:none;margin-top:8px;"></div>
@@ -9186,7 +9235,7 @@ function openBulkOutModal(){
   const hoursRowsHtml = gens.map(g=>`
     <div class="field-row" style="align-items:flex-end;">
       <div style="flex:0 0 auto;min-width:90px;font-size:13px;font-weight:700;padding-bottom:8px;">${g.id}${g.model? ` <span class="muted" style="font-weight:400;font-size:11.5px;">· ${escR(g.model)}</span>`:''}</div>
-      ${g.hoursKnown? `<div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">출고시 누적 사용시간(h)</label><input type="number" id="fb-hours-${g.id}" value="${g.hours||0}" min="0"></div>` : `<div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">누적 사용시간</label><div class="hint" style="margin-top:4px;">누적시간 확인불가 모델</div></div>`}
+      ${g.hoursKnown? `<div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">출고시 누적 사용시간(h)</label><input type="number" id="fb-hours-${g.id}" value="${g.hours||0}" min="0"></div>` : `<div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">누적 사용시간</label><div class="hint" style="margin-top:4px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</div></div>`}
     </div>`).join('');
   const fuelRowsHtml = gens.map(g=>`
     <div class="field-row" style="align-items:flex-end;flex-wrap:wrap;margin-bottom:4px;">
@@ -9202,8 +9251,8 @@ function openBulkOutModal(){
     </div>`).join('');
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
-      <h3>선택한 ${gens.length}대 한번에 출고</h3>
+    <div class="modal" style="text-align:left;">
+      <h3 style="text-align:center;">📤 선택한 ${gens.length}대 한번에 출고</h3>
       <div class="modal-sub">아래 거래처/현장 정보는 선택된 발전기 전체에 동일하게 적용됩니다. 발전기별 누적 사용시간·연료는 아래에서 각각 확인·수정해주세요.</div>
       <div class="field" style="margin:8px 0 4px;">
         <label>발전기별 출고시 누적 사용시간(h)</label>
@@ -9242,7 +9291,6 @@ function openBulkOutModal(){
       <div class="field"><label>거래처명</label>
         <input type="text" id="fb-site" list="customer-datalist" placeholder="예: 00건설" oninput="onBulkCustomerNameInput()">
         <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
-        <div class="hint">이전에 거래한 업체명을 선택하면 담당자·연락처·주소가 자동으로 채워집니다.</div>
       </div>
       <div class="field-row">
         <div class="field"><label>사용일수(일)</label>
@@ -9250,7 +9298,6 @@ function openBulkOutModal(){
         </div>
         <div class="field"><label>예상가동시간(h/일, 대당)</label>
           <input type="number" id="fb-estdaily" step="0.5" min="0" placeholder="예: 8">
-          <div class="hint">입력하면 출고중 목록에 정비 도래 시점을 미리 추정해 보여줍니다.</div>
         </div>
         <div class="field"><label>반납 예정일 (선택)</label>
           <input type="date" id="fb-returndate" onchange="syncBulkReturnDateToUsageDays()">
@@ -9468,7 +9515,7 @@ function openBulkInModal(){
       return `
       <div class="field-row" style="align-items:flex-end;">
         <div style="flex:0 0 auto;min-width:110px;font-size:13px;font-weight:700;padding-bottom:8px;">${g.id}${g.model? ` <span class="muted" style="font-weight:400;font-size:11.5px;">· ${escR(g.model)}</span>`:''}<div class="muted" style="font-size:11px;font-weight:400;">${escR(rt.customer||'-')}</div></div>
-        <div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">누적 사용시간</label><div class="hint" style="margin-top:4px;">누적시간 확인불가 모델</div></div>
+        <div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">누적 사용시간</label><div class="hint" style="margin-top:4px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</div></div>
       </div>`;
     }
     return `
@@ -9479,8 +9526,8 @@ function openBulkInModal(){
   }).join('');
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
-      <h3>선택한 ${gens.length}대 한번에 입고</h3>
+    <div class="modal" style="text-align:left;">
+      <h3 style="text-align:center;">📥 선택한 ${gens.length}대 한번에 입고</h3>
       <div class="modal-sub">모두 정상입고로 처리됩니다. 고장/수리 등록이 필요한 발전기는 목록에서 개별로 "입고 처리"를 이용해주세요.</div>
       <div class="field-row">
         <div class="field"><label>입고일</label>
@@ -9757,7 +9804,6 @@ function printBatchReceipt(batchId){
             <button class="btn sm" onclick="closeReceipt()">닫기</button>
           </div>
         </div>
-        <div id="print-msg" class="print-msg no-print" style="display:block;">부자재·비고는 이 ${items.length}대에 공통으로 한 번만 표시되고, 연료는 발전기별로 각각 표시됩니다. "인쇄하기"를 누르면 바로 인쇄되고, "인쇄용 파일 다운로드"로 파일을 받아 나중에 인쇄할 수도 있습니다.</div>
         ${body}
       </div>
     </div>`;
@@ -9999,7 +10045,6 @@ function printReceipt(id, rtOverride){
             <button class="btn sm" onclick="closeReceipt()">닫기</button>
           </div>
         </div>
-        <div id="print-msg" class="print-msg no-print" style="display:block;">${rtOverride? '아직 상차 확인 전 예정 인수증입니다. 실제 출고 정보와 다를 수 있습니다.<br>' : ''}"인쇄하기"를 누르면 바로 인쇄되고, "인쇄용 파일 다운로드"로 파일을 받아 나중에 인쇄할 수도 있습니다. 인쇄창에서 "추가 설정 &gt; 머리글과 바닥글"을 꺼주시면 여백에 주소/날짜가 안 찍힙니다.</div>
         ${body}
       </div>
     </div>`;
@@ -10034,7 +10079,7 @@ function openShareModal(id){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" style="z-index:350;" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>인수증 공유</h3>
+      <h3>🧾 인수증 공유</h3>
       <div class="modal-sub">아래 내용을 복사해서 카카오톡/문자에 붙여넣거나, 문자로 바로 보낼 수 있습니다.</div>
       <div class="field"><textarea id="f-share-text" rows="10" readonly style="font-family:var(--mono);font-size:12px;white-space:pre-wrap;">${text.replace(/</g,'&lt;')}</textarea></div>
       <div class="field">
@@ -10232,8 +10277,8 @@ function openInModal(id){
   const baselineForModal = fuelBaselineOf(g);
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal modal-wide" style="text-align:center;">
-      <h3>입고 처리</h3>
+    <div class="modal modal-wide" style="text-align:left;">
+      <h3 style="text-align:center;">📥 입고 처리</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)} · ${g.rental.customer||'-'}</div>
       <div class="out-row stretch">
         <div class="field f-md"><div class="out-card">
@@ -10258,7 +10303,7 @@ function openInModal(id){
           <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
         </div></div>` : `<div class="field f-md"><div class="out-card">
           <label>누적 사용시간</label>
-          <div class="hint" style="margin-top:8px;">누적시간 확인불가 모델</div>
+          <div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</div>
         </div></div>`}
         <div class="field f-sm"><div class="out-card">
           <label>전압</label>
@@ -10529,7 +10574,7 @@ function openReportBreakdownModal(id){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
-      <h3>고장 등록</h3>
+      <h3>🛠️ 고장 등록</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
       <div class="hint" style="margin-bottom:10px;color:var(--danger);">고장으로 등록하면 [수리 완료 처리]를 하기 전까지 이 발전기는 출고할 수 없습니다.</div>
       <div class="field"><label>고장 발생(확인)일</label><input type="date" id="f-brk-date" value="${todayStr()}"></div>
@@ -10644,8 +10689,8 @@ function openMaintModal(id, editId, repairComplete){
   maintPhotosPending = rec ? maintPhotosOf(rec) : [];
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
-      <h3>${repairComplete? '고장 수리 완료 처리' : (editId? '정비 기록 수정' : '정비 등록')}</h3>
+    <div class="modal" style="text-align:left;">
+      <h3 style="text-align:center;">🔧 ${repairComplete? '고장 수리 완료 처리' : (editId? '정비 기록 수정' : '정비 등록')}</h3>
       <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
       ${repairComplete && g.repairNote? `<div class="detail-card" style="margin-bottom:14px;padding:12px 14px;background:var(--danger-tint);border-color:var(--danger);">
         <div style="font-size:11px;font-weight:700;color:var(--danger);margin-bottom:4px;">등록된 고장내용${g.repairSince? ` (${g.repairSince} 접수)`:''}</div>
@@ -10653,7 +10698,7 @@ function openMaintModal(id, editId, repairComplete){
       </div>` : ''}
       <div class="field-row">
         <div class="field"><label>정비일</label><input type="date" id="f-mdate" value="${rec? rec.date : todayStr()}"></div>
-        ${g.hoursKnown? `<div class="field"><label>정비시 누적 사용시간(h)</label><input type="number" id="f-mhours" value="${rec? (rec.hours||0) : (g.hours||0)}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 ${(g.hours||0).toLocaleString()}h</div></div>` : `<div class="field"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;">누적시간 확인불가 모델</div></div>`}
+        ${g.hoursKnown? `<div class="field"><label>정비시 누적 사용시간(h)</label><input type="number" id="f-mhours" value="${rec? (rec.hours||0) : (g.hours||0)}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 ${(g.hours||0).toLocaleString()}h</div></div>` : `<div class="field"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</div></div>`}
       </div>
       <div class="field-row">
         <div class="field"><label>정비 유형</label>${typeButtonsHtml}</div>
@@ -10953,7 +10998,7 @@ function openUserNameGate(){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay">
     <div class="modal">
-      <h3>사용자 선택</h3>
+      <h3>👤 사용자 선택</h3>
       <div class="modal-sub">이 화면을 여는 모든 사람과 데이터가 공유됩니다. 본인 이름을 눌러주세요.</div>
       <div class="btn-row" style="flex-direction:column;gap:8px;margin-top:10px;">${options}</div>
     </div>
@@ -11119,7 +11164,7 @@ function renderQuickOrderQr(){
   const img = document.getElementById('quick-order-qr');
   if(!img) return;
   const url = getQuickOrderUrl();
-  img.src = url ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}` : '';
+  img.src = url ? `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(url)}` : '';
 }
 function printQuickOrderQr(){
   const url = getQuickOrderUrl();
