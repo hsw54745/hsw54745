@@ -682,9 +682,10 @@ async function renderQmStockListInner(){
     }
     const filtered = qmStockCapacityFilter==null ? inStock : inStock.filter(g=>capacityOf(g)===qmStockCapacityFilter);
     wrap.innerHTML = `<div style="font-size:13px;color:#888;margin:10px 0 8px;text-align:right;">총 ${filtered.length}대</div>` + filtered.map(g=>`
-      <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
         <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
-        <span style="font-size:14px;color:#333;text-align:right;">${escR(g.model||'')}</span>
+        <span style="font-size:14px;color:#333;text-align:right;flex:1;">${escR(g.model||'')}</span>
+        <input type="checkbox" style="width:24px;height:24px;flex-shrink:0;">
       </div>`).join('');
   }catch(e){
     if(document.getElementById('qm-stock-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">목록을 불러오지 못했습니다.</div>';
