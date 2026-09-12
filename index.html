@@ -555,10 +555,11 @@ function renderQuickModeUI(){
     <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;position:relative;">
       <button type="button" onclick="triggerPwaInstall()" title="홈 화면에 앱으로 추가" style="position:absolute;top:14px;right:14px;padding:6px 10px;font-size:12px;font-weight:700;background:#fff;color:#888;border:1.5px solid #ccc;border-radius:10px;cursor:pointer;">📲 앱설치</button>
       <div style="margin-bottom:20px;">
-        <div style="width:100%;aspect-ratio:7/2;border-radius:14px;overflow:hidden;background-image:url('icon-192.png');background-size:100% auto;background-position:center 25%;"></div>
+        <div style="width:100%;aspect-ratio:7/2;border-radius:14px;overflow:hidden;background-image:url('icon-192.png');background-size:250% auto;background-position:97.7% 30.8%;"></div>
         <div style="font-size:15px;color:#555;margin-top:10px;text-align:center;">원하시는 메뉴를 골라주세요</div>
       </div>
       <button type="button" onclick="renderQuickModeStockList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📦 입고된 발전기 리스트 보기</button>
+      <button type="button" onclick="renderQuickModeOutList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:28px;">🚚 출고중 발전기 리스트 보기</button>
       <button type="button" onclick="renderQuickModePasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📤 출고 문자 붙여넣기</button>
       <button type="button" onclick="renderQuickModeReturnPasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">🔻 철수 문자 붙여넣기</button>
       <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;">📝 출고예약 등록</button>
@@ -760,6 +761,131 @@ async function submitQmVoltageEdit(id){
     box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
     box.textContent = '저장하지 못했습니다. 다시 시도해주세요.';
     if(btn){ btn.disabled = false; btn.textContent = '저장'; }
+  }
+}
+let qmOutRegionFilter = null;
+async function renderQuickModeOutList(){
+  qmOutRegionFilter = null;
+  await renderQmOutListInner();
+}
+function clearQmOutRegionFilter(){
+  qmOutRegionFilter = null;
+  renderQmOutListInner();
+}
+function viewQmOutRegion(region){
+  qmOutRegionFilter = region;
+  renderQmOutListInner();
+}
+async function renderQmOutListInner(){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQuickModeUI()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:24px;font-weight:800;color:#5B7FA6;">🚚 출고중 발전기</div>
+        <div style="font-size:14px;color:#555;margin-top:6px;">지역을 눌러서 골라보세요</div>
+      </div>
+      <div id="qm-out-regionbtns" style="margin-bottom:10px;"></div>
+      <div id="qm-out-list"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+    </div>
+  `);
+  const regionWrap = document.getElementById('qm-out-regionbtns');
+  const wrap = document.getElementById('qm-out-list');
+  try{
+    const cur = await window.storage.get('gen-fleet-v2', true);
+    let gens = [];
+    try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    const outGens = gens.filter(g=>g && !g.retired && g.status==='out').sort((a,b)=>String(a.id).localeCompare(String(b.id), 'ko', {numeric:true}));
+    if(!document.getElementById('qm-out-list')) return; // 화면이 이미 닫혔으면 무시
+    if(outGens.length===0){
+      if(regionWrap) regionWrap.innerHTML = '';
+      wrap.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">지금 출고중인 발전기가 없습니다.</div>';
+      return;
+    }
+    // 지역별 개수 집계
+    const regionCounts = {};
+    outGens.forEach(g=>{
+      const region = regionOf((g.rental&&(g.rental.address||g.rental.site))||'');
+      regionCounts[region] = (regionCounts[region]||0) + 1;
+    });
+    const regionEntries = Object.entries(regionCounts).sort((a,b)=>b[1]-a[1]);
+    if(regionWrap){
+      regionWrap.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <button type="button" onclick="clearQmOutRegionFilter()" style="padding:10px 14px;font-size:14px;font-weight:800;border-radius:10px;border:2px solid #5B7FA6;background:${qmOutRegionFilter==null?'#5B7FA6':'#fff'};color:${qmOutRegionFilter==null?'#fff':'#5B7FA6'};cursor:pointer;">전체 (${outGens.length})</button>
+        ${regionEntries.map(([region,cnt])=>{
+          const active = qmOutRegionFilter===region;
+          return `<button type="button" onclick="viewQmOutRegion('${region.replace(/'/g,"\\'")}')" style="padding:10px 14px;font-size:14px;font-weight:800;border-radius:10px;border:2px solid #5B7FA6;background:${active?'#5B7FA6':'#fff'};color:${active?'#fff':'#5B7FA6'};cursor:pointer;">${escR(region)} (${cnt})</button>`;
+        }).join('')}
+      </div>`;
+    }
+    const filtered = qmOutRegionFilter==null ? outGens : outGens.filter(g=>regionOf((g.rental&&(g.rental.address||g.rental.site))||'')===qmOutRegionFilter);
+    wrap.innerHTML = `<div style="font-size:13px;color:#888;margin:10px 0 8px;text-align:right;">총 ${filtered.length}대</div>` + filtered.map(g=>{
+      const city = cityOf((g.rental&&(g.rental.address||g.rental.site))||'');
+      return `
+      <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
+        <span style="font-size:13px;color:#333;text-align:right;flex:1;">${escR(g.model||'')}</span>
+        <span class="pill" style="background:#EAF2E9;color:#2C6E49;border:1px solid #2C6E49;font-size:11px;white-space:nowrap;">${escR(g.voltage)||'전압 미설정'}</span>
+        <span class="pill" style="background:#E8EEF4;color:#5B7FA6;border:1px solid #5B7FA6;font-size:11px;">${escR(city)}</span>
+        <button type="button" onclick="openQmOutDetail('${g.id}')" style="background:#5B7FA6;border:none;color:#fff;font-weight:800;font-size:12.5px;padding:8px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;">상세보기</button>
+      </div>`;
+    }).join('');
+  }catch(e){
+    if(document.getElementById('qm-out-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">목록을 불러오지 못했습니다.</div>';
+  }
+}
+async function openQmOutDetail(id){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQmOutListInner()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div id="qm-out-detail-body"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+    </div>
+  `);
+  try{
+    const cur = await window.storage.get('gen-fleet-v2', true);
+    let gens = [];
+    try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    const g = gens.find(x=>x && String(x.id)===String(id));
+    const body = document.getElementById('qm-out-detail-body');
+    if(!body) return; // 화면이 이미 닫혔으면 무시
+    if(!g || g.status!=='out'){
+      body.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">해당 발전기를 찾을 수 없습니다.</div>';
+      return;
+    }
+    const r = g.rental || {};
+    const hoursDisplay = g.hoursKnown
+      ? (r.startHours!=null? `${Number(r.startHours).toLocaleString()}h` : null)
+      : { raw: '<span style="color:#C23B3B;">확인불가</span>' };
+    const rows = [
+      ['업체명', r.customer],
+      ['담당자', r.manager],
+      ['연락처', r.phone],
+      ['주소', r.address || r.site],
+      ['출고일', r.outDate? `${fmtDateKR(r.outDate)}${r.arriveTime? ` (${r.arriveTime})` : ''}` : null],
+      ['임대구분', r.longTerm? '장기임대' : '단기임대'],
+      ['출고시 누적사용시간', hoursDisplay],
+      ['예상 일일 사용시간', r.longTerm && r.estDaily? `${r.estDaily}h/일` : null],
+      ['연료 요청/실제(L)', (r.fuelRequested!=null || r.fuelActual!=null) ? `요청 ${r.fuelRequested!=null?r.fuelRequested:'-'} / 실제 ${r.fuelActual!=null?r.fuelActual:'-'}` : null],
+      ['부자재', r.supplies],
+      ['비고', r.note]
+    ];
+    body.innerHTML = `
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:22px;font-weight:800;color:#2C4A66;">${escR(g.id)}</div>
+        <div style="font-size:14px;color:#555;margin-top:4px;">${escR(g.model||'')}</div>
+        <span class="pill" style="background:#EAF2E9;color:#2C6E49;border:1px solid #2C6E49;font-size:12px;margin-top:6px;display:inline-block;">${escR(g.voltage)||'전압 미설정'}</span>
+      </div>
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px;">
+        ${rows.map(([k,v])=>`
+          <div style="padding:10px 0;border-bottom:1px solid #eee;">
+            <div style="font-size:12.5px;color:#888;margin-bottom:3px;">${k}</div>
+            <div style="font-size:16px;font-weight:700;color:#222;">${v==null? '<span style="color:#bbb;font-weight:400;">미기재</span>' : (v.raw!=null? v.raw : escR(v))}</div>
+          </div>`).join('')}
+      </div>`;
+  }catch(e){
+    const body = document.getElementById('qm-out-detail-body');
+    if(body) body.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">불러오지 못했습니다.</div>';
   }
 }
 function renderQuickModeReserveUI(){
@@ -2432,6 +2558,29 @@ function regionOf(address){
   const jeonnam = ['목포','여수','순천','나주','광양','담양','곡성','구례','고흥','보성','화순','장흥','강진','해남','영암','무안','함평','영광','장성','완도','진도','신안'];
   if(jeonnam.some(c=>a.includes(c)) || /전남/.test(a)) return '전남';
   return '기타';
+}
+// 목록 한 줄에 보여줄 구체적인 지역(시/군)명 — 필터 버튼은 광역(regionOf)으로 묶고, 개별 줄은 실제 지역명으로 보여주기 위함
+function cityOf(address){
+  if(!address) return '기타';
+  const a = address;
+  const groups = [
+    ['서울'], ['인천'], ['대전'], ['세종'], ['대구'], ['부산'], ['울산'], ['제주'], ['광주'],
+    ['고양','파주','의정부','동두천','양주','포천','연천','가평','남양주','구리','김포'],
+    ['수원','성남','용인','안양','부천','안산','평택','화성','시흥','군포','의왕','하남','오산','이천','안성','여주','과천','광명'],
+    ['천안','아산','서산','당진','논산','공주','보령','계룡','금산','부여','서천','청양','홍성','예산','태안'],
+    ['청주','충주','제천','보은','옥천','영동','증평','진천','괴산','음성','단양'],
+    ['춘천','원주','강릉','동해','태백','속초','삼척','홍천','횡성','영월','평창','정선','철원','화천','양구','인제','고성','양양'],
+    ['포항','경주','김천','안동','구미','영주','영천','상주','문경','경산','군위','의성','청송','영양','영덕','청도','고령','성주','칠곡','예천','봉화','울진','울릉'],
+    ['창원','진주','통영','사천','김해','밀양','거제','양산','의령','함안','창녕','남해','하동','산청','함양','거창','합천'],
+    ['전주','군산','익산','정읍','남원','김제','완주','진안','무주','장수','임실','순창','고창','부안'],
+    ['목포','여수','순천','나주','광양','담양','곡성','구례','고흥','보성','화순','장흥','강진','해남','영암','무안','함평','영광','장성','완도','진도','신안']
+  ];
+  for(const list of groups){
+    for(const city of list){
+      if(a.includes(city)) return city;
+    }
+  }
+  return regionOf(a); // 매칭되는 시/군이 없으면 광역 이름이라도 보여줌
 }
 function backupReminderBannerHtml(){
   if(autoBackupFolderActive) return '';
@@ -4653,7 +4802,8 @@ function renderManualTab(){
 
     ${manualSection('📱','문자 간편등록 (퀵메뉴)', false,
       '문자로 오더를 주시는 분(예: 이영숙님)이 사무실 프로그램 로그인 없이 스마트폰에서 바로 문자를 등록할 수 있는 전용 화면입니다. [설정 → 📱 문자 간편등록 QR코드]로 QR을 찍거나, 앱 주소 뒤에 <code>?quick=1</code>을 붙여서 접속하면 이 화면만 뜹니다.', [
-      ['📦 입고된 발전기 리스트 보기', '지금 입고 상태인 발전기를 용량(kW)별로 몇 대 있는지 간단히 볼 수 있습니다.'],
+      ['📦 입고된 발전기 리스트 보기', '지금 입고 상태인 발전기를 용량(kW)별로 몇 대 있는지 간단히 볼 수 있고, 각 발전기의 셋팅전압을 눌러 바로 수정할 수도 있습니다. 옆의 빈 체크박스는 저장되지 않는 눈으로만 확인하는 용도로, 공장 현장에서 실물을 하나씩 확인할 때 체크해가며 쓰시면 됩니다.'],
+      ['🚚 출고중 발전기 리스트 보기', '지금 출고중인 발전기를 지역별로 몇 대 있는지 볼 수 있습니다. 목록에는 번호·모델·지역만 나오고, "상세보기"를 누르면 업체명·담당자·연락처·주소를 확인할 수 있습니다.'],
       ['📤 출고 문자 붙여넣기', '문자 앱에서 오더 내용을 복사한 뒤 "📋 복사한 문자 붙여넣기"를 누르면 바로 채워지고(맨 앞에 "★★★해성발전기 출고요청★★★" 문구가 자동으로 붙습니다), "등록하기"를 누르면 사무실 [출고 대기] 화면 상단 "📩 문자오더 원문" 카드로 곧바로 올라갑니다.'],
       ['🔻 철수 문자 붙여넣기', '회수(철수) 요청 문자를 복사해 붙여넣으면(맨 앞에 "★★★해성발전기 철수요청★★★" 문구가 자동으로 붙습니다) 등록 즉시 사무실 [출고중] 화면 상단에 철수요청 카드로 뜹니다.'],
       ['등록 후 문자로도 보내기', '등록하기 버튼 위 체크박스입니다. 체크한 채로 등록하면, 등록이 끝난 뒤 스마트폰 문자 앱이 내용이 채워진 채로 자동으로 열립니다. 받는 사람(또는 단체문자 그룹)은 문자 앱에서 직접 선택해서 보내야 하며, 자동으로 전송되지는 않습니다.'],
