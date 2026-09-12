@@ -559,7 +559,8 @@ function renderQuickModeUI(){
         <div style="font-size:15px;color:#555;margin-top:10px;text-align:center;">원하시는 메뉴를 골라주세요</div>
       </div>
       <button type="button" onclick="renderQuickModeStockList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📦 입고된 발전기 리스트 보기</button>
-      <button type="button" onclick="renderQuickModeOutList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:28px;">🚚 출고중 발전기 리스트 보기</button>
+      <button type="button" onclick="renderQuickModeOutList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">🚚 출고중 발전기 리스트 보기</button>
+      <button type="button" onclick="renderQmReservationList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:28px;">⏳ 출고대기 리스트 보기</button>
       <button type="button" onclick="renderQuickModePasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📤 출고 문자 붙여넣기</button>
       <button type="button" onclick="renderQuickModeReturnPasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">🔻 철수 문자 붙여넣기</button>
       <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;">📝 출고예약 등록</button>
@@ -653,7 +654,12 @@ async function renderQmStockListInner(){
   const capWrap = document.getElementById('qm-stock-capbtns');
   const wrap = document.getElementById('qm-stock-list');
   try{
-    const cur = await window.storage.get('gen-fleet-v2', true);
+    const [cur, curThresh] = await Promise.all([
+      window.storage.get('gen-fleet-v2', true),
+      window.storage.get('gen-warn-threshold-v1', true).catch(()=>null)
+    ]);
+    let warnThreshold = 50;
+    try{ warnThreshold = curThresh ? (JSON.parse(curThresh.value)||50) : 50; }catch(e){ warnThreshold = 50; }
     let gens = [];
     try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
     if(!Array.isArray(gens)) gens = [];
@@ -687,12 +693,28 @@ async function renderQmStockListInner(){
       const vStyle = vColor
         ? `border:1px solid ${vColor};color:${vColor};background:${vColor}15;`
         : `border:1px solid #ccc;color:#888;background:#f2f2f2;`;
+      let maintPill;
+      if(g.hoursKnown){
+        const elapsed = elapsedHours(g);
+        const remaining = getCycle(g) - elapsed;
+        const mColor = remaining<=0 ? '#C23B3B' : (remaining<=warnThreshold ? '#C97A1E' : '#2C6E49');
+        maintPill = `<span style="border:1px solid ${mColor};color:${mColor};background:${mColor}15;font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;white-space:nowrap;">마지막 정비 후 ${Math.round(elapsed).toLocaleString()}h 사용</span>`;
+      } else {
+        maintPill = `<span style="border:1px solid #C23B3B;color:#C23B3B;background:#C23B3B15;font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;white-space:nowrap;">확인불가</span>`;
+      }
       return `
-      <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
-        <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
-        <span style="font-size:14px;color:#333;text-align:right;flex:1;">${escR(g.model||'')}</span>
-        <button type="button" onclick="openQmVoltageEdit('${g.id}')" style="${vStyle}font-weight:800;font-size:13px;padding:6px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;">${escR(g.voltage)||'전압 미설정'}</button>
-        <input type="checkbox" style="width:24px;height:24px;flex-shrink:0;">
+      <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+          <div style="text-align:left;min-width:0;">
+            <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
+            <span style="font-size:13px;color:#333;margin-left:6px;">${escR(g.model||'')}</span>
+          </div>
+          <input type="checkbox" style="width:24px;height:24px;flex-shrink:0;">
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
+          <button type="button" onclick="openQmVoltageEdit('${g.id}')" style="${vStyle}font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;border-style:solid;border-width:1px;">${escR(g.voltage)||'전압 미설정'}</button>
+          ${maintPill}
+        </div>
       </div>`;
     }).join('');
   }catch(e){
@@ -830,9 +852,10 @@ async function renderQmOutListInner(){
           </div>
           <button type="button" onclick="openQmOutDetail('${g.id}')" style="background:#5B7FA6;border:none;color:#fff;font-weight:800;font-size:12px;padding:8px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0;">상세보기</button>
         </div>
-        <div style="display:flex;gap:6px;margin-top:8px;">
+        <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
           <span class="pill" style="background:#EAF2E9;color:#2C6E49;border:1px solid #2C6E49;font-size:10px;white-space:nowrap;">${escR(g.voltage)||'전압 미설정'}</span>
           <span class="pill" style="background:#E8EEF4;color:#5B7FA6;border:1px solid #5B7FA6;font-size:10px;">${escR(city)}</span>
+          <button type="button" onclick="openQmInProcess('${g.id}')" style="margin-left:8px;background:#2C6E49;border:none;color:#fff;font-weight:800;font-size:11.5px;padding:6px 10px;border-radius:16px;cursor:pointer;white-space:nowrap;">📥 입고처리</button>
         </div>
       </div>`;
     }).join('');
@@ -892,6 +915,668 @@ async function openQmOutDetail(id){
   }catch(e){
     const body = document.getElementById('qm-out-detail-body');
     if(body) body.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">불러오지 못했습니다.</div>';
+  }
+}
+function qmTankDimsOf(g, materials){
+  const m = materials && g && materials[g.model];
+  return {
+    width: (g && g.tankWidth>0) ? g.tankWidth : ((m && m.tankWidth) || null),
+    depth: (g && g.tankDepth>0) ? g.tankDepth : ((m && m.tankDepth) || null),
+    height: (g && g.tankHeight>0) ? g.tankHeight : ((m && m.tankHeight) || null)
+  };
+}
+function qmFuelBaselineOf(g, materials){
+  const m = materials && g && materials[g.model];
+  const modelDefault = (m && m.fuelBaselineHeight>0) ? m.fuelBaselineHeight : 0;
+  return (g && g.fuelBaselineHeight>0) ? g.fuelBaselineHeight : modelDefault;
+}
+function qmComputeFuelLiters(g, heightCm, materials){
+  const {width:w, depth:d, height:h} = qmTankDimsOf(g, materials);
+  if(heightCm==null || !(w>0 && d>0)) return null;
+  const baseline = qmFuelBaselineOf(g, materials);
+  const maxUsableHeight = h>0 ? Math.max(h - baseline, 0) : null;
+  const clampedHeight = (maxUsableHeight>0 && heightCm>0) ? Math.min(heightCm, maxUsableHeight) : heightCm;
+  return Math.round(w*d*clampedHeight/1000*10)/10;
+}
+async function openQmInProcess(id){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQmOutListInner()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div id="qm-in-body"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+    </div>
+  `);
+  try{
+    const [curGens, curMat] = await Promise.all([
+      window.storage.get('gen-fleet-v2', true),
+      window.storage.get('gen-materials-v1', true)
+    ]);
+    let gens = []; try{ gens = curGens ? JSON.parse(curGens.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    let materials = {}; try{ materials = curMat ? JSON.parse(curMat.value) : {}; }catch(e){ materials = {}; }
+    const g = gens.find(x=>x && String(x.id)===String(id));
+    const body = document.getElementById('qm-in-body');
+    if(!body) return; // 화면이 이미 닫혔으면 무시
+    if(!g || g.status!=='out'){
+      body.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">해당 발전기를 찾을 수 없습니다.</div>';
+      return;
+    }
+    const r = g.rental || {};
+    const tankDims = qmTankDimsOf(g, materials);
+    const baseline = qmFuelBaselineOf(g, materials);
+    const today = todayStr();
+    const hasFuelRecord = (r.fuelRequested!=null || r.fuelActual!=null);
+    body.innerHTML = `
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:22px;font-weight:800;color:#2C6E49;">📥 입고처리</div>
+        <div style="font-size:14px;color:#555;margin-top:6px;">${escR(g.id)} · ${escR(g.model||'')} · ${escR(r.customer||'-')}</div>
+      </div>
+      ${r.note? `<div style="background:#FBEAEA;border:1px solid #C23B3B;border-radius:10px;padding:12px 14px;margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:800;color:#C23B3B;margin-bottom:4px;">📝 출고시 비고</div>
+        <div style="font-size:13.5px;color:#C23B3B;line-height:1.4;">${escR(r.note)}</div>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:#C23B3B;cursor:pointer;">
+          <input type="checkbox" id="qmin-note-ack"> 위 비고 내용을 확인했습니다
+        </label>
+      </div>` : ''}
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px;margin-bottom:10px;">
+        <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:6px;">입고일</label>
+        <input type="date" id="qmin-date" value="${today}" style="width:100%;font-size:16px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;">
+      </div>
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px;margin-bottom:10px;">
+        <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:6px;">전압</label>
+        <input type="text" id="qmin-voltage" value="${escR(r.voltage||g.voltage||'')}" placeholder="예: 380V" style="width:100%;font-size:16px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;">
+        ${voltageButtonsHtml('qmin-voltage')}
+      </div>
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px;margin-bottom:10px;">
+        ${g.hoursKnown ? `
+        <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:6px;">입고시(반납) 누적 사용시간(h)</label>
+        <input type="number" id="qmin-endhours" placeholder="예: ${Math.round((g.hours||0))}" min="${r.startHours||0}" style="width:100%;font-size:16px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;">
+        <div style="font-size:12.5px;color:#C23B3B;font-weight:700;margin-top:6px;">출고시 누적시간: ${(r.startHours||0).toLocaleString()}h</div>
+        ` : `
+        <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:4px;">누적 사용시간</label>
+        <div style="font-size:14px;color:#C23B3B;font-weight:700;">확인불가</div>
+        `}
+      </div>
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px;margin-bottom:10px;">
+        ${hasFuelRecord ? `
+        <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:4px;">⛽ 측정한 연료 높이(cm)${baseline>0? ` (기준높이 ${baseline}cm 위로 올라온 높이만 입력)` : ''}</label>
+        <div style="font-size:12.5px;color:#2C4A66;font-weight:700;margin-bottom:8px;">출고시 요청 ${r.fuelRequested!=null?r.fuelRequested:'-'}L / 주입 ${r.fuelActual!=null?r.fuelActual:'-'}L</div>
+        <input type="hidden" id="qmin-fuel-notused" value="">
+        <div id="qmin-fuel-height-wrap">
+          <input type="number" id="qmin-fuel-height" min="-5" step="0.5" placeholder="예: 32" style="width:100%;font-size:16px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;" oninput="qmCalcRemainingFuel(${JSON.stringify(tankDims)}, ${baseline})">
+          ${(tankDims.width>0 && tankDims.depth>0) ? `<div style="font-size:11.5px;color:#888;margin-top:4px;">탱크 규격 기준 자동 환산</div>` : `<div style="font-size:11.5px;color:#C97A1E;margin-top:4px;">탱크 규격 미등록 (측정 높이만 기록)</div>`}
+        </div>
+        <div id="qmin-fuel-result" style="margin-top:8px;font-size:14px;font-weight:800;color:#2C6E49;display:none;"></div>
+        <button type="button" onclick="qmToggleFuelNotUsed()" id="qmin-fuel-notused-btn" style="margin-top:8px;background:#fff;border:2px solid #888;color:#555;font-weight:700;font-size:12.5px;padding:6px 12px;border-radius:16px;cursor:pointer;">⛽ 연료사용안함</button>
+        ` : `<div style="font-size:13px;color:#888;">이 출고는 연료 요청·주입 기록이 없어 연료 확인이 필요 없습니다.</div>`}
+      </div>
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px;margin-bottom:14px;">
+        <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:8px;">부자재 회수 여부</label>
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="qmin-sup-yes" onclick="qmSetSupRecovered(true)" style="flex:1;padding:10px;border-radius:10px;border:2px solid #2C6E49;background:#2C6E49;color:#fff;font-weight:800;cursor:pointer;">회수됨</button>
+          <button type="button" id="qmin-sup-no" onclick="qmSetSupRecovered(false)" style="flex:1;padding:10px;border-radius:10px;border:2px solid #888;background:#fff;color:#555;font-weight:800;cursor:pointer;">회수안됨</button>
+        </div>
+        <input type="hidden" id="qmin-sup-recovered" value="yes">
+        <textarea id="qmin-sup-note" placeholder="회수 안 된 부자재나 사유를 적어주세요" style="display:none;width:100%;margin-top:8px;font-size:14px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;min-height:60px;"></textarea>
+      </div>
+      <div id="qmin-status" style="display:none;margin-bottom:14px;padding:14px;border-radius:12px;font-size:15px;font-weight:700;text-align:center;"></div>
+      <button id="qmin-save-btn" onclick="submitQmInProcess('${id}')" style="width:100%;padding:18px;font-size:20px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">입고처리 완료</button>
+    `;
+  }catch(e){
+    const body = document.getElementById('qm-in-body');
+    if(body) body.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">불러오지 못했습니다.</div>';
+  }
+}
+function qmSetSupRecovered(recovered){
+  document.getElementById('qmin-sup-recovered').value = recovered ? 'yes' : 'no';
+  document.getElementById('qmin-sup-yes').style.background = recovered ? '#2C6E49' : '#fff';
+  document.getElementById('qmin-sup-yes').style.color = recovered ? '#fff' : '#555';
+  document.getElementById('qmin-sup-no').style.background = recovered ? '#fff' : '#C23B3B';
+  document.getElementById('qmin-sup-no').style.color = recovered ? '#555' : '#fff';
+  document.getElementById('qmin-sup-no').style.borderColor = recovered ? '#888' : '#C23B3B';
+  document.getElementById('qmin-sup-note').style.display = recovered ? 'none' : 'block';
+}
+function qmCalcRemainingFuel(tankDims, baseline){
+  const heightEl = document.getElementById('qmin-fuel-height');
+  const resultEl = document.getElementById('qmin-fuel-result');
+  if(!heightEl || !resultEl) return;
+  const height = heightEl.value==='' ? null : Number(heightEl.value);
+  if(height==null || !(tankDims.width>0 && tankDims.depth>0)){ resultEl.style.display='none'; return; }
+  const maxUsable = tankDims.height>0 ? Math.max(tankDims.height-baseline, 0) : null;
+  const clamped = (maxUsable>0 && height>0) ? Math.min(height, maxUsable) : height;
+  const liters = Math.round(tankDims.width*tankDims.depth*clamped/1000*10)/10;
+  resultEl.style.display = 'block';
+  resultEl.textContent = `약 ${liters}L 남음`;
+}
+function qmToggleFuelNotUsed(){
+  const el = document.getElementById('qmin-fuel-notused');
+  const btn = document.getElementById('qmin-fuel-notused-btn');
+  const heightWrap = document.getElementById('qmin-fuel-height-wrap');
+  const isOn = el.value==='yes';
+  el.value = isOn ? '' : 'yes';
+  if(heightWrap) heightWrap.style.display = isOn ? 'block' : 'none';
+  if(btn){
+    btn.style.background = isOn ? '#fff' : '#C97A1E';
+    btn.style.color = isOn ? '#555' : '#fff';
+    btn.style.borderColor = isOn ? '#888' : '#C97A1E';
+  }
+}
+async function submitQmInProcess(id){
+  const btn = document.getElementById('qmin-save-btn');
+  const box = document.getElementById('qmin-status');
+  box.style.display = 'none';
+  const showErr = (msg)=>{
+    box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+    box.textContent = msg;
+  };
+  try{
+    const [curGens, curMat, curRentals] = await Promise.all([
+      window.storage.get('gen-fleet-v2', true),
+      window.storage.get('gen-materials-v1', true),
+      window.storage.get('gen-rentals-v2', true)
+    ]);
+    let gens = []; try{ gens = curGens ? JSON.parse(curGens.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    let materials = {}; try{ materials = curMat ? JSON.parse(curMat.value) : {}; }catch(e){ materials = {}; }
+    let rentals = []; try{ rentals = curRentals ? JSON.parse(curRentals.value) : []; }catch(e){ rentals = []; }
+    if(!Array.isArray(rentals)) rentals = [];
+    const g = gens.find(x=>x && String(x.id)===String(id));
+    if(!g || g.status!=='out'){ showErr('해당 발전기를 찾을 수 없습니다.'); return; }
+    const r = g.rental || {};
+
+    const noteAckEl = document.getElementById('qmin-note-ack');
+    if(r.note && noteAckEl && !noteAckEl.checked){ showErr('출고시 비고 내용을 확인했다는 체크를 해야 입고 처리할 수 있습니다.'); return; }
+
+    const inDate = document.getElementById('qmin-date').value;
+    const voltage = (document.getElementById('qmin-voltage').value||'').trim();
+    const endHoursEl = document.getElementById('qmin-endhours');
+    const endHours = endHoursEl ? (endHoursEl.value==='' ? null : Number(endHoursEl.value)) : null;
+
+    if(!inDate || (g.hoursKnown && (endHours===null || isNaN(endHours) || endHours < (r.startHours||0)))){
+      showErr('입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다)');
+      return;
+    }
+    if(r.outDate && inDate && g.hoursKnown && endHours!==null){
+      const usedH = endHours - (r.startHours||0);
+      const outD = new Date(r.outDate+'T00:00:00');
+      const inD = new Date(inDate+'T00:00:00');
+      const days = Math.max(1, Math.round((inD-outD)/86400000));
+      const avgDaily = usedH/days;
+      if(avgDaily > 24){
+        showErr(`누적시간 차이(${usedH.toLocaleString()}h)를 임대일수(${days}일)로 나누면 하루 평균 ${avgDaily.toFixed(1)}시간이 됩니다. 하루는 24시간을 넘을 수 없으니 누적시간을 다시 확인해주세요.`);
+        return;
+      }
+    }
+    const supRecoveredVal = document.getElementById('qmin-sup-recovered').value;
+    const suppliesRecovered = supRecoveredVal==='yes';
+    const suppliesNote = suppliesRecovered ? '' : (document.getElementById('qmin-sup-note').value||'').trim();
+
+    const fuelNotUsedEl = document.getElementById('qmin-fuel-notused');
+    const fuelNotUsed = !!(fuelNotUsedEl && fuelNotUsedEl.value==='yes');
+    const fuelHeightEl = document.getElementById('qmin-fuel-height');
+    const measuredFuelHeightCm = (!fuelNotUsed && fuelHeightEl && fuelHeightEl.value!=='') ? Number(fuelHeightEl.value) : null;
+    let remainingFuelLiters = null;
+    if(measuredFuelHeightCm!=null) remainingFuelLiters = qmComputeFuelLiters(g, measuredFuelHeightCm, materials);
+    const fuelExhaustNote = (remainingFuelLiters===0) ? '출고시 연료 모두 소진되어 입고' : '';
+    const combinedNote = [r.note, fuelExhaustNote].filter(Boolean).join(' / ');
+
+    if(btn){ btn.disabled = true; btn.textContent = '처리 중...'; }
+
+    rentals.push({
+      id: 'q'+Date.now()+Math.random().toString(36).slice(2,7), genId: g.id, customer: r.customer, manager: r.manager, phone: r.phone,
+      site: r.site, address: r.address, supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', suppliesRecovered, suppliesNote,
+      fuelRequested: r.fuelRequested, fuelActual: r.fuelActual, usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, note: combinedNote,
+      outDate: r.outDate, inDate, startHours: r.startHours, endHours,
+      usedHours: endHours!=null ? endHours - (r.startHours||0) : null, longTerm: r.longTerm, estDaily: r.estDaily,
+      voltage, outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: r.loadConfirmedBy||null, inProcessedBy: '문자 간편등록(퀵메뉴)', inProcessedAt: nowDateTimeStr(),
+      measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
+      paymentConfirmed: r.paymentConfirmed||false, forcedOut: r.forcedOut||false, forceReason: r.forceReason||'', forcedBy: r.forcedBy||null
+    });
+
+    g.status = 'in';
+    if(g.hoursKnown && endHours!==null) g.hours = endHours;
+    g.voltage = voltage;
+    g.voltageUpdatedAt = nowDateTimeStr();
+    g.voltageUpdatedAtMs = Date.now();
+    g.voltageUpdatedBy = '문자 간편등록(퀵메뉴)';
+    g.rental = null;
+
+    await Promise.all([
+      window.storage.set('gen-fleet-v2', JSON.stringify(gens), true),
+      window.storage.set('gen-rentals-v2', JSON.stringify(rentals), true)
+    ]);
+
+    box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
+    box.textContent = '✅ 입고처리 완료되었습니다!';
+    if(btn) btn.textContent = '입고처리 완료';
+    setTimeout(()=>{ if(document.getElementById('qmin-status')) renderQmOutListInner(); }, 800);
+  }catch(e){
+    showErr('처리하지 못했습니다. 다시 시도해주세요.');
+    if(btn){ btn.disabled = false; btn.textContent = '입고처리 완료'; }
+  }
+}
+let qmResListCache = null; // 최근 불러온 출고대기 목록(뒤로가기 시 재사용)
+async function renderQmReservationList(){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQuickModeUI()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:24px;font-weight:800;color:#8A6D00;">⏳ 출고대기</div>
+        <div style="font-size:14px;color:#555;margin-top:6px;">출고일 순서대로 보여드려요</div>
+      </div>
+      <div id="qm-res-list"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+    </div>
+  `);
+  await qmRefreshReservationList();
+}
+async function qmRefreshReservationList(){
+  const wrap = document.getElementById('qm-res-list');
+  try{
+    const cur = await window.storage.get('gen-reservations-v1', true);
+    let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    list.sort((a,b)=>(a.outDate||'').localeCompare(b.outDate||''));
+    if(!document.getElementById('qm-res-list')) return; // 화면이 이미 닫혔으면 무시
+    if(list.length===0){
+      wrap.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">지금 출고대기 중인 건이 없습니다.</div>';
+      return;
+    }
+    wrap.innerHTML = list.map(r=>{
+      const assigned = r.genId && r.genId!==UNASSIGNED_GEN_ID;
+      return `
+      <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+          <span style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(r.customer||r.site||'거래처 미기재')}</span>
+          <span style="font-size:12px;color:#888;white-space:nowrap;">${r.outDate? fmtDateKR(r.outDate) : '출고일 미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</span>
+        </div>
+        <div style="font-size:13px;color:#333;margin-top:4px;">
+          ${assigned? `<span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+          ${assigned
+            ? `<button type="button" onclick="openQmConfirmLoad('${r.id}')" style="background:#2C6E49;border:none;color:#fff;font-weight:800;font-size:12px;padding:8px 12px;border-radius:16px;cursor:pointer;">🚚 상차완료</button>`
+            : `<button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#8A6D00;border:none;color:#fff;font-weight:800;font-size:12px;padding:8px 12px;border-radius:16px;cursor:pointer;">🔧 발전기 배정</button>`}
+          <button type="button" onclick="openQmEditReservation('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-weight:800;font-size:12px;padding:6px 12px;border-radius:16px;cursor:pointer;">내용보기/수정</button>
+          <button type="button" onclick="cancelQmReservation('${r.id}')" style="background:#fff;border:2px solid #C23B3B;color:#C23B3B;font-weight:800;font-size:12px;padding:6px 12px;border-radius:16px;cursor:pointer;">${r.pendingLoad? '출고취소':'예약취소'}</button>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    if(document.getElementById('qm-res-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">목록을 불러오지 못했습니다.</div>';
+  }
+}
+function cancelQmReservation(resId){
+  openConfirmModal('이 출고대기 건을 취소할까요?', async function(){
+    try{
+      const cur = await window.storage.get('gen-reservations-v1', true);
+      let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+      if(!Array.isArray(list)) list = [];
+      list = list.filter(x=>x.id!==resId);
+      await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
+      qmRefreshReservationList();
+    }catch(e){
+      showInfoModal('취소하지 못했습니다. 다시 시도해주세요.');
+    }
+  }, '취소하기', '그대로 두기');
+}
+async function openQmAssignGen(resId){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQmReservationList()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:22px;font-weight:800;color:#8A6D00;">🔧 발전기 배정</div>
+        <div id="qmag-sub" style="font-size:14px;color:#555;margin-top:6px;">불러오는 중...</div>
+      </div>
+      <div id="qmag-list"></div>
+    </div>
+  `);
+  try{
+    const [resCur, fleetCur] = await Promise.all([
+      window.storage.get('gen-reservations-v1', true),
+      window.storage.get('gen-fleet-v2', true)
+    ]);
+    let list = []; try{ list = resCur ? JSON.parse(resCur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    let gens = []; try{ gens = fleetCur ? JSON.parse(fleetCur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    const r = list.find(x=>x.id===resId);
+    if(!document.getElementById('qmag-sub')) return; // 화면이 이미 닫혔으면 무시
+    if(!r){ document.getElementById('qmag-sub').textContent = '해당 출고대기 건을 찾을 수 없습니다.'; return; }
+    const reservedGenIds = new Set(list.map(x=>x.genId));
+    const candidates = gens.filter(g=>g && !g.retired && g.status==='in' && !g.underRepair && !reservedGenIds.has(g.id))
+      .sort((a,b)=>String(a.id).localeCompare(String(b.id), 'ko', {numeric:true}));
+    document.getElementById('qmag-sub').textContent = `${r.customer||r.site||'거래처 미기재'} · 배정할 발전기(입고 상태)를 골라주세요`;
+    const listWrap = document.getElementById('qmag-list');
+    if(candidates.length===0){
+      listWrap.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">지금 배정할 수 있는(입고 상태인) 발전기가 없습니다.</div>';
+      return;
+    }
+    listWrap.innerHTML = candidates.map(g=>`
+      <button type="button" onclick="submitQmAssignGen('${resId}','${g.id}')" style="width:100%;text-align:left;background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
+        <span style="font-size:13px;color:#333;">${escR(g.model||'미설정')}</span>
+      </button>`).join('');
+  }catch(e){
+    const sub = document.getElementById('qmag-sub');
+    if(sub) sub.textContent = '불러오지 못했습니다.';
+  }
+}
+async function submitQmAssignGen(resId, genId){
+  try{
+    const [resCur, fleetCur] = await Promise.all([
+      window.storage.get('gen-reservations-v1', true),
+      window.storage.get('gen-fleet-v2', true)
+    ]);
+    let list = []; try{ list = resCur ? JSON.parse(resCur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    let gens = []; try{ gens = fleetCur ? JSON.parse(fleetCur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    const r = list.find(x=>x.id===resId);
+    const g = gens.find(x=>x && x.id===genId);
+    if(!r){ showInfoModal('해당 출고대기 건을 찾을 수 없습니다.'); return; }
+    if(list.some(x=>x.id!==resId && x.genId===genId)){
+      showInfoModal('방금 다른 곳에서 같은 발전기를 먼저 배정했습니다. 다시 선택해주세요.');
+      openQmAssignGen(resId);
+      return;
+    }
+    if(!g || g.status!=='in' || g.underRepair){
+      showInfoModal('선택한 발전기를 지금은 배정할 수 없습니다. 다시 선택해주세요.');
+      openQmAssignGen(resId);
+      return;
+    }
+    r.genId = genId;
+    r.pendingLoad = true;
+    r.startHours = g.hoursKnown ? (g.hours||0) : 0;
+    await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
+    renderQmReservationList();
+  }catch(e){
+    showInfoModal('배정하지 못했습니다. 다시 시도해주세요.');
+  }
+}
+async function openQmConfirmLoad(resId){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQmReservationList()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div id="qmcl-body"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+    </div>
+  `);
+  try{
+    const cur = await window.storage.get('gen-reservations-v1', true);
+    let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    const r = list.find(x=>x.id===resId);
+    const body = document.getElementById('qmcl-body');
+    if(!body) return; // 화면이 이미 닫혔으면 무시
+    if(!r){ body.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">해당 출고대기 건을 찾을 수 없습니다.</div>'; return; }
+    const needFuel = (r.fuelRequested!=null || r.fuelActual!=null);
+    const fuelAmt = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
+    const infoRows = [
+      ['거래처', r.customer||r.site||''],
+      ['담당자', r.manager||''],
+      ['연락처', r.phone||''],
+      ['현장 주소', r.address||''],
+      ['전압', r.voltage||'']
+    ].filter(([k,v])=>v);
+    body.innerHTML = `
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:22px;font-weight:800;color:#2C6E49;">🚚 상차 완료 확인</div>
+        <div style="font-size:14px;color:#555;margin-top:6px;">${escR(r.genId)}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px;margin-bottom:12px;">
+        ${infoRows.map(([k,v])=>`
+          <div style="padding:8px 0;border-bottom:1px solid #eee;">
+            <div style="font-size:12px;color:#888;">${k}</div>
+            <div style="font-size:15px;font-weight:700;color:#222;">${escR(v)}</div>
+          </div>`).join('') || '<div style="color:#999;font-size:13px;">등록된 거래처 정보가 없습니다.</div>'}
+        <div style="margin-top:10px;">
+          <div style="font-size:12px;color:#888;margin-bottom:4px;">부자재</div>
+          ${suppliesListHtml(r.suppliesItems, r.suppliesCustom, r.supplies)}
+        </div>
+        ${r.note? `<div style="margin-top:10px;font-size:13px;color:#C23B3B;font-weight:700;">📝 비고: ${escR(r.note)}</div>` : ''}
+      </div>
+      ${needFuel? `
+      <div style="background:#E4ECF2;border:1px solid #2C4A66;border-radius:10px;padding:14px;margin-bottom:12px;">
+        <div style="font-size:14px;color:#1B3247;font-weight:800;margin-bottom:8px;">⛽ 연료 ${fuelAmt}L를 넣어드리기로 되어 있습니다.</div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
+          <input type="checkbox" id="qmcl-fuel-ack"> 연료를 실제로 넣었습니다
+        </label>
+      </div>` : ''}
+      <div id="qmcl-status" style="display:none;margin-bottom:14px;padding:14px;border-radius:12px;font-size:15px;font-weight:700;text-align:center;"></div>
+      <button id="qmcl-save-btn" onclick="submitQmConfirmLoad('${resId}', ${needFuel})" style="width:100%;padding:18px;font-size:20px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">상차 완료</button>
+    `;
+  }catch(e){
+    const body = document.getElementById('qmcl-body');
+    if(body) body.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">불러오지 못했습니다.</div>';
+  }
+}
+async function submitQmConfirmLoad(resId, needFuel){
+  const btn = document.getElementById('qmcl-save-btn');
+  const box = document.getElementById('qmcl-status');
+  box.style.display = 'none';
+  if(needFuel){
+    const ack = document.getElementById('qmcl-fuel-ack');
+    if(!ack || !ack.checked){
+      box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+      box.textContent = '연료 주입 확인 체크를 해야 상차 완료할 수 있습니다.';
+      return;
+    }
+  }
+  if(btn){ btn.disabled = true; btn.textContent = '처리 중...'; }
+  try{
+    const [resCur, fleetCur, supCur] = await Promise.all([
+      window.storage.get('gen-reservations-v1', true),
+      window.storage.get('gen-fleet-v2', true),
+      window.storage.get('gen-supplies-stock-v1', true)
+    ]);
+    let list = []; try{ list = resCur ? JSON.parse(resCur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    let gens = []; try{ gens = fleetCur ? JSON.parse(fleetCur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    let suppliesStock = {}; try{ suppliesStock = supCur ? JSON.parse(supCur.value) : {}; }catch(e){ suppliesStock = {}; }
+
+    const r = list.find(x=>x.id===resId);
+    if(!r){ box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34'; box.textContent='해당 출고대기 건을 찾을 수 없습니다.'; if(btn){btn.disabled=false;btn.textContent='상차 완료';} return; }
+    const g = gens.find(x=>x && x.id===r.genId);
+    if(!g){ box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34'; box.textContent='해당 발전기를 찾을 수 없습니다.'; if(btn){btn.disabled=false;btn.textContent='상차 완료';} return; }
+    if(g.status==='out'){
+      list = list.filter(x=>x.id!==resId);
+      await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
+      box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+      box.textContent = '이미 출고된 발전기였어서 출고대기 목록에서 정리했습니다.';
+      setTimeout(()=>{ if(document.getElementById('qmcl-status')) renderQmReservationList(); }, 1200);
+      return;
+    }
+    if(g.underRepair){
+      box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+      box.textContent = '고장 수리 중인 발전기라 상차완료 처리할 수 없습니다.';
+      if(btn){ btn.disabled = false; btn.textContent = '상차 완료'; }
+      return;
+    }
+
+    g.status = 'out';
+    if(g.hoursKnown) g.hours = r.startHours||0;
+    g.rental = {
+      customer: r.customer, manager: r.manager, phone: r.phone, site: r.site, address: r.address,
+      supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', voltage: r.voltage, qty: r.qty,
+      fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
+      usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null,
+      outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
+      outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: '문자 간편등록(퀵메뉴)'
+    };
+    if(r.suppliesItems && r.suppliesItems.length){
+      r.suppliesItems.forEach(it=>{
+        suppliesStock[it.name] = (suppliesStock[it.name]!==undefined ? suppliesStock[it.name] : 0) - (it.qty||1);
+      });
+    }
+    list = list.filter(x=>x.id!==resId);
+
+    await Promise.all([
+      window.storage.set('gen-fleet-v2', JSON.stringify(gens), true),
+      window.storage.set('gen-reservations-v1', JSON.stringify(list), true),
+      window.storage.set('gen-supplies-stock-v1', JSON.stringify(suppliesStock), true)
+    ]);
+
+    box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
+    box.textContent = '✅ 상차완료 - 출고 처리되었습니다!';
+    if(btn) btn.textContent = '상차 완료';
+    setTimeout(()=>{ if(document.getElementById('qmcl-status')) renderQmReservationList(); }, 900);
+  }catch(e){
+    box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+    box.textContent = '처리하지 못했습니다. 다시 시도해주세요.';
+    if(btn){ btn.disabled = false; btn.textContent = '상차 완료'; }
+  }
+}
+async function openQmEditReservation(resId){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQmReservationList()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div id="qmre-body"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+    </div>
+  `);
+  try{
+    const cur = await window.storage.get('gen-reservations-v1', true);
+    let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    const r = list.find(x=>x.id===resId);
+    const body = document.getElementById('qmre-body');
+    if(!body) return; // 화면이 이미 닫혔으면 무시
+    if(!r){ body.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">해당 출고대기 건을 찾을 수 없습니다.</div>'; return; }
+    const inputStyle = 'width:100%;font-size:18px;padding:14px;border-radius:12px;border:2px solid #ccc;box-sizing:border-box;';
+    const labelStyle = 'display:block;font-size:14px;font-weight:800;color:#333;margin-bottom:6px;';
+    const arriveTimeOpts = [...Array.from({length:7},(_,i)=>`오전 ${i+6}시`), ...Array.from({length:6},(_,i)=>`오후 ${i+1}시`)];
+    const isCustomArrive = r.arriveTime && r.arriveTime!=='지금즉시' && !arriveTimeOpts.includes(r.arriveTime);
+    body.innerHTML = `
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:22px;font-weight:800;color:#5B7FA6;">내용보기/수정</div>
+        <div style="font-size:14px;color:#555;margin-top:4px;">${r.genId && r.genId!==UNASSIGNED_GEN_ID? escR(r.genId) : '🅾 미지정'}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div><label style="${labelStyle}">거래처명</label><input id="qmre-customer" type="text" style="${inputStyle}" value="${escR(r.customer||'')}"></div>
+        <div><label style="${labelStyle}">현장 주소</label><input id="qmre-address" type="text" style="${inputStyle}" value="${escR(r.address||'')}"></div>
+        <div><label style="${labelStyle}">담당자</label><input id="qmre-manager" type="text" style="${inputStyle}" value="${escR(r.manager||'')}"></div>
+        <div><label style="${labelStyle}">연락처</label><input id="qmre-phone" type="tel" style="${inputStyle}" value="${escR(r.phone||'')}" oninput="this.value=formatPhoneNumber(this.value)"></div>
+        <div><label style="${labelStyle}">전압</label><input id="qmre-voltage" type="text" style="${inputStyle}" value="${escR(r.voltage||'')}">${voltageButtonsHtml('qmre-voltage')}</div>
+        <div><label style="${labelStyle}">출고예정일</label><input id="qmre-outdate" type="date" style="${inputStyle}" value="${escR(r.outDate||'')}"></div>
+        <div>
+          <label style="${labelStyle}">도착시간</label>
+          <select id="qmre-arrivetime-select" style="${inputStyle}" onchange="onQmreArriveTimeSelect()">
+            <option value="">선택 안함</option>
+            <option value="지금즉시" ${r.arriveTime==='지금즉시'?'selected':''}>지금즉시</option>
+            ${arriveTimeOpts.map(v=>`<option value="${v}" ${r.arriveTime===v?'selected':''}>${v}</option>`).join('')}
+            <option value="__custom__" ${isCustomArrive?'selected':''}>직접 입력...</option>
+          </select>
+          <input type="text" id="qmre-arrivetime" value="${isCustomArrive? escR(r.arriveTime) : ''}" placeholder="예: 오전 6시 30분" style="${inputStyle};display:${isCustomArrive?'block':'none'};margin-top:8px;">
+        </div>
+        <div><label style="${labelStyle}">운임료 부담</label>
+          <select id="qmre-freight" style="${inputStyle}">
+            <option value="우리부담" ${r.freightBearer==='우리부담'?'selected':''}>우리부담</option>
+            <option value="고객부담" ${r.freightBearer==='고객부담'?'selected':''}>고객부담(배차하지마세요)</option>
+          </select>
+        </div>
+        <div>
+          <label style="${labelStyle}">연료</label>
+          <div style="background:#E4ECF2;border:1px solid #2C4A66;border-radius:10px;padding:12px 14px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:15px;font-weight:800;color:#333;">
+              <input type="checkbox" id="qmre-fuel-toggle" ${(r.fuelRequested!=null||r.fuelActual!=null)?'checked':''} onchange="toggleFuelFields('qmre-fuel-toggle','qmre-fuel-wrap')" style="width:20px;height:20px;">
+              ⛽ 연료 넣고 출고
+            </label>
+            <div id="qmre-fuel-wrap" style="display:${(r.fuelRequested!=null||r.fuelActual!=null)?'block':'none'};margin-top:12px;">
+              <div style="display:flex;gap:10px;">
+                <div style="flex:1;"><label style="${labelStyle}">고객요청(L)</label><input id="qmre-fuel-req" type="number" min="0" style="${inputStyle};border-color:#2C4A66;color:#2C4A66;font-weight:700;" value="${r.fuelRequested!=null?r.fuelRequested:''}"></div>
+                <div style="flex:1;"><label style="${labelStyle}">실제주입(L)</label><input id="qmre-fuel-actual" type="number" min="0" style="${inputStyle};border-color:#8A5A00;color:#8A5A00;font-weight:700;" value="${r.fuelActual!=null?r.fuelActual:''}"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div><label style="${labelStyle}">상차일자</label><input id="qmre-loaddate" type="date" style="${inputStyle}" value="${escR(r.loadDate||r.outDate||'')}"></div>
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1;"><label style="${labelStyle}">사용일수</label><input id="qmre-usagedays" type="number" min="0" style="${inputStyle}" value="${r.usageDays!=null?r.usageDays:''}"></div>
+          <div style="flex:1;"><label style="${labelStyle}">예상가동시간(h/일)</label><input id="qmre-estdaily" type="number" step="0.5" min="0" style="${inputStyle}" value="${r.estDaily!=null?r.estDaily:''}"></div>
+        </div>
+        <div><label style="${labelStyle}">부자재</label>${suppliesPickerHtml('qmre-supplies', r.suppliesItems, r.suppliesCustom, '')}</div>
+        <div><label style="${labelStyle}">비고</label><textarea id="qmre-note" style="${inputStyle}" rows="3">${escR(r.note||'')}</textarea></div>
+      </div>
+      <div id="qmre-status" style="display:none;margin-top:14px;padding:14px;border-radius:12px;font-size:15px;font-weight:700;text-align:center;"></div>
+      <button id="qmre-save-btn" onclick="submitQmEditReservation('${resId}')" style="width:100%;margin-top:16px;padding:18px;font-size:20px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:16px;cursor:pointer;">저장</button>
+    `;
+    initSuppliesPicker('qmre-supplies');
+  }catch(e){
+    const body = document.getElementById('qmre-body');
+    if(body) body.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">불러오지 못했습니다.</div>';
+  }
+}
+function onQmreArriveTimeSelect(){
+  const sel = document.getElementById('qmre-arrivetime-select');
+  const input = document.getElementById('qmre-arrivetime');
+  if(!sel || !input) return;
+  if(sel.value==='__custom__'){
+    input.style.display = 'block'; input.value = ''; input.focus();
+  } else {
+    input.style.display = 'none'; input.value = sel.value;
+  }
+}
+async function submitQmEditReservation(resId){
+  const btn = document.getElementById('qmre-save-btn');
+  const box = document.getElementById('qmre-status');
+  box.style.display = 'none';
+  const customer = document.getElementById('qmre-customer').value.trim();
+  const address = document.getElementById('qmre-address').value.trim();
+  const manager = document.getElementById('qmre-manager').value.trim();
+  const phone = document.getElementById('qmre-phone').value.trim();
+  const voltage = document.getElementById('qmre-voltage').value.trim();
+  const outDate = document.getElementById('qmre-outdate').value;
+  const freightBearer = document.getElementById('qmre-freight').value;
+  const note = document.getElementById('qmre-note').value.trim();
+  const suppliesEl = document.getElementById('qmre-supplies');
+  const supplies = suppliesEl ? suppliesEl.value.trim() : '';
+  let suppliesItems = []; try{ suppliesItems = JSON.parse(document.getElementById('qmre-supplies-items').value || '[]'); }catch(e){ suppliesItems = []; }
+  const suppliesCustomEl = document.getElementById('qmre-supplies-custom');
+  const suppliesCustom = suppliesCustomEl ? suppliesCustomEl.value.trim() : '';
+  const fuelEnabled = document.getElementById('qmre-fuel-toggle').checked;
+  const fuelRequested = fuelEnabled ? (Number(document.getElementById('qmre-fuel-req').value)||null) : null;
+  const fuelActual = fuelEnabled ? (Number(document.getElementById('qmre-fuel-actual').value)|| fuelRequested || null) : null;
+  const arriveTime = document.getElementById('qmre-arrivetime').value.trim() || null;
+  const loadDateEl = document.getElementById('qmre-loaddate');
+  const loadDate = (loadDateEl && loadDateEl.value) ? loadDateEl.value : outDate;
+  const usageDays = Number(document.getElementById('qmre-usagedays').value)||null;
+  const estDailyRaw = Number(document.getElementById('qmre-estdaily').value||0);
+  const estDaily = estDailyRaw>0 ? estDailyRaw : null;
+
+  if(!customer || !address || !phone){
+    box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+    box.textContent = '거래처명, 현장 주소, 담당자 연락처를 모두 입력해주세요.';
+    return;
+  }
+  if(!outDate){
+    box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+    box.textContent = '출고예정일을 입력해주세요.';
+    return;
+  }
+  if(btn){ btn.disabled = true; btn.textContent = '저장 중...'; }
+  try{
+    const cur = await window.storage.get('gen-reservations-v1', true);
+    let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    const r = list.find(x=>x.id===resId);
+    if(!r){
+      box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+      box.textContent = '해당 출고대기 건을 찾을 수 없습니다 (이미 처리되었을 수 있습니다).';
+      if(btn){ btn.disabled = false; btn.textContent = '저장'; }
+      return;
+    }
+    Object.assign(r, {
+      customer, site: customer, address, manager, phone, voltage, outDate, arriveTime,
+      freightBearer, note, supplies, suppliesItems, suppliesCustom,
+      fuelRequested, fuelActual, loadDate, usageDays, estDaily
+    });
+    await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
+    box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
+    box.textContent = '✅ 저장되었습니다!';
+    if(btn) btn.textContent = '저장';
+    setTimeout(()=>{ if(document.getElementById('qmre-status')) renderQmReservationList(); }, 700);
+  }catch(e){
+    box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+    box.textContent = '저장하지 못했습니다. 다시 시도해주세요.';
+    if(btn){ btn.disabled = false; btn.textContent = '저장'; }
   }
 }
 function renderQuickModeReserveUI(){
@@ -4808,8 +5493,9 @@ function renderManualTab(){
 
     ${manualSection('📱','문자 간편등록 (퀵메뉴)', false,
       '문자로 오더를 주시는 분(예: 이영숙님)이 사무실 프로그램 로그인 없이 스마트폰에서 바로 문자를 등록할 수 있는 전용 화면입니다. [설정 → 📱 문자 간편등록 QR코드]로 QR을 찍거나, 앱 주소 뒤에 <code>?quick=1</code>을 붙여서 접속하면 이 화면만 뜹니다.', [
-      ['📦 입고된 발전기 리스트 보기', '지금 입고 상태인 발전기를 용량(kW)별로 몇 대 있는지 간단히 볼 수 있고, 각 발전기의 셋팅전압을 눌러 바로 수정할 수도 있습니다. 옆의 빈 체크박스는 저장되지 않는 눈으로만 확인하는 용도로, 공장 현장에서 실물을 하나씩 확인할 때 체크해가며 쓰시면 됩니다.'],
-      ['🚚 출고중 발전기 리스트 보기', '지금 출고중인 발전기를 지역별로 몇 대 있는지 볼 수 있습니다. 목록에는 번호·모델·지역만 나오고, "상세보기"를 누르면 업체명·담당자·연락처·주소를 확인할 수 있습니다.'],
+      ['📦 입고된 발전기 리스트 보기', '지금 입고 상태인 발전기를 용량(kW)별로 몇 대 있는지 간단히 볼 수 있고, 각 발전기의 셋팅전압을 눌러 바로 수정할 수도 있습니다. "마지막 정비 후 OOOh 사용" 표시는 사무실 프로그램과 똑같은 정비주기 기준(임박·초과시 색이 바뀝니다)으로 함께 보여지며, 누적시간을 확인할 수 없는 발전기는 빨간 "확인불가"로 표시됩니다. 옆의 빈 체크박스는 저장되지 않는 눈으로만 확인하는 용도로, 공장 현장에서 실물을 하나씩 확인할 때 체크해가며 쓰시면 됩니다.'],
+      ['🚚 출고중 발전기 리스트 보기', '지금 출고중인 발전기를 지역별로 몇 대 있는지 볼 수 있습니다. 목록에는 번호·모델·전압·지역이 나오고, "상세보기"를 누르면 업체명·담당자·연락처·주소·출고일·임대구분·연료 등 출고 내용 전체를 확인할 수 있습니다. "📥 입고처리" 버튼을 누르면 사무실 프로그램과 똑같은 방식으로 입고일·누적시간·전압·연료 확인·부자재 회수 여부를 입력해 바로 입고 처리할 수 있고, 처리 즉시 사무실 화면에도 반영됩니다.'],
+      ['⏳ 출고대기 리스트 보기', '지금 출고대기 중인 건을 출고일 순서로 보여줍니다. 발전기가 아직 안 정해졌으면 "🔧 발전기 배정"으로 지금 입고 상태인 발전기 중에서 바로 골라 배정할 수 있고, 이미 배정되어 있으면 "🚚 상차완료"로 실제 싣고 나갈 때 사무실 프로그램과 똑같이 처리할 수 있습니다(연료 넣기로 되어 있으면 확인 체크 필요). "내용보기/수정"으로 거래처·주소·전압·연료·부자재 등 등록된 내용을 언제든 고칠 수 있고, "출고취소/예약취소"로 건 자체를 지울 수 있습니다. 여기서 한 처리는 모두 사무실 화면에 실시간으로 반영됩니다.'],
       ['📤 출고 문자 붙여넣기', '문자 앱에서 오더 내용을 복사한 뒤 "📋 복사한 문자 붙여넣기"를 누르면 바로 채워지고(맨 앞에 "★★★해성발전기 출고요청★★★" 문구가 자동으로 붙습니다), "등록하기"를 누르면 사무실 [출고 대기] 화면 상단 "📩 문자오더 원문" 카드로 곧바로 올라갑니다.'],
       ['🔻 철수 문자 붙여넣기', '회수(철수) 요청 문자를 복사해 붙여넣으면(맨 앞에 "★★★해성발전기 철수요청★★★" 문구가 자동으로 붙습니다) 등록 즉시 사무실 [출고중] 화면 상단에 철수요청 카드로 뜹니다.'],
       ['등록 후 문자로도 보내기', '등록하기 버튼 위 체크박스입니다. 체크한 채로 등록하면, 등록이 끝난 뒤 스마트폰 문자 앱이 내용이 채워진 채로 자동으로 열립니다. 받는 사람(또는 단체문자 그룹)은 문자 앱에서 직접 선택해서 보내야 하며, 자동으로 전송되지는 않습니다.'],
