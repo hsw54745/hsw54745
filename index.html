@@ -681,14 +681,85 @@ async function renderQmStockListInner(){
       </div>`;
     }
     const filtered = qmStockCapacityFilter==null ? inStock : inStock.filter(g=>capacityOf(g)===qmStockCapacityFilter);
-    wrap.innerHTML = `<div style="font-size:13px;color:#888;margin:10px 0 8px;text-align:right;">총 ${filtered.length}대</div>` + filtered.map(g=>`
+    wrap.innerHTML = `<div style="font-size:13px;color:#888;margin:10px 0 8px;text-align:right;">총 ${filtered.length}대</div>` + filtered.map(g=>{
+      const vColor = voltageColor(g.voltage);
+      const vStyle = vColor
+        ? `border:1px solid ${vColor};color:${vColor};background:${vColor}15;`
+        : `border:1px solid #ccc;color:#888;background:#f2f2f2;`;
+      return `
       <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
         <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
         <span style="font-size:14px;color:#333;text-align:right;flex:1;">${escR(g.model||'')}</span>
+        <button type="button" onclick="openQmVoltageEdit('${g.id}')" style="${vStyle}font-weight:800;font-size:13px;padding:6px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;">${escR(g.voltage)||'전압 미설정'}</button>
         <input type="checkbox" style="width:24px;height:24px;flex-shrink:0;">
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }catch(e){
     if(document.getElementById('qm-stock-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">목록을 불러오지 못했습니다.</div>';
+  }
+}
+async function openQmVoltageEdit(id){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQmStockListInner()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:22px;font-weight:800;color:#2C6E49;">⚡ 전압 수정</div>
+        <div id="qmv-sub" style="font-size:14px;color:#555;margin-top:6px;">불러오는 중...</div>
+      </div>
+      <input id="qmv-input" type="text" style="width:100%;font-size:20px;padding:14px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;" placeholder="예: 380V">
+      ${voltageButtonsHtml('qmv-input', {vertical:true, big:true})}
+      <div id="qmv-status" style="display:none;margin-top:14px;padding:14px;border-radius:12px;font-size:15px;font-weight:700;text-align:center;"></div>
+      <button id="qmv-save-btn" onclick="submitQmVoltageEdit('${id}')" style="width:100%;margin-top:16px;padding:18px;font-size:20px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">저장</button>
+    </div>
+  `);
+  try{
+    const cur = await window.storage.get('gen-fleet-v2', true);
+    let gens = [];
+    try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    const g = gens.find(x=>x && String(x.id)===String(id));
+    if(!document.getElementById('qmv-sub')) return; // 화면이 이미 닫혔으면 무시
+    if(!g){
+      document.getElementById('qmv-sub').textContent = '해당 발전기를 찾을 수 없습니다.';
+      return;
+    }
+    document.getElementById('qmv-sub').textContent = `${g.id} · ${g.model||'모델 미등록'} (현재: ${g.voltage||'미설정'})`;
+    document.getElementById('qmv-input').value = g.voltage || '';
+  }catch(e){
+    if(document.getElementById('qmv-sub')) document.getElementById('qmv-sub').textContent = '불러오지 못했습니다.';
+  }
+}
+async function submitQmVoltageEdit(id){
+  const btn = document.getElementById('qmv-save-btn');
+  const box = document.getElementById('qmv-status');
+  const value = (document.getElementById('qmv-input').value||'').trim();
+  box.style.display = 'none';
+  if(btn){ btn.disabled = true; btn.textContent = '저장 중...'; }
+  try{
+    const cur = await window.storage.get('gen-fleet-v2', true);
+    let gens = [];
+    try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    const g = gens.find(x=>x && String(x.id)===String(id));
+    if(!g){
+      box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+      box.textContent = '해당 발전기를 찾을 수 없습니다.';
+      if(btn){ btn.disabled = false; btn.textContent = '저장'; }
+      return;
+    }
+    g.voltage = value;
+    g.voltageUpdatedAt = nowDateTimeStr();
+    g.voltageUpdatedAtMs = Date.now();
+    g.voltageUpdatedBy = '문자 간편등록(퀵메뉴)';
+    await window.storage.set('gen-fleet-v2', JSON.stringify(gens), true);
+    box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
+    box.textContent = '✅ 전압이 저장되었습니다!';
+    if(btn) btn.textContent = '저장';
+    setTimeout(()=>{ if(document.getElementById('qmv-status')) renderQmStockListInner(); }, 700);
+  }catch(e){
+    box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+    box.textContent = '저장하지 못했습니다. 다시 시도해주세요.';
+    if(btn){ btn.disabled = false; btn.textContent = '저장'; }
   }
 }
 function renderQuickModeReserveUI(){
@@ -1410,7 +1481,7 @@ function adminModeSectionHtml(){
       <div class="btn-row" style="flex-wrap:wrap;">
         <button class="btn danger" onclick="resetAllToIn()" title="현재 출고중인 발전기를 포함해 전체 발전기를 입고 상태로 되돌립니다. 임대 정보·출고 대기는 사라지고, 임대·정비 이력 자체는 남습니다.">입고로 초기화</button>
         <button class="btn danger" onclick="resetAllToOut()" title="전체 발전기를 거래처 정보 없이 출고 상태로 되돌립니다. 임대·정비 이력은 남습니다.">출고로 초기화</button>
-        <button class="btn danger" onclick="resetMaintHistory()" title="모든 발전기의 정비 등록 기록을 삭제하고, 누적 사용시간을 확인할 수 없음 상태로 되돌립니다.">정비내역 초기화</button>
+        <button class="btn danger" onclick="resetMaintHistory()" title="모든 발전기의 정비 등록 기록을 삭제하고, 누적 사용시간을 확인불가 상태로 되돌립니다.">정비내역 초기화</button>
         <button class="btn danger" onclick="resetPartsStock()" title="등록된 모든 부품의 재고 수량을 삭제합니다. 모델별 자재 등록 항목(오일필터명 등)은 남습니다.">부품재고 초기화</button>
         <button class="btn danger" onclick="resetCustomerInfo()" title="출고시 입력하는 거래처명·담당자·연락처·현장주소·부자재·연료 등 고객정보와 임대·예약 이력을 모두 삭제합니다. 발전기 번호·모델·상태는 유지됩니다.">고객정보 초기화</button>
         <button class="btn danger" style="background:#7a0d0d;border-color:#7a0d0d;" onclick="resetEverything()" title="입력했던 모든 정보(모델·이력·자재·부품재고·공지사항·일정표 등)를 처음 상태로 완전히 초기화합니다. 발전기 번호만 남습니다.">⚠ 전체 초기화</button>
@@ -1822,11 +1893,9 @@ function endSaving(){
 
 function findGen(id){ return DB.gens.find(g=>g.id===id); }
 const UNASSIGNED_GEN_ID = '__UNASSIGNED__'; // 출고예약 등록 시 발전기를 아직 정하지 않은 경우 사용하는 표시값
-// 누적시간 상태: 'known'(확인됨) / 'na'(해당없음 - 구형이라 계기 자체가 없음) / 'unknown'(미확인 - 아직 값 미입력)
+// 누적시간 상태: 'known'(확인됨) / 'unavailable'(누적시간 확인불가 - 이유 상관없이 하나로 통일)
 function hoursStatus(g){
-  if(g.hoursKnown) return 'known';
-  if(g.hoursNA) return 'na';
-  return 'unknown';
+  return g.hoursKnown ? 'known' : 'unavailable';
 }
 function modelColorDot(model){
   const c = model && DB.modelColors ? DB.modelColors[model] : null;
@@ -2790,11 +2859,11 @@ function renderInList(){
       <td class="wrap-ok">${displayModel(g)}${g.borrowed? ` <span class="pill" style="background:var(--primary-tint);color:var(--primary-dark);border:1px solid var(--primary);">🤝 임대</span>`:''}${isPendingOut? ` <span class="pill warn">출고대기</span>`:''}${isBroken? `<div class="muted" style="font-size:11px;color:var(--danger);font-weight:700;">⚠ 고장: ${escR(g.repairNote||'-')}${g.repairPhoto? ` <img src="${g.repairPhoto}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;cursor:pointer;" onclick="openImageViewModal('${g.repairPhoto}','고장 사진')">`:''}</div>`:''}</td>
       <td>${voltagePillHtml(g.id, g.voltage)}</td>
       <td>${usableCapacityCell(g)}</td>
-      <td class="muted">${hoursStatus(g)==='known'? `${(g.hours||0).toLocaleString()}h <span style="font-size:11px;">(정비: ${(g.lastMaintHours||0).toLocaleString()}h)</span>` : (hoursStatus(g)==='na'? '해당없음' : '미확인')}</td>
+      <td class="muted">${hoursStatus(g)==='known'? `${(g.hours||0).toLocaleString()}h <span style="font-size:11px;">(정비: ${(g.lastMaintHours||0).toLocaleString()}h)</span>` : '<span style="color:var(--danger);font-weight:700;">확인불가</span>'}</td>
       <td class="muted" style="font-size:11px;">${fuelRec && fuelRec.inProcessedBy? escR(fuelRec.inProcessedBy) : '-'}</td>
       <td style="font-size:12.5px;">${fuelCell}</td>
-      <td>${g.hoursKnown? gaugeHtml(el,r,getCycle(g)) : (g.lastOilChangeDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastOilChangeDate)}일 초과</span>` : '<span class="muted" style="font-size:12px;">누적시간 확인할 수 없음</span>')}</td>
-      <td>${isBroken? '<span class="pill danger">수리중</span> ' : ''}${hoursStatus(g)==='known'? pillHtml(maintStatus(r)) : (hoursStatus(g)==='na'? '<span class="pill gray">해당없음</span>' : '<span class="pill gray">확인 필요 (정비관리에서 입력)</span>')}</td>
+      <td>${g.hoursKnown? gaugeHtml(el,r,getCycle(g)) : (g.lastOilChangeDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastOilChangeDate)}일 초과</span>` : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 확인불가</span>')}</td>
+      <td>${isBroken? '<span class="pill danger">수리중</span> ' : ''}${hoursStatus(g)==='known'? pillHtml(maintStatus(r)) : '<span class="pill danger">확인불가</span>'}</td>
       <td><div class="btn-row" style="flex-wrap:nowrap;">
         ${isBroken
           ? `<button class="btn sm danger" onclick="openMaintModal('${g.id}', null, true)" style="white-space:nowrap;">수리 완료 처리</button>`
@@ -2958,7 +3027,7 @@ function renderOutList(){
     const el = isLT? estElapsed(g) : elapsedHours(g);
     const rem = isLT? estRemaining(g) : remainingHours(g);
     const pred = predictedDate(g);
-    let predTxt = g.hoursKnown? '-' : (g.lastOilChangeDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastOilChangeDate)}일 초과</span>` : '<span class="muted" style="font-size:12px;">확인불가</span>');
+    let predTxt = g.hoursKnown? '-' : (g.lastOilChangeDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastOilChangeDate)}일 초과</span>` : '<span style="font-size:12px;color:var(--danger);font-weight:700;">확인불가</span>');
     if(isLT){ predTxt = pred.overdue ? '<span class="pill danger">정비 도래</span>' : `${dow(pred.date)} (약 ${pred.days}일 후)`; }
     const expIn = expectedInDate(rt);
     return `<tr${rt.forcedOut? ` style="background:var(--danger-tint);"`:''}>
@@ -2979,7 +3048,7 @@ function renderOutList(){
         ${rt.smsOrder? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;margin-top:4px;" onclick="showSmsOrderForGen('${g.id}')">📩 문자오더확인</button>`:''}
       </td>
       <td class="muted">${dow(rt.outDate)||'-'}</td>
-      <td>${isLT? gaugeHtml(el,rem,getCycle(g)) : (g.hoursKnown? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</span>')}</td>
+      <td>${isLT? gaugeHtml(el,rem,getCycle(g)) : (g.hoursKnown? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 확인불가</span>')}</td>
       <td style="font-size:12px;">${predTxt}</td>
       <td style="font-size:12px;">${expIn? (()=>{ const diff = daysFromToday(expIn); const isLate = diff!=null && diff<0; const cls = isLate?'danger':(diff<=1?'danger':(diff<=3?'warn':'gray')); return `<span class="pill ${cls}">📅 ${inDateLabelFull(expIn)}</span>`; })() : '<span class="muted">-</span>'}</td>
       <td>
@@ -3216,13 +3285,16 @@ function renderMaintList(){
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
       <td class="muted" style="font-size:12px;">${g.status==='in'?'입고':'출고중'}</td>
-      <td>${known? gaugeHtml(el,rem,getCycle(g)) : '<span class="muted" style="font-size:12px;">확인 불가</span>'}</td>
-      <td>${known? pillHtml(maintStatus(rem)) : '<span class="pill gray">-</span>'}</td>
-      <td><div class="btn-row">
+      <td>${known? gaugeHtml(el,rem,getCycle(g)) : '<span style="color:var(--danger);font-weight:700;font-size:12px;">확인불가</span>'}</td>
+      <td>${known? pillHtml(maintStatus(rem)) : '<span class="pill danger">확인불가</span>'}</td>
+      <td><div class="btn-row" style="align-items:center;">
         <button class="btn sm" onclick="openMaintModal('${g.id}')">정비 등록</button>
         <button class="btn sm" onclick="goToHistory('${g.id}')">이력조회</button>
         <button class="btn sm" onclick="openAdjustModal('${g.id}')">직접수정</button>
         <button class="btn sm" onclick="openCycleModal('${g.id}')" style="${getCycle(g)!==DEFAULT_CYCLE? 'color:var(--danger);font-weight:700;border-color:var(--danger);':''}">정비주기(${getCycle(g)}h)</button>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--danger);white-space:nowrap;cursor:pointer;margin-left:4px;" title="체크하면 이 발전기는 목록·정비관리·장기임대 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;확인불가&quot;로 고정 표시됩니다. 강제입고 없이 이 화면에서 바로 켜고 끌 수 있습니다.">
+          <input type="checkbox" ${!g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', !this.checked)"> 누적시간 확인불가
+        </label>
       </div></td>
     </tr>`;
   }).join('');
@@ -3295,7 +3367,7 @@ function openAdjustModal(id){
           </div></div>
         </div>
       </div>` : `
-      <div class="hint" style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:10px 12px;margin-bottom:12px;color:var(--danger);">이 발전기는 "누적시간 확인불가 모델"로 설정되어 있습니다. 누적시간 값을 입력하려면 [설정 → 발전기 모델 설정]에서 "가동시간 확인가능" 체크박스를 먼저 체크해주세요.</div>
+      <div class="hint" style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:10px 12px;margin-bottom:12px;color:var(--danger);">이 발전기는 "누적시간 확인불가"로 설정되어 있습니다. 누적시간 값을 입력하려면 [설정 → 발전기 모델 설정]에서 "가동시간 확인가능" 체크박스를 먼저 체크해주세요.</div>
       <div class="out-row stretch">
         <div class="field f-eq"><div class="out-card">
           <label>마지막 엔진오일교체일</label><input type="date" id="f-adj-lastoildate" value="${g.lastOilChangeDate||''}"><div class="hint">누적시간을 알 수 없는 발전기는 이 날짜를 기준으로 [입고]/[출고중] 목록에 "마지막 엔진오일교체후 ○○일 초과"로 표시됩니다. 실제로 엔진오일을 교체한 날짜만 입력해주세요.</div>
@@ -3821,7 +3893,7 @@ function resetAllToOut(){
   }, '초기화');
 }
 function resetMaintHistory(){
-  openConfirmModal('정비 내역을 전부 초기화할까요?\n\n모든 발전기의 정비 등록 기록이 삭제되고, 누적 사용시간이 "누적시간 확인할 수 없음" 상태로 초기화됩니다. 부품 재고 차감 내역은 복원되지 않습니다. 되돌릴 수 없는 작업이니 먼저 백업을 받아두시길 권장합니다.', function(){
+  openConfirmModal('정비 내역을 전부 초기화할까요?\n\n모든 발전기의 정비 등록 기록이 삭제되고, 누적 사용시간이 "누적시간 확인불가" 상태로 초기화됩니다. 부품 재고 차감 내역은 복원되지 않습니다. 되돌릴 수 없는 작업이니 먼저 백업을 받아두시길 권장합니다.', function(){
     
       DB.maint = [];
       DB.gens.forEach(g=>{
@@ -3832,7 +3904,7 @@ function resetMaintHistory(){
         }
       });
       renderContent();
-      flash('정비 내역이 초기화되었습니다 (누적시간: 확인할 수 없음)');
+      flash('정비 내역이 초기화되었습니다 (누적시간: 확인불가)');
       saveWithRetry(saveMaint);
       saveWithRetry(saveGens);
     
@@ -4218,7 +4290,7 @@ function renderGenHistory(){
       <div class="detail-head">
         <div><div class="gid-big">${g.id}</div><div class="muted" style="font-size:13px;">${displayModel(g)}</div></div>
         <div class="btn-row">
-          ${g.retired? '<span class="pill gray">폐기됨</span>' : (g.status==='in'?'<span class="pill gray">입고</span>':'<span class="pill gray">출고중</span>')} ${g.underRepair? '<span class="pill danger">고장/수리중</span>' : ''} ${rem!==null? pillHtml(maintStatus(rem)) : '<span class="pill gray">확인 필요</span>'}
+          ${g.retired? '<span class="pill gray">폐기됨</span>' : (g.status==='in'?'<span class="pill gray">입고</span>':'<span class="pill gray">출고중</span>')} ${g.underRepair? '<span class="pill danger">고장/수리중</span>' : ''} ${rem!==null? pillHtml(maintStatus(rem)) : '<span class="pill danger">확인불가</span>'}
           <button class="btn sm" onclick="openAdjustModal('${g.id}')">정보 수정</button>
           ${!g.retired && g.status==='in'
             ? (g.underRepair
@@ -4228,9 +4300,9 @@ function renderGenHistory(){
         </div>
       </div>
       <div class="detail-grid">
-        <div class="item"><div class="k">누적 사용시간</div><div class="v">${hoursStatus(g)==='known'? (g.hours||0).toLocaleString()+'h' : (hoursStatus(g)==='na'? '해당없음' : '미확인')}</div></div>
+        <div class="item"><div class="k">누적 사용시간</div><div class="v">${hoursStatus(g)==='known'? (g.hours||0).toLocaleString()+'h' : '<span style="color:var(--danger);font-weight:700;">확인불가</span>'}</div></div>
         <div class="item"><div class="k">마지막 정비시점</div><div class="v">${g.hoursKnown? (g.lastMaintHours||0).toLocaleString()+'h' : '-'}${g.lastMaintDate? `<div class="muted" style="font-size:11px;font-weight:400;">${dow(g.lastMaintDate)}</div>`:''}</div></div>
-        <div class="item"><div class="k">정비 후 경과</div><div class="v">${el!==null? Math.round(el).toLocaleString()+'h' : '확인불가'}</div></div>
+        <div class="item"><div class="k">정비 후 경과</div><div class="v">${el!==null? Math.round(el).toLocaleString()+'h' : '<span style="color:var(--danger);font-weight:700;">확인불가</span>'}</div></div>
         <div class="item"><div class="k">정비 주기</div><div class="v">${getCycle(g).toLocaleString()}h</div></div>
         <div class="item"><div class="k">누적 임대 사용시간</div><div class="v">${totalRentedHours.toLocaleString()}h</div></div>
         <div class="item"><div class="k">누적 임대 건수</div><div class="v">${rentals.length}건</div></div>
@@ -4551,7 +4623,7 @@ function renderManualTab(){
 
     ${manualSection('📥','입고', false,
       '현재 창고에 있는(입고 상태) 발전기 목록입니다.', [
-      ['누적시간 표시 (보기 전용)', '목록에 "누적시간(정비: OOh)" 형태로 표시만 됩니다. 값을 아직 등록 안 했으면 "미확인", 구형이라 계기 자체가 없으면 "해당없음"으로 표시됩니다. 이 화면에서는 수정할 수 없고, 값을 입력·수정하려면 [정비 관리 → 직접수정]을 이용해주세요.'],
+      ['누적시간 표시 (보기 전용)', '목록에 "누적시간(정비: OOh)" 형태로 표시만 됩니다. [설정 → 발전기 모델 설정 → 관리]에서 "누적시간 추적" 체크가 꺼져 있으면 이유(값 미입력이든 계기 고장이든) 상관없이 항상 빨간 "확인불가"로 통일해서 표시됩니다. 이 화면에서는 수정할 수 없고, 값을 입력·수정하려면 [정비 관리 → 직접수정]을 이용해주세요.'],
       ['🖨 인쇄', '"입고 발전기" 제목 옆 인쇄 버튼으로, 현재 필터된 입고 목록(번호·모델·전압·누적시간·정비상태)을 가로(landscape) 방향 인쇄용 파일로 받을 수 있습니다.'],
       ['🤝 발전기 임의추가 · 반납', '협력업체 등에서 급하게 빌려온 발전기를 임시로 등록할 때 사용합니다. "🖨 인쇄" 버튼 옆에 있으며, 발전기 번호·모델(용량 포함)·현재 누적 사용시간·마지막 정비시 누적시간만 입력하면 등록됩니다. 자재·부품은 관리하지 않고, 모델에 용량(kW)이 포함되어 있으면 우리 발전기와 똑같은 방식으로 정비주기가 자동 계산됩니다. 목록에는 모델명 옆에 "🤝 임대" 배지로 표시되고, 출고·입고 처리는 일반 발전기와 완전히 동일하게 하면 됩니다. 다 쓰고 협력업체에 돌려줄 때는 [입고] 목록 처리 버튼 칸의 "↩ 반납"을 누르면 되는데(고장수리중이거나 이미 출고대기 중이면 안 뜹니다), 반납하면 우리가 관리하는 발전기 목록에서는 사라지지만 그동안의 임대·정비 기록은 이력에 그대로 남습니다. 출고 나가면 매출관리에도 일반 발전기와 똑같이 잡히고, 각 매출 건 카드에 "🤝 외주업체명"·"🤝 발전기 임대비용" 칸이 추가로 나와서 어느 협력업체에서 빌렸고 얼마를 지불하는지 따로 기록할 수 있으며, 마진(이익)도 자동으로 계산됩니다.'],
       ['용량별 보기', '목록 위에 자동으로 생기는 용량(kW) 버튼을 누르면 그 용량의 발전기만 걸러서 봅니다. "전체" 버튼으로 다시 전체 목록으로 돌아갑니다.'],
@@ -6048,7 +6120,7 @@ function renderSettingsTab(){
         const modelRowHtml = g=>{
           const cap = capacityOf(g);
           const ratioOptions = [100,90,80,70,60,50,40,30].map(r=>`<option value="${r}" ${(g.usageRatio||100)===r?'selected':''}>${r}%</option>`).join('');
-          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·장기임대 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가 모델&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
+          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·장기임대 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
         };
         const half = Math.ceil(activeList.length/2);
         const thead = `<thead><tr><th style="width:42px;">번호</th><th style="width:112px;">모델/용량</th><th style="width:56px;">년식</th><th style="width:78px;">정격대비사용</th><th style="width:64px;">가동시간<br>확인가능</th><th style="width:74px;"></th></tr></thead>`;
@@ -6590,7 +6662,7 @@ async function toggleHoursKnownSetting(id, checked){
   g.hoursUpdatedBy = DB.currentUserName || null;
   await saveGens();
   renderContent();
-  flash(checked? `${g.id} 가동시간 확인가능으로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 실제 값을 입력해주세요.` : `${g.id} 누적시간 확인불가 모델로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 마지막 엔진오일교체일을 입력해주세요.`);
+  flash(checked? `${g.id} 가동시간 확인가능으로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 실제 값을 입력해주세요.` : `${g.id} 누적시간 확인불가로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 마지막 엔진오일교체일을 입력해주세요.`);
 }
 async function updateManufactureDate(id, value){
   const g = findGen(id);
@@ -7183,8 +7255,8 @@ function downloadInGensPrintFile(){
   if(list.length===0){ showInfoModal('인쇄할 입고 발전기가 없습니다.'); return; }
   const rows = list.map(g=>{
     const rem = estRemaining(g);
-    const status = g.underRepair ? '수리중' : (g.hoursKnown? {ok:'정상',warn:'임박',danger:'정비필요'}[maintStatus(rem)] : '누적시간 확인할 수 없음');
-    return `<tr><td class="name">${escR(g.id)}</td><td class="name">${escR(g.model||'모델 미등록')}</td><td>${escR(g.voltage||'-')}</td><td>${hoursStatus(g)==='known'? (g.hours||0).toLocaleString()+'h' : (hoursStatus(g)==='na'? '해당없음' : '미확인')}</td><td>${status}</td></tr>`;
+    const status = g.underRepair ? '수리중' : (g.hoursKnown? {ok:'정상',warn:'임박',danger:'정비필요'}[maintStatus(rem)] : '<span style="color:var(--danger);font-weight:700;">확인불가</span>');
+    return `<tr><td class="name">${escR(g.id)}</td><td class="name">${escR(g.model||'모델 미등록')}</td><td>${escR(g.voltage||'-')}</td><td>${hoursStatus(g)==='known'? (g.hours||0).toLocaleString()+'h' : '<span style="color:var(--danger);font-weight:700;">확인불가</span>'}</td><td>${status}</td></tr>`;
   }).join('');
   const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <title>입고 발전기 목록 - ${todayStr()}</title>
@@ -8641,7 +8713,7 @@ function openOutInfoEditModal(id){
       <div class="modal-sub">${g.id} · [${displayModel(g)}]</div>
       <div class="hint" style="margin-bottom:10px;color:var(--danger);">이미 출고중인 발전기의 거래처·현장·날짜 등 정보를 직접 수정합니다. (입고 처리 없이 바로 저장됩니다)</div>
       <div class="out-row stretch">
-        ${g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-oie-starthours" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}" min="0"><input type="hidden" id="f-oie-starthours-orig" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}"></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</div></div></div>`}
+        ${g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-oie-starthours" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}" min="0"><input type="hidden" id="f-oie-starthours-orig" value="${rt.startHours!=null?rt.startHours:(g.hours||0)}"></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가</div></div></div>`}
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="f-oie-outdate" value="${rt.outDate||todayStr()}">
         </div></div>
@@ -8974,7 +9046,7 @@ function openOutModal(id, reservationId){
       </div>` : ''}
       ${isEditingPending? `<div class="hint" style="margin-bottom:10px;color:var(--danger);">이 발전기는 이미 [출고 대기]에 상차대기로 등록되어 있습니다. 여기서 수정하면 상차대기 내용이 갱신됩니다.</div>` : ''}
       <div class="out-row stretch">
-        ${g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}"><div class="hint" id="starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 누적: ${(g.hours||0).toLocaleString()}h</div></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</div></div></div>`}
+        ${g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}"><div class="hint" id="starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 누적: ${(g.hours||0).toLocaleString()}h</div></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가</div></div></div>`}
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="f-outdate" value="${(res&&(res.outDate||res.plannedOutDate))||todayStr()}" onchange="syncReturnDateToUsageDays()">
         </div></div>
@@ -9281,7 +9353,7 @@ function openBulkOutModal(){
   const hoursRowsHtml = gens.map(g=>`
     <div class="field-row" style="align-items:flex-end;">
       <div style="flex:0 0 auto;min-width:90px;font-size:13px;font-weight:700;padding-bottom:8px;">${g.id}${g.model? ` <span class="muted" style="font-weight:400;font-size:11.5px;">· ${escR(g.model)}</span>`:''}</div>
-      ${g.hoursKnown? `<div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">출고시 누적 사용시간(h)</label><input type="number" id="fb-hours-${g.id}" value="${g.hours||0}" min="0"></div>` : `<div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">누적 사용시간</label><div class="hint" style="margin-top:4px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</div></div>`}
+      ${g.hoursKnown? `<div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">출고시 누적 사용시간(h)</label><input type="number" id="fb-hours-${g.id}" value="${g.hours||0}" min="0"></div>` : `<div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">누적 사용시간</label><div class="hint" style="margin-top:4px;color:var(--danger);font-weight:700;">누적시간 확인불가</div></div>`}
     </div>`).join('');
   const fuelRowsHtml = gens.map(g=>`
     <div class="field-row" style="align-items:flex-end;flex-wrap:wrap;margin-bottom:4px;">
@@ -9561,7 +9633,7 @@ function openBulkInModal(){
       return `
       <div class="field-row" style="align-items:flex-end;">
         <div style="flex:0 0 auto;min-width:110px;font-size:13px;font-weight:700;padding-bottom:8px;">${g.id}${g.model? ` <span class="muted" style="font-weight:400;font-size:11.5px;">· ${escR(g.model)}</span>`:''}<div class="muted" style="font-size:11px;font-weight:400;">${escR(rt.customer||'-')}</div></div>
-        <div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">누적 사용시간</label><div class="hint" style="margin-top:4px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</div></div>
+        <div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">누적 사용시간</label><div class="hint" style="margin-top:4px;color:var(--danger);font-weight:700;">누적시간 확인불가</div></div>
       </div>`;
     }
     return `
@@ -10349,7 +10421,7 @@ function openInModal(id){
           <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
         </div></div>` : `<div class="field f-md"><div class="out-card">
           <label>누적 사용시간</label>
-          <div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</div>
+          <div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가</div>
         </div></div>`}
         <div class="field f-sm"><div class="out-card">
           <label>전압</label>
@@ -10519,7 +10591,7 @@ async function submitIn(id){
     errEl.textContent = '출고시 비고 내용을 확인했다는 체크를 해야 입고 처리할 수 있습니다.';
     errEl.style.display='block'; return;
   }
-  // 누적시간 확인불가 모델은 입력을 생략할 수 있습니다. (설정 → 발전기 모델 설정에서 지정)
+  // 누적시간 확인불가은 입력을 생략할 수 있습니다. (설정 → 발전기 모델 설정에서 지정)
   if(!inDate || (g.hoursKnown && (endHours===null || isNaN(endHours) || endHours < g.rental.startHours))){
     errEl.textContent = '입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다)';
     errEl.style.display='block'; return;
@@ -10566,7 +10638,7 @@ async function submitIn(id){
     measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
     paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null
   });
-  // 누적시간 확인불가 모델(설정에서 지정)은 여기서 hoursKnown을 절대 자동으로 켜지 않습니다.
+  // 누적시간 확인불가(설정에서 지정)은 여기서 hoursKnown을 절대 자동으로 켜지 않습니다.
   if(g.hoursKnown && endHours!==null){
     g.hours = endHours;
   }
@@ -10744,7 +10816,7 @@ function openMaintModal(id, editId, repairComplete){
       </div>` : ''}
       <div class="field-row">
         <div class="field"><label>정비일</label><input type="date" id="f-mdate" value="${rec? rec.date : todayStr()}"></div>
-        ${g.hoursKnown? `<div class="field"><label>정비시 누적 사용시간(h)</label><input type="number" id="f-mhours" value="${rec? (rec.hours||0) : (g.hours||0)}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 ${(g.hours||0).toLocaleString()}h</div></div>` : `<div class="field"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가 모델</div></div>`}
+        ${g.hoursKnown? `<div class="field"><label>정비시 누적 사용시간(h)</label><input type="number" id="f-mhours" value="${rec? (rec.hours||0) : (g.hours||0)}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 ${(g.hours||0).toLocaleString()}h</div></div>` : `<div class="field"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가</div></div>`}
       </div>
       <div class="field-row">
         <div class="field"><label>정비 유형</label>${typeButtonsHtml}</div>

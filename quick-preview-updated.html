@@ -681,14 +681,85 @@ async function renderQmStockListInner(){
       </div>`;
     }
     const filtered = qmStockCapacityFilter==null ? inStock : inStock.filter(g=>capacityOf(g)===qmStockCapacityFilter);
-    wrap.innerHTML = `<div style="font-size:13px;color:#888;margin:10px 0 8px;text-align:right;">총 ${filtered.length}대</div>` + filtered.map(g=>`
+    wrap.innerHTML = `<div style="font-size:13px;color:#888;margin:10px 0 8px;text-align:right;">총 ${filtered.length}대</div>` + filtered.map(g=>{
+      const vColor = voltageColor(g.voltage);
+      const vStyle = vColor
+        ? `border:1px solid ${vColor};color:${vColor};background:${vColor}15;`
+        : `border:1px solid #ccc;color:#888;background:#f2f2f2;`;
+      return `
       <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
         <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
         <span style="font-size:14px;color:#333;text-align:right;flex:1;">${escR(g.model||'')}</span>
+        <button type="button" onclick="openQmVoltageEdit('${g.id}')" style="${vStyle}font-weight:800;font-size:13px;padding:6px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;">${escR(g.voltage)||'전압 미설정'}</button>
         <input type="checkbox" style="width:24px;height:24px;flex-shrink:0;">
-      </div>`).join('');
+      </div>`;
+    }).join('');
   }catch(e){
     if(document.getElementById('qm-stock-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">목록을 불러오지 못했습니다.</div>';
+  }
+}
+async function openQmVoltageEdit(id){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQmStockListInner()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:22px;font-weight:800;color:#2C6E49;">⚡ 전압 수정</div>
+        <div id="qmv-sub" style="font-size:14px;color:#555;margin-top:6px;">불러오는 중...</div>
+      </div>
+      <input id="qmv-input" type="text" style="width:100%;font-size:20px;padding:14px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;" placeholder="예: 380V">
+      ${voltageButtonsHtml('qmv-input', {vertical:true, big:true})}
+      <div id="qmv-status" style="display:none;margin-top:14px;padding:14px;border-radius:12px;font-size:15px;font-weight:700;text-align:center;"></div>
+      <button id="qmv-save-btn" onclick="submitQmVoltageEdit('${id}')" style="width:100%;margin-top:16px;padding:18px;font-size:20px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">저장</button>
+    </div>
+  `);
+  try{
+    const cur = await window.storage.get('gen-fleet-v2', true);
+    let gens = [];
+    try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    const g = gens.find(x=>x && String(x.id)===String(id));
+    if(!document.getElementById('qmv-sub')) return; // 화면이 이미 닫혔으면 무시
+    if(!g){
+      document.getElementById('qmv-sub').textContent = '해당 발전기를 찾을 수 없습니다.';
+      return;
+    }
+    document.getElementById('qmv-sub').textContent = `${g.id} · ${g.model||'모델 미등록'} (현재: ${g.voltage||'미설정'})`;
+    document.getElementById('qmv-input').value = g.voltage || '';
+  }catch(e){
+    if(document.getElementById('qmv-sub')) document.getElementById('qmv-sub').textContent = '불러오지 못했습니다.';
+  }
+}
+async function submitQmVoltageEdit(id){
+  const btn = document.getElementById('qmv-save-btn');
+  const box = document.getElementById('qmv-status');
+  const value = (document.getElementById('qmv-input').value||'').trim();
+  box.style.display = 'none';
+  if(btn){ btn.disabled = true; btn.textContent = '저장 중...'; }
+  try{
+    const cur = await window.storage.get('gen-fleet-v2', true);
+    let gens = [];
+    try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    const g = gens.find(x=>x && String(x.id)===String(id));
+    if(!g){
+      box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+      box.textContent = '해당 발전기를 찾을 수 없습니다.';
+      if(btn){ btn.disabled = false; btn.textContent = '저장'; }
+      return;
+    }
+    g.voltage = value;
+    g.voltageUpdatedAt = nowDateTimeStr();
+    g.voltageUpdatedAtMs = Date.now();
+    g.voltageUpdatedBy = '문자 간편등록(퀵메뉴)';
+    await window.storage.set('gen-fleet-v2', JSON.stringify(gens), true);
+    box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
+    box.textContent = '✅ 전압이 저장되었습니다!';
+    if(btn) btn.textContent = '저장';
+    setTimeout(()=>{ if(document.getElementById('qmv-status')) renderQmStockListInner(); }, 700);
+  }catch(e){
+    box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
+    box.textContent = '저장하지 못했습니다. 다시 시도해주세요.';
+    if(btn){ btn.disabled = false; btn.textContent = '저장'; }
   }
 }
 function renderQuickModeReserveUI(){
