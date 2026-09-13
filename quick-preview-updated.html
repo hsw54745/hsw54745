@@ -654,16 +654,31 @@ async function renderQmStockListInner(){
   const capWrap = document.getElementById('qm-stock-capbtns');
   const wrap = document.getElementById('qm-stock-list');
   try{
-    const [cur, curThresh] = await Promise.all([
+    const [cur, curThresh, curRentals] = await Promise.all([
       window.storage.get('gen-fleet-v2', true),
-      window.storage.get('gen-warn-threshold-v1', true).catch(()=>null)
+      window.storage.get('gen-warn-threshold-v1', true).catch(()=>null),
+      window.storage.get('gen-rentals-v2', true).catch(()=>null)
     ]);
     let warnThreshold = 50;
     try{ warnThreshold = curThresh ? (JSON.parse(curThresh.value)||50) : 50; }catch(e){ warnThreshold = 50; }
+    let rentals = [];
+    try{ rentals = curRentals ? JSON.parse(curRentals.value) : []; }catch(e){ rentals = []; }
+    if(!Array.isArray(rentals)) rentals = [];
+    const lastInMap = {};
+    rentals.forEach(r=>{
+      if(!r.inDate) return;
+      const key = r.inProcessedAt || r.inDate;
+      if(!lastInMap[r.genId] || key > lastInMap[r.genId]) lastInMap[r.genId] = key;
+    });
     let gens = [];
     try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
     if(!Array.isArray(gens)) gens = [];
-    const inStock = gens.filter(g=>g && !g.retired && g.status==='in').sort((a,b)=>String(a.id).localeCompare(String(b.id), 'ko', {numeric:true}));
+    const inStock = gens.filter(g=>g && !g.retired && g.status==='in').sort((a,b)=>{
+      const ka = lastInMap[a.id] || '';
+      const kb = lastInMap[b.id] || '';
+      if(ka || kb) return kb.localeCompare(ka);
+      return String(a.id).localeCompare(String(b.id), 'ko', {numeric:true});
+    });
     if(!document.getElementById('qm-stock-list')) return; // 화면이 이미 닫혔으면 무시
     if(inStock.length===0){
       if(capWrap) capWrap.innerHTML = '';
@@ -817,7 +832,7 @@ async function renderQmOutListInner(){
     let gens = [];
     try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
     if(!Array.isArray(gens)) gens = [];
-    const outGens = gens.filter(g=>g && !g.retired && g.status==='out').sort((a,b)=>String(a.id).localeCompare(String(b.id), 'ko', {numeric:true}));
+    const outGens = gens.filter(g=>g && !g.retired && g.status==='out').sort((a,b)=>((b.rental&&b.rental.outDate)||'').localeCompare((a.rental&&a.rental.outDate)||''));
     if(!document.getElementById('qm-out-list')) return; // 화면이 이미 닫혔으면 무시
     if(outGens.length===0){
       if(regionWrap) regionWrap.innerHTML = '';
@@ -1182,6 +1197,15 @@ async function qmRefreshReservationList(){
     }
     wrap.innerHTML = list.map(r=>{
       const assigned = r.genId && r.genId!==UNASSIGNED_GEN_ID;
+      const infoRows = [
+        ['담당자', r.manager],
+        ['연락처', r.phone],
+        ['주소', r.address || r.site],
+        ['전압', r.voltage],
+        ['연료', (r.fuelRequested!=null||r.fuelActual!=null) ? `요청 ${r.fuelRequested!=null?r.fuelRequested:'-'}L / 실제 ${r.fuelActual!=null?r.fuelActual:'-'}L` : null],
+        ['부자재', r.supplies],
+        ['비고', r.note]
+      ].filter(([k,v])=>v);
       return `
       <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
@@ -1191,6 +1215,14 @@ async function qmRefreshReservationList(){
         <div style="font-size:13px;color:#333;margin-top:4px;">
           ${assigned? `<span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
+        ${infoRows.length? `
+        <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;display:flex;flex-direction:column;gap:4px;">
+          ${infoRows.map(([k,v])=>`
+            <div style="display:flex;gap:8px;font-size:12.5px;line-height:1.4;">
+              <span style="color:#999;flex-shrink:0;width:42px;">${k}</span>
+              <span style="color:#333;word-break:break-all;">${escR(v)}</span>
+            </div>`).join('')}
+        </div>` : ''}
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
           ${assigned
             ? `<button type="button" onclick="openQmConfirmLoad('${r.id}')" style="background:#2C6E49;border:none;color:#fff;font-weight:800;font-size:12px;padding:8px 12px;border-radius:16px;cursor:pointer;">🚚 상차완료</button>`
