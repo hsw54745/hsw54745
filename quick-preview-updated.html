@@ -1207,13 +1207,13 @@ async function qmRefreshReservationList(){
         ['비고', r.note]
       ].filter(([k,v])=>v);
       return `
-      <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+      <div style="background:${assigned?'#EAF5EC':'#fff'};border:1px solid ${assigned?'#2C6E49':'#ddd'};border-radius:10px;padding:12px 14px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
           <span style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(r.customer||r.site||'거래처 미기재')}</span>
           <span style="font-size:12px;color:#888;white-space:nowrap;">${r.outDate? fmtDateKR(r.outDate) : '출고일 미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</span>
         </div>
         <div style="font-size:13px;color:#333;margin-top:4px;">
-          ${assigned? `<span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
+          ${assigned? `<span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
         ${infoRows.length? `
         <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;display:flex;flex-direction:column;gap:4px;">
