@@ -1186,9 +1186,15 @@ async function renderQmReservationList(){
 async function qmRefreshReservationList(){
   const wrap = document.getElementById('qm-res-list');
   try{
-    const cur = await window.storage.get('gen-reservations-v1', true);
+    const [cur, curFleet] = await Promise.all([
+      window.storage.get('gen-reservations-v1', true),
+      window.storage.get('gen-fleet-v2', true).catch(()=>null)
+    ]);
     let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
     if(!Array.isArray(list)) list = [];
+    let gens = []; try{ gens = curFleet ? JSON.parse(curFleet.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    const modelById = {}; gens.forEach(g=>{ if(g) modelById[g.id] = g.model; });
     list.sort((a,b)=>(a.outDate||'').localeCompare(b.outDate||''));
     if(!document.getElementById('qm-res-list')) return; // 화면이 이미 닫혔으면 무시
     if(list.length===0){
@@ -1208,12 +1214,10 @@ async function qmRefreshReservationList(){
       ].filter(([k,v])=>v);
       return `
       <div style="background:${assigned?'#EAF5EC':'#fff'};border:1px solid ${assigned?'#2C6E49':'#ddd'};border-radius:10px;padding:12px 14px;margin-bottom:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
-          <span style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(r.customer||r.site||'거래처 미기재')}</span>
-          <span style="font-size:12px;color:#888;white-space:nowrap;">${r.outDate? fmtDateKR(r.outDate) : '출고일 미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</span>
-        </div>
-        <div style="font-size:13px;color:#333;margin-top:4px;">
-          ${assigned? `<span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
+        <div style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(r.customer||r.site||'거래처 미기재')}</div>
+        <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${r.outDate? fmtDateKR(r.outDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
+        <div style="font-size:13px;color:#333;margin-top:6px;">
+          ${assigned? `<span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
         ${infoRows.length? `
         <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;display:flex;flex-direction:column;gap:4px;">
