@@ -1291,11 +1291,20 @@ async function openQmAssignGen(resId){
       listWrap.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">지금 배정할 수 있는(입고 상태인) 발전기가 없습니다.</div>';
       return;
     }
-    listWrap.innerHTML = candidates.map(g=>`
-      <button type="button" onclick="submitQmAssignGen('${resId}','${g.id}')" style="width:100%;text-align:left;background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
-        <span style="font-size:13px;color:#333;">${escR(g.model||'미설정')}</span>
-      </button>`).join('');
+    listWrap.innerHTML = candidates.map(g=>{
+      const vColor = voltageColor(g.voltage);
+      const vStyle = vColor
+        ? `border:1px solid ${vColor};color:${vColor};background:${vColor}15;`
+        : `border:1px solid #ccc;color:#888;background:#f2f2f2;`;
+      return `
+      <button type="button" onclick="submitQmAssignGen('${resId}','${g.id}')" style="width:100%;text-align:left;background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div style="text-align:left;min-width:0;">
+          <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
+          <span style="font-size:13px;color:#333;margin-left:6px;">${escR(g.model||'미설정')}</span>
+        </div>
+        <span style="${vStyle}font-weight:800;font-size:11px;padding:6px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;">${escR(g.voltage)||'전압 미설정'}</span>
+      </button>`;
+    }).join('');
   }catch(e){
     const sub = document.getElementById('qmag-sub');
     if(sub) sub.textContent = '불러오지 못했습니다.';
@@ -1709,7 +1718,13 @@ function renderQuickModeReserveUI(){
         </div>
       </details>
 
-      <button id="qmr-btn" type="button" onclick="submitQuickReserve()" style="width:100%;margin-top:20px;padding:22px;font-size:24px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;">등록하기</button>
+      <div style="margin-top:14px;background:#fff;border:2px solid #ccc;border-radius:14px;padding:12px 14px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:#333;cursor:pointer;">
+          <input type="checkbox" id="qmr-sms-toggle" style="width:22px;height:22px;flex-shrink:0;">
+          <span>등록 후 문자로도 보내기<br><span style="font-size:13px;font-weight:400;color:#777;white-space:nowrap;">(문자 앱에서 단체문자 선택)</span></span>
+        </label>
+      </div>
+      <button id="qmr-btn" type="button" onclick="submitQuickReserve()" style="width:100%;margin-top:16px;padding:22px;font-size:24px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;">등록하기</button>
       <div id="qmr-status" style="margin-top:16px;padding:16px;border-radius:12px;font-size:17px;font-weight:700;text-align:center;white-space:pre-line;display:none;"></div>
     </div>
   `);
@@ -1919,9 +1934,10 @@ async function submitQuickReserve(){
 
     box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
     box.textContent = '✅ 출고예약이 등록되었습니다!\n사무실 화면에 곧 나타납니다.';
-    openConfirmModal('문자로도 발송하시겠습니까?', function(){
+    const smsToggleQmr = document.getElementById('qmr-sms-toggle');
+    if(smsToggleQmr && smsToggleQmr.checked){
       openQmrSmsCompose({customer, address, manager, phone, voltage, outDate, arriveTime, freightBearer, fuelRequested, fuelActual, note});
-    }, '예', '아니오');
+    }
     ['qmr-customer','qmr-address','qmr-manager','qmr-phone','qmr-voltage','qmr-usagedays','qmr-estdaily','qmr-returndate','qmr-note','qmr-fuel-req','qmr-fuel-actual','qmr-arrivetime'].forEach(id=>{
       const el = document.getElementById(id); if(el) el.value = '';
     });
@@ -1929,6 +1945,8 @@ async function submitQuickReserve(){
     const arriveInputEl = document.getElementById('qmr-arrivetime'); if(arriveInputEl) arriveInputEl.style.display = 'none';
     const fuelToggleEl = document.getElementById('qmr-fuel-toggle');
     if(fuelToggleEl){ fuelToggleEl.checked = false; toggleFuelFields('qmr-fuel-toggle','qmr-fuel-wrap'); }
+    const smsToggleResetEl = document.getElementById('qmr-sms-toggle');
+    if(smsToggleResetEl) smsToggleResetEl.checked = false;
     const outdateEl = document.getElementById('qmr-outdate'); if(outdateEl) outdateEl.value = today;
     const loaddateEl = document.getElementById('qmr-loaddate'); if(loaddateEl) loaddateEl.value = today;
     setQmrDate(today, 'qmr-quickdate-today');
