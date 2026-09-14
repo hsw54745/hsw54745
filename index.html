@@ -10269,7 +10269,7 @@ async function submitOut(idParam, reservationId){
     id: reservationId || uid(), genId: id, pendingLoad: true, batchId: (existing && existing.batchId) || null,
     customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty,
     fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
-    outDate, startHours, longTerm, estDaily,
+    outDate, startHours, longTerm, estDaily, smsOrder: (existing&&existing.smsOrder)||null,
     outProcessedBy: DB.currentUserName || (existing&&existing.outProcessedBy) || null,
     createdAt: (existing && existing.createdAt) || todayStr()
   };
