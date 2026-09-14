@@ -9681,7 +9681,9 @@ function submitReserveNoGen(resId){
       customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
       fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
       outDate, startHours, longTerm, estDaily, smsOrder: (existing&&existing.smsOrder)||null,
-      outProcessedBy: (existing&&existing.outProcessedBy) || DB.currentUserName || null, createdAt: (existing&&existing.createdAt) || todayStr()
+      outProcessedBy: (existing&&existing.outProcessedBy) || DB.currentUserName || null, createdAt: (existing&&existing.createdAt) || todayStr(),
+      genAssignedBy: (existing && existing.genId===genSel && existing.genAssignedBy) ? existing.genAssignedBy : (DB.currentUserName||null),
+      genAssignedAt: (existing && existing.genId===genSel && existing.genAssignedAt) ? existing.genAssignedAt : nowDateTimeStr()
     };
     if(existing){
       const idx = DB.reservations.findIndex(x=>x.id===existing.id);
@@ -10322,6 +10324,7 @@ async function submitOut(idParam, reservationId){
     fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
     outDate, startHours, longTerm, estDaily, smsOrder: (existing&&existing.smsOrder)||null,
     outProcessedBy: DB.currentUserName || (existing&&existing.outProcessedBy) || null,
+    genAssignedBy: (existing&&existing.genAssignedBy)||null, genAssignedAt: (existing&&existing.genAssignedAt)||null,
     createdAt: (existing && existing.createdAt) || todayStr()
   };
   const idx = reservationId ? DB.reservations.findIndex(r=>r.id===reservationId) : -1;
@@ -10690,6 +10693,7 @@ async function submitBulkOut(){
       fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentConfirmed, forcedOut, forceReason, forcedBy: forcedOut ? (DB.currentUserName||null) : null, note,
       outDate, startHours: hoursMap[id], longTerm, estDaily: longTerm? estDaily: null,
       outProcessedBy: DB.currentUserName || null,
+      genAssignedBy: DB.currentUserName || null, genAssignedAt: nowDateTimeStr(),
       createdAt: todayStr()
     });
   });
