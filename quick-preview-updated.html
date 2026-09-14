@@ -710,14 +710,14 @@ async function renderQmStockListInner(){
     rentals.forEach(r=>{
       if(!r.inDate) return;
       const key = r.inProcessedAt || r.inDate;
-      if(!lastInMap[r.genId] || key > lastInMap[r.genId]) lastInMap[r.genId] = key;
+      if(!lastInMap[r.genId] || key > lastInMap[r.genId].key) lastInMap[r.genId] = { key, date: r.inDate };
     });
     let gens = [];
     try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
     if(!Array.isArray(gens)) gens = [];
     const inStock = gens.filter(g=>g && !g.retired && g.status==='in').sort((a,b)=>{
-      const ka = lastInMap[a.id] || '';
-      const kb = lastInMap[b.id] || '';
+      const ka = (lastInMap[a.id]&&lastInMap[a.id].key) || '';
+      const kb = (lastInMap[b.id]&&lastInMap[b.id].key) || '';
       if(ka || kb) return kb.localeCompare(ka);
       return String(a.id).localeCompare(String(b.id), 'ko', {numeric:true});
     });
@@ -759,6 +759,7 @@ async function renderQmStockListInner(){
       } else {
         maintPill = `<span style="border:1px solid #C23B3B;color:#C23B3B;background:#C23B3B15;font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;white-space:nowrap;">확인불가</span>`;
       }
+      const lastIn = lastInMap[g.id];
       return `
       <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
@@ -768,7 +769,8 @@ async function renderQmStockListInner(){
           </div>
           <input type="checkbox" style="width:24px;height:24px;flex-shrink:0;">
         </div>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
+        ${lastIn? `<div style="font-size:11px;color:#888;margin-top:3px;">🕐 최근 입고 ${escR(lastIn.date)}</div>` : ''}
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;">
           <button type="button" onclick="openQmVoltageEdit('${g.id}')" style="${vStyle}font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;border-style:solid;border-width:1px;">${escR(g.voltage)||'전압 미설정'}</button>
           ${maintPill}
         </div>
@@ -900,6 +902,7 @@ async function renderQmOutListInner(){
     const filtered = qmOutRegionFilter==null ? outGens : outGens.filter(g=>regionOf((g.rental&&(g.rental.address||g.rental.site))||'')===qmOutRegionFilter);
     wrap.innerHTML = `<div style="font-size:13px;color:#888;margin:10px 0 8px;text-align:right;">총 ${filtered.length}대</div>` + filtered.map(g=>{
       const city = cityOf((g.rental&&(g.rental.address||g.rental.site))||'');
+      const outDate = g.rental && g.rental.outDate;
       return `
       <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
@@ -909,6 +912,7 @@ async function renderQmOutListInner(){
           </div>
           <button type="button" onclick="openQmOutDetail('${g.id}')" style="background:#5B7FA6;border:none;color:#fff;font-weight:800;font-size:12px;padding:8px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0;">상세보기</button>
         </div>
+        ${outDate? `<div style="font-size:11px;color:#888;margin-top:3px;">🚚 출고일 ${escR(outDate)}</div>` : ''}
         <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
           <span class="pill" style="background:#EAF2E9;color:#2C6E49;border:1px solid #2C6E49;font-size:10px;white-space:nowrap;">${escR(g.voltage)||'전압 미설정'}</span>
           <span class="pill" style="background:#E8EEF4;color:#5B7FA6;border:1px solid #5B7FA6;font-size:10px;">${escR(city)}</span>
