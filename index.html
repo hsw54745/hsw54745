@@ -5856,7 +5856,7 @@ function renderManualTab(){
       ['접근 권한', '매출관리 관리자 이름은 "이영숙"으로 고정되어 있어 바꿀 수 없습니다. "이영숙"으로 접속했을 때만 상단 탭에 매출관리가 보이고 사용할 수 있으며, 그 외 이름으로 접속하면 탭 자체가 안 보입니다. 비밀번호도 "이영숙"으로 접속했을 때만 [설정 → 매출관리자 지정]에서 설정할 수 있고, 다른 이름으로 접속하면 비밀번호 입력칸 자체가 안 보입니다. 비밀번호를 설정해두면 매출관리 탭에 들어갈 때 비밀번호를 입력해야 합니다("비밀번호 없이 사용" 체크를 켜두면 비밀번호를 물어보지 않습니다).'],
       ['관리자 모드로 매출관리 열람', '"이영숙"이 아니어도, [설정 → 🔐 관리자 모드]를 전용 비밀번호로 열고 그 안의 "매출관리 보기" 체크를 켜면 매출관리 탭이 보입니다(매출관리자 지정과는 완전히 별개의 통로입니다). 이 경로로 들어갈 때는 매출관리 자체 비밀번호는 물어보지 않고 바로 들어가집니다(관리자 모드 비밀번호로 이미 확인된 것으로 간주). 이 체크는 **지금 쓰고 있는 이 기기·이 브라우저에만 적용**되고, 다른 사람 화면이나 다른 기기에는 전혀 영향을 주지 않습니다. 관리자 모드가 5분 후 잠겨도 이 체크는 계속 유지되며, 다시 끄고 싶으면 관리자 모드를 한 번 더 열어서 체크를 직접 풀어야 합니다.'],
       ['비밀번호 변경시 다른 기기 자동 잠금', '한 기기에서 비밀번호를 새로 저장하면, 그 기기는 계속 열람 가능한 상태로 유지되지만 이미 열려있던 다른 기기·다른 창은 새 비밀번호를 모르는 상태가 되어 다음 자동 동기화 때(최대 2분 이내) 자동으로 다시 잠깁니다. 그 화면에서 다시 들어가려면 새 비밀번호를 입력해야 합니다.'],
-      ['업체별 매출현황', '지금 출고중인 발전기를 출고일 순서대로 보여줍니다. 각 매출 건은 현장명 아래에 "HS-1, HS-2..."처럼 계속 증가하는 고유 매출번호가 카드로 크게 표시되어, 전화나 대화로 특정 건을 빠르게 지칭할 때 씁니다(숨기거나 취소해도 번호는 재사용되지 않습니다). 발전기별로 청구일자·업체명·현장명·용량·발전기번호·사용기간·견적금액(공급가·세액·합계)·계산서 발행·운임(출고운임/세액, 입고운임/세액)·입금일/입금금액·미수금·담당자·연락처·비고를 표 안에서 바로 입력할 수 있고, 공급가와 각 운임을 넣으면 세액(10%)이 자동 계산되며 합계도 자동으로 더해집니다(합계는 직접 고칠 수도 있음). 업체명에 담당자 이름·전화번호가 같이 적혀 있으면 자동으로 나눠서 담당자·연락처 칸에 채워줍니다. 입력한 내용은 곧바로 저장되며, 별도의 등록 버튼이 필요 없습니다. 한 번 생성된 매출 기록은 이후 출고취소·입고가 되어도 지워지지 않고 그대로 남습니다.'],
+      ['업체별 매출현황', '지금 출고중인 발전기를 출고일 순서대로 보여줍니다. 각 매출 건은 현장명 아래에 "HS-1, HS-2..."처럼 계속 증가하는 고유 매출번호가 카드로 크게 표시되어, 전화나 대화로 특정 건을 빠르게 지칭할 때 씁니다(숨기거나 취소해도 번호는 재사용되지 않습니다). 같은 거래처에 출고취소 이력이 있으면 그 밑에 빨간 카드로 "어느 발전기를, 언제, 무슨 사유로 취소했는지" 같이 표시됩니다(예: 발전기를 바꿔서 다시 출고한 경우). 발전기별로 청구일자·업체명·현장명·용량·발전기번호·사용기간·견적금액(공급가·세액·합계)·계산서 발행·운임(출고운임/세액, 입고운임/세액)·입금일/입금금액·미수금·담당자·연락처·비고를 표 안에서 바로 입력할 수 있고, 공급가와 각 운임을 넣으면 세액(10%)이 자동 계산되며 합계도 자동으로 더해집니다(합계는 직접 고칠 수도 있음). 업체명에 담당자 이름·전화번호가 같이 적혀 있으면 자동으로 나눠서 담당자·연락처 칸에 채워줍니다. 입력한 내용은 곧바로 저장되며, 별도의 등록 버튼이 필요 없습니다. 한 번 생성된 매출 기록은 이후 출고취소·입고가 되어도 지워지지 않고 그대로 남습니다.'],
       ['계산서 발행 버튼', '견적금액 칸 아래 있는 토글 버튼입니다. 누르면 "발행 처리할까요?" 또는 "미발행으로 변경할까요?" 확인창이 뜨고, 확인해야만 "계산서 미발행" ↔ "계산서 발행함" 상태가 바뀝니다.'],
       ['이 매출 숨기기', '청구일자 칸 아래 큰 버튼입니다. 누르면 숨기는 이유를 입력하라는 창이 뜨고, 이유를 적고 확인하면 목록에서 안 보이게 숨겨집니다(삭제 아님). "숨김매출" 체크를 켜면 숨긴 건만 모아서 볼 수 있고, 각 건에 적어둔 숨긴 이유도 함께 표시되며 "복원하기" 버튼으로 다시 되돌릴 수 있습니다.'],
       ['출고취소와 매출 기록의 연동', '[출고중] 목록에서 "🚫 출고취소"를 누르면 취소 사유를 적고 "비용발생"/"비용발생 안함" 중 골라야 합니다. "비용발생"을 고르면 그 건의 매출 기록은 정상 목록에 그대로 남고, "비용발생 안함"을 고르면 사유와 함께 자동으로 "숨김매출" 처리되어 정상 목록에서 빠집니다.'],
@@ -6232,6 +6232,16 @@ function renderSalesTab(){
         ${rec.billSeqNo? `<div class="detail-card" style="margin-top:8px;padding:9px 8px;min-width:110px;text-align:center;background:var(--primary-tint);border:1px solid var(--primary);">
           <span style="font-size:19px;font-weight:900;letter-spacing:0.5px;color:var(--primary-dark);white-space:nowrap;">HS-${rec.billSeqNo}</span>
         </div>` : ''}
+        ${(()=>{
+          const cancels = (DB.cancelOutHistory||[]).filter(h=>h && h.customer===rec.customer);
+          if(cancels.length===0) return '';
+          return `<div class="detail-card" style="margin-top:8px;padding:9px 8px;min-width:110px;text-align:center;background:var(--danger-tint);border:1px solid var(--danger);">
+            <div style="font-size:11px;font-weight:800;color:var(--danger);margin-bottom:4px;">🚫 출고취소 이력</div>
+            ${cancels.map(h=>`<div style="font-size:10.5px;color:var(--danger);line-height:1.4;margin-top:4px;border-top:1px dashed var(--danger);padding-top:4px;">
+              ${escR(h.genId||'-')} · ${dow(h.outDate)||'-'}<br>${escR(h.reason||'사유 미기재')}
+            </div>`).join('')}
+          </div>`;
+        })()}
       </td>
       <td rowspan="2">${rec.manual? `<input type="number" min="0" value="${rec.capacity!=null? rec.capacity:''}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','capacity', this.value===''?null:Number(this.value))">` : capStr}</td>
       <td rowspan="2" class="gid">${rec.manual? `<input type="text" value="${escR(rec.genId).replace(/"/g,'&quot;')}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','genId', this.value)">` : rec.genId}</td>
@@ -6336,21 +6346,21 @@ function renderSalesTab(){
           <input type="checkbox" style="width:19px;height:19px;flex:none;" ${salesShowHiddenOnly?'checked':''} onchange="toggleSalesShowHiddenOnly(this.checked)">
           숨김매출 <span class="cnt">${hiddenCount}건</span>
         </label>
-        <div class="muted" style="font-size:12px;margin-top:5px;white-space:nowrap;">체크하면 숨긴 매출 건만 보여줍니다.</div>
+        <details class="info-toggle" style="margin-top:5px;"><summary></summary><p class="muted" style="white-space:normal;">체크하면 숨긴 매출 건만 보여줍니다.</p></details>
       </div>
       <div class="detail-card" style="padding:14px 16px;display:flex;flex-direction:column;justify-content:center;flex:none;background:var(--primary-tint);">
         <label style="display:flex;align-items:center;gap:7px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;color:var(--primary-dark);">
           <input type="checkbox" style="width:19px;height:19px;flex:none;" ${salesShowBorrowedOnly?'checked':''} onchange="toggleSalesShowBorrowedOnly(this.checked)">
           🤝 임대발전기 매출 <span class="cnt">${borrowedCount}건</span>
         </label>
-        <div class="muted" style="font-size:12px;margin-top:5px;white-space:nowrap;">체크하면 임대 발전기 매출 건만 보여줍니다.</div>
+        <details class="info-toggle" style="margin-top:5px;"><summary></summary><p class="muted" style="white-space:normal;">체크하면 임대 발전기 매출 건만 보여줍니다.</p></details>
       </div>
       <div class="detail-card" style="padding:14px 16px;display:flex;flex-direction:column;justify-content:center;flex:none;">
         <label style="display:flex;align-items:center;gap:7px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap;">
           <input type="checkbox" style="width:19px;height:19px;flex:none;" ${salesShowFreight?'checked':''} onchange="toggleSalesShowFreight(this.checked)">
           출고운임·입고운임 표시 켜기/끄기
         </label>
-        <div class="muted" style="font-size:12px;margin-top:5px;white-space:nowrap;">체크를 끄면 운임 관련 입력칸이 표에서 숨겨집니다.</div>
+        <details class="info-toggle" style="margin-top:5px;"><summary></summary><p class="muted" style="white-space:normal;">체크를 끄면 운임 관련 입력칸이 표에서 숨겨집니다.</p></details>
       </div>
     </div>
     <div style="display:flex;gap:14px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">
