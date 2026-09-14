@@ -497,7 +497,7 @@ const TABS = [
   {id:'maint', label:'🔧 정비 관리', color:'#8A4FBE'},
   {id:'materials', label:'🧰 자재 관리', color:'#1E8E8E'},
   {id:'history', label:'📜 이력 조회', color:'#6B6F1A'},
-  {id:'settlement', label:'📊 가동률 통계', color:'#B0338E'},
+  {id:'settlement', label:'📊 임대율 통계', color:'#B0338E'},
   {id:'sales', label:'💰 매출관리', color:'#2F7D4F'},
   {id:'consumable-order', label:'🛒 소모품주문', color:'#3A5FCD'},
   {id:'improvements', label:'📝 보완요청', color:'#CA5A2E'},
@@ -5462,19 +5462,48 @@ function renderSettlementTab(){
       <tbody>${rows.map(([name,stat])=>`<tr><td class="wrap-ok">${escR(name)}</td><td>${stat.count}건</td></tr>`).join('')}</tbody>
     </table>`;
 
+  const byCapacity = {};
+  utilList.forEach(x=>{
+    const cap = capacityOf(x.g);
+    if(!byCapacity[cap]) byCapacity[cap] = {held:0, totalRate:0, rentalCount:0};
+    byCapacity[cap].held++;
+    byCapacity[cap].totalRate += x.rate;
+  });
+  DB.rentals.forEach(r=>{
+    const g = DB.gens.find(x=>x.id===r.genId);
+    if(!g) return;
+    const cap = capacityOf(g);
+    if(!byCapacity[cap]) byCapacity[cap] = {held:0, totalRate:0, rentalCount:0};
+    byCapacity[cap].rentalCount++;
+  });
+  const capacityEntries = Object.entries(byCapacity).map(([cap,stat])=>({
+    cap: Number(cap), held: stat.held, avgRate: stat.held>0? Math.round(stat.totalRate/stat.held) : 0, rentalCount: stat.rentalCount
+  })).sort((a,b)=>a.cap-b.cap);
+  const capacityRowsHtml = capacityEntries.map(x=>{
+    const color = x.avgRate>=70? 'var(--ok)' : x.avgRate>=40? 'var(--warn)' : 'var(--danger)';
+    return `<tr><td class="gid">${x.cap===Infinity? '용량 미상' : x.cap+'kW'}</td><td class="muted">${x.held}대</td><td><div class="gauge-wrap"><div class="gauge"><div class="gauge-fill" style="width:${x.avgRate}%;background:${color};"></div></div><span class="gauge-txt" style="color:${color};">${x.avgRate}%</span></div></td><td class="muted">${x.rentalCount}건</td></tr>`;
+  }).join('');
+
   return `
-    <div class="section-title">📊 발전기별 가동률 (최근 90일)</div>
+    <div class="section-title">📊 발전기별 임대율 (최근 90일)</div>
     <details class="info-toggle"><summary></summary><p class="muted">최근 90일 중 출고(임대)되어 있던 일수 비율입니다. 낮은 순으로 확인하면 놀고 있는 장비를 파악할 수 있습니다.</p></details>
     <div class="util-two-col">
       <div class="util-table"><table>
-        <thead><tr><th>번호</th><th>모델</th><th>출고일수</th><th>가동률</th></tr></thead>
+        <thead><tr><th>번호</th><th>모델</th><th>출고일수</th><th>임대율</th></tr></thead>
         <tbody>${utilRows1}</tbody>
       </table></div>
       <div class="util-table"><table>
-        <thead><tr><th>번호</th><th>모델</th><th>출고일수</th><th>가동률</th></tr></thead>
+        <thead><tr><th>번호</th><th>모델</th><th>출고일수</th><th>임대율</th></tr></thead>
         <tbody>${utilRows2}</tbody>
       </table></div>
     </div>
+
+    <div class="section-title" style="margin-top:24px;">📊 발전기 용량별 임대 통계</div>
+    <details class="info-toggle"><summary></summary><p class="muted">용량(kW)별로 지금 몇 대를 보유하고 있는지, 최근 90일 평균 임대율은 어떤지, 지금까지 누적 임대 건수가 몇 건인지 보여줍니다. 어떤 용량대가 잘 돌고 어떤 용량대가 놀고 있는지 한눈에 볼 수 있습니다.</p></details>
+    <table>
+      <thead><tr><th>용량</th><th>보유대수</th><th>평균임대율(90일)</th><th>누적 임대건수</th></tr></thead>
+      <tbody>${capacityRowsHtml}</tbody>
+    </table>
 
     <div class="section-title" style="margin-top:24px;">📊 거래처별 임대 건수</div>
     ${Object.keys(byCustomer).length===0? `<div class="empty">데이터가 없습니다.</div>` : `
@@ -5755,10 +5784,10 @@ function renderManualTab(){
       ['거래처별 이력 · 주의사항', '지금까지 거래한 모든 업체 목록과 임대 건수를 보여줍니다 (임대 건수가 많은 순으로 정렬됩니다). 업체를 클릭하면 "입금 문제", "장비 관리 불량", "회수일자 지연" 같은 주의 태그를 선택하고, 목록에 없는 태그는 직접 입력해서 추가할 수도 있습니다. 메모도 자유롭게 남길 수 있습니다. 태그·메모가 있는 업체는 목록에서 빨간색으로 표시됩니다. 이렇게 설정해두면, 나중에 출고하기 화면에서 그 거래처명을 입력할 때 주의사항이 자동으로 빨간 박스로 함께 뜹니다. 아래 임대 이력에는 완료·진행중·예약/상차대기 상태와 함께 발전기 번호·모델, 임대기간과 임대사용시간(그 임대 건 동안 실제로 돌아간 총 시간 = 입고시 누적시간 − 출고시 누적시간), 담당자·연락처, 현장주소, 전압·부자재·연료·비고까지 출고시 입력된 내용이 카드 형태로 전부 표시됩니다. "🖨 인쇄" 버튼으로 이 거래처의 주의 태그·메모와 임대 이력 전체를 인쇄용 파일로 받을 수 있습니다.']
     ])}
 
-    ${manualSection('📊','가동률 통계', false,
+    ${manualSection('📊','임대율 통계', false,
       '전체 운영 현황을 숫자로 확인하는 화면입니다.', [
       ['거래처별 임대 건수', '어느 거래처와 거래가 많은지 보여줍니다.'],
-      ['발전기별 가동률(최근 90일)', '최근 90일 중 출고되어 있던 비율입니다. 낮을수록 놀고 있는 장비라는 뜻입니다.']
+      ['발전기별 임대율(최근 90일)', '최근 90일 중 출고되어 있던 비율입니다. 낮을수록 놀고 있는 장비라는 뜻입니다.']
     ])}
 
     ${manualSection('💰','매출관리', false,
