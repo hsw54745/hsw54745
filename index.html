@@ -9559,7 +9559,7 @@ function parseSmsOrderText(text){
   const phoneRe = /01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/;
   const capacityRe = /\d+(\.\d+)?\s*(키로|kw|톤)/i;
   const voltageRe = /(\d{2,4})\s*볼트|\b(\d{2,4})\s*v\b/i;
-  const addressRe = /(시|도|군|구|읍|면|동|리|로|길)[\s]*\d|산\s*\d/;
+  const addressRe = /(시|도|군|구|읍|면|동|리|로|길)[\s]*\d|산\s*\d|(^|\s)[가-힣]{2,}(시|도|군|구|읍|면|동|리)(\s|$)/;
   const usageDaysRe = /(\d{1,3})\s*일\s*간?\s*사용|사용\s*(\d{1,3})\s*일/;
   const supplyKeywords = ['접지봉','깔판','용접기','가설분전함','분전반','전선','케이블','분전함','릴선'];
   const leftover = [];
@@ -9649,12 +9649,13 @@ function parseSmsOrderText(text){
 // 철수(회수) 요청 문자에서 주소·연락처·담당자·회수예정일을 뽑아냅니다.
 // 오늘/내일/"OO일 후"/특정 날짜("18일") 표현을 인식합니다. 시간은 철수 요청에서는 안 쓰므로 뽑지 않습니다.
 function parseReturnRequestText(text){
-  const result = {address:'', phone:'', manager:'', recallDate:''};
+  const result = {address:'', phone:'', manager:'', customer:'', recallDate:''};
   if(!text) return result;
   const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
   const phoneRe = /01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/;
-  const addressRe = /(시|도|군|구|읍|면|동|리|로|길)[\s]*\d|산\s*\d/;
+  const addressRe = /(시|도|군|구|읍|면|동|리|로|길)[\s]*\d|산\s*\d|(^|\s)[가-힣]{2,}(시|도|군|구|읍|면|동|리)(\s|$)/;
   const today = new Date();
+  const leftover = [];
 
   // 날짜는 더 구체적인 표현(특정 날짜 > N일 후 > 내일 > 오늘) 순으로 찾습니다.
   const relMatch = text.match(/(\d{1,2})\s*일\s*(후|뒤)/);
@@ -9675,19 +9676,31 @@ function parseReturnRequestText(text){
   }
 
   lines.forEach(line=>{
-    if(/\d+(\.\d+)?\s*(키로|kw|톤)/i.test(line)) return; // 용량 줄은 "키로"의 "로"가 주소 패턴과 헷갈릴 수 있어 건너뜁니다.
-    const pm = line.match(phoneRe);
+    let l = line.replace(/[★☆]+\s*해성발전기\s*(출고|철수)?\s*요청\s*[★☆]+/g, '').trim();
+    if(!l) return;
+    if(/\d+(\.\d+)?\s*(키로|kw|톤)/i.test(l)) return; // 용량 줄은 "키로"의 "로"가 주소 패턴과 헷갈릴 수 있어 건너뜁니다.
+    if(l.startsWith('*')) return; // "*지금철수" 같은 메모 줄
+    const pm = l.match(phoneRe);
     if(pm){
       result.phone = pm[0].replace(/[^0-9]/g,'');
-      const rest = line.replace(phoneRe,'').trim();
+      const rest = l.replace(phoneRe,'').trim();
       if(rest) result.manager = rest;
       return;
     }
-    if(addressRe.test(line)) result.address = result.address ? result.address+' '+line : line;
+    if(addressRe.test(l)){ result.address = result.address ? result.address+' '+l : l; return; }
+    leftover.push(l);
   });
+  // 남는 줄(회사명일 가능성이 높은 줄)을 업체명 후보로 씁니다. 담당자를 못 뽑았으면 직급 붙은 줄을 담당자로 먼저 뺍니다.
+  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장)\s*님?$|님$/;
+  const titleIdx = leftover.findIndex(l=>titleRe.test(l));
+  if(titleIdx>=0 && !result.manager){
+    result.manager = leftover[titleIdx];
+    leftover.splice(titleIdx,1);
+  }
+  if(leftover.length>0) result.customer = leftover[0];
   return result;
 }
-// 지금 출고중인 발전기 중, 이 철수요청 문자와 연락처(우선)·주소가 일치하는 것을 찾습니다.
+// 지금 출고중인 발전기 중, 이 철수요청 문자와 연락처(우선)·주소·업체명이 일치하는 것을 찾습니다.
 function findMatchedGenForReturnRequest(text){
   const parsed = parseReturnRequestText(text);
   const outGens = activeGens().filter(g=>g.status==='out' && g.rental);
@@ -9697,6 +9710,11 @@ function findMatchedGenForReturnRequest(text){
   }
   if(parsed.address){
     const m = outGens.find(g=>g.rental.address && (g.rental.address.includes(parsed.address) || parsed.address.includes(g.rental.address)));
+    if(m) return m;
+  }
+  if(parsed.customer){
+    // 연락처·주소로 못 찾으면(담당자가 바뀐 경우 등) 업체명으로 마지막으로 한 번 더 찾아봅니다.
+    const m = outGens.find(g=>g.rental.customer && (g.rental.customer.includes(parsed.customer) || parsed.customer.includes(g.rental.customer)));
     if(m) return m;
   }
   return null;
