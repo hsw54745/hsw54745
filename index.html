@@ -1259,7 +1259,7 @@ async function qmRefreshReservationList(){
         <div style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(r.customer||r.site||'거래처 미기재')}</div>
         <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${r.outDate? fmtDateKR(r.outDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
         <div style="font-size:13px;color:#333;margin-top:6px;">
-          ${assigned? `<span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:none;border:none;color:#5B7FA6;font-size:11px;font-weight:800;text-decoration:underline;cursor:pointer;padding:0;margin-left:4px;">변경</button>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
+          ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
         ${infoRows.length? `
         <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;display:flex;flex-direction:column;gap:4px;">
