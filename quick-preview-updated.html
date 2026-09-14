@@ -550,9 +550,46 @@ function pwGateHide(){
 function isQuickMode(){
   return true; // 미리보기 전용: 항상 퀵메뉴로 열림
 }
+let qmCurrentUserName = '';
+function qmLabel(){ return (qmCurrentUserName||'미지정') + '(간편등록)'; }
+async function startQuickMode(){
+  try{
+    const cur = await window.storage.get('gen-user-name-v1', false);
+    let name = ''; try{ name = cur ? JSON.parse(cur.value) : ''; }catch(e){ name = ''; }
+    if(name){ qmCurrentUserName = name; renderQuickModeUI(); return; }
+  }catch(e){ /* 저장된 이름이 없거나 불러오지 못하면 선택 화면으로 */ }
+  openQmUserGate();
+}
+async function openQmUserGate(){
+  let names = ['이성웅','홍승우','이영숙'];
+  try{
+    const cur = await window.storage.get('gen-team-members-v1', true);
+    const teamMembers = cur ? JSON.parse(cur.value) : [];
+    if(Array.isArray(teamMembers)) names = [...new Set([...teamMembers.filter(Boolean), ...names])];
+  }catch(e){ /* 못 불러오면 기본 이름 목록만 사용 */ }
+  const options = names.map(n=>`<button type="button" onclick="submitQmUserName('${n.replace(/'/g,"\\'")}')" style="width:100%;padding:18px;font-size:18px;font-weight:800;background:#fff;border:2px solid #2C4A66;color:#2C4A66;border-radius:14px;cursor:pointer;margin-bottom:10px;">${escR(n)}님</button>`).join('');
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <div style="text-align:center;margin-bottom:16px;">
+        <div style="font-size:24px;font-weight:800;color:#2C6E49;">👤 사용자 선택</div>
+        <div style="font-size:14px;color:#555;margin-top:6px;">이 폰에서 등록하는 내용에 본인 이름이 남습니다. 본인 이름을 눌러주세요.</div>
+      </div>
+      ${options}
+    </div>
+  `);
+}
+async function submitQmUserName(name){
+  qmCurrentUserName = name;
+  try{ await window.storage.set('gen-user-name-v1', JSON.stringify(name), false); }catch(e){ /* 저장 실패해도 이번 접속에서는 계속 이 이름으로 진행 */ }
+  renderQuickModeUI();
+}
+function changeQmUserName(){
+  openQmUserGate();
+}
 function renderQuickModeUI(){
   pwGateShow(`
     <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;position:relative;">
+      <button type="button" onclick="changeQmUserName()" title="사용자 변경" style="position:absolute;top:14px;left:14px;padding:6px 10px;font-size:12px;font-weight:700;background:#fff;color:#2C4A66;border:1.5px solid #2C4A66;border-radius:10px;cursor:pointer;">👤 ${escR(qmCurrentUserName||'이름 미선택')}</button>
       <button type="button" onclick="triggerPwaInstall()" title="홈 화면에 앱으로 추가" style="position:absolute;top:14px;right:14px;padding:6px 10px;font-size:12px;font-weight:700;background:#fff;color:#888;border:1.5px solid #ccc;border-radius:10px;cursor:pointer;">📲 앱설치</button>
       <div style="margin-bottom:20px;">
         <div style="text-align:center;">
@@ -566,8 +603,8 @@ function renderQuickModeUI(){
       <button type="button" onclick="renderQuickModeStockList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📦 입고된 발전기 리스트 보기</button>
       <button type="button" onclick="renderQuickModeOutList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">🚚 출고중 발전기 리스트 보기</button>
       <button type="button" onclick="renderQmReservationList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:28px;">⏳ 출고대기 리스트 보기</button>
-      <button type="button" onclick="renderQuickModePasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📤 출고 문자 붙여넣기</button>
-      <button type="button" onclick="renderQuickModeReturnPasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">🔻 철수 문자 붙여넣기</button>
+      <button type="button" onclick="renderQuickModePasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📤 출고 문자 보내기</button>
+      <button type="button" onclick="renderQuickModeReturnPasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">🔻 철수 문자 보내기</button>
       <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;">📝 출고예약 등록</button>
       <div id="qm-install-status" style="margin-top:10px;"></div>
     </div>
@@ -793,7 +830,7 @@ async function submitQmVoltageEdit(id){
     g.voltage = value;
     g.voltageUpdatedAt = nowDateTimeStr();
     g.voltageUpdatedAtMs = Date.now();
-    g.voltageUpdatedBy = '문자 간편등록(퀵메뉴)';
+    g.voltageUpdatedBy = qmLabel();
     await window.storage.set('gen-fleet-v2', JSON.stringify(gens), true);
     box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
     box.textContent = '✅ 전압이 저장되었습니다!';
@@ -1147,7 +1184,7 @@ async function submitQmInProcess(id){
       fuelRequested: r.fuelRequested, fuelActual: r.fuelActual, usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, note: combinedNote,
       outDate: r.outDate, inDate, startHours: r.startHours, endHours,
       usedHours: endHours!=null ? endHours - (r.startHours||0) : null, longTerm: r.longTerm, estDaily: r.estDaily,
-      voltage, outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: r.loadConfirmedBy||null, inProcessedBy: '문자 간편등록(퀵메뉴)', inProcessedAt: nowDateTimeStr(),
+      voltage, outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: r.loadConfirmedBy||null, inProcessedBy: qmLabel(), inProcessedAt: nowDateTimeStr(),
       measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
       paymentConfirmed: r.paymentConfirmed||false, forcedOut: r.forcedOut||false, forceReason: r.forceReason||'', forcedBy: r.forcedBy||null
     });
@@ -1157,7 +1194,7 @@ async function submitQmInProcess(id){
     g.voltage = voltage;
     g.voltageUpdatedAt = nowDateTimeStr();
     g.voltageUpdatedAtMs = Date.now();
-    g.voltageUpdatedBy = '문자 간편등록(퀵메뉴)';
+    g.voltageUpdatedBy = qmLabel();
     g.rental = null;
 
     await Promise.all([
@@ -1222,7 +1259,7 @@ async function qmRefreshReservationList(){
         <div style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(r.customer||r.site||'거래처 미기재')}</div>
         <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${r.outDate? fmtDateKR(r.outDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
         <div style="font-size:13px;color:#333;margin-top:6px;">
-          ${assigned? `<span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
+          ${assigned? `<span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:none;border:none;color:#5B7FA6;font-size:11px;font-weight:800;text-decoration:underline;cursor:pointer;padding:0;margin-left:4px;">변경</button>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
         ${infoRows.length? `
         <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;display:flex;flex-direction:column;gap:4px;">
@@ -1282,10 +1319,11 @@ async function openQmAssignGen(resId){
     const r = list.find(x=>x.id===resId);
     if(!document.getElementById('qmag-sub')) return; // 화면이 이미 닫혔으면 무시
     if(!r){ document.getElementById('qmag-sub').textContent = '해당 출고대기 건을 찾을 수 없습니다.'; return; }
-    const reservedGenIds = new Set(list.map(x=>x.genId));
+    const reservedGenIds = new Set(list.filter(x=>x.id!==resId).map(x=>x.genId));
+    const alreadyAssigned = r.genId && r.genId!==UNASSIGNED_GEN_ID;
     const candidates = gens.filter(g=>g && !g.retired && g.status==='in' && !g.underRepair && !reservedGenIds.has(g.id))
       .sort((a,b)=>String(a.id).localeCompare(String(b.id), 'ko', {numeric:true}));
-    document.getElementById('qmag-sub').textContent = `${r.customer||r.site||'거래처 미기재'} · 배정할 발전기(입고 상태)를 골라주세요`;
+    document.getElementById('qmag-sub').textContent = `${r.customer||r.site||'거래처 미기재'} · ${alreadyAssigned? `현재 배정: ${r.genId} · 변경할` : '배정할'} 발전기(입고 상태)를 골라주세요`;
     const listWrap = document.getElementById('qmag-list');
     if(candidates.length===0){
       listWrap.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">지금 배정할 수 있는(입고 상태인) 발전기가 없습니다.</div>';
@@ -1293,14 +1331,16 @@ async function openQmAssignGen(resId){
     }
     listWrap.innerHTML = candidates.map(g=>{
       const vColor = voltageColor(g.voltage);
+      const isCurrent = g.id===r.genId;
       const vStyle = vColor
         ? `border:1px solid ${vColor};color:${vColor};background:${vColor}15;`
         : `border:1px solid #ccc;color:#888;background:#f2f2f2;`;
       return `
-      <button type="button" onclick="submitQmAssignGen('${resId}','${g.id}')" style="width:100%;text-align:left;background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <button type="button" onclick="submitQmAssignGen('${resId}','${g.id}')" style="width:100%;text-align:left;background:${isCurrent?'#EAF5EC':'#fff'};border:1px solid ${isCurrent?'#2C6E49':'#ddd'};border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;">
         <div style="text-align:left;min-width:0;">
           <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
           <span style="font-size:13px;color:#333;margin-left:6px;">${escR(g.model||'미설정')}</span>
+          ${isCurrent? '<span style="font-size:11px;font-weight:800;color:#2C6E49;margin-left:6px;">✅ 현재 배정</span>' : ''}
         </div>
         <span style="${vStyle}font-weight:800;font-size:11px;padding:6px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;">${escR(g.voltage)||'전압 미설정'}</span>
       </button>`;
@@ -1450,7 +1490,7 @@ async function submitQmConfirmLoad(resId, needFuel){
       fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
       usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null,
       outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
-      outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: '문자 간편등록(퀵메뉴)'
+      outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: qmLabel()
     };
     if(r.suppliesItems && r.suppliesItems.length){
       r.suppliesItems.forEach(it=>{
@@ -1910,7 +1950,7 @@ async function submitQuickReserve(){
         note,
         outDate, startHours, longTerm: false, estDaily,
         smsOrder: null,
-        outProcessedBy: '이영숙(간편등록)', createdAt: today, createdAtTs: Date.now()
+        outProcessedBy: qmLabel(), createdAt: today, createdAtTs: Date.now()
       };
     } else {
       newItem = {
@@ -1926,7 +1966,7 @@ async function submitQuickReserve(){
         note,
         smsOrder: null,
         longTerm: false, estDaily,
-        outProcessedBy: '이영숙(간편등록)', createdAt: today, createdAtTs: Date.now()
+        outProcessedBy: qmLabel(), createdAt: today, createdAtTs: Date.now()
       };
     }
     list.push(newItem);
@@ -2076,7 +2116,7 @@ async function submitQuickOrder(){
       note: '',
       smsOrder: text,
       longTerm: false, estDaily: null,
-      outProcessedBy: '이영숙(문자접수)', createdAt: today, createdAtTs: Date.now()
+      outProcessedBy: qmLabel(), createdAt: today, createdAtTs: Date.now()
     };
     // 저장 직전에 최신 목록을 다시 받아와서 그 위에 이번 건만 추가합니다 (동시편집 충돌 방지)
     const cur = await window.storage.get('gen-reservations-v1', true);
@@ -2138,7 +2178,7 @@ async function submitQuickReturnOrder(){
       try{ rrList = rrCur ? JSON.parse(rrCur.value) : []; }catch(e4){ rrList = []; }
       if(!Array.isArray(rrList)) rrList = [];
       newId = uid();
-      rrList.push({ id: newId, text, handled: false, createdAt: today, createdAtTs: Date.now() });
+      rrList.push({ id: newId, text, handled: false, authorBy: qmLabel(), createdAt: today, createdAtTs: Date.now() });
       await window.storage.set('gen-return-requests-v1', JSON.stringify(rrList), true);
     }catch(e5){
       box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
@@ -3995,7 +4035,7 @@ function renderOutList(){
       <div style="display:flex;flex-wrap:wrap;gap:8px;">
         ${pendingReturns.map(r=>`
         <div style="width:170px;height:250px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
-          <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}</div>
+          <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}${r.authorBy? ` · ${escR(r.authorBy)}` : ''}</div>
           <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;flex:1;overflow:hidden;" onclick="viewReturnRequestText('${r.id}')">${escR(r.text||'')}</div>
           <div style="display:flex;gap:4px;margin-top:6px;">
             <button class="btn sm primary" style="flex:1;font-size:10px;padding:2px 4px;" onclick="markReturnRequestHandled('${r.id}')">✅ 처리완료</button>
@@ -5551,12 +5591,12 @@ function renderManualTab(){
     ])}
 
     ${manualSection('📱','문자 간편등록 (퀵메뉴)', false,
-      '문자로 오더를 주시는 분(예: 이영숙님)이 사무실 프로그램 로그인 없이 스마트폰에서 바로 문자를 등록할 수 있는 전용 화면입니다. [설정 → 📱 문자 간편등록 QR코드]로 QR을 찍거나, 앱 주소 뒤에 <code>?quick=1</code>을 붙여서 접속하면 이 화면만 뜹니다.', [
+      '문자로 오더를 주시는 분(예: 이영숙님)이 사무실 프로그램 로그인 없이 스마트폰에서 바로 문자를 등록할 수 있는 전용 화면입니다. [설정 → 📱 문자 간편등록 QR코드]로 QR을 찍거나, 앱 주소 뒤에 <code>?quick=1</code>을 붙여서 접속하면 이 화면만 뜹니다. 처음 접속하면 사무실 프로그램처럼 사용자 선택 화면이 먼저 뜨고, 한 번 고른 이름은 그 폰에 저장되어 다음에 열 때는 바로 메뉴로 들어갑니다(왼쪽 위 이름 버튼으로 언제든 변경 가능). 여기서 등록·처리한 모든 내용에는 선택한 이름이 그대로 남습니다.', [
       ['📦 입고된 발전기 리스트 보기', '지금 입고 상태인 발전기를 용량(kW)별로 몇 대 있는지 간단히 볼 수 있고, 각 발전기의 셋팅전압을 눌러 바로 수정할 수도 있습니다. "마지막 정비 후 OOOh 사용" 표시는 사무실 프로그램과 똑같은 정비주기 기준(임박·초과시 색이 바뀝니다)으로 함께 보여지며, 누적시간을 확인할 수 없는 발전기는 빨간 "확인불가"로 표시됩니다. 옆의 빈 체크박스는 저장되지 않는 눈으로만 확인하는 용도로, 공장 현장에서 실물을 하나씩 확인할 때 체크해가며 쓰시면 됩니다.'],
       ['🚚 출고중 발전기 리스트 보기', '지금 출고중인 발전기를 지역별로 몇 대 있는지 볼 수 있습니다. 목록에는 번호·모델·전압·지역이 나오고, "상세보기"를 누르면 업체명·담당자·연락처·주소·출고일·임대구분·연료 등 출고 내용 전체를 확인할 수 있습니다. "📥 입고처리" 버튼을 누르면 사무실 프로그램과 똑같은 방식으로 입고일·누적시간·전압·연료 확인·부자재 회수 여부를 입력해 바로 입고 처리할 수 있고, 처리 즉시 사무실 화면에도 반영됩니다.'],
       ['⏳ 출고대기 리스트 보기', '지금 출고대기 중인 건을 출고일 순서로 보여줍니다. 발전기가 아직 안 정해졌으면 "🔧 발전기 배정"으로 지금 입고 상태인 발전기 중에서 바로 골라 배정할 수 있고, 이미 배정되어 있으면 "🚚 상차완료"로 실제 싣고 나갈 때 사무실 프로그램과 똑같이 처리할 수 있습니다(연료 넣기로 되어 있으면 확인 체크 필요). "내용보기/수정"으로 거래처·주소·전압·연료·부자재 등 등록된 내용을 언제든 고칠 수 있고, "출고취소/예약취소"로 건 자체를 지울 수 있습니다. 여기서 한 처리는 모두 사무실 화면에 실시간으로 반영됩니다.'],
-      ['📤 출고 문자 붙여넣기', '문자 앱에서 오더 내용을 복사한 뒤 "📋 복사한 문자 붙여넣기"를 누르면 바로 채워지고(맨 앞에 "★해성발전기 출고요청★" 문구가 자동으로 붙습니다), "등록하기"를 누르면 사무실 [출고 대기] 화면 상단 "📩 문자오더 원문" 카드로 곧바로 올라갑니다.'],
-      ['🔻 철수 문자 붙여넣기', '회수(철수) 요청 문자를 복사해 붙여넣으면(맨 앞에 "★해성발전기 철수요청★" 문구가 자동으로 붙습니다) 등록 즉시 사무실 [출고중] 화면 상단에 철수요청 카드로 뜹니다.'],
+      ['📤 출고 문자 보내기', '문자 앱에서 오더 내용을 복사한 뒤 "📋 복사한 문자 붙여넣기"를 누르면 바로 채워지고(맨 앞에 "★해성발전기 출고요청★" 문구가 자동으로 붙습니다), "등록하기"를 누르면 사무실 [출고 대기] 화면 상단 "📩 문자오더 원문" 카드로 곧바로 올라갑니다.'],
+      ['🔻 철수 문자 보내기', '회수(철수) 요청 문자를 복사해 붙여넣으면(맨 앞에 "★해성발전기 철수요청★" 문구가 자동으로 붙습니다) 등록 즉시 사무실 [출고중] 화면 상단에 철수요청 카드로 뜹니다.'],
       ['등록 후 문자로도 보내기', '등록하기 버튼 위 체크박스입니다. 체크한 채로 등록하면, 등록이 끝난 뒤 스마트폰 문자 앱이 내용이 채워진 채로 자동으로 열립니다. 받는 사람(또는 단체문자 그룹)은 문자 앱에서 직접 선택해서 보내야 하며, 자동으로 전송되지는 않습니다.'],
       ['📝 출고예약 등록', '문자 없이 거래처 정보를 직접 입력해서 출고예약을 등록할 수 있는 화면으로 이동합니다.'],
       ['📨 최근 내가 등록한 내역', '각 화면 하단에 최근 본인이 등록한 문자오더·철수요청 목록이 표시되어, 방금 등록한 내용이 잘 들어갔는지 바로 확인할 수 있습니다.']
@@ -8918,7 +8958,7 @@ function renderReserveTab(){
       <div style="display:flex;flex-wrap:wrap;gap:8px;">
         ${smsOrderCards.map(r=>`
         <div style="width:170px;height:260px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
-          <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}</div>
+          <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}${r.outProcessedBy? ` · ${escR(r.outProcessedBy)}` : ''}</div>
           <div style="font-size:14px;font-weight:700;color:var(--primary-dark);margin-bottom:4px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
           <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;flex:1;overflow:hidden;" onclick="showSmsOrderModal('${r.id}')">${escR(r.smsOrder||'')}</div>
           <div style="display:flex;gap:4px;margin-top:6px;">
@@ -12050,17 +12090,49 @@ function shouldSkipSync(){
   return false;
 }
 let syncInFlight = false;
+let syncFrequentInFlight = false;
+// 자주 바뀌는 핵심 데이터(입고/출고대기/출고중 = 발전기 목록·예약)만 짧은 주기로 동기화합니다.
+// 나머지(매출·부자재·정비이력 등, 자주 안 바뀌는 데이터)는 아래 syncFromStorage에서 긴 주기로 처리합니다.
+// 이렇게 나눈 이유: 매번 전체 항목을 다 받아오면 파이어베이스 무료 다운로드 한도(월 10GB)를 금방 넘기게 되어,
+// 자주 확인해야 하는 항목만 자주, 나머지는 뜸하게 받아오도록 최적화했습니다.
+async function syncFrequentData(){
+  if(syncFrequentInFlight || syncInFlight) return;
+  if(document.hidden) return;
+  if(shouldSkipSync()) return;
+  syncFrequentInFlight = true;
+  try{
+    const [gens, reservations] = await Promise.all([
+      peekStorage('gen-fleet-v2', DB.gens),
+      peekStorage('gen-reservations-v1', DB.reservations)
+    ]);
+    const before = JSON.stringify({gens:DB.gens, reservations:DB.reservations});
+    const after = JSON.stringify({gens, reservations});
+    if(before !== after){
+      const newReservations = (reservations||[]).filter(r=>r && (r.pendingLoad || r.genId===UNASSIGNED_GEN_ID) && !seenReservationIds.has(r.id) && r.outProcessedBy!==DB.currentUserName);
+      seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID).map(r=>r.id));
+      DB.gens = gens; lastSyncedGensSnapshot = snapshotGens(DB.gens); DB.reservations = reservations;
+      if(!shouldSkipSync()){
+        renderTabbar();
+        renderContent();
+        renderUserBadge();
+        if(newReservations.length>0) showLoadingListPopup(true, newReservations);
+      }
+    }
+  }catch(e){
+    // 동기화 실패시 조용히 무시하고 다음 주기에 재시도
+  }finally{
+    syncFrequentInFlight = false;
+  }
+}
 async function syncFromStorage(){
   if(syncInFlight) return;
   if(document.hidden) return;
   if(shouldSkipSync()) return;
   syncInFlight = true;
   try{
-    const [gens, rentals, maint, reservations, materials, technicians, warnThreshold, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, modelColors, notices, returnRequests, incomingSmsOrders, calendarEvents, genColorOverrides, salesEnabled, salesRecords, salesManagers, salesPassword, salesPasswordBypass, salesBillingRecords, cancelOutHistory, palletDefaultRemoved, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
-      peekStorage('gen-fleet-v2', DB.gens),
+    const [rentals, maint, materials, technicians, warnThreshold, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, modelColors, notices, returnRequests, incomingSmsOrders, calendarEvents, genColorOverrides, salesEnabled, salesRecords, salesManagers, salesPassword, salesPasswordBypass, salesBillingRecords, cancelOutHistory, palletDefaultRemoved, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate] = await Promise.all([
       peekStorage('gen-rentals-v2', DB.rentals),
       peekStorage('gen-maintenance-v2', DB.maint),
-      peekStorage('gen-reservations-v1', DB.reservations),
       peekStorage('gen-materials-v1', DB.materials),
       peekStorage('gen-technicians-v1', DB.technicians),
       peekStorage('gen-warn-threshold-v1', DB.warnThreshold),
@@ -12099,16 +12171,14 @@ async function syncFromStorage(){
       peekStorage('gen-company-info-v1', DB.companyInfo),
       peekStorage('gen-last-backup-date-v1', DB.lastBackupDate)
     ]);
-    const before = JSON.stringify({gens:DB.gens,rentals:DB.rentals,maint:DB.maint,reservations:DB.reservations,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,modelColors:DB.modelColors,notices:DB.notices,returnRequests:DB.returnRequests,incomingSmsOrders:DB.incomingSmsOrders,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,salesEnabled:DB.salesEnabled,salesRecords:DB.salesRecords,salesManagers:DB.salesManagers,salesPassword:DB.salesPassword,salesPasswordBypass:DB.salesPasswordBypass,salesBillingRecords:DB.salesBillingRecords,cancelOutHistory:DB.cancelOutHistory,palletDefaultRemoved:DB.palletDefaultRemoved,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
-    const after = JSON.stringify({gens,rentals,maint,reservations,materials,technicians,warnThreshold,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,modelColors,notices,returnRequests,incomingSmsOrders,calendarEvents,genColorOverrides,salesEnabled,salesRecords,salesManagers,salesPassword,salesPasswordBypass,salesBillingRecords,cancelOutHistory,palletDefaultRemoved,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate});
+    const before = JSON.stringify({rentals:DB.rentals,maint:DB.maint,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,modelColors:DB.modelColors,notices:DB.notices,returnRequests:DB.returnRequests,incomingSmsOrders:DB.incomingSmsOrders,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,salesEnabled:DB.salesEnabled,salesRecords:DB.salesRecords,salesManagers:DB.salesManagers,salesPassword:DB.salesPassword,salesPasswordBypass:DB.salesPasswordBypass,salesBillingRecords:DB.salesBillingRecords,cancelOutHistory:DB.cancelOutHistory,palletDefaultRemoved:DB.palletDefaultRemoved,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate});
+    const after = JSON.stringify({rentals,maint,materials,technicians,warnThreshold,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,modelColors,notices,returnRequests,incomingSmsOrders,calendarEvents,genColorOverrides,salesEnabled,salesRecords,salesManagers,salesPassword,salesPasswordBypass,salesBillingRecords,cancelOutHistory,palletDefaultRemoved,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate});
     if(before !== after){
       const newNotices = (notices||[]).filter(n=>n && !seenNoticeIds.has(n.id) && n.authorBy!==DB.currentUserName);
       const newEvents = (calendarEvents||[]).filter(e=>e && !seenEventIds.has(e.id) && e.authorBy!==DB.currentUserName);
-      const newReservations = (reservations||[]).filter(r=>r && (r.pendingLoad || r.genId===UNASSIGNED_GEN_ID) && !seenReservationIds.has(r.id) && r.outProcessedBy!==DB.currentUserName);
       seenNoticeIds = new Set((notices||[]).map(n=>n.id));
       seenEventIds = new Set((calendarEvents||[]).map(e=>e.id));
-      seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID).map(r=>r.id));
-      DB.gens = gens; lastSyncedGensSnapshot = snapshotGens(DB.gens); DB.rentals = rentals; DB.maint = maint; DB.reservations = reservations;
+      DB.rentals = rentals; DB.maint = maint;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold;
       DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.modelColors = modelColors; DB.notices = notices; DB.returnRequests = returnRequests || []; DB.incomingSmsOrders = incomingSmsOrders || []; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.salesEnabled = salesEnabled === true; DB.salesRecords = salesRecords || []; DB.salesManagers = salesManagers || []; if((DB.salesManagers[0]||'').trim() !== SALES_MANAGER_FIXED_NAME){ DB.salesManagers[0] = SALES_MANAGER_FIXED_NAME; saveSalesManagers(); } DB.salesPassword = salesPassword || ''; DB.salesPasswordBypass = salesPasswordBypass !== false; DB.salesBillingRecords = salesBillingRecords || []; DB.cancelOutHistory = cancelOutHistory || []; DB.palletDefaultRemoved = palletDefaultRemoved === true; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate;
       applyCompanyBranding();
@@ -12116,8 +12186,7 @@ async function syncFromStorage(){
         renderTabbar();
         renderContent();
         renderUserBadge();
-        if(newReservations.length>0) showLoadingListPopup(true, newReservations);
-        else if(newNotices.length>0 || newEvents.length>0) showNewPostPopup(newNotices, newEvents);
+        if(newNotices.length>0 || newEvents.length>0) showNewPostPopup(newNotices, newEvents);
       }
     }
   }catch(e){
@@ -12126,7 +12195,10 @@ async function syncFromStorage(){
     syncInFlight = false;
   }
 }
-if(!isQuickMode()) setInterval(syncFromStorage, 120000);
+if(!isQuickMode()){
+  setInterval(syncFrequentData, 30000);
+  setInterval(syncFromStorage, 300000);
+}
 
 // ===== 음성 알림 (오늘 상차 미완료 안내) =====
 function isVoiceAlertsEnabled(){ return localStorage.getItem('voiceAlertsEnabled') !== '0'; }
@@ -12384,7 +12456,28 @@ function speakErrorText(text){
 if(isQuickMode()){
   const manifestLinkEl = document.querySelector('link[rel="manifest"]');
   if(manifestLinkEl) manifestLinkEl.setAttribute('href', 'manifest-quick.json');
-  renderQuickModeUI();
+  startQuickMode();
+  // 스마트폰 자체 "뒤로가기"를 눌렀을 때 앱이 통째로 닫히면서 작성 중이던 내용이 사라지는 걸 막기 위한 처리입니다.
+  // 화면이 바뀔 때마다 히스토리를 하나씩 쌓아두고, 뒤로가기를 누르면 그 히스토리를 소비하게 해서 앱이 안 닫히게 하고,
+  // 대신 작성 중인 내용이 있으면 정말 나갈지 먼저 물어봅니다.
+  function qmHasUnsavedInput(){
+    const root = document.getElementById('pw-gate');
+    if(!root) return false;
+    const fields = root.querySelectorAll('textarea, input[type=text], input[type=number], input[type=tel]');
+    for(const f of fields){ if((f.value||'').trim()) return true; }
+    return false;
+  }
+  history.pushState({qm:true}, '', location.href);
+  window.addEventListener('popstate', function(){
+    history.pushState({qm:true}, '', location.href);
+    if(qmHasUnsavedInput()){
+      openConfirmModal('작성 중인 내용이 있습니다.\n\n처음 화면으로 나가시겠습니까?', function(){
+        renderQuickModeUI();
+      }, '나가기', '계속 작성');
+    } else {
+      renderQuickModeUI();
+    }
+  });
 } else {
   initPasswordGate();
 }
