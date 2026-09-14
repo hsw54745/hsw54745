@@ -518,6 +518,7 @@ let salesFilterGenId = '';
 let seenNoticeIds = new Set();
 let seenEventIds = new Set();
 let seenReservationIds = new Set();
+let seenReturnRequestIds = new Set();
 let uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 // ---------- 비밀번호 게이트 ----------
@@ -4146,7 +4147,15 @@ function renderOutList(){
         ${(rt.loadDate||rt.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(rt.loadDate),rt.arriveTime].filter(Boolean).join(' · ')}</div>`:''}
         ${rt.freightBearer? `<div class="muted" style="font-size:11px;">운임료: ${rt.freightBearer}</div>`:''}
         ${rt.note? `<div class="muted" style="font-size:11px;">비고: ${rt.note}</div>`:''}
-        ${rt.smsOrder? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;margin-top:4px;" onclick="showSmsOrderForGen('${g.id}')">📩 문자오더확인</button>`:''}
+        ${rt.smsOrder? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;margin-top:4px;" onclick="showSmsOrderForGen('${g.id}')">📩 출고오더확인</button>`:''}
+        ${(()=>{
+          const matchedReq = (DB.returnRequests||[]).filter(r=>r && !r.handled).find(r=>{
+            const m = findMatchedGenForReturnRequest(r.text);
+            return m && m.id===g.id;
+          });
+          if(!matchedReq) return '';
+          return `<button class="btn sm" style="color:#B23A34;font-weight:700;border-color:#B23A34;background:#FBEAEA;margin-top:4px;margin-left:4px;" onclick="viewMatchedReturnRequest('${g.id}','${matchedReq.id}')">🔻 철수오더확인</button>`;
+        })()}
       </td>
       <td class="muted">${dow(rt.outDate)||'-'}</td>
       <td>${isLT? gaugeHtml(el,rem,getCycle(g)) : (g.hoursKnown? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 확인불가</span>')}</td>
@@ -5780,7 +5789,7 @@ function renderManualTab(){
       ['전압변경 표시', '출고 전압이 발전기 기존 셋팅전압과 다르면 빨간 글씨로 뜹니다. 글씨를 클릭하면 그 모델의 전압 설정 방법 사진을 볼 수 있고, 그 아래 "✓ 설정완료" 버튼을 누르면 발전기에서 실제로 전압을 바꾸셨는지 확인한 뒤 셋팅전압이 업데이트되고 정비이력에도 자동으로 기록됩니다.'],
       ['부자재확인', '출고시 선택한 부자재 목록만 간단히 팝업으로 보여줍니다 (비고확인과 같은 형식 — 내용만 표시, 닫기 버튼만 있음). 부자재가 없으면 "부자재없음"으로 표시됩니다.'],
       ['비고확인', '출고하기에서 비고란에 내용을 적어두면 부자재확인 버튼 바로 아래에 파란색 버튼으로 "비고확인"이 뜹니다 (부자재확인과 같은 크기·모양). 클릭하면 비고 내용만 바로 보여줍니다. 비고가 없으면 표시되지 않습니다.'],
-      ['📩 문자오더 원문 확인', '이영숙님 등이 퀵메뉴(문자 간편등록)로 붙여넣어 등록한 출고 문자 원문이 노란 카드로 맨 위에 따로 표시됩니다. 카드 안 거래처명은 진하게 강조되어 보이고, 문자 내용을 다 확인해서 발전기 배정 등 처리를 마쳤으면 "✅ 확인완료"를 눌러 숨김 목록으로 넘길 수 있습니다("▸ 숨김 목록 보기"에서 다시 볼 수 있고 "↩️ 다시 표시"로 되돌릴 수 있습니다). 필요 없는 건은 "🗑 삭제"로 바로 지울 수 있습니다.'],
+      ['📩 문자오더 원문 확인', '이영숙님 등이 퀵메뉴(문자 간편등록)로 붙여넣어 등록한 출고 문자 원문이 노란 카드로 맨 위에 따로 표시됩니다. 카드 안 거래처명은 진하게 강조되어 보이고, 문자 내용을 다 확인해서 발전기 배정 등 처리를 마쳤으면 "✅ 확인완료"를 눌러 숨김 목록으로 넘길 수 있습니다("▸ 숨김 목록 보기"에서 다시 볼 수 있고 "↩️ 다시 표시"로 되돌릴 수 있습니다). 필요 없는 건은 "🗑 삭제"로 바로 지울 수 있습니다. 아직 거래처 정보를 입력 안 한 문자오더 건을 "내용보기/수정"으로 열면, 문자 원문에서 업체명·주소·담당자·연락처·전압·도착일시(오늘/내일/며칠 표현 인식)·부자재(비고)를 자동으로 추출해 미리 채워줍니다(상차일자는 도착예정일 하루 전으로 자동 계산됩니다). 100% 정확하진 않으니 빨간 안내문구가 뜨면 채워진 내용을 꼭 확인 후 저장해주세요 — 이미 값이 입력되어 있는 칸은 자동으로 덮어쓰지 않습니다.'],
       ['📥 상차·입고 예정 안내 팝업', '이름을 선택해 접속(로그인)할 때마다 오늘/내일 상차할 목록과 오늘/내일 입고예정 목록을 함께 팝업으로 보여줍니다 (모든 사용자, 접속할 때마다 매번). 오늘·내일 상차·입고가 전부 없으면 팝업 자체가 뜨지 않습니다. 또한 다른 사람이 출고하기에서 상차대기 건을 새로 등록하면, 약 2분 이내에 등록한 사람을 제외한 나머지 팀원들에게 이 팝업이 자동으로 뜹니다 (등록한 사람 본인에게는 뜨지 않습니다). 팝업 안 상차 내용은 [출고대기] 탭, 입고예정 내용은 [출고중] 탭과 동일하며 누구나 볼 수 있습니다.']
     ])}
 
@@ -5806,7 +5815,7 @@ function renderManualTab(){
       ['한번에 입고', '왼쪽 체크박스로 여러 대를 선택하면 뜨는 "한번에 입고" 버튼으로, 여러 대를 한 번에 정상입고 처리합니다. 발전기별 입고시 누적 사용시간을 대별로 각각 입력합니다. (고장 등록이 필요하거나 연료 높이 측정이 필요한 경우는 개별 "입고 처리"를 이용해주세요)'],
       ['장기→단기 / 단기→장기', '임대 구분을 전환합니다. 장기임대는 예상 사용시간을 입력해 정비 시점을 추정합니다.'],
       ['입금 확인', '🚨 미입금 출고 건의 입금 확인 처리.'],
-      ['🔻 철수(회수) 요청', '퀵메뉴에서 등록된 철수 요청 문자가 [출고중] 화면 맨 위에 빨간 카드로 표시됩니다. 요청을 확인하고 실제 회수(입고 처리)까지 마쳤으면 "✅ 처리완료"를 눌러 숨김 목록으로 넘길 수 있고("▸ 숨김 목록 보기"에서 다시 확인·"↩️ 다시 표시" 가능), "🗑 삭제"로 바로 지울 수도 있습니다.'],
+      ['🔻 철수(회수) 요청', '퀵메뉴에서 등록된 철수 요청 문자가 [출고중] 화면 맨 위에 빨간 카드로 표시됩니다. 새로 등록되면 문자오더와 마찬가지로 30초 이내에 음성 알림("철수요청이 등록되었습니다")이 울립니다(음성 알림 사용 시간대 안일 때만). 요청을 확인하고 실제 회수(입고 처리)까지 마쳤으면 "✅ 처리완료"를 눌러 숨김 목록으로 넘길 수 있고("▸ 숨김 목록 보기"에서 다시 확인·"↩️ 다시 표시" 가능), "🗑 삭제"로 바로 지울 수도 있습니다. 철수 문자의 연락처·주소가 지금 출고중인 발전기 중 하나와 일치하면, [출고중] 목록 그 발전기 칸에 "🔻 철수오더확인" 버튼이 자동으로 뜹니다 — 누르면 문자 원문과 함께, 문자에서 인식한 회수예정일(오늘/내일/"OO일 후"/특정 날짜 "18일" 등)을 보여주고, "이 날짜로 반납예정일에 적용" 버튼으로 바로 그 발전기의 반납예정일(사용일수)에 반영할 수 있습니다.'],
       ['🖨 출고 리스트 인쇄(단기/장기)', '현재 출고중인 발전기 전체를 단기임대 1장·장기임대 1장으로 나눠 인쇄합니다. 번호·모델·거래처·현장·담당자연락처·출고일이 함께 나오고, 장기임대 페이지 맨 아래에는 준비할 부품 합계(같은 품명은 수량을 합산)가 자동으로 표시됩니다. 현장 정기 점검 출장 전에 쓰기 좋습니다.']
     ])}
 
@@ -9117,7 +9126,7 @@ function renderReserveTab(){
         ? `<button class="btn sm" style="color:var(--danger);font-weight:700;border-color:var(--danger);" onclick="showSuppliesModal('${r.id}')">부자재확인</button>`
         : `<span class="muted">부자재없음</span>`;
       const noteMarker2 = (r.note && r.note.trim()) ? `<button class="btn sm" style="color:var(--primary-dark);font-weight:700;border-color:var(--primary);text-align:center;margin-top:4px;" onclick="showNoteModal('${r.id}')">비고확인</button>` : '';
-      const smsMarker2 = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 문자오더확인</button>` : '';
+      const smsMarker2 = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 출고오더확인</button>` : '';
       const rowStyle = isRaw ? ' style="background:#FFFDF3;"' : (isDelayed2? ' style="background:var(--danger-tint);"' : '');
       return `<tr${rowStyle}>
         <td class="gid"><span class="pill warn">🅾 미지정</span>${isRaw? `<div style="margin-top:4px;"><span class="pill" style="background:#FFF3C4;color:#8A6D00;border-color:#E8B923;">📩 문자오더</span></div>`:''}</td>
@@ -9155,7 +9164,7 @@ function renderReserveTab(){
       ? `<button class="btn sm" style="color:var(--danger);font-weight:700;border-color:var(--danger);" onclick="showSuppliesModal('${r.id}')">부자재확인</button>`
       : `<span class="muted">부자재없음</span>`;
     const noteMarker = (r.note && r.note.trim()) ? `<button class="btn sm" style="color:var(--primary-dark);font-weight:700;border-color:var(--primary);text-align:center;margin-top:4px;" onclick="showNoteModal('${r.id}')">비고확인</button>` : '';
-    const smsMarker = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 문자오더확인</button>` : '';
+    const smsMarker = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 출고오더확인</button>` : '';
     return `<tr${isDelayed? ` style="background:var(--danger-tint);"`:''}>
       <td class="gid">${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)}</td>
       <td class="wrap-ok" style="max-width:130px;">${g? displayModel(g): '-'}</td>
@@ -9537,9 +9546,230 @@ function showInfoModal(message){
   </div>`;
   document.getElementById('info-ok-btn').addEventListener('click', closeModal);
 }
+// 문자오더 원문에서 업체명·주소·담당자·연락처·전압·도착일시·비고(부자재)를 최대한 뽑아냅니다.
+// 100% 정확하진 않으니, 이미 값이 있는 칸은 절대 덮어쓰지 않고 "비어있는 칸만" 채우는 용도로 씁니다.
+function parseSmsOrderText(text){
+  const result = {customer:'', address:'', manager:'', phone:'', voltage:'', arriveTime:'', outDate:'', loadDate:'', note:'', usageDays:''};
+  if(!text) return result;
+  // 소수점(예: "1.4톤")은 보호해두고, 그 외 줄바꿈/쉼표/마침표를 전부 구분자로 써서 잘게 쪼갭니다.
+  // (사모님 문자가 "구형(L9)380볼트.분전반,내일8시도착.OO리820-1번지.2일간사용.다온스틸텍.김신경이사"처럼
+  //  한 줄에 여러 정보를 마침표/쉼표로만 구분해서 보내는 경우가 있어서, 줄바꿈만으론 못 나눕니다)
+  const protectedText = text.replace(/(\d)\.(\d)/g, '$1\u2027$2');
+  const lines = protectedText.split(/[\n,]+|\.+/).map(l=>l.replace(/\u2027/g,'.').trim()).filter(Boolean);
+  const phoneRe = /01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/;
+  const capacityRe = /\d+(\.\d+)?\s*(키로|kw|톤)/i;
+  const voltageRe = /(\d{2,4})\s*볼트|\b(\d{2,4})\s*v\b/i;
+  const addressRe = /(시|도|군|구|읍|면|동|리|로|길)[\s]*\d|산\s*\d/;
+  const usageDaysRe = /(\d{1,3})\s*일\s*간?\s*사용|사용\s*(\d{1,3})\s*일/;
+  const supplyKeywords = ['접지봉','깔판','용접기','가설분전함','분전반','전선','케이블','분전함','릴선'];
+  const leftover = [];
+  const noteParts = [];
+  let arrivalLine = '';
+
+  lines.forEach(line=>{
+    let l = line.replace(/[★☆]+\s*해성발전기\s*(출고|철수)?\s*요청\s*[★☆]+/g, '').trim();
+    if(!l) return; // 헤더만 있던 조각
+    const vm = l.match(voltageRe);
+    if(vm && !result.voltage) result.voltage = `${vm[1]||vm[2]}V`;
+    if(capacityRe.test(l)){
+      const um0 = l.match(usageDaysRe);
+      if(um0) result.usageDays = um0[1] || um0[2];
+      return;
+    }
+    if(l.startsWith('*')){ noteParts.push(l.slice(1).trim()); return; }
+    if(supplyKeywords.some(k=>l.includes(k)) && l.length<20){ noteParts.push(l); return; }
+    const um = l.match(usageDaysRe);
+    if(um){ result.usageDays = um[1] || um[2]; return; }
+    const pm = l.match(phoneRe);
+    if(pm){
+      result.phone = pm[0].replace(/[^0-9]/g,'');
+      const rest = l.replace(phoneRe,'').trim();
+      if(rest) result.manager = rest;
+      return;
+    }
+    if(l.includes('도착')){ arrivalLine = l; return; }
+    if(addressRe.test(l)){ result.address = result.address ? result.address+' '+l : l; return; }
+    if(vm) return; // 전압만 있고 다른 정보가 없는 조각(예: "380볼트")은 업체명 후보에서 제외합니다.
+    leftover.push(l);
+  });
+
+  // "OO소장님"/"OO이사님"처럼 직급이 붙은 줄은 업체명이 아니라 담당자일 가능성이 높습니다.
+  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장)\s*님?$|님$/;
+  const titleIdx = leftover.findIndex(l=>titleRe.test(l));
+  if(titleIdx>=0 && !result.manager){
+    result.manager = leftover[titleIdx];
+    leftover.splice(titleIdx,1);
+  }
+
+  if(leftover.length===1) result.customer = leftover[0];
+  else if(leftover.length>=2){
+    result.customer = leftover[0];
+    // 남는 줄이 더 있으면(현장명 등) 주소 뒤에 참고로 붙여둡니다.
+    result.address = result.address ? `${result.address} (${leftover.slice(1).join(' ')})` : leftover.slice(1).join(' ');
+  }
+  result.note = noteParts.join(', ');
+
+  // 도착 시간/날짜 파싱
+  if(arrivalLine){
+    if(arrivalLine.includes('지금')) result.arriveTime = '지금즉시';
+    else{
+      const tm = arrivalLine.match(/(오전|오후)?\s*(\d{1,2})\s*시\s*(반|(\d{1,2})\s*분)?/);
+      if(tm){
+        let ampm = tm[1];
+        const hour = Number(tm[2]);
+        if(!ampm) ampm = (hour>=7 && hour<=12) ? '오전' : '오후';
+        const minute = tm[3]==='반' ? 30 : (tm[4]? Number(tm[4]) : 0);
+        result.arriveTime = minute>0 ? `${ampm} ${hour}시 ${minute}분` : `${ampm} ${hour}시`;
+      }
+    }
+    const today = new Date();
+    if(arrivalLine.includes('오늘')) result.outDate = toLocalDateStr(today);
+    else if(arrivalLine.includes('내일')){
+      const d = new Date(today); d.setDate(d.getDate()+1);
+      result.outDate = toLocalDateStr(d);
+    } else {
+      const dm = arrivalLine.match(/(\d{1,2})\s*일/);
+      if(dm){
+        const day = Number(dm[1]);
+        let d = new Date(today.getFullYear(), today.getMonth(), day);
+        if(d < new Date(today.getFullYear(), today.getMonth(), today.getDate())) d = new Date(today.getFullYear(), today.getMonth()+1, day);
+        result.outDate = toLocalDateStr(d);
+      }
+      // 날짜를 명확히 알 수 없으면 절대 추정하지 않고 비워둡니다 (잘못 채우면 출고일 사고로 이어질 수 있음).
+    }
+  }
+  if(result.outDate){
+    // 발전기는 도착일 하루 전에 상차해야 하므로 상차일 = 출고(도착)예정일 - 1일
+    const d = new Date(result.outDate+'T00:00:00');
+    d.setDate(d.getDate()-1);
+    result.loadDate = toLocalDateStr(d);
+  }
+  return result;
+}
+// 철수(회수) 요청 문자에서 주소·연락처·담당자·회수예정일을 뽑아냅니다.
+// 오늘/내일/"OO일 후"/특정 날짜("18일") 표현을 인식합니다. 시간은 철수 요청에서는 안 쓰므로 뽑지 않습니다.
+function parseReturnRequestText(text){
+  const result = {address:'', phone:'', manager:'', recallDate:''};
+  if(!text) return result;
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const phoneRe = /01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/;
+  const addressRe = /(시|도|군|구|읍|면|동|리|로|길)[\s]*\d|산\s*\d/;
+  const today = new Date();
+
+  // 날짜는 더 구체적인 표현(특정 날짜 > N일 후 > 내일 > 오늘) 순으로 찾습니다.
+  const relMatch = text.match(/(\d{1,2})\s*일\s*(후|뒤)/);
+  const dayMatch = text.match(/(\d{1,2})\s*일(?!\s*(후|뒤))/);
+  if(relMatch){
+    const d = new Date(today); d.setDate(d.getDate()+Number(relMatch[1]));
+    result.recallDate = toLocalDateStr(d);
+  } else if(dayMatch){
+    const day = Number(dayMatch[1]);
+    let d = new Date(today.getFullYear(), today.getMonth(), day);
+    if(d < new Date(today.getFullYear(), today.getMonth(), today.getDate())) d = new Date(today.getFullYear(), today.getMonth()+1, day);
+    result.recallDate = toLocalDateStr(d);
+  } else if(/내일/.test(text)){
+    const d = new Date(today); d.setDate(d.getDate()+1);
+    result.recallDate = toLocalDateStr(d);
+  } else if(/오늘|지금/.test(text)){
+    result.recallDate = toLocalDateStr(today);
+  }
+
+  lines.forEach(line=>{
+    if(/\d+(\.\d+)?\s*(키로|kw|톤)/i.test(line)) return; // 용량 줄은 "키로"의 "로"가 주소 패턴과 헷갈릴 수 있어 건너뜁니다.
+    const pm = line.match(phoneRe);
+    if(pm){
+      result.phone = pm[0].replace(/[^0-9]/g,'');
+      const rest = line.replace(phoneRe,'').trim();
+      if(rest) result.manager = rest;
+      return;
+    }
+    if(addressRe.test(line)) result.address = result.address ? result.address+' '+line : line;
+  });
+  return result;
+}
+// 지금 출고중인 발전기 중, 이 철수요청 문자와 연락처(우선)·주소가 일치하는 것을 찾습니다.
+function findMatchedGenForReturnRequest(text){
+  const parsed = parseReturnRequestText(text);
+  const outGens = activeGens().filter(g=>g.status==='out' && g.rental);
+  if(parsed.phone){
+    const m = outGens.find(g=>g.rental.phone && g.rental.phone.replace(/[^0-9]/g,'')===parsed.phone);
+    if(m) return m;
+  }
+  if(parsed.address){
+    const m = outGens.find(g=>g.rental.address && (g.rental.address.includes(parsed.address) || parsed.address.includes(g.rental.address)));
+    if(m) return m;
+  }
+  return null;
+}
+function viewMatchedReturnRequest(genId, reqId){
+  const g = findGen(genId);
+  const r = (DB.returnRequests||[]).find(x=>x && x.id===reqId);
+  if(!g || !r) return;
+  const parsed = parseReturnRequestText(r.text);
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>🔻 철수오더확인</h3>
+      <div class="modal-sub">${escR(g.id)} · ${escR(g.model||'')}</div>
+      <div style="background:#FBEAEA;border:1px solid var(--danger);border-radius:10px;padding:12px 14px;white-space:pre-wrap;font-size:14.5px;line-height:1.6;color:#333;text-align:left;">${escR(r.text||'')}</div>
+      ${parsed.recallDate? `<div style="margin-top:12px;background:var(--warn-tint);border:1px solid var(--warn);border-radius:10px;padding:12px 14px;text-align:left;">
+        <div style="font-size:13px;font-weight:800;color:var(--warn);">🗓️ 문자에서 인식한 회수예정일: ${escR(parsed.recallDate)}</div>
+        <button type="button" class="btn sm primary" style="margin-top:8px;" onclick="applyRecallDateToGen('${g.id}','${parsed.recallDate}')">이 날짜로 반납예정일에 적용</button>
+      </div>` : `<div class="hint" style="margin-top:10px;">문자에서 회수예정일을 인식하지 못했습니다. [정보 직접 수정]에서 직접 입력해주세요.</div>`}
+      <div class="modal-actions">
+        <button class="btn primary" onclick="closeModal()">닫기</button>
+      </div>
+    </div>
+  </div>`;
+}
+async function applyRecallDateToGen(genId, dateStr){
+  const g = findGen(genId);
+  if(!g || !g.rental || !g.rental.outDate){ flash('출고일 정보가 없어 반납예정일을 계산할 수 없습니다'); return; }
+  const start = new Date(g.rental.outDate+'T00:00:00');
+  const end = new Date(dateStr+'T00:00:00');
+  if(isNaN(start.getTime()) || isNaN(end.getTime())){ flash('날짜 형식이 올바르지 않아 적용할 수 없습니다'); return; }
+  const days = Math.round((end-start)/86400000);
+  if(!(days>0)){ flash('회수예정일이 출고일보다 이전이라 적용할 수 없습니다'); return; }
+  g.rental.usageDays = days;
+  await saveWithRetry(saveGens);
+  renderContent();
+  closeModal();
+  flash(`${g.id} 반납예정일이 ${dateStr}(사용일수 ${days}일)로 적용되었습니다`);
+}
 function openReserveNoGenModal(resId, draft){
   const existing = resId ? DB.reservations.find(x=>x.id===resId) : null;
-  const pre = existing || draft || null;
+  let autoFilled = false;
+  const autoFields = {}; // 실제로 자동으로 채워진 칸만 표시(파랑 배경)하기 위한 기록
+  let pre = existing || draft || null;
+  if(existing && existing.smsOrder && !existing.customer && !existing.site && !existing.address){
+    const parsed = parseSmsOrderText(existing.smsOrder);
+    pre = Object.assign({}, existing, {
+      customer: existing.customer || parsed.customer,
+      site: existing.site || parsed.customer,
+      address: existing.address || parsed.address,
+      manager: existing.manager || parsed.manager,
+      phone: existing.phone || parsed.phone,
+      voltage: existing.voltage || parsed.voltage,
+      arriveTime: existing.arriveTime || parsed.arriveTime,
+      plannedOutDate: existing.outDate || parsed.outDate,
+      loadDate: existing.loadDate || parsed.loadDate,
+      note: existing.note || parsed.note,
+      usageDays: existing.usageDays || parsed.usageDays
+    });
+    if(!existing.customer && parsed.customer) autoFields.site = true;
+    if(!existing.address && parsed.address) autoFields.address = true;
+    if(!existing.manager && parsed.manager) autoFields.manager = true;
+    if(!existing.phone && parsed.phone) autoFields.phone = true;
+    if(!existing.voltage && parsed.voltage) autoFields.voltage = true;
+    if(!existing.arriveTime && parsed.arriveTime) autoFields.arriveTime = true;
+    if(!existing.outDate && parsed.outDate) autoFields.outdate = true;
+    if(!existing.loadDate && parsed.loadDate) autoFields.loaddate = true;
+    if(!existing.note && parsed.note) autoFields.note = true;
+    if(!existing.usageDays && parsed.usageDays) autoFields.usagedays = true;
+    autoFilled = true;
+  }
+  // 자동으로 채워진 칸만 옅은 노란 배경으로 표시합니다(직접 입력한 칸과 구분되게, 확인 안 하고 지나치지 않도록).
+  const autoStyle = (key)=> autoFields[key] ? 'background:#FFF9E0;border-color:#E8B923;' : '';
   const candidates = activeGens().filter(x=>x.status==='in' && !x.underRepair && !DB.reservations.some(r=>r.genId===x.id)).sort(sortByIdNatural);
   const genOptionsHtml = `<option value="${UNASSIGNED_GEN_ID}" selected>🅾 미지정 (나중에 발전기 배정)</option>` +
     candidates.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
@@ -9554,7 +9784,7 @@ function openReserveNoGenModal(resId, draft){
     <div class="modal modal-wide" style="text-align:left;">
       <h3 style="text-align:center;">📝 ${existing? '출고예약 수정' : '출고예약'}</h3>
       <div class="modal-sub">발전기를 아직 정하지 않았어도 거래처 정보를 먼저 등록해둘 수 있습니다. 나중에 [출고 대기]에서 발전기를 배정하면 정상 출고로 이어집니다.</div>
-      ${(!existing && draft) ? `<div class="hint" style="color:var(--danger);font-weight:700;background:var(--danger-tint);padding:8px 10px;border-radius:8px;margin-bottom:6px;">⚠️ 문자 내용에서 자동으로 추출한 내용입니다. 틀린 부분 없는지 꼭 확인 후 저장해주세요.</div>` : ''}
+      ${(!existing && draft) || autoFilled ? `<div class="hint" style="color:var(--danger);font-weight:700;background:var(--danger-tint);padding:8px 10px;border-radius:8px;margin-bottom:6px;">⚠️ 문자 내용에서 자동으로 추출해 채워봤습니다 (노란 배경 칸). 100% 정확하지 않으니 하나씩 확인 후 저장해주세요. 인식하지 못한 칸은 비워뒀습니다.</div>` : ''}
       ${(!existing && draft && draft.rawText) ? `<details open style="text-align:left;background:var(--surface-alt,#F5F5F5);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:10px;">
         <summary style="cursor:pointer;font-weight:700;">📄 원본 문자 내용 보기</summary>
         <div style="white-space:pre-wrap;font-size:13.5px;margin-top:8px;color:#333;">${escR(draft.rawText)}</div>
@@ -9565,7 +9795,7 @@ function openReserveNoGenModal(resId, draft){
         </div></div>
         <div class="field f-sm" id="f-rsv-starthours-wrap" style="display:none;"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-rsv-starthours" value="0" min="0"><div class="hint" id="rsv-starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);"></div></div></div>
         <div class="field f-sm"><div class="out-card"><label>출고예정일</label>
-          <input type="date" id="f-rsv-outdate" value="${(pre&&pre.plannedOutDate)||todayStr()}" onchange="syncRsvReturnDateToUsageDays()">
+          <input type="date" id="f-rsv-outdate" value="${(pre&&pre.plannedOutDate)||todayStr()}" onchange="syncRsvReturnDateToUsageDays()" style="${autoStyle('outdate')}">
         </div></div>
         <div class="field f-sm"><div class="out-card"><label>도착시간</label>
           ${(()=>{
@@ -9573,18 +9803,18 @@ function openReserveNoGenModal(resId, draft){
             const cur = (pre&&pre.arriveTime)||'';
             const isCustom = cur && cur!=='지금즉시' && !opts.includes(cur);
             return `
-            <select id="f-rsv-arrivetime-select" onchange="onRsvArriveTimeSelect()">
+            <select id="f-rsv-arrivetime-select" onchange="onRsvArriveTimeSelect()" style="${autoStyle('arriveTime')}">
               <option value="">선택 안함</option>
               <option value="지금즉시" ${cur==='지금즉시'?'selected':''}>지금즉시</option>
               ${opts.map(v=>`<option value="${v}" ${cur===v?'selected':''}>${v}</option>`).join('')}
               <option value="__custom__" ${isCustom?'selected':''}>직접 입력...</option>
             </select>
-            <input type="text" id="f-rsv-arrivetime" value="${escR(cur)}" placeholder="예: 오전 6시 30분" style="margin-top:6px;${isCustom?'':'display:none;'}">
+            <input type="text" id="f-rsv-arrivetime" value="${escR(cur)}" placeholder="예: 오전 6시 30분" style="margin-top:6px;${isCustom?'':'display:none;'}${autoStyle('arriveTime')}">
             `;
           })()}
         </div></div>
         <div class="field f-sm"><div class="out-card"><label>상차일자</label>
-          <input type="date" id="f-rsv-loaddate" value="${(pre&&pre.loadDate)||(pre&&pre.plannedOutDate)||todayStr()}">
+          <input type="date" id="f-rsv-loaddate" value="${(pre&&pre.loadDate)||(pre&&pre.plannedOutDate)||todayStr()}" style="${autoStyle('loaddate')}">
         </div></div>
         <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="f-rsv-freight">
           <option value="우리부담" ${!pre||pre.freightBearer!=='고객부담'?'selected':''}>우리부담</option>
@@ -9593,12 +9823,12 @@ function openReserveNoGenModal(resId, draft){
       </div>
       <div class="out-row">
         <div class="field f-lg"><label>거래처명</label>
-          <input type="text" id="f-rsv-site" list="customer-datalist" value="${((pre&&(pre.site||pre.customer))||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onRsvCustomerNameInput()" style="font-size:14px;">
+          <input type="text" id="f-rsv-site" list="customer-datalist" value="${((pre&&(pre.site||pre.customer))||'').replace(/"/g,'&quot;')}" placeholder="예: 00건설" oninput="onRsvCustomerNameInput()" style="font-size:14px;${autoStyle('site')}">
           <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
           <div id="f-rsv-site-warning">${pre?customerWarningHtml((pre.site||pre.customer)||''):''}</div>
         </div>
         <div class="field f-xs"><label>사용일수(일)</label>
-          <input type="number" id="f-rsv-usagedays" min="0" value="${(pre&&pre.usageDays)||''}" placeholder="예: 7" oninput="syncRsvUsageDaysToReturnDate()">
+          <input type="number" id="f-rsv-usagedays" min="0" value="${(pre&&pre.usageDays)||''}" placeholder="예: 7" oninput="syncRsvUsageDaysToReturnDate()" style="${autoStyle('usagedays')}">
         </div>
         <div class="field f-xs"><label>예상가동시간(h/일)</label>
           <input type="number" id="f-rsv-estdaily" step="0.5" min="0" value="${(pre&&pre.estDaily)||''}" placeholder="예: 8">
@@ -9608,17 +9838,17 @@ function openReserveNoGenModal(resId, draft){
         </div>
       </div>
       <div class="out-row">
-        <div class="field f-lg"><label>현장 주소</label><input type="text" id="f-rsv-address" value="${((pre&&pre.address)||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
-        <div class="field f-sm"><label>담당자</label><input type="text" id="f-rsv-manager" value="${((pre&&pre.manager)||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장"></div>
-        <div class="field f-sm"><label>연락처</label><input type="text" id="f-rsv-phone" value="${((pre&&pre.phone)||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
+        <div class="field f-lg"><label>현장 주소</label><input type="text" id="f-rsv-address" value="${((pre&&pre.address)||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12" style="${autoStyle('address')}"></div>
+        <div class="field f-sm"><label>담당자</label><input type="text" id="f-rsv-manager" value="${((pre&&pre.manager)||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장" style="${autoStyle('manager')}"></div>
+        <div class="field f-sm"><label>연락처</label><input type="text" id="f-rsv-phone" value="${((pre&&pre.phone)||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)" style="${autoStyle('phone')}"></div>
       </div>
       <div class="out-row stretch">
         <div class="field f-eq"><div class="out-card"><label>전압</label>
-          <input type="text" id="f-rsv-voltage" value="${(pre&&pre.voltage)||''}" placeholder="예: 380V">
+          <input type="text" id="f-rsv-voltage" value="${(pre&&pre.voltage)||''}" placeholder="예: 380V" style="${autoStyle('voltage')}">
           ${voltageButtonsHtml('f-rsv-voltage')}
         </div></div>
         <div class="field f-eq"><div class="out-card"><label>부자재 출고</label>${suppliesPickerHtml('f-rsv-supplies', (pre&&pre.suppliesItems)||[], (pre? (pre.suppliesItems?(pre.suppliesCustom||''):(pre.supplies||'')) : ''), '')}</div></div>
-        <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-rsv-note">${(pre&&pre.note)||''}</textarea></div></div>
+        <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-rsv-note" style="${autoStyle('note')}">${(pre&&pre.note)||''}</textarea></div></div>
       </div>
       <div class="out-row">
         <div class="field f-lg">
@@ -12258,6 +12488,7 @@ async function init(){
   seenNoticeIds = new Set((DB.notices||[]).map(n=>n.id));
   seenEventIds = new Set((DB.calendarEvents||[]).map(e=>e.id));
   seenReservationIds = new Set((DB.reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID).map(r=>r.id));
+  seenReturnRequestIds = new Set((DB.returnRequests||[]).filter(r=>!r.handled).map(r=>r.id));
   DB.currentUserName = results.currentUserName;
   const phoneMigrationChanged = migratePhoneFieldsInPlace();
   applyCompanyBranding();
@@ -12356,21 +12587,28 @@ async function syncFrequentData(){
   if(shouldSkipSync()) return;
   syncFrequentInFlight = true;
   try{
-    const [gens, reservations] = await Promise.all([
+    const [gens, reservations, returnRequests] = await Promise.all([
       peekStorage('gen-fleet-v2', DB.gens),
-      peekStorage('gen-reservations-v1', DB.reservations)
+      peekStorage('gen-reservations-v1', DB.reservations),
+      peekStorage('gen-return-requests-v1', DB.returnRequests)
     ]);
-    const before = JSON.stringify({gens:DB.gens, reservations:DB.reservations});
-    const after = JSON.stringify({gens, reservations});
+    const before = JSON.stringify({gens:DB.gens, reservations:DB.reservations, returnRequests:DB.returnRequests});
+    const after = JSON.stringify({gens, reservations, returnRequests});
     if(before !== after){
       const newReservations = (reservations||[]).filter(r=>r && (r.pendingLoad || r.genId===UNASSIGNED_GEN_ID) && !seenReservationIds.has(r.id) && r.outProcessedBy!==DB.currentUserName);
       seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID).map(r=>r.id));
+      const newReturnRequests = (returnRequests||[]).filter(r=>r && !r.handled && !seenReturnRequestIds.has(r.id) && r.authorBy!==DB.currentUserName);
+      seenReturnRequestIds = new Set((returnRequests||[]).filter(r=>!r.handled).map(r=>r.id));
       DB.gens = gens; lastSyncedGensSnapshot = snapshotGens(DB.gens); DB.reservations = reservations; lastSyncedReservationsSnapshot = snapshotById(DB.reservations);
+      DB.returnRequests = returnRequests || [];
       if(!shouldSkipSync()){
         renderTabbar();
         renderContent();
         renderUserBadge();
         if(newReservations.length>0) showLoadingListPopup(true, newReservations);
+        if(newReturnRequests.length>0 && isWithinVoiceAlertHours()){
+          speakText(newReturnRequests.length>1 ? `철수요청이 등록되었습니다. ${koNativeCount(newReturnRequests.length)}건입니다.` : '철수요청이 등록되었습니다. 출고중 화면을 확인해주세요.');
+        }
       }
     }
   }catch(e){
@@ -12385,7 +12623,7 @@ async function syncFromStorage(){
   if(shouldSkipSync()) return;
   syncInFlight = true;
   try{
-    const [rentals, maint, materials, technicians, warnThreshold, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, modelColors, notices, returnRequests, incomingSmsOrders, calendarEvents, genColorOverrides, salesEnabled, salesRecords, salesManagers, salesPassword, salesPasswordBypass, salesBillingRecords, cancelOutHistory, palletDefaultRemoved, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate, deleteLog] = await Promise.all([
+    const [rentals, maint, materials, technicians, warnThreshold, partsStock, partsSpecs, partsUnit, partsCategory, partsSupplier, partsMinStock, partsPurchaseLog, consumableOrders, orderMarks, improvements, teamMembers, suppliesCatalog, suppliesStock, modelColors, notices, incomingSmsOrders, calendarEvents, genColorOverrides, salesEnabled, salesRecords, salesManagers, salesPassword, salesPasswordBypass, salesBillingRecords, cancelOutHistory, palletDefaultRemoved, suppliesSizes, suppliesSpecs, suppliesCategories, customerNotes, readMarkers, companyInfo, lastBackupDate, deleteLog] = await Promise.all([
       peekStorage('gen-rentals-v2', DB.rentals),
       peekStorage('gen-maintenance-v2', DB.maint),
       peekStorage('gen-materials-v1', DB.materials),
@@ -12406,7 +12644,6 @@ async function syncFromStorage(){
       peekStorage('gen-supplies-stock-v1', DB.suppliesStock),
       peekStorage('gen-model-colors-v1', DB.modelColors),
       peekStorage('gen-notices-v1', DB.notices),
-      peekStorage('gen-return-requests-v1', DB.returnRequests),
       peekStorage('gen-incoming-sms-v1', DB.incomingSmsOrders),
       peekStorage('gen-calendar-events-v1', DB.calendarEvents),
       peekStorage('gen-gen-color-overrides-v1', DB.genColorOverrides),
@@ -12427,8 +12664,8 @@ async function syncFromStorage(){
       peekStorage('gen-last-backup-date-v1', DB.lastBackupDate),
       peekStorage('gen-delete-log-v1', DB.deleteLog)
     ]);
-    const before = JSON.stringify({rentals:DB.rentals,maint:DB.maint,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,modelColors:DB.modelColors,notices:DB.notices,returnRequests:DB.returnRequests,incomingSmsOrders:DB.incomingSmsOrders,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,salesEnabled:DB.salesEnabled,salesRecords:DB.salesRecords,salesManagers:DB.salesManagers,salesPassword:DB.salesPassword,salesPasswordBypass:DB.salesPasswordBypass,salesBillingRecords:DB.salesBillingRecords,cancelOutHistory:DB.cancelOutHistory,palletDefaultRemoved:DB.palletDefaultRemoved,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate,deleteLog:DB.deleteLog});
-    const after = JSON.stringify({rentals,maint,materials,technicians,warnThreshold,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,modelColors,notices,returnRequests,incomingSmsOrders,calendarEvents,genColorOverrides,salesEnabled,salesRecords,salesManagers,salesPassword,salesPasswordBypass,salesBillingRecords,cancelOutHistory,palletDefaultRemoved,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate,deleteLog});
+    const before = JSON.stringify({rentals:DB.rentals,maint:DB.maint,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,modelColors:DB.modelColors,notices:DB.notices,incomingSmsOrders:DB.incomingSmsOrders,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,salesEnabled:DB.salesEnabled,salesRecords:DB.salesRecords,salesManagers:DB.salesManagers,salesPassword:DB.salesPassword,salesPasswordBypass:DB.salesPasswordBypass,salesBillingRecords:DB.salesBillingRecords,cancelOutHistory:DB.cancelOutHistory,palletDefaultRemoved:DB.palletDefaultRemoved,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate,deleteLog:DB.deleteLog});
+    const after = JSON.stringify({rentals,maint,materials,technicians,warnThreshold,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,modelColors,notices,incomingSmsOrders,calendarEvents,genColorOverrides,salesEnabled,salesRecords,salesManagers,salesPassword,salesPasswordBypass,salesBillingRecords,cancelOutHistory,palletDefaultRemoved,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate,deleteLog});
     if(before !== after){
       const newNotices = (notices||[]).filter(n=>n && !seenNoticeIds.has(n.id) && n.authorBy!==DB.currentUserName);
       const newEvents = (calendarEvents||[]).filter(e=>e && !seenEventIds.has(e.id) && e.authorBy!==DB.currentUserName);
@@ -12436,7 +12673,7 @@ async function syncFromStorage(){
       seenEventIds = new Set((calendarEvents||[]).map(e=>e.id));
       DB.rentals = rentals; lastSyncedRentalsSnapshot = snapshotById(DB.rentals); DB.maint = maint;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold;
-      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.modelColors = modelColors; DB.notices = notices; DB.returnRequests = returnRequests || []; DB.incomingSmsOrders = incomingSmsOrders || []; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.salesEnabled = salesEnabled === true; DB.salesRecords = salesRecords || []; DB.salesManagers = salesManagers || []; if((DB.salesManagers[0]||'').trim() !== SALES_MANAGER_FIXED_NAME){ DB.salesManagers[0] = SALES_MANAGER_FIXED_NAME; saveSalesManagers(); } DB.salesPassword = salesPassword || ''; DB.salesPasswordBypass = salesPasswordBypass !== false; DB.salesBillingRecords = salesBillingRecords || []; DB.cancelOutHistory = cancelOutHistory || []; DB.palletDefaultRemoved = palletDefaultRemoved === true; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate; DB.deleteLog = deleteLog || []; lastSyncedDeleteLogSnapshot = snapshotById(DB.deleteLog);
+      DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.modelColors = modelColors; DB.notices = notices; DB.incomingSmsOrders = incomingSmsOrders || []; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.salesEnabled = salesEnabled === true; DB.salesRecords = salesRecords || []; DB.salesManagers = salesManagers || []; if((DB.salesManagers[0]||'').trim() !== SALES_MANAGER_FIXED_NAME){ DB.salesManagers[0] = SALES_MANAGER_FIXED_NAME; saveSalesManagers(); } DB.salesPassword = salesPassword || ''; DB.salesPasswordBypass = salesPasswordBypass !== false; DB.salesBillingRecords = salesBillingRecords || []; DB.cancelOutHistory = cancelOutHistory || []; DB.palletDefaultRemoved = palletDefaultRemoved === true; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate; DB.deleteLog = deleteLog || []; lastSyncedDeleteLogSnapshot = snapshotById(DB.deleteLog);
       applyCompanyBranding();
       if(!shouldSkipSync()){
         renderTabbar();
