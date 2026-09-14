@@ -7351,7 +7351,7 @@ function renderSettingsTab(){
         <div class="field-row" style="align-items:flex-end;flex-wrap:wrap;">
           <div class="field" style="max-width:140px;">
             <label>발전기 번호</label>
-            <input type="text" id="f-gencolor-id" placeholder="예: S-14">
+            <input type="text" id="f-gencolor-id" placeholder="예: S-14" onkeydown="if(event.key==='Enter'){event.preventDefault();addGenColorOverride();}">
           </div>
           <div class="field" style="max-width:60px;">
             <label>색상</label>
@@ -7450,16 +7450,16 @@ function renderSettingsTab(){
             const suspicious = g.tankWidth>0 && g.tankDepth>0 && g.tankHeight>0 && g.tankHeight < g.tankDepth*0.6;
             return `<div style="display:flex;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--border);flex-wrap:wrap;${suspicious? 'background:var(--danger-tint);border-radius:6px;':''}">
             ${genColorDot(g)}
-            <span style="font-size:13px;min-width:90px;">${escR(g.id)} <span class="muted" style="font-size:11.5px;">${escR(g.model||'모델 미등록')}</span></span>
+            <span style="font-size:13px;flex:0 0 170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escR(g.id)} ${escR(g.model||'모델 미등록')}">${escR(g.id)} <span class="muted" style="font-size:11.5px;">${escR(g.model||'모델 미등록')}</span></span>
             <span class="muted" style="font-size:10.5px;white-space:nowrap;">⛽ 탱크</span>
-            <input type="number" min="0" value="${g.tankWidth||''}" placeholder="${defW||'가로'}" title="가로(cm) - 비우면 모델 기본값(${defW||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankWidth',this.value)">
+            <input type="number" min="0" value="${g.tankWidth||''}" placeholder="${defW||'가로'}" title="가로(cm) - 비우면 모델 기본값(${defW||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankWidth',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();focusNextTankInput(this);}">
             <span class="muted" style="font-size:11px;">×</span>
-            <input type="number" min="0" value="${g.tankDepth||''}" placeholder="${defD||'세로'}" title="세로(cm) - 비우면 모델 기본값(${defD||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankDepth',this.value)">
+            <input type="number" min="0" value="${g.tankDepth||''}" placeholder="${defD||'세로'}" title="세로(cm) - 비우면 모델 기본값(${defD||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankDepth',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();focusNextTankInput(this);}">
             <span class="muted" style="font-size:11px;">×</span>
-            <input type="number" min="0" value="${g.tankHeight||''}" placeholder="${defH||'높이'}" title="높이(cm) - 비우면 모델 기본값(${defH||'미등록'}) 사용" style="width:56px;padding:5px 4px;${suspicious?'border-color:var(--danger);':''}" onchange="updateGenTankDim('${g.id}','tankHeight',this.value)">
+            <input type="number" min="0" value="${g.tankHeight||''}" placeholder="${defH||'높이'}" title="높이(cm) - 비우면 모델 기본값(${defH||'미등록'}) 사용" style="width:56px;padding:5px 4px;${suspicious?'border-color:var(--danger);':''}" onchange="updateGenTankDim('${g.id}','tankHeight',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();focusNextTankInput(this);}">
             <span class="muted" style="font-size:11px;">cm</span>
             <span class="muted" style="font-size:10.5px;white-space:nowrap;margin-left:8px;">📏 기준높이</span>
-            <input type="number" min="0" step="0.5" value="${g.fuelBaselineHeight||''}" placeholder="${modelBaselineDefault||'0'}" title="비우면 모델 기본값(${modelBaselineDefault||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenFuelBaseline('${g.id}', this.value)">
+            <input type="number" min="0" step="0.5" value="${g.fuelBaselineHeight||''}" placeholder="${modelBaselineDefault||'0'}" title="비우면 모델 기본값(${modelBaselineDefault||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenFuelBaseline('${g.id}', this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();focusNextTankInput(this);}">
             <span class="muted" style="font-size:11px;">cm</span>
             ${hasOverride? `<button type="button" class="btn sm danger" onclick="clearGenTankOverride('${g.id}')" title="개별 설정 삭제">삭제</button>` : ''}
             ${suspicious? `<div style="flex-basis:100%;color:var(--danger);font-weight:700;font-size:11.5px;">⚠️ 높이가 가로·세로에 비해 너무 낮습니다 — 세로·높이 순서가 바뀌지 않았는지 확인해주세요.</div>`:''}
@@ -7483,16 +7483,16 @@ function renderSettingsTab(){
             const suspicious = g.tankWidth>0 && g.tankDepth>0 && g.tankHeight>0 && g.tankHeight < g.tankDepth*0.6;
             return `<div style="display:flex;align-items:center;gap:6px;padding:7px 2px;border-bottom:1px solid var(--border);flex-wrap:wrap;${suspicious? 'background:var(--danger-tint);border-radius:6px;':''}">
             ${genColorDot(g)}
-            <span style="font-size:13px;min-width:90px;">${escR(g.id)} <span class="muted" style="font-size:11.5px;">${escR(g.model||'모델 미등록')}</span></span>
+            <span style="font-size:13px;flex:0 0 170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escR(g.id)} ${escR(g.model||'모델 미등록')}">${escR(g.id)} <span class="muted" style="font-size:11.5px;">${escR(g.model||'모델 미등록')}</span></span>
             <span class="muted" style="font-size:10.5px;white-space:nowrap;">⛽ 탱크</span>
-            <input type="number" min="0" value="${g.tankWidth||''}" placeholder="${defW||'가로'}" title="가로(cm) - 비우면 모델 기본값(${defW||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankWidth',this.value)">
+            <input type="number" min="0" value="${g.tankWidth||''}" placeholder="${defW||'가로'}" title="가로(cm) - 비우면 모델 기본값(${defW||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankWidth',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();focusNextTankInput(this);}">
             <span class="muted" style="font-size:11px;">×</span>
-            <input type="number" min="0" value="${g.tankDepth||''}" placeholder="${defD||'세로'}" title="세로(cm) - 비우면 모델 기본값(${defD||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankDepth',this.value)">
+            <input type="number" min="0" value="${g.tankDepth||''}" placeholder="${defD||'세로'}" title="세로(cm) - 비우면 모델 기본값(${defD||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenTankDim('${g.id}','tankDepth',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();focusNextTankInput(this);}">
             <span class="muted" style="font-size:11px;">×</span>
-            <input type="number" min="0" value="${g.tankHeight||''}" placeholder="${defH||'높이'}" title="높이(cm) - 비우면 모델 기본값(${defH||'미등록'}) 사용" style="width:56px;padding:5px 4px;${suspicious?'border-color:var(--danger);':''}" onchange="updateGenTankDim('${g.id}','tankHeight',this.value)">
+            <input type="number" min="0" value="${g.tankHeight||''}" placeholder="${defH||'높이'}" title="높이(cm) - 비우면 모델 기본값(${defH||'미등록'}) 사용" style="width:56px;padding:5px 4px;${suspicious?'border-color:var(--danger);':''}" onchange="updateGenTankDim('${g.id}','tankHeight',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();focusNextTankInput(this);}">
             <span class="muted" style="font-size:11px;">cm</span>
             <span class="muted" style="font-size:10.5px;white-space:nowrap;margin-left:8px;">📏 기준높이</span>
-            <input type="number" min="0" step="0.5" value="${g.fuelBaselineHeight||''}" placeholder="${modelBaselineDefault||'0'}" title="비우면 모델 기본값(${modelBaselineDefault||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenFuelBaseline('${g.id}', this.value)">
+            <input type="number" min="0" step="0.5" value="${g.fuelBaselineHeight||''}" placeholder="${modelBaselineDefault||'0'}" title="비우면 모델 기본값(${modelBaselineDefault||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenFuelBaseline('${g.id}', this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();focusNextTankInput(this);}">
             <span class="muted" style="font-size:11px;">cm</span>
             ${hasOverride? `<button type="button" class="btn sm danger" onclick="clearGenTankOverride('${g.id}')" title="개별 설정 삭제">삭제</button>` : ''}
             ${suspicious? `<div style="flex-basis:100%;color:var(--danger);font-weight:700;font-size:11.5px;">⚠️ 높이가 가로·세로에 비해 너무 낮습니다 — 세로·높이 순서가 바뀌지 않았는지 확인해주세요.</div>`:''}
@@ -7541,6 +7541,18 @@ async function updateGenFuelBaseline(id, value){
   g.fuelBaselineHeight = (v && v>0) ? v : null;
   await saveGens();
   flash('저장되었습니다');
+}
+// 탱크규격 입력칸에서 Enter를 누르면 같은 줄의 다음 칸(가로→세로→높이→기준높이→다음 발전기 가로...)으로 자동 이동합니다.
+function focusNextTankInput(el){
+  const scope = el.closest('.settings-table') || document;
+  const inputs = Array.from(scope.querySelectorAll('input[type=number]'));
+  const idx = inputs.indexOf(el);
+  if(idx>=0 && idx<inputs.length-1){
+    inputs[idx+1].focus();
+    inputs[idx+1].select();
+  } else if(el.blur){
+    el.blur();
+  }
 }
 async function updateGenTankDim(id, field, value){
   const g = findGen(id);
@@ -7772,6 +7784,7 @@ async function addGenColorOverride(){
   DB.genColorOverrides[g.id] = colorEl.value;
   await saveGenColorOverrides();
   idEl.value = '';
+  idEl.focus();
   renderGenColorOverrideList();
   renderContent();
   flash(`${g.id} 색상이 고정되었습니다`);
