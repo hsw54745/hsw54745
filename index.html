@@ -790,6 +790,7 @@ async function openQmVoltageEdit(id){
       </div>
       <input id="qmv-input" type="text" style="width:100%;font-size:20px;padding:14px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;" placeholder="예: 380V">
       ${voltageButtonsHtml('qmv-input', {vertical:true, big:true})}
+      <div id="qmv-guide-wrap" style="margin-top:12px;"></div>
       <div id="qmv-status" style="display:none;margin-top:14px;padding:14px;border-radius:12px;font-size:15px;font-weight:700;text-align:center;"></div>
       <button id="qmv-save-btn" onclick="submitQmVoltageEdit('${id}')" style="width:100%;margin-top:16px;padding:18px;font-size:20px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">저장</button>
     </div>
@@ -807,6 +808,11 @@ async function openQmVoltageEdit(id){
     }
     document.getElementById('qmv-sub').textContent = `${g.id} · ${g.model||'모델 미등록'} (현재: ${g.voltage||'미설정'})`;
     document.getElementById('qmv-input').value = g.voltage || '';
+    const guideWrap = document.getElementById('qmv-guide-wrap');
+    if(guideWrap && g.model){
+      const escM = g.model.replace(/'/g,"\\'");
+      guideWrap.innerHTML = `<button type="button" onclick="qmShowVoltageGuide('${escM}')" style="width:100%;background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-weight:800;font-size:14px;padding:10px;border-radius:12px;cursor:pointer;">📷 이 모델 전압 설정방법 사진 보기</button>`;
+    }
   }catch(e){
     if(document.getElementById('qmv-sub')) document.getElementById('qmv-sub').textContent = '불러오지 못했습니다.';
   }
@@ -843,6 +849,60 @@ async function submitQmVoltageEdit(id){
     box.textContent = '저장하지 못했습니다. 다시 시도해주세요.';
     if(btn){ btn.disabled = false; btn.textContent = '저장'; }
   }
+}
+// 전압 설정방법 사진(모델별)은 용량이 커서, 필요할 때(눌렀을 때)만 불러와 캐시해둡니다.
+let qmMaterialsCache = null;
+async function qmShowVoltageGuide(model){
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>📷 전압 설정방법</h3>
+      <div class="modal-sub">${escR(model)}</div>
+      <div id="qmvg-body" style="text-align:center;color:#999;font-size:14px;padding:16px 0;">불러오는 중...</div>
+      <div class="modal-actions"><button class="btn primary" onclick="closeModal()">닫기</button></div>
+    </div>
+  </div>`;
+  try{
+    if(!qmMaterialsCache){
+      const cur = await window.storage.get('gen-materials-v1', true);
+      qmMaterialsCache = cur ? JSON.parse(cur.value) : {};
+    }
+    const body = document.getElementById('qmvg-body');
+    if(!body) return; // 창이 이미 닫혔으면 무시
+    const m = qmMaterialsCache[model] || {};
+    const escM = model.replace(/'/g,"\\'");
+    const blocks = VOLTAGE_GUIDE_KINDS.map(kind=>{
+      const photos = voltageGuidePhotos(m, kind);
+      if(photos.length===0) return '';
+      const label = VOLTAGE_GUIDE_LABELS[kind];
+      return `<button type="button" class="btn sm" style="margin:3px 4px 3px 0;color:var(--primary-dark);border-color:var(--primary);" onclick="qmViewVoltageGuidePhoto('${escM}','${kind}',0)">${label} (${photos.length}장)</button>`;
+    }).join('');
+    body.innerHTML = blocks ? `<div style="text-align:left;">${blocks}</div>` : '<div class="hint">등록된 전압 설정 방법 사진이 없습니다.</div>';
+  }catch(e){
+    const body = document.getElementById('qmvg-body');
+    if(body) body.innerHTML = '<div style="color:#B23A34;">불러오지 못했습니다.</div>';
+  }
+}
+function qmViewVoltageGuidePhoto(model, kind, idx){
+  const m = (qmMaterialsCache && qmMaterialsCache[model]) || {};
+  const photos = voltageGuidePhotos(m, kind);
+  const note = voltageGuideNote(m, kind);
+  const photo = photos[idx];
+  if(!photo) return;
+  const escM = model.replace(/'/g,"\\'");
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal" style="max-width:820px;">
+      <h3>⚡ ${VOLTAGE_GUIDE_LABELS[kind]||'전압 설정'}</h3>
+      <div class="modal-sub">${escR(model)}${photos.length>1? ` (${idx+1}/${photos.length})`:''}</div>
+      <img src="${photo}" alt="" style="width:100%;border-radius:10px;border:1px solid var(--border-strong);margin-bottom:10px;">
+      ${note? `<div style="font-size:14px;white-space:pre-wrap;line-height:1.6;">${escR(note)}</div>` : ''}
+      ${photos.length>1? `<div class="btn-row" style="margin-top:10px;justify-content:center;flex-wrap:wrap;">${photos.map((p,i)=>`<button type="button" class="btn sm ${i===idx?'primary':''}" onclick="qmViewVoltageGuidePhoto('${escM}','${kind}',${i})">${i+1}</button>`).join('')}</div>`:''}
+      <div class="modal-actions">
+        <button class="btn primary" onclick="closeModal()">닫기</button>
+      </div>
+    </div>
+  </div>`;
 }
 let qmOutRegionFilter = null;
 async function renderQuickModeOutList(){
@@ -1046,6 +1106,7 @@ async function openQmInProcess(id){
         <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:6px;">전압</label>
         <input type="text" id="qmin-voltage" value="${escR(r.voltage||g.voltage||'')}" placeholder="예: 380V" style="width:100%;font-size:16px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;">
         ${voltageButtonsHtml('qmin-voltage')}
+        ${g.model? `<button type="button" onclick="qmShowVoltageGuide('${g.model.replace(/'/g,"\\'")}')" style="width:100%;margin-top:8px;background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-weight:800;font-size:13px;padding:8px;border-radius:10px;cursor:pointer;">📷 이 모델 전압 설정방법 사진 보기</button>` : ''}
       </div>
       <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px;margin-bottom:10px;">
         ${g.hoursKnown ? `
