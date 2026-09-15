@@ -1559,7 +1559,7 @@ async function submitQmConfirmLoad(resId, needFuel){
       customer: r.customer, manager: r.manager, phone: r.phone, site: r.site, address: r.address,
       supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', voltage: r.voltage, qty: r.qty,
       fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
-      usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null,
+      usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
       outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
       outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: qmLabel(), genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null
     };
@@ -9307,19 +9307,20 @@ function deleteSmsOrderCard(resId){
 function showSmsOrderModal(resId){
   const r = DB.reservations.find(x=>x.id===resId);
   if(!r) return;
-  showSmsOrderText(r.smsOrder, `${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)} · ${escR(r.customer||r.site||'')}`);
+  showSmsOrderText(r.smsOrder, `${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)} · ${escR(r.customer||r.site||'')}`, r.smsOrderAt||r.createdAtTs);
 }
 function showSmsOrderForGen(gid){
   const g = findGen(gid);
   if(!g || !g.rental) return;
-  showSmsOrderText(g.rental.smsOrder, escR(g.id));
+  showSmsOrderText(g.rental.smsOrder, escR(g.id), g.rental.smsOrderAt);
 }
-function showSmsOrderText(text, subtitle){
+function showSmsOrderText(text, subtitle, sentAtTs){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
       <h3>📩 문자오더 원문</h3>
       ${subtitle? `<div class="modal-sub">${subtitle}</div>` : ''}
+      ${sentAtTs? `<div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:10px;">🕐 문자 보낸(등록된) 시각: ${fmtCardDateTime(sentAtTs)}</div>` : ''}
       <div style="font-size:14.5px;white-space:pre-wrap;line-height:1.6;background:#FFF8E1;border:2px solid #E8B923;border-radius:12px;padding:14px 16px;text-align:left;">${escR(text||'')}</div>
       <div class="modal-actions">
         <button class="btn primary" onclick="closeModal()">닫기</button>
@@ -9492,7 +9493,7 @@ async function confirmLoad(resId){
   g.rental = {
     customer: r.customer, manager: r.manager, phone: r.phone, site: r.site, address: r.address,
     supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', voltage: r.voltage, qty: r.qty, fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
-    usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null,
+    usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
     outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
     outProcessedBy: r.outProcessedBy || null, loadConfirmedBy: DB.currentUserName || null, genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null
   };
@@ -9565,6 +9566,7 @@ function parseSmsOrderText(text){
   const leftover = [];
   const noteParts = [];
   let arrivalLine = '';
+  let isLoadDateHint = false; // "상차"라고만 되어 있으면(도착 언급 없이) 그 날짜 자체가 상차일이라 -1일 계산을 안 합니다.
 
   lines.forEach(line=>{
     let l = line.replace(/[★☆]+\s*해성발전기\s*(출고|철수)?\s*요청\s*[★☆]+/g, '').trim();
@@ -9587,17 +9589,20 @@ function parseSmsOrderText(text){
       if(rest) result.manager = rest;
       return;
     }
-    if(l.includes('도착')){ arrivalLine = l; return; }
+    if(l.includes('도착')||l.includes('상차')||l.includes('투입')){ arrivalLine = l; isLoadDateHint = l.includes('상차') && !l.includes('도착'); return; }
     if(addressRe.test(l)){ result.address = result.address ? result.address+' '+l : l; return; }
     if(vm) return; // 전압만 있고 다른 정보가 없는 조각(예: "380볼트")은 업체명 후보에서 제외합니다.
     leftover.push(l);
   });
 
   // "OO소장님"/"OO이사님"처럼 직급이 붙은 줄은 업체명이 아니라 담당자일 가능성이 높습니다.
-  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장)\s*님?$|님$/;
+  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장)\s*님?$|님$/;
   const titleIdx = leftover.findIndex(l=>titleRe.test(l));
   if(titleIdx>=0 && !result.manager){
-    result.manager = leftover[titleIdx];
+    // 한국 이름은 보통 2~3자(드물게 4자)라, "업체명 OOO소장님"처럼 붙어 있어도 이름+직급 부분만 뽑아냅니다.
+    const nameTitleRe = /([가-힣]{2,4})\s*(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장)\s*(님)?$/;
+    const nm = leftover[titleIdx].match(nameTitleRe);
+    result.manager = nm ? `${nm[1]}${nm[2]}${nm[3]||''}` : leftover[titleIdx];
     leftover.splice(titleIdx,1);
   }
 
@@ -9623,7 +9628,7 @@ function parseSmsOrderText(text){
       }
     }
     const today = new Date();
-    if(arrivalLine.includes('오늘')) result.outDate = toLocalDateStr(today);
+    if(arrivalLine.includes('오늘') || arrivalLine.includes('지금')) result.outDate = toLocalDateStr(today);
     else if(arrivalLine.includes('내일')){
       const d = new Date(today); d.setDate(d.getDate()+1);
       result.outDate = toLocalDateStr(d);
@@ -9639,10 +9644,15 @@ function parseSmsOrderText(text){
     }
   }
   if(result.outDate){
-    // 발전기는 도착일 하루 전에 상차해야 하므로 상차일 = 출고(도착)예정일 - 1일
-    const d = new Date(result.outDate+'T00:00:00');
-    d.setDate(d.getDate()-1);
-    result.loadDate = toLocalDateStr(d);
+    if(isLoadDateHint){
+      // 문자에 "도착"이 아니라 "상차"만 언급된 경우, 그 날짜 자체가 상차일입니다(하루 전으로 계산하지 않음).
+      result.loadDate = result.outDate;
+    } else {
+      // 발전기는 도착일 하루 전에 상차해야 하므로 상차일 = 출고(도착)예정일 - 1일
+      const d = new Date(result.outDate+'T00:00:00');
+      d.setDate(d.getDate()-1);
+      result.loadDate = toLocalDateStr(d);
+    }
   }
   return result;
 }
@@ -9691,10 +9701,12 @@ function parseReturnRequestText(text){
     leftover.push(l);
   });
   // 남는 줄(회사명일 가능성이 높은 줄)을 업체명 후보로 씁니다. 담당자를 못 뽑았으면 직급 붙은 줄을 담당자로 먼저 뺍니다.
-  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장)\s*님?$|님$/;
+  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장)\s*님?$|님$/;
   const titleIdx = leftover.findIndex(l=>titleRe.test(l));
   if(titleIdx>=0 && !result.manager){
-    result.manager = leftover[titleIdx];
+    const nameTitleRe = /([가-힣]{2,4})\s*(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장)\s*(님)?$/;
+    const nm = leftover[titleIdx].match(nameTitleRe);
+    result.manager = nm ? `${nm[1]}${nm[2]}${nm[3]||''}` : leftover[titleIdx];
     leftover.splice(titleIdx,1);
   }
   if(leftover.length>0) result.customer = leftover[0];
@@ -9729,6 +9741,7 @@ function viewMatchedReturnRequest(genId, reqId){
     <div class="modal">
       <h3>🔻 철수오더확인</h3>
       <div class="modal-sub">${escR(g.id)} · ${escR(g.model||'')}</div>
+      ${r.createdAtTs? `<div class="muted" style="font-size:12px;margin-top:-6px;margin-bottom:10px;">🕐 문자 보낸(등록된) 시각: ${fmtCardDateTime(r.createdAtTs)}${r.authorBy? ` · ${escR(r.authorBy)}`:''}</div>` : ''}
       <div style="background:#FBEAEA;border:1px solid var(--danger);border-radius:10px;padding:12px 14px;white-space:pre-wrap;font-size:14.5px;line-height:1.6;color:#333;text-align:left;">${escR(r.text||'')}</div>
       ${parsed.recallDate? `<div style="margin-top:12px;background:var(--warn-tint);border:1px solid var(--warn);border-radius:10px;padding:12px 14px;text-align:left;">
         <div style="font-size:13px;font-weight:800;color:var(--warn);">🗓️ 문자에서 인식한 회수예정일: ${escR(parsed.recallDate)}</div>
@@ -10029,7 +10042,7 @@ function submitReserveNoGen(resId){
       id: existing? existing.id : uid(), genId: genSel, pendingLoad: true, batchId: (existing&&existing.batchId)||null,
       customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
       fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
-      outDate, startHours, longTerm, estDaily, smsOrder: (existing&&existing.smsOrder)||null,
+      outDate, startHours, longTerm, estDaily, smsOrder: (existing&&existing.smsOrder)||null, smsOrderAt: (existing&&(existing.smsOrderAt||existing.createdAtTs))||null,
       outProcessedBy: (existing&&existing.outProcessedBy) || DB.currentUserName || null, createdAt: (existing&&existing.createdAt) || todayStr(),
       genAssignedBy: (existing && existing.genId===genSel && existing.genAssignedBy) ? existing.genAssignedBy : (DB.currentUserName||null),
       genAssignedAt: (existing && existing.genId===genSel && existing.genAssignedAt) ? existing.genAssignedAt : nowDateTimeStr()
@@ -10050,7 +10063,7 @@ function submitReserveNoGen(resId){
     id: existing? existing.id : uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false, plannedOutDate: outDate, batchId: (existing&&existing.batchId)||null,
     customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
     fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
-    longTerm, estDaily, smsOrder: (existing&&existing.smsOrder)||null,
+    longTerm, estDaily, smsOrder: (existing&&existing.smsOrder)||null, smsOrderAt: (existing&&(existing.smsOrderAt||existing.createdAtTs))||null,
     outProcessedBy: (existing&&existing.outProcessedBy) || DB.currentUserName || null, createdAt: (existing&&existing.createdAt) || todayStr()
   };
   if(existing){
@@ -10671,7 +10684,7 @@ async function submitOut(idParam, reservationId){
     id: reservationId || uid(), genId: id, pendingLoad: true, batchId: (existing && existing.batchId) || null,
     customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty,
     fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
-    outDate, startHours, longTerm, estDaily, smsOrder: (existing&&existing.smsOrder)||null,
+    outDate, startHours, longTerm, estDaily, smsOrder: (existing&&existing.smsOrder)||null, smsOrderAt: (existing&&(existing.smsOrderAt||existing.createdAtTs))||null,
     outProcessedBy: DB.currentUserName || (existing&&existing.outProcessedBy) || null,
     genAssignedBy: (existing&&existing.genAssignedBy)||null, genAssignedAt: (existing&&existing.genAssignedAt)||null,
     createdAt: (existing && existing.createdAt) || todayStr()
