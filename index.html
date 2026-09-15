@@ -968,7 +968,12 @@ async function renderQmOutListInner(){
     let gens = [];
     try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
     if(!Array.isArray(gens)) gens = [];
-    const outGens = gens.filter(g=>g && !g.retired && g.status==='out').sort((a,b)=>((b.rental&&b.rental.outDate)||'').localeCompare((a.rental&&a.rental.outDate)||''));
+    const outGens = gens.filter(g=>g && !g.retired && g.status==='out').sort((a,b)=>{
+      const at = (a.rental&&a.rental.outConfirmedAt)||0;
+      const bt = (b.rental&&b.rental.outConfirmedAt)||0;
+      if(at !== bt) return bt - at;
+      return ((b.rental&&b.rental.outDate)||'').localeCompare((a.rental&&a.rental.outDate)||'');
+    });
     if(!document.getElementById('qm-out-list')) return; // 화면이 이미 닫혔으면 무시
     if(outGens.length===0){
       if(regionWrap) regionWrap.innerHTML = '';
@@ -4009,7 +4014,12 @@ function renderDashboard(){
 
   // 출고중 최근 요약 (출고일 최근순)
   const outSummary = [...outGens]
-    .sort((a,b)=>((b.rental&&b.rental.outDate)||'').localeCompare((a.rental&&a.rental.outDate)||''))
+    .sort((a,b)=>{
+      const at = (a.rental&&a.rental.outConfirmedAt)||0;
+      const bt = (b.rental&&b.rental.outConfirmedAt)||0;
+      if(at !== bt) return bt - at;
+      return ((b.rental&&b.rental.outDate)||'').localeCompare((a.rental&&a.rental.outDate)||'');
+    })
     .slice(0,5);
   const outSummaryRows = outSummary.map(g=>{
     const rt = g.rental;
