@@ -9708,7 +9708,7 @@ function confirmAssignGen(resId){
   saveWithRetry(saveReservations);
   openOutModal(chosenId, resId);
 }
-function confirmLoadPrompt(resId){
+function confirmLoadPrompt(resId, isTransfer){
   const r = DB.reservations.find(x=>x.id===resId);
   if(!r) return;
   const g = findGen(r.genId);
@@ -9741,7 +9741,12 @@ function confirmLoadPrompt(resId){
         <div style="font-size:12px;font-weight:800;color:#8A6D00;margin-bottom:6px;">📩 문자오더 원문</div>
         <div style="font-size:13.5px;white-space:pre-wrap;line-height:1.5;color:#333;">${escR(r.smsOrder)}</div>
       </div>` : ''}
-      ${needFuel? `
+      ${needFuel? (isTransfer? `
+      <div style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:12px;margin-bottom:6px;">
+        <div style="font-size:14px;color:var(--danger);font-weight:800;">⛽ 연료 ${fuelAmt}L 요청이 있지만, 현장이동은 공장을 거치지 않아 연료를 넣을 수 없습니다.</div>
+        <div class="hint" style="margin-top:4px;">"상차 완료"를 누르면 연료는 주입되지 않은 것으로 기록되고, 비고에 자동으로 남습니다. 고객에게는 별도로 안내해주세요.</div>
+      </div>
+      ` : `
       <div style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:12px;margin-bottom:6px;">
         <div style="font-size:14px;color:var(--primary-dark);font-weight:800;margin-bottom:8px;">⛽ 연료 ${fuelAmt}L를 넣어드리기로 되어 있습니다.</div>
         <div class="field chk" style="margin:0;">
@@ -9750,10 +9755,10 @@ function confirmLoadPrompt(resId){
         </div>
       </div>
       <div id="f-loadconfirm-err" class="err" style="display:none;"></div>
-      ` : ''}
+      `) : ''}
       <div class="modal-actions">
         <button class="btn" onclick="closeModal()">취소</button>
-        <button class="btn primary" onclick="${needFuel? `submitConfirmLoadWithFuelCheck('${resId}')` : `confirmLoad('${resId}')`}">상차 완료</button>
+        <button class="btn primary" onclick="${(needFuel && !isTransfer)? `submitConfirmLoadWithFuelCheck('${resId}')` : `confirmLoad('${resId}', ${isTransfer?'true':'false'})`}">상차 완료</button>
       </div>
     </div>
   </div>`;
@@ -9767,7 +9772,7 @@ function submitConfirmLoadWithFuelCheck(resId){
   }
   confirmLoad(resId);
 }
-async function confirmLoad(resId){
+async function confirmLoad(resId, isTransfer){
   const r = DB.reservations.find(x=>x.id===resId);
   if(!r){ return; }
   const g = findGen(r.genId);
@@ -9783,12 +9788,16 @@ async function confirmLoad(resId){
     showInfoModal('고장 수리 중인 발전기라 상차완료 처리할 수 없습니다. 수리 완료 처리 후 다시 시도해주세요.');
     return;
   }
+  const skippedFuel = isTransfer && (r.fuelRequested!=null || r.fuelActual!=null);
+  const transferFuelNote = skippedFuel ? `⛽ 현장이동으로 연료 미주입 (고객요청 ${r.fuelRequested!=null?r.fuelRequested:r.fuelActual}L 미반영)` : '';
   g.status = 'out';
   g.hours = r.startHours;
   g.rental = {
     customer: r.customer, manager: r.manager, phone: r.phone, site: r.site, address: r.address,
-    supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', voltage: r.voltage, qty: r.qty, fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
-    usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
+    supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', voltage: r.voltage, qty: r.qty,
+    fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
+    usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'',
+    note: [r.note, transferFuelNote].filter(Boolean).join(' / '), smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
     outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
     outProcessedBy: r.outProcessedBy || null, loadConfirmedBy: DB.currentUserName || null, genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null
   };
@@ -9804,13 +9813,16 @@ async function confirmLoad(resId){
   await saveReservations();
   renderContent();
   closeModal();
-  flash('상차 확인 완료 - 출고되었습니다');
+  flash(skippedFuel ? '상차 확인 완료 - 출고되었습니다 (연료는 미주입으로 기록됨)' : '상차 확인 완료 - 출고되었습니다');
   if(isWithinVoiceAlertHours()) speakText('상차완료입니다.');
   printReceipt(g.id);
 }
 
 // ---------- 출고 / 입고 / 정비 처리 ----------
-function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
+function closeModal(){
+  document.getElementById('modal-root').innerHTML='';
+  pendingOutIsTransfer = false; // 현장이동 도중 취소되면, 이후 일반 출고까지 상차완료를 건너뛰지 않도록 초기화합니다.
+}
 function openConfirmModal(message, onConfirm, okLabel, cancelLabel){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay">
@@ -11103,6 +11115,14 @@ async function confirmOutSubmit(){
     const siblingCount = siblings.length;
     await saveReservations();
     pendingOutSubmitCtx = null;
+    if(pendingOutIsTransfer){
+      pendingOutIsTransfer = false;
+      currentTab = 'reserve';
+      renderTabbar();
+      renderContent();
+      confirmLoadPrompt(pendingData.id, true); // 현장이동은 상차대기에 놔두지 않고, 바로 이어서 상차완료 확인창을 띄웁니다.
+      return;
+    }
     closeModal();
     currentTab = 'reserve';
     renderTabbar();
@@ -12493,6 +12513,7 @@ async function submitIn(id, isTransfer){
 
 // ===== 현장이동: 새 현장을 [출고대기](미지정)에서 골라 바로 이어서 출고 =====
 let pendingTransferAutoNote = '';
+let pendingOutIsTransfer = false; // 현장이동은 "상차대기"에 놔두지 않고 바로 상차완료 확인창까지 이어줍니다.
 function startTransferOut(id, autoNote){
   pendingTransferAutoNote = autoNote || '';
   const g = findGen(id);
@@ -12522,6 +12543,7 @@ function startTransferOut(id, autoNote){
   </div>`;
 }
 function pickTransferReservation(genId, resId){
+  pendingOutIsTransfer = true;
   if(resId){
     const r = DB.reservations.find(x=>x.id===resId);
     if(!r){ showInfoModal('이미 사라진 출고대기 건입니다. 다시 선택해주세요.'); startTransferOut(genId, pendingTransferAutoNote); return; }
