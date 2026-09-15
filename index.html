@@ -4204,15 +4204,19 @@ function renderOutList(){
       <div class="section-title" style="margin-top:0;color:var(--danger);">🔻 철수(회수) 요청 <span class="cnt">${pendingReturns.length}건</span></div>
       ${pendingReturns.length===0 ? `<div class="empty" style="margin-top:4px;">처리할 철수요청이 없습니다.</div>` : `
       <div style="display:flex;flex-wrap:wrap;gap:8px;">
-        ${pendingReturns.map(r=>`
-        <div style="width:170px;height:250px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
+        ${pendingReturns.map(r=>{
+          const change = detectReturnRequestChange(r, returnReqAll);
+          const cardStyle = change ? 'border:2px solid var(--danger);box-shadow:0 0 0 2px var(--danger-tint);' : 'border:1px solid var(--border);';
+          return `
+        <div style="width:170px;height:250px;flex-shrink:0;background:#fff;${cardStyle}border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
+          ${change? `<div style="background:var(--danger);color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;line-height:1.3;">⚠️ ${change.diffs.join('·')} 변경됨!<br>(${fmtCardDateTime(change.priorAt)} 문자와 다름)</div>` : ''}
           <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}${r.authorBy? ` · ${escR(r.authorBy)}` : ''}</div>
           <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;flex:1;overflow:hidden;" onclick="viewReturnRequestText('${r.id}')">${escR(r.text||'')}</div>
           <div style="display:flex;gap:4px;margin-top:6px;">
             <button class="btn sm primary" style="flex:1;font-size:10px;padding:2px 4px;" onclick="markReturnRequestHandled('${r.id}')">✅ 처리완료</button>
             <button class="btn sm danger" style="flex:1;font-size:10px;padding:2px 4px;" onclick="deleteReturnRequestCard('${r.id}')">🗑 삭제</button>
           </div>
-        </div>`).join('')}
+        </div>`;}).join('')}
       </div>`}
       ${handledReturns.length===0 ? '' : `
       <details class="list-toggle" style="margin-top:10px;"><summary>▸ 숨김 목록 보기 (${handledReturns.length}건)</summary>
@@ -6137,13 +6141,14 @@ function dedupBillingRecords(){
   }
   return changed;
 }
-// 며칠 이내(발전기를 바꿔서 다시 출고하는 등) 같은 거래처·같은 현장으로 있었던 출고취소 이력을 찾습니다.
-function findRelatedCancelHistory(customer, site, outDate){
-  if(!customer || !outDate) return [];
+// 며칠 이내(발전기를 바꿔서 다시 출고하는 등) 있었던 출고취소 이력 중, "이 매출기록 자체(같은 발전기)"가 취소된 경우만 찾습니다.
+// (예전엔 같은 거래처·현장이면 다 같이 떴는데, 그러면 발전기를 바꿔서 새로 나간 정상 건에도 남의 취소이력이 같이 붙어서 헷갈렸습니다.)
+function findRelatedCancelHistory(customer, site, outDate, genId){
+  if(!customer || !outDate || !genId) return [];
   const t = new Date(outDate+'T00:00:00').getTime();
   if(isNaN(t)) return [];
   return (DB.cancelOutHistory||[]).filter(h=>{
-    if(!h || h.customer!==customer) return false;
+    if(!h || h.customer!==customer || h.genId!==genId) return false;
     if(site && h.site && h.site!==site) return false;
     const ht = new Date((h.outDate||'')+'T00:00:00').getTime();
     if(isNaN(ht)) return false;
@@ -6259,7 +6264,7 @@ function renderSalesTab(){
           <span style="font-size:19px;font-weight:900;letter-spacing:0.5px;color:var(--primary-dark);white-space:nowrap;">HS-${rec.billSeqNo}</span>
         </div>` : ''}
         ${(()=>{
-          const cancels = findRelatedCancelHistory(rec.customer, rec.site, rec.outDate);
+          const cancels = findRelatedCancelHistory(rec.customer, rec.site, rec.outDate, rec.genId);
           if(cancels.length===0) return '';
           return `<div class="detail-card" style="margin-top:8px;padding:9px 8px;min-width:110px;text-align:center;background:var(--danger-tint);border:1px solid var(--danger);">
             <div style="font-size:11px;font-weight:800;color:var(--danger);margin-bottom:4px;">🚫 출고취소 이력</div>
@@ -9204,8 +9209,12 @@ function renderReserveTab(){
       <div class="section-title" style="margin-top:0;color:#8A6D00;">📩 문자오더 원문 <span class="cnt">${smsOrderCards.length}건</span></div>
       ${smsOrderCards.length===0 ? `<div class="empty" style="margin-top:4px;">확인할 문자오더가 없습니다.</div>` : `
       <div style="display:flex;flex-wrap:wrap;gap:8px;">
-        ${smsOrderCards.map(r=>`
-        <div style="width:170px;height:260px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
+        ${smsOrderCards.map(r=>{
+          const change = detectSmsOrderChange(r, smsOrderAll);
+          const cardStyle = change ? 'border:2px solid var(--danger);box-shadow:0 0 0 2px var(--danger-tint);' : 'border:1px solid var(--border);';
+          return `
+        <div style="width:170px;height:260px;flex-shrink:0;background:#fff;${cardStyle}border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
+          ${change? `<div style="background:var(--danger);color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;line-height:1.3;">⚠️ ${change.diffs.join('·')} 변경됨!<br>(${fmtCardDateTime(change.priorAt)} 문자와 다름)</div>` : ''}
           <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}${r.outProcessedBy? ` · ${escR(r.outProcessedBy)}` : ''}</div>
           <div style="font-size:14px;font-weight:700;color:var(--primary-dark);margin-bottom:4px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
           <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;flex:1;overflow:hidden;" onclick="showSmsOrderModal('${r.id}')">${escR(r.smsOrder||'')}</div>
@@ -9213,7 +9222,7 @@ function renderReserveTab(){
             <button class="btn sm primary" style="flex:1;font-size:10px;padding:2px 4px;" onclick="markSmsOrderChecked('${r.id}')">✅ 확인완료</button>
             <button class="btn sm danger" style="flex:1;font-size:10px;padding:2px 4px;" onclick="deleteSmsOrderCard('${r.id}')">🗑 삭제</button>
           </div>
-        </div>`).join('')}
+        </div>`;}).join('')}
       </div>`}
       ${smsOrderHidden.length===0 ? '' : `
       <details class="list-toggle" style="margin-top:10px;"><summary>▸ 숨김 목록 보기 (${smsOrderHidden.length}건)</summary>
@@ -9718,6 +9727,52 @@ function parseReturnRequestText(text){
   }
   if(leftover.length>0) result.customer = leftover[0];
   return result;
+}
+// 같은 연락처(우선)·업체명으로 24시간 이내에 먼저 등록된 문자오더가 있는데, 주소·도착시간·전압·상차일이 달라졌으면
+// "내용이 바뀐 문자"로 판단해서 알려줍니다 (오타 등으로 뒤늦게 정정 문자가 오는 경우가 있어서, 놓치지 않게 하기 위함입니다).
+const SMS_CHANGE_WINDOW_MS = 24*60*60*1000;
+function detectSmsOrderChange(item, allItems){
+  if(!item || !item.smsOrder || !item.createdAtTs) return null;
+  const cur = parseSmsOrderText(item.smsOrder);
+  if(!cur.phone && !cur.customer) return null;
+  let prior = null, priorParsed = null;
+  (allItems||[]).forEach(o=>{
+    if(!o || o.id===item.id || !o.smsOrder || !o.createdAtTs) return;
+    if(o.createdAtTs >= item.createdAtTs) return; // 이 문자보다 먼저 온 것만 비교
+    if(item.createdAtTs - o.createdAtTs > SMS_CHANGE_WINDOW_MS) return;
+    const op = parseSmsOrderText(o.smsOrder);
+    const samePhone = cur.phone && op.phone && cur.phone===op.phone;
+    const sameCustomer = !samePhone && cur.customer && op.customer && cur.customer===op.customer;
+    if(!samePhone && !sameCustomer) return;
+    if(!prior || o.createdAtTs > prior.createdAtTs){ prior = o; priorParsed = op; }
+  });
+  if(!prior) return null;
+  const fields = [['address','주소'],['arriveTime','도착시간'],['outDate','출고예정일'],['voltage','전압'],['loadDate','상차일']];
+  const diffs = fields.filter(([k])=> cur[k] && priorParsed[k] && cur[k]!==priorParsed[k]).map(([,label])=>label);
+  if(diffs.length===0) return null;
+  return { priorAt: prior.createdAtTs, diffs };
+}
+// 철수요청 문자도 같은 방식으로: 연락처/업체명이 같은데 24시간 이내 먼저 온 철수문자와 주소·회수예정일이 달라졌으면 알려줍니다.
+function detectReturnRequestChange(item, allItems){
+  if(!item || !item.text || !item.createdAtTs) return null;
+  const cur = parseReturnRequestText(item.text);
+  if(!cur.phone && !cur.customer) return null;
+  let prior = null, priorParsed = null;
+  (allItems||[]).forEach(o=>{
+    if(!o || o.id===item.id || !o.text || !o.createdAtTs) return;
+    if(o.createdAtTs >= item.createdAtTs) return;
+    if(item.createdAtTs - o.createdAtTs > SMS_CHANGE_WINDOW_MS) return;
+    const op = parseReturnRequestText(o.text);
+    const samePhone = cur.phone && op.phone && cur.phone===op.phone;
+    const sameCustomer = !samePhone && cur.customer && op.customer && cur.customer===op.customer;
+    if(!samePhone && !sameCustomer) return;
+    if(!prior || o.createdAtTs > prior.createdAtTs){ prior = o; priorParsed = op; }
+  });
+  if(!prior) return null;
+  const fields = [['address','주소'],['recallDate','회수예정일']];
+  const diffs = fields.filter(([k])=> cur[k] && priorParsed[k] && cur[k]!==priorParsed[k]).map(([,label])=>label);
+  if(diffs.length===0) return null;
+  return { priorAt: prior.createdAtTs, diffs };
 }
 // 지금 출고중인 발전기 중, 이 철수요청 문자와 연락처(우선)·주소·업체명이 일치하는 것을 찾습니다.
 function findMatchedGenForReturnRequest(text){
