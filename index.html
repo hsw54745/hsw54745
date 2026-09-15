@@ -3933,8 +3933,10 @@ function renderDashboard(){
       <td class="gid">${x.g.id}</td>
       <td class="wrap-ok">${displayModel(x.g)}</td>
       <td class="wrap-ok">${rt.customer||'-'}${rt.site? `<div class="muted" style="font-size:11px;">${rt.site}</div>`:''}</td>
+      <td class="wrap-ok" style="font-size:12px;">${escR(rt.address||'-')}</td>
+      <td>${voltagePillHtml(x.g.id, x.g.voltage)}</td>
+      <td class="muted" style="font-size:12px;">${dow(rt.outDate)||'-'}</td>
       <td><span class="pill ${diff<=0?'warn':'gray'}">${inDCountLabel(x.date)}</span></td>
-      <td><button class="btn sm primary" onclick="openInModal('${x.g.id}')">입고 처리</button></td>
     </tr>`;
   }).join('');
 
@@ -3976,6 +3978,9 @@ function renderDashboard(){
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
       <td class="wrap-ok">${rt.customer||'<span class="muted">미기재</span>'}${rt.site? `<div class="muted" style="font-size:11px;">${escR(rt.site)}</div>`:''}</td>
+      <td class="wrap-ok" style="font-size:12px;">${escR(rt.address||'-')}</td>
+      <td class="muted" style="font-size:12px;">${escR(rt.manager||'-')}</td>
+      <td class="muted" style="font-size:12px;">${escR(rt.phone||'-')}</td>
       <td class="muted">${dow(rt.outDate)||'-'}</td>
     </tr>`;
   }).join('');
@@ -4059,7 +4064,7 @@ function renderDashboard(){
     </div>
     ${soonList.length===0? `<div class="empty">5일 이내 입고 예정인 발전기가 없습니다.</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th>거래처/현장</th><th>입고예정</th><th></th></tr></thead>
+      <thead><tr><th>번호</th><th>모델</th><th>거래처/현장</th><th>주소</th><th>전압</th><th>출고일</th><th>입고예정</th></tr></thead>
       <tbody>${soonRows}</tbody>
     </table></div>`}
 
@@ -4079,7 +4084,7 @@ function renderDashboard(){
     </div>
     ${outSummary.length===0? `<div class="empty">현재 출고중인 발전기가 없습니다.</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th>거래처/현장</th><th>출고일</th></tr></thead>
+      <thead><tr><th>번호</th><th>모델</th><th>거래처/현장</th><th>주소</th><th>담당자</th><th>연락처</th><th>출고일</th></tr></thead>
       <tbody>${outSummaryRows}</tbody>
     </table></div>`}
 
