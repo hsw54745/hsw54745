@@ -606,7 +606,9 @@ function renderQuickModeUI(){
       <button type="button" onclick="renderQmReservationList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:28px;">⏳ 출고대기 리스트 보기</button>
       <button type="button" onclick="renderQuickModePasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📤 출고 문자 보내기</button>
       <button type="button" onclick="renderQuickModeReturnPasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">🔻 철수 문자 보내기</button>
-      <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;">📝 출고예약 등록</button>
+      <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📝 출고예약 등록</button>
+      <button type="button" onclick="renderQmNoticeList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#6A4C93;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📢 공지사항 보기</button>
+      <button type="button" onclick="renderQmCalendarView()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#1565C0;color:#fff;border:none;border-radius:16px;cursor:pointer;">🗓️ 일정표 보기</button>
       <div id="qm-install-status" style="margin-top:10px;"></div>
     </div>
   `);
@@ -1739,6 +1741,220 @@ async function submitQmEditReservation(resId){
     box.textContent = '저장하지 못했습니다. 다시 시도해주세요.';
     if(btn){ btn.disabled = false; btn.textContent = '저장'; }
   }
+}
+// ===== 퀵메뉴: 공지사항 =====
+async function renderQmNoticeList(){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQuickModeUI()" style="display:inline-block;background:#fff;border:2px solid #6A4C93;color:#6A4C93;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:24px;font-weight:800;color:#6A4C93;">📢 공지사항</div>
+      </div>
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:12px;margin-bottom:14px;">
+        <input type="text" id="qm-notice-title" placeholder="제목" style="width:100%;font-size:15px;padding:10px;border:1.5px solid #ccc;border-radius:8px;box-sizing:border-box;margin-bottom:8px;">
+        <textarea id="qm-notice-content" placeholder="내용을 입력해주세요" style="width:100%;min-height:70px;font-size:15px;padding:10px;border:1.5px solid #ccc;border-radius:8px;box-sizing:border-box;"></textarea>
+        <button type="button" onclick="addQmNotice()" style="width:100%;margin-top:8px;padding:12px;font-size:15px;font-weight:800;background:#6A4C93;color:#fff;border:none;border-radius:10px;cursor:pointer;">✍ 공지 등록</button>
+      </div>
+      <div id="qm-notice-list"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+    </div>
+  `);
+  await qmRefreshNoticeList();
+}
+async function qmRefreshNoticeList(){
+  const wrap = document.getElementById('qm-notice-list');
+  try{
+    const cur = await window.storage.get('gen-notices-v1', true).catch(()=>null);
+    let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    list = [...list].sort((a,b)=>(b.createdDate||'').localeCompare(a.createdDate||'') || String(b.id||'').localeCompare(String(a.id||'')));
+    if(!document.getElementById('qm-notice-list')) return;
+    if(list.length===0){
+      wrap.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">등록된 공지사항이 없습니다.</div>';
+      return;
+    }
+    wrap.innerHTML = list.map(item=>{
+      const comments = item.comments||[];
+      const commentsHtml = comments.map(cm=>`
+        <div style="padding:6px 0;border-top:1px dashed #eee;font-size:12.5px;">
+          <div style="color:#999;font-size:11px;">💬 ${escR(cm.authorBy||'이름미상')} · ${dow(cm.createdDate)||'-'}</div>
+          <div style="white-space:pre-wrap;line-height:1.5;margin-top:2px;font-size:13.5px;color:#333;">${escR(cm.content)}</div>
+        </div>`).join('');
+      return `<div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+        <div style="font-weight:800;font-size:16px;color:#333;">${escR(item.title||'(제목 없음)')}</div>
+        <div style="color:#999;font-size:11.5px;margin:2px 0 6px;">✍ ${escR(item.authorBy||'이름미상')} · ${dow(item.createdDate)||'-'}</div>
+        ${item.content? `<div style="font-size:14.5px;white-space:pre-wrap;line-height:1.55;color:#333;">${escR(item.content)}</div>`:''}
+        <div style="margin-top:10px;">
+          <div style="color:#999;font-size:11.5px;font-weight:700;margin-bottom:2px;">댓글 ${comments.length}개</div>
+          ${commentsHtml}
+          <div style="display:flex;gap:6px;margin-top:8px;">
+            <input type="text" id="qm-notice-comment-${item.id}" placeholder="댓글 입력" style="flex:1;min-width:0;font-size:14px;padding:8px 10px;border:1.5px solid #ccc;border-radius:8px;box-sizing:border-box;" onkeydown="if(event.key==='Enter'){addQmNoticeComment('${item.id}');}">
+            <button type="button" onclick="addQmNoticeComment('${item.id}')" style="padding:8px 12px;font-size:13px;font-weight:700;background:#F4F0FA;color:#6A4C93;border:1.5px solid #6A4C93;border-radius:8px;cursor:pointer;">등록</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    if(document.getElementById('qm-notice-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:13px;">공지사항을 불러오지 못했습니다.</div>';
+  }
+}
+async function addQmNotice(){
+  const titleEl = document.getElementById('qm-notice-title');
+  const contentEl = document.getElementById('qm-notice-content');
+  const title = titleEl.value.trim();
+  const content = contentEl.value.trim();
+  if(!title && !content){ flash('제목이나 내용을 입력해주세요'); return; }
+  try{
+    const cur = await window.storage.get('gen-notices-v1', true).catch(()=>null);
+    let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    list.push({ id: uid(), title, content, authorBy: qmLabel(), createdDate: todayStr(), comments: [] });
+    await window.storage.set('gen-notices-v1', JSON.stringify(list), true);
+    titleEl.value=''; contentEl.value='';
+    flash('공지사항이 등록되었습니다');
+    await qmRefreshNoticeList();
+  }catch(e){ flash('등록하지 못했습니다. 다시 시도해주세요.'); }
+}
+async function addQmNoticeComment(noticeId){
+  const el = document.getElementById(`qm-notice-comment-${noticeId}`);
+  if(!el) return;
+  const content = el.value.trim();
+  if(!content){ flash('댓글 내용을 입력해주세요'); return; }
+  try{
+    const cur = await window.storage.get('gen-notices-v1', true).catch(()=>null);
+    let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    const item = list.find(x=>x && x.id===noticeId);
+    if(!item){ flash('이미 삭제된 공지입니다'); await qmRefreshNoticeList(); return; }
+    if(!item.comments) item.comments = [];
+    item.comments.push({id: uid(), content, authorBy: qmLabel(), createdDate: todayStr()});
+    await window.storage.set('gen-notices-v1', JSON.stringify(list), true);
+    flash('댓글이 등록되었습니다');
+    await qmRefreshNoticeList();
+  }catch(e){ flash('등록하지 못했습니다. 다시 시도해주세요.'); }
+}
+// ===== 퀵메뉴: 일정표 =====
+let qmCalYear = null, qmCalMonth = null;
+async function renderQmCalendarView(){
+  const now = new Date();
+  if(qmCalYear==null){ qmCalYear = now.getFullYear(); qmCalMonth = now.getMonth(); }
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQuickModeUI()" style="display:inline-block;background:#fff;border:2px solid #1565C0;color:#1565C0;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;">
+        <button type="button" onclick="navQmCalendar(-1)" style="background:#fff;border:1.5px solid #ccc;border-radius:8px;font-size:16px;padding:6px 12px;cursor:pointer;">◀</button>
+        <div id="qm-cal-label" style="font-size:19px;font-weight:800;color:#1565C0;min-width:110px;text-align:center;"></div>
+        <button type="button" onclick="navQmCalendar(1)" style="background:#fff;border:1.5px solid #ccc;border-radius:8px;font-size:16px;padding:6px 12px;cursor:pointer;">▶</button>
+      </div>
+      <div id="qm-cal-wrap" style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:10px;"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+    </div>
+  `);
+  await qmRefreshCalendar();
+}
+function navQmCalendar(delta){
+  qmCalMonth += delta;
+  if(qmCalMonth<0){ qmCalMonth=11; qmCalYear--; }
+  else if(qmCalMonth>11){ qmCalMonth=0; qmCalYear++; }
+  qmRefreshCalendar();
+}
+async function qmRefreshCalendar(){
+  const wrap = document.getElementById('qm-cal-wrap');
+  const labelEl = document.getElementById('qm-cal-label');
+  if(labelEl) labelEl.textContent = `${qmCalYear}년 ${qmCalMonth+1}월`;
+  try{
+    const cur = await window.storage.get('gen-calendar-events-v1', true).catch(()=>null);
+    let events = []; try{ events = cur ? JSON.parse(cur.value) : []; }catch(e){ events = []; }
+    if(!Array.isArray(events)) events = [];
+    if(!document.getElementById('qm-cal-wrap')) return;
+    const firstDow = new Date(qmCalYear, qmCalMonth, 1).getDay();
+    const totalDays = new Date(qmCalYear, qmCalMonth+1, 0).getDate();
+    const todayS = todayStr();
+    const cells = [];
+    for(let i=0;i<firstDow;i++) cells.push(null);
+    for(let d=1; d<=totalDays; d++) cells.push(d);
+    while(cells.length % 7 !== 0) cells.push(null);
+    const dowLabels = ['일','월','화','수','목','금','토'];
+    const headHtml = dowLabels.map((l,i)=>`<div style="text-align:center;font-size:12px;font-weight:700;padding:4px 0;color:${i===0?'#B23A34':i===6?'#1565C0':'#555'};">${l}</div>`).join('');
+    const cellsHtml = cells.map((d,idx)=>{
+      if(d==null) return `<div style="min-height:56px;background:#F4F6F5;border-radius:6px;"></div>`;
+      const dateStr = `${qmCalYear}-${pad2(qmCalMonth+1)}-${pad2(d)}`;
+      const isToday = dateStr===todayS;
+      const dowIdx = idx % 7;
+      const holiday = koreanHolidayName(dateStr);
+      const evs = events.filter(e=>e && e.date===dateStr);
+      const numColor = holiday? '#B23A34' : (dowIdx===0?'#B23A34':dowIdx===6?'#1565C0':'#333');
+      return `<div style="min-height:56px;border:1px solid #eee;border-radius:6px;padding:4px;cursor:pointer;${isToday?'background:#FFF3C4;border-color:#E8B923;':''}" onclick="openQmCalendarDayModal('${dateStr}')">
+        <div style="font-size:12px;font-weight:${isToday?'800':'600'};color:${numColor};">${d}</div>
+        ${holiday? `<div style="color:#B23A34;font-weight:700;font-size:9.5px;margin-top:1px;">${escR(holiday)}</div>`:''}
+        ${evs.length? `<div style="color:#1565C0;font-weight:700;font-size:10px;margin-top:2px;">●${evs.length}</div>` : ''}
+      </div>`;
+    }).join('');
+    wrap.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:2px;">${headHtml}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">${cellsHtml}</div>
+    `;
+  }catch(e){
+    if(document.getElementById('qm-cal-wrap')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:13px;padding:20px 0;">일정을 불러오지 못했습니다.</div>';
+  }
+}
+async function openQmCalendarDayModal(dateStr){
+  const holiday = koreanHolidayName(dateStr);
+  let evs = [];
+  try{
+    const cur = await window.storage.get('gen-calendar-events-v1', true).catch(()=>null);
+    let events = []; try{ events = cur ? JSON.parse(cur.value) : []; }catch(e){ events = []; }
+    if(!Array.isArray(events)) events = [];
+    evs = events.filter(e=>e && e.date===dateStr).sort((a,b)=>(a.createdDate||'').localeCompare(b.createdDate||''));
+  }catch(e){ /* 무시하고 빈 목록으로 표시 */ }
+  const evHtml = evs.length? evs.map(e=>`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px dashed #eee;">
+      <div>
+        <div style="font-size:13.5px;white-space:pre-wrap;color:#333;">${escR(e.text)}</div>
+        <div style="color:#999;font-size:11px;margin-top:2px;">✍ ${escR(e.authorBy||'이름미상')}</div>
+      </div>
+      <button type="button" onclick="removeQmCalendarEvent('${e.id}','${dateStr}')" style="background:#fff;border:1.5px solid #B23A34;color:#B23A34;font-size:11px;font-weight:700;border-radius:8px;padding:4px 8px;cursor:pointer;">삭제</button>
+    </div>`).join('') : `<div style="text-align:center;color:#999;font-size:13px;padding:10px 0;">등록된 일정이 없습니다.</div>`;
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>🗓️ ${dow(dateStr)}</h3>
+      ${holiday? `<div style="text-align:center;color:#B23A34;font-weight:800;font-size:14px;margin-top:-4px;margin-bottom:6px;">🎌 ${escR(holiday)}</div>` : ''}
+      <div class="field">
+        <textarea id="qm-cal-event-text" placeholder="일정 내용 입력" style="min-height:60px;"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">닫기</button>
+        <button class="btn primary" onclick="addQmCalendarEvent('${dateStr}')">일정 추가</button>
+      </div>
+      <div style="margin-top:14px;max-height:220px;overflow-y:auto;">${evHtml}</div>
+    </div>
+  </div>`;
+}
+async function addQmCalendarEvent(dateStr){
+  const el = document.getElementById('qm-cal-event-text');
+  const text = el.value.trim();
+  if(!text){ flash('일정 내용을 입력해주세요'); return; }
+  try{
+    const cur = await window.storage.get('gen-calendar-events-v1', true).catch(()=>null);
+    let events = []; try{ events = cur ? JSON.parse(cur.value) : []; }catch(e){ events = []; }
+    if(!Array.isArray(events)) events = [];
+    events.push({id: uid(), date: dateStr, text, authorBy: qmLabel(), createdDate: todayStr()});
+    await window.storage.set('gen-calendar-events-v1', JSON.stringify(events), true);
+    flash('일정이 등록되었습니다');
+    await openQmCalendarDayModal(dateStr);
+    await qmRefreshCalendar();
+  }catch(e){ flash('등록하지 못했습니다. 다시 시도해주세요.'); }
+}
+async function removeQmCalendarEvent(id, dateStr){
+  try{
+    const cur = await window.storage.get('gen-calendar-events-v1', true).catch(()=>null);
+    let events = []; try{ events = cur ? JSON.parse(cur.value) : []; }catch(e){ events = []; }
+    if(!Array.isArray(events)) events = [];
+    events = events.filter(e=>e && e.id!==id);
+    await window.storage.set('gen-calendar-events-v1', JSON.stringify(events), true);
+    flash('일정이 삭제되었습니다');
+    await openQmCalendarDayModal(dateStr);
+    await qmRefreshCalendar();
+  }catch(e){ flash('삭제하지 못했습니다. 다시 시도해주세요.'); }
 }
 function renderQuickModeReserveUI(){
   const inputStyle = 'width:100%;font-size:20px;padding:16px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;';
