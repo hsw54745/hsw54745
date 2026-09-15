@@ -4452,6 +4452,7 @@ function renderOutList(){
           <button class="btn sm" onclick="openOutInfoEditModal('${g.id}')" style="white-space:nowrap;">정보 수정</button>
           <button class="btn sm" onclick="printReceipt('${g.id}')" style="white-space:nowrap;">인수증</button>
           <button class="btn sm primary" onclick="openInModal('${g.id}')" style="white-space:nowrap;">입고 처리</button>
+          <button class="btn sm" onclick="openInModal('${g.id}', true)" style="white-space:nowrap;color:#8A5A00;border-color:#8A5A00;" title="공장 입고 없이 바로 다른 현장으로 나가는 경우 사용합니다. 이번 임대를 종료 처리한 뒤, 곧바로 같은 발전기로 새 출고 화면을 열어줍니다.">🔀 현장이동</button>
         </div>
         <div class="btn-row" style="flex-wrap:wrap;row-gap:4px;margin-top:4px;">
           <button class="btn sm" onclick="quickForceInPrompt('${g.id}')" style="white-space:nowrap;" title="발전기를 새로 등록해 시스템을 처음 시작할 때, 아직 임대 정보가 없는 발전기를 거래처 입력 없이 한 번에 [입고] 상태로 정리하는 용도입니다. 누적 사용시간은 여기서 입력되지 않으니, 실제 값은 [설정 → 발전기 모델 설정 → 관리]에서 직접 입력해주세요. 평소 운영 중에는 거의 쓸 일이 없습니다.">⚡ 강제입고</button>
@@ -12189,7 +12190,7 @@ function calcRemainingFuel(id){
   resultEl.style.display = 'block';
   resultEl.innerHTML = `${mainLine}${baseline>0? `<div class="muted" style="font-size:11px;">기준높이 ${baseline}cm는 항상 남는 부분이라 계산에서 제외, 측정높이 ${height}cm만 반영</div>`:''}${underBaseline? `<div class="muted" style="font-size:11px;color:var(--danger);">기준높이보다 ${Math.abs(height)}cm 낮게 측정되었습니다.</div>` : ''}${overTank? `<div class="muted" style="font-size:11px;color:var(--danger);">측정높이가 기준높이 위로 잴 수 있는 최대 높이(${maxUsableHeight}cm)를 초과해 그 높이 기준으로 계산했습니다.</div>` : ''}`;
 }
-function openInModal(id){
+function openInModal(id, isTransfer){
   const g = findGen(id);
   const suggested = Math.round(estCurrentHours(g));
   const rt = g.rental;
@@ -12198,7 +12199,8 @@ function openInModal(id){
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal modal-wide" style="text-align:left;">
-      <h3 style="text-align:center;">📥 입고 처리</h3>
+      <h3 style="text-align:center;">${isTransfer? '🔀 현장이동 (입고 없이 바로 재출고)' : '📥 입고 처리'}</h3>
+      ${isTransfer? `<div class="hint" style="text-align:center;color:#8A5A00;font-weight:700;margin-top:-6px;">이번 임대를 종료 처리한 뒤, 곧바로 이 발전기로 새 출고 화면이 열립니다.</div>`:''}
       <div class="modal-sub">${g.id} · ${displayModel(g)} · ${g.rental.customer||'-'}</div>
       <div class="out-row stretch">
         <div class="field f-md"><div class="out-card">
@@ -12218,8 +12220,8 @@ function openInModal(id){
           <input type="date" id="f-indate" value="${todayStr()}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
         </div></div>
         ${g.hoursKnown? `<div class="field f-md"><div class="out-card">
-          <label>입고시(반납) 누적 사용시간(h)</label>
-          <input type="number" id="f-endhours" placeholder="예: ${suggested}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
+          <label>입고시(반납) 누적 사용시간(h)${isTransfer? ' <span class="muted" style="font-weight:400;">(선택 - 계기판 못 보면 비워두세요)</span>':''}</label>
+          <input type="number" id="f-endhours" placeholder="${isTransfer? '모르면 비워두세요' : `예: ${suggested}`}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
           <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
         </div></div>` : `<div class="field f-md"><div class="out-card">
           <label>누적 사용시간</label>
@@ -12277,7 +12279,7 @@ function openInModal(id){
       <div id="f-err" class="err" style="display:none;"></div>
       <div class="modal-actions" style="justify-content:center;">
         <button class="btn" onclick="closeModal()">취소</button>
-        <button class="btn primary" onclick="submitIn('${g.id}')">입고 처리</button>
+        <button class="btn primary" onclick="submitIn('${g.id}', ${isTransfer?'true':'false'})">${isTransfer? '종료하고 새 출고 열기':'입고 처리'}</button>
       </div>
     </div>
   </div>`;
@@ -12369,7 +12371,7 @@ function setSuppliesRecovered(recovered){
     applySuppliesNo();
   }
 }
-async function submitIn(id){
+async function submitIn(id, isTransfer){
   const g = findGen(id);
   const inDate = document.getElementById('f-indate').value;
   const endHoursEl = document.getElementById('f-endhours');
@@ -12394,8 +12396,13 @@ async function submitIn(id){
     errEl.style.display='block'; return;
   }
   // 누적시간 확인불가은 입력을 생략할 수 있습니다. (설정 → 발전기 모델 설정에서 지정)
-  if(!inDate || (g.hoursKnown && (endHours===null || isNaN(endHours) || endHours < g.rental.startHours))){
+  // 현장이동(공장 미경유)은 계기판을 직접 볼 수 없는 경우가 많아, 누적시간 입력을 필수로 강제하지 않습니다.
+  if(!inDate || (g.hoursKnown && !isTransfer && (endHours===null || isNaN(endHours) || endHours < g.rental.startHours))){
     errEl.textContent = '입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다)';
+    errEl.style.display='block'; return;
+  }
+  if(isTransfer && endHours!==null && !isNaN(endHours) && endHours < g.rental.startHours){
+    errEl.textContent = '입력한 누적시간이 출고시 누적시간보다 작습니다. 확인 후 다시 입력해주세요.';
     errEl.style.display='block'; return;
   }
   // 하루 24시간을 초과하는 물리적으로 불가능한 사용시간 감지 (데이터 입력 실수 방지)
@@ -12429,7 +12436,8 @@ async function submitIn(id){
   }
   const fuelExhaustNote = (remainingFuelLiters===0) ? '출고시 연료 모두 소진되어 입고' : '';
   const rt = g.rental;
-  const combinedNote = [rt.note, fuelExhaustNote].filter(Boolean).join(' / ');
+  const transferNote = (isTransfer && g.hoursKnown && endHours===null) ? '현장이동(공장 미경유)으로 종료 - 반납시 누적시간 미확인' : (isTransfer ? '현장이동(공장 미경유)으로 종료' : '');
+  const combinedNote = [rt.note, fuelExhaustNote, transferNote].filter(Boolean).join(' / ');
   const newRentalId = uid();
   DB.rentals.push({
     id: newRentalId, genId: g.id, customer: rt.customer, manager: rt.manager, phone: rt.phone,
@@ -12465,6 +12473,17 @@ async function submitIn(id){
   }
   await saveGens();
   await saveRentals();
+  if(isTransfer && condition!=='broken'){
+    renderContent();
+    flash('이번 임대가 종료 처리되었습니다. 이어서 새 현장을 골라주세요.');
+    if(isWithinVoiceAlertHours()) speakText('입고처리되었습니다.');
+    maybeLogVoltageChange(id, oldVoltageForLog, voltage);
+    const autoNote = (g.hoursKnown && endHours===null)
+      ? `⚠️ 이전 현장(${rt.customer||'-'}) 반납시 누적시간 미확인 - 이번 사용시간에 이전 구간 사용량이 섞여있을 수 있습니다.`
+      : '';
+    startTransferOut(id, autoNote);
+    return;
+  }
   closeModal();
   renderContent();
   flash(condition==='broken' ? '입고 처리되었습니다 (고장 등록 - 수리 완료 전까지 출고 불가)' : '입고 처리되었습니다');
@@ -12472,6 +12491,55 @@ async function submitIn(id){
   maybeLogVoltageChange(id, oldVoltageForLog, voltage);
 }
 
+// ===== 현장이동: 새 현장을 [출고대기](미지정)에서 골라 바로 이어서 출고 =====
+let pendingTransferAutoNote = '';
+function startTransferOut(id, autoNote){
+  pendingTransferAutoNote = autoNote || '';
+  const g = findGen(id);
+  if(!g) return;
+  const pending = (DB.reservations||[]).filter(r=>r && r.genId===UNASSIGNED_GEN_ID)
+    .sort((a,b)=>(a.plannedOutDate||a.outDate||'').localeCompare(b.plannedOutDate||b.outDate||''));
+  const itemsHtml = pending.length? pending.map(r=>`
+    <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <div>
+        <div style="font-weight:800;">${escR(r.customer||r.site||'거래처 미기재')}</div>
+        <div class="muted" style="font-size:12px;">${escR(r.address||r.site||'-')}${r.plannedOutDate? ` · 출고예정 ${dow(r.plannedOutDate)}`:''}</div>
+      </div>
+      <button class="btn sm primary" onclick="pickTransferReservation('${id}','${r.id}')" style="white-space:nowrap;">이 현장으로</button>
+    </div>`).join('') : `<div class="empty">등록된 출고대기(미지정) 건이 없습니다.</div>`;
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal" style="text-align:left;">
+      <h3>🔀 새 현장 선택</h3>
+      <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
+      <div class="hint" style="margin-bottom:10px;">출고대기(미지정)에 등록된 건이 있으면 골라서 바로 보낼 수 있습니다. 없거나 해당 건이 아니면 직접 입력해주세요.</div>
+      <div style="max-height:280px;overflow-y:auto;margin-bottom:10px;">${itemsHtml}</div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">취소</button>
+        <button class="btn" onclick="pickTransferReservation('${id}', null)">🆕 직접 입력</button>
+      </div>
+    </div>
+  </div>`;
+}
+function pickTransferReservation(genId, resId){
+  if(resId){
+    const r = DB.reservations.find(x=>x.id===resId);
+    if(!r){ showInfoModal('이미 사라진 출고대기 건입니다. 다시 선택해주세요.'); startTransferOut(genId, pendingTransferAutoNote); return; }
+    r.genId = genId;
+    r.pendingLoad = true; // 발전기가 정해졌으니 이제부터는 일반 상차대기와 동일하게 취급합니다.
+    r.genAssignedBy = DB.currentUserName || null;
+    r.genAssignedAt = nowDateTimeStr();
+    saveWithRetry(saveReservations);
+    openOutModal(genId, resId);
+  } else {
+    openOutModal(genId);
+  }
+  if(pendingTransferAutoNote){
+    const noteEl = document.getElementById('f-note');
+    if(noteEl && !noteEl.value) noteEl.value = pendingTransferAutoNote;
+  }
+  pendingTransferAutoNote = '';
+}
 function setMaintType(type){
   const el = document.getElementById('f-mtype');
   if(el) el.value = type;
