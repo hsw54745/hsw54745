@@ -580,9 +580,11 @@ function isQuickMode(){
 let qmCurrentUserName = '';
 function qmLabel(){ return (qmCurrentUserName||'미지정') + '(간편등록)'; }
 async function startQuickMode(){
+  // 사용자 이름은 폰마다 따로 기억해야 하므로, 서버(파이어베이스)가 아니라 이 브라우저 안에만 저장합니다.
+  // (예전엔 파이어베이스에 저장해서, 한 사람이 이름을 고르면 다른 폰들도 그 이름으로 덮어써지는 문제가 있었습니다)
   try{
-    const cur = await window.storage.get('gen-user-name-v1', false);
-    let name = ''; try{ name = cur ? JSON.parse(cur.value) : ''; }catch(e){ name = ''; }
+    const raw = localStorage.getItem('gen-user-name-v1');
+    const name = raw ? JSON.parse(raw) : '';
     if(name){ qmCurrentUserName = name; renderQuickModeUI(); return; }
   }catch(e){ /* 저장된 이름이 없거나 불러오지 못하면 선택 화면으로 */ }
   openQmUserGate();
@@ -607,7 +609,7 @@ async function openQmUserGate(){
 }
 async function submitQmUserName(name){
   qmCurrentUserName = name;
-  try{ await window.storage.set('gen-user-name-v1', JSON.stringify(name), false); }catch(e){ /* 저장 실패해도 이번 접속에서는 계속 이 이름으로 진행 */ }
+  try{ localStorage.setItem('gen-user-name-v1', JSON.stringify(name)); }catch(e){ /* 저장 실패해도 이번 접속에서는 계속 이 이름으로 진행 */ }
   renderQuickModeUI();
 }
 function changeQmUserName(){
@@ -1340,18 +1342,24 @@ async function qmRefreshReservationList(){
     }
     wrap.innerHTML = list.map(r=>{
       const assigned = r.genId && r.genId!==UNASSIGNED_GEN_ID;
+      // 사무실에서 아직 "내용보기/수정"으로 확인·저장하기 전이면 칸이 비어있는 게 정상입니다.
+      // 그래도 문자오더 원문이 있으면, 사무실 화면처럼 자동인식된 내용을 미리보기로 보여줍니다.
+      const hasManualInfo = r.customer || r.address || r.manager || r.phone;
+      const auto = (!hasManualInfo && r.smsOrder) ? parseSmsOrderText(r.smsOrder) : null;
+      const dCustomer = r.customer || (auto&&auto.customer) || r.site || '거래처 미기재';
       const infoRows = [
-        ['담당자', r.manager],
-        ['연락처', r.phone],
-        ['주소', r.address || r.site],
-        ['전압', r.voltage],
-        ['연료', (r.fuelRequested!=null||r.fuelActual!=null) ? `요청 ${r.fuelRequested!=null?r.fuelRequested:'-'}L / 실제 ${r.fuelActual!=null?r.fuelActual:'-'}L` : null],
+        ['담당자', r.manager || (auto&&auto.manager)],
+        ['연락처', r.phone || (auto&&auto.phone)],
+        ['주소', r.address || r.site || (auto&&auto.address)],
+        ['전압', r.voltage || (auto&&auto.voltage)],
+        ['연료', (r.fuelRequested!=null||r.fuelActual!=null) ? `요청 ${r.fuelRequested!=null?r.fuelRequested:'-'}L / 실제 ${r.fuelActual!=null?r.fuelActual:'-'}L` : ((auto&&(auto.fuelRequested!=null||auto.fuelActual!=null)) ? `요청 ${auto.fuelRequested!=null?auto.fuelRequested:'-'}L / 실제 ${auto.fuelActual!=null?auto.fuelActual:'-'}L` : null)],
         ['부자재', r.supplies],
-        ['비고', r.note]
+        ['비고', r.note || (auto&&auto.note)]
       ].filter(([k,v])=>v);
       return `
       <div style="background:${assigned?'#EAF5EC':'#fff'};border:1px solid ${assigned?'#2C6E49':'#ddd'};border-radius:10px;padding:12px 14px;margin-bottom:8px;">
-        <div style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(r.customer||r.site||'거래처 미기재')}</div>
+        ${auto? `<div style="font-size:11px;font-weight:800;color:#8A6D00;background:#FFF8E1;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;">🤖 문자 자동인식 (사무실 확인 전)</div>` : ''}
+        <div style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(dCustomer)}</div>
         <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${r.outDate? fmtDateKR(r.outDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
         <div style="font-size:13px;color:#333;margin-top:6px;">
           ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
@@ -1633,28 +1641,38 @@ async function openQmEditReservation(resId){
     const inputStyle = 'width:100%;font-size:18px;padding:14px;border-radius:12px;border:2px solid #ccc;box-sizing:border-box;';
     const labelStyle = 'display:block;font-size:14px;font-weight:800;color:#333;margin-bottom:6px;';
     const arriveTimeOpts = [...Array.from({length:7},(_,i)=>`오전 ${i+6}시`), ...Array.from({length:6},(_,i)=>`오후 ${i+1}시`)];
-    const isCustomArrive = r.arriveTime && r.arriveTime!=='지금즉시' && !arriveTimeOpts.includes(r.arriveTime);
+    // 사무실 확인 전, 문자오더 원문에서 자동인식된 값을 미리 채워서 보여줍니다 (빈칸으로 남겨두는 것보다
+    // 무엇이 인식됐는지 바로 보이는 게, 붙여넣은 사람 입장에서 "잘 들어갔구나" 확인이 되니까요).
+    const auto = (r.smsOrder && !(r.customer||r.address||r.manager||r.phone)) ? parseSmsOrderText(r.smsOrder) : null;
+    const autoBg = 'background:#FFF8DC;border-color:#E8B923;';
+    const av = (field) => r[field] || (auto&&auto[field]) || '';
+    const styleFor = (field) => (!r[field] && auto && auto[field]) ? (inputStyle+autoBg) : inputStyle;
+    const dCustomer = av('customer'), dAddress = av('address'), dManager = av('manager'), dPhone = av('phone'), dVoltage = av('voltage'), dArriveTime = r.arriveTime || (auto&&auto.arriveTime) || '', dNote = av('note');
+    const dFuelReq = r.fuelRequested!=null ? r.fuelRequested : (auto&&auto.fuelRequested!=null ? auto.fuelRequested : null);
+    const dFuelActual = r.fuelActual!=null ? r.fuelActual : (auto&&auto.fuelActual!=null ? auto.fuelActual : null);
+    const isCustomArrive = dArriveTime && dArriveTime!=='지금즉시' && !arriveTimeOpts.includes(dArriveTime);
     body.innerHTML = `
       <div style="text-align:center;margin-bottom:16px;">
         <div style="font-size:22px;font-weight:800;color:#5B7FA6;">내용보기/수정</div>
         <div style="font-size:14px;color:#555;margin-top:4px;">${r.genId && r.genId!==UNASSIGNED_GEN_ID? escR(r.genId) : '🅾 미지정'}</div>
+        ${auto? `<div style="font-size:12px;font-weight:800;color:#8A6D00;background:#FFF8E1;display:inline-block;padding:3px 10px;border-radius:10px;margin-top:6px;">🤖 노란 칸은 문자에서 자동으로 읽은 내용이에요. 틀렸으면 고쳐주세요.</div>` : ''}
       </div>
       <div style="display:flex;flex-direction:column;gap:14px;">
-        <div><label style="${labelStyle}">거래처명</label><input id="qmre-customer" type="text" style="${inputStyle}" value="${escR(r.customer||'')}"></div>
-        <div><label style="${labelStyle}">현장 주소</label><input id="qmre-address" type="text" style="${inputStyle}" value="${escR(r.address||'')}"></div>
-        <div><label style="${labelStyle}">담당자</label><input id="qmre-manager" type="text" style="${inputStyle}" value="${escR(r.manager||'')}"></div>
-        <div><label style="${labelStyle}">연락처</label><input id="qmre-phone" type="tel" style="${inputStyle}" value="${escR(r.phone||'')}" oninput="this.value=formatPhoneNumber(this.value)"></div>
-        <div><label style="${labelStyle}">전압</label><input id="qmre-voltage" type="text" style="${inputStyle}" value="${escR(r.voltage||'')}">${voltageButtonsHtml('qmre-voltage')}</div>
+        <div><label style="${labelStyle}">거래처명</label><input id="qmre-customer" type="text" style="${styleFor('customer')}" value="${escR(dCustomer)}"></div>
+        <div><label style="${labelStyle}">현장 주소</label><input id="qmre-address" type="text" style="${styleFor('address')}" value="${escR(dAddress)}"></div>
+        <div><label style="${labelStyle}">담당자</label><input id="qmre-manager" type="text" style="${styleFor('manager')}" value="${escR(dManager)}"></div>
+        <div><label style="${labelStyle}">연락처</label><input id="qmre-phone" type="tel" style="${styleFor('phone')}" value="${escR(dPhone)}" oninput="this.value=formatPhoneNumber(this.value)"></div>
+        <div><label style="${labelStyle}">전압</label><input id="qmre-voltage" type="text" style="${styleFor('voltage')}" value="${escR(dVoltage)}">${voltageButtonsHtml('qmre-voltage')}</div>
         <div><label style="${labelStyle}">출고예정일</label><input id="qmre-outdate" type="date" style="${inputStyle}" value="${escR(r.outDate||'')}"></div>
         <div>
           <label style="${labelStyle}">도착시간</label>
           <select id="qmre-arrivetime-select" style="${inputStyle}" onchange="onQmreArriveTimeSelect()">
             <option value="">선택 안함</option>
-            <option value="지금즉시" ${r.arriveTime==='지금즉시'?'selected':''}>지금즉시</option>
-            ${arriveTimeOpts.map(v=>`<option value="${v}" ${r.arriveTime===v?'selected':''}>${v}</option>`).join('')}
+            <option value="지금즉시" ${dArriveTime==='지금즉시'?'selected':''}>지금즉시</option>
+            ${arriveTimeOpts.map(v=>`<option value="${v}" ${dArriveTime===v?'selected':''}>${v}</option>`).join('')}
             <option value="__custom__" ${isCustomArrive?'selected':''}>직접 입력...</option>
           </select>
-          <input type="text" id="qmre-arrivetime" value="${isCustomArrive? escR(r.arriveTime) : ''}" placeholder="예: 오전 6시 30분" style="${inputStyle};display:${isCustomArrive?'block':'none'};margin-top:8px;">
+          <input type="text" id="qmre-arrivetime" value="${isCustomArrive? escR(dArriveTime) : ''}" placeholder="예: 오전 6시 30분" style="${inputStyle};display:${isCustomArrive?'block':'none'};margin-top:8px;">
         </div>
         <div><label style="${labelStyle}">운임료 부담</label>
           <select id="qmre-freight" style="${inputStyle}">
@@ -1666,13 +1684,13 @@ async function openQmEditReservation(resId){
           <label style="${labelStyle}">연료</label>
           <div style="background:#E4ECF2;border:1px solid #2C4A66;border-radius:10px;padding:12px 14px;">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:15px;font-weight:800;color:#333;">
-              <input type="checkbox" id="qmre-fuel-toggle" ${(r.fuelRequested!=null||r.fuelActual!=null)?'checked':''} onchange="toggleFuelFields('qmre-fuel-toggle','qmre-fuel-wrap')" style="width:20px;height:20px;">
+              <input type="checkbox" id="qmre-fuel-toggle" ${(dFuelReq!=null||dFuelActual!=null)?'checked':''} onchange="toggleFuelFields('qmre-fuel-toggle','qmre-fuel-wrap')" style="width:20px;height:20px;">
               ⛽ 연료 넣고 출고
             </label>
-            <div id="qmre-fuel-wrap" style="display:${(r.fuelRequested!=null||r.fuelActual!=null)?'block':'none'};margin-top:12px;">
+            <div id="qmre-fuel-wrap" style="display:${(dFuelReq!=null||dFuelActual!=null)?'block':'none'};margin-top:12px;">
               <div style="display:flex;gap:10px;">
-                <div style="flex:1;"><label style="${labelStyle}">고객요청(L)</label><input id="qmre-fuel-req" type="number" min="0" style="${inputStyle};border-color:#2C4A66;color:#2C4A66;font-weight:700;" value="${r.fuelRequested!=null?r.fuelRequested:''}"></div>
-                <div style="flex:1;"><label style="${labelStyle}">실제주입(L)</label><input id="qmre-fuel-actual" type="number" min="0" style="${inputStyle};border-color:#8A5A00;color:#8A5A00;font-weight:700;" value="${r.fuelActual!=null?r.fuelActual:''}"></div>
+                <div style="flex:1;"><label style="${labelStyle}">고객요청(L)</label><input id="qmre-fuel-req" type="number" min="0" style="${inputStyle};border-color:#2C4A66;color:#2C4A66;font-weight:700;" value="${dFuelReq!=null?dFuelReq:''}"></div>
+                <div style="flex:1;"><label style="${labelStyle}">실제주입(L)</label><input id="qmre-fuel-actual" type="number" min="0" style="${inputStyle};border-color:#8A5A00;color:#8A5A00;font-weight:700;" value="${dFuelActual!=null?dFuelActual:''}"></div>
               </div>
             </div>
           </div>
@@ -1683,7 +1701,7 @@ async function openQmEditReservation(resId){
           <div style="flex:1;"><label style="${labelStyle}">예상가동시간(h/일)</label><input id="qmre-estdaily" type="number" step="0.5" min="0" style="${inputStyle}" value="${r.estDaily!=null?r.estDaily:''}"></div>
         </div>
         <div><label style="${labelStyle}">부자재</label>${suppliesPickerHtml('qmre-supplies', r.suppliesItems, r.suppliesCustom, '')}</div>
-        <div><label style="${labelStyle}">비고</label><textarea id="qmre-note" style="${inputStyle}" rows="3">${escR(r.note||'')}</textarea></div>
+        <div><label style="${labelStyle}">비고</label><textarea id="qmre-note" style="${styleFor('note')}" rows="3">${escR(dNote)}</textarea></div>
       </div>
       <div id="qmre-status" style="display:none;margin-top:14px;padding:14px;border-radius:12px;font-size:15px;font-weight:700;text-align:center;"></div>
       <button id="qmre-save-btn" onclick="submitQmEditReservation('${resId}')" style="width:100%;margin-top:16px;padding:18px;font-size:20px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:16px;cursor:pointer;">저장</button>
@@ -3062,7 +3080,10 @@ async function saveWithRetry(fn, retries){
     saveInFlightCount = Math.max(0, saveInFlightCount-1);
   }
 }
-async function saveCurrentUserName(){ await storageSetChecked('gen-user-name-v1', JSON.stringify(DB.currentUserName), false); }
+async function saveCurrentUserName(){
+  // 이 값은 기기(브라우저)마다 따로 기억해야 하는 값이라, 서버(파이어베이스)가 아니라 이 브라우저 안에만 저장합니다.
+  try{ localStorage.setItem('gen-user-name-v1', JSON.stringify(DB.currentUserName)); }catch(e){}
+}
 async function saveTeamMembers(){ await storageSetChecked('gen-team-members-v1', JSON.stringify(DB.teamMembers), true); }
 // 발전기 목록(gens)은 전체를 하나의 값으로 저장/조회합니다. 그런데 여러 명이 동시에
 // 서로 다른 발전기를 수정하면, 나중에 저장하는 사람이 자기 브라우저에 남아있던
@@ -12907,8 +12928,7 @@ async function init(){
     ['customerNotes', 'gen-customer-notes-v1', {}, true],
     ['readMarkers', 'gen-read-markers-v1', {}, true],
     ['palletDefaultRemoved', 'gen-pallet-default-removed-v1', false, true],
-    ['companyInfo', 'gen-company-info-v1', {name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}, true],
-    ['currentUserName', 'gen-user-name-v1', '', false]
+    ['companyInfo', 'gen-company-info-v1', {name:'해성발전기', address:'', phone:'031-355-2569', mobile:'010-5644-3732'}, true]
   ];
   const results = {};
   const BATCH_SIZE = 5;
@@ -12995,7 +13015,11 @@ async function init(){
   seenEventIds = new Set((DB.calendarEvents||[]).map(e=>e.id));
   seenReservationIds = new Set((DB.reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID).map(r=>r.id));
   seenReturnRequestIds = new Set((DB.returnRequests||[]).filter(r=>!r.handled).map(r=>r.id));
-  DB.currentUserName = results.currentUserName;
+  // 사용자 이름은 기기(브라우저)마다 따로 기억해야 하므로, 파이어베이스가 아니라 이 브라우저의 localStorage에서만 불러옵니다.
+  try{
+    const raw = localStorage.getItem('gen-user-name-v1');
+    DB.currentUserName = raw ? JSON.parse(raw) : '';
+  }catch(e){ DB.currentUserName = ''; }
   const phoneMigrationChanged = migratePhoneFieldsInPlace();
   applyCompanyBranding();
   renderTabbar();
