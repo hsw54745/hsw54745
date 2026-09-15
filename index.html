@@ -1598,7 +1598,7 @@ async function submitQmConfirmLoad(resId, needFuel){
       fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
       usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
       outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
-      outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: qmLabel(), genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null
+      outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: qmLabel(), genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now()
     };
     if(r.suppliesItems && r.suppliesItems.length){
       r.suppliesItems.forEach(it=>{
@@ -4422,7 +4422,11 @@ function renderOutList(){
   const allOutGens = activeGens().filter(g=>g.status==='out');
   const list = allOutGens.filter(g=>(!outRegionFilter || regionOf((g.rental&&(g.rental.address||g.rental.site))||'')===outRegionFilter) && (outCapacityFilter==null || capacityOf(g)===outCapacityFilter))
     .sort((a,b)=>{
-      if(!!a.hoursKnown !== !!b.hoursKnown) return a.hoursKnown? -1 : 1;
+      // 실제로 상차완료(출고 확정)된 시각 기준, 마지막에 나간 순서대로 정렬합니다.
+      const at = (a.rental&&a.rental.outConfirmedAt)||0;
+      const bt = (b.rental&&b.rental.outConfirmedAt)||0;
+      if(at !== bt) return bt - at;
+      // 예전 기록이라 시각이 없으면 출고일(날짜)로 대신 비교합니다.
       return ((b.rental&&b.rental.outDate)||'').localeCompare((a.rental&&a.rental.outDate)||'');
     });
   for(const id of [...bulkInSelection]){
@@ -5304,7 +5308,7 @@ function resetAllToOut(){
             supplies: '', voltage: g.voltage||'', qty: 1,
             fuelRequested: null, fuelActual: null, usageDays: null,
             loadDate: null, arriveTime: null, freightBearer: null, note: '',
-            outDate: todayStr(), startHours: g.hours||0, longTerm: false, estDaily: null
+            outDate: todayStr(), startHours: g.hours||0, longTerm: false, estDaily: null, outConfirmedAt: Date.now()
           };
         }
       });
@@ -9820,7 +9824,7 @@ async function confirmLoad(resId, isTransfer){
     usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'',
     note: [r.note, transferFuelNote].filter(Boolean).join(' / '), smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
     outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
-    outProcessedBy: r.outProcessedBy || null, loadConfirmedBy: DB.currentUserName || null, genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null
+    outProcessedBy: r.outProcessedBy || null, loadConfirmedBy: DB.currentUserName || null, genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now()
   };
   if(r.suppliesItems && r.suppliesItems.length){
     DB.suppliesStock = DB.suppliesStock || {};
@@ -10773,7 +10777,7 @@ async function quickForceOut(id){
     freightBearer:'우리부담', paymentConfirmed:false, forcedOut:false, forceReason:'', forcedBy:null,
     note:'(정보없이 강제출고됨 - 오입고 수정용)',
     outDate: todayStr(), startHours: g.hours||0, longTerm:false, estDaily:null,
-    outProcessedBy: DB.currentUserName||null, loadConfirmedBy: DB.currentUserName||null
+    outProcessedBy: DB.currentUserName||null, loadConfirmedBy: DB.currentUserName||null, outConfirmedAt: Date.now()
   };
   closeModal();
   await saveGens();
