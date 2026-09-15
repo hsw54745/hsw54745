@@ -9888,14 +9888,15 @@ function parseSmsOrderText(text){
       if(um0) result.usageDays = um0[1] || um0[2];
       return;
     }
+    // "*연료 20리터"처럼 별표가 붙어도 연료 줄이면 비고가 아니라 연료 정보로 인식해야 합니다.
+    const fpm0 = l.match(fuelParenRe);
+    if(fpm0){ result.fuelRequested = Number(fpm0[1]); result.fuelActual = Number(fpm0[2]); return; }
+    const fsm0 = l.match(fuelSimpleRe);
+    if(fsm0){ result.fuelRequested = Number(fsm0[1]); result.fuelActual = Number(fsm0[1]); return; }
     if(l.startsWith('*')){ noteParts.push(l.slice(1).trim()); return; }
     if(supplyKeywords.some(k=>l.includes(k)) && l.length<20){ noteParts.push(l); return; }
     const um = l.match(usageDaysRe);
     if(um){ result.usageDays = um[1] || um[2]; return; }
-    const fpm = l.match(fuelParenRe);
-    if(fpm){ result.fuelRequested = Number(fpm[1]); result.fuelActual = Number(fpm[2]); return; }
-    const fsm = l.match(fuelSimpleRe);
-    if(fsm){ result.fuelRequested = Number(fsm[1]); result.fuelActual = Number(fsm[1]); return; }
     const pm = l.match(phoneRe);
     if(pm){
       result.phone = pm[0].replace(/[^0-9]/g,'');
@@ -9904,6 +9905,8 @@ function parseSmsOrderText(text){
       return;
     }
     if(l.includes('도착')||l.includes('상차')||l.includes('투입')){ arrivalLine = l; isLoadDateHint = l.includes('상차') && !l.includes('도착'); return; }
+    // "2시간대기후철수"처럼 대기시간을 설명하는 조각은 거래처명이 아니라 비고로 보내야 합니다.
+    if(/\d+\s*시간.*(대기|후|뒤)/.test(l)){ noteParts.push(l); return; }
     if(addressRe.test(l)){ result.address = result.address ? result.address+' '+l : l; return; }
     if(vm) return; // 전압만 있고 다른 정보가 없는 조각(예: "380볼트")은 업체명 후보에서 제외합니다.
     leftover.push(l);
@@ -9913,11 +9916,21 @@ function parseSmsOrderText(text){
   const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저)\s*님?$|님$/;
   const titleIdx = leftover.findIndex(l=>titleRe.test(l));
   if(titleIdx>=0 && !result.manager){
-    // 직급 단어가 목록에 없어도(예: "OOO매니저님"이 아닌 낯선 직책), 한국 이름은 보통 앞 2~4글자라
-    // 앞부분을 이름으로, 나머지(직급+님)는 그대로 뒤에 붙여둡니다.
-    const nm = leftover[titleIdx].match(/^([가-힣]{2,4})\s*(.*)$/);
-    result.manager = nm ? (nm[2] ? `${nm[1]}${nm[2]}` : nm[1]) : leftover[titleIdx];
-    leftover.splice(titleIdx,1);
+    const raw = leftover[titleIdx];
+    // 목록에 있는 직급이면(예: "대륙종합건설 정규삼소장님") 그 직급 바로 앞 이름만 담당자로 뽑고,
+    // 앞에 남는 글자(회사명 등)는 업체명 후보로 다시 넣어둡니다.
+    const knownTitleRe = /([가-힣]{2,4})\s*(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저)\s*(님)?$/;
+    const km = raw.match(knownTitleRe);
+    if(km){
+      result.manager = `${km[1]}${km[2]}${km[3]||''}`;
+      const prefix = raw.slice(0, km.index).trim();
+      leftover.splice(titleIdx,1);
+      if(prefix) leftover.push(prefix);
+    } else {
+      // 목록에 없는 낯선 직급이면(예: "박지훈지점장님") 앞뒤를 나눌 근거가 없으니 통째로 담당자로 씁니다.
+      result.manager = raw;
+      leftover.splice(titleIdx,1);
+    }
   }
 
   if(leftover.length===1) result.customer = leftover[0];
@@ -10018,10 +10031,18 @@ function parseReturnRequestText(text){
   const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저)\s*님?$|님$/;
   const titleIdx = leftover.findIndex(l=>titleRe.test(l));
   if(titleIdx>=0 && !result.manager){
-    // 직급 단어가 목록에 없어도 앞 2~4글자를 이름으로, 나머지(직급+님)는 그대로 뒤에 붙여둡니다.
-    const nm = leftover[titleIdx].match(/^([가-힣]{2,4})\s*(.*)$/);
-    result.manager = nm ? (nm[2] ? `${nm[1]}${nm[2]}` : nm[1]) : leftover[titleIdx];
-    leftover.splice(titleIdx,1);
+    const raw = leftover[titleIdx];
+    const knownTitleRe = /([가-힣]{2,4})\s*(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저)\s*(님)?$/;
+    const km = raw.match(knownTitleRe);
+    if(km){
+      result.manager = `${km[1]}${km[2]}${km[3]||''}`;
+      const prefix = raw.slice(0, km.index).trim();
+      leftover.splice(titleIdx,1);
+      if(prefix) leftover.push(prefix);
+    } else {
+      result.manager = raw;
+      leftover.splice(titleIdx,1);
+    }
   }
   if(leftover.length>0) result.customer = leftover[0];
   return result;
@@ -12494,6 +12515,20 @@ async function submitIn(id, isTransfer){
   await saveGens();
   await saveRentals();
   if(isTransfer && condition!=='broken'){
+    // 현장이동으로 임대를 종료했으니, 이 현장과 매칭되는 미처리 철수요청이 있으면 자동으로 처리완료 처리합니다.
+    // (findMatchedGenForReturnRequest는 g.rental이 살아있어야 매칭되는데 이미 비웠으므로, 방금 종료한 rt로 직접 비교합니다)
+    const autoHandled = (DB.returnRequests||[]).filter(r=>{
+      if(!r || r.handled) return false;
+      const parsed = parseReturnRequestText(r.text);
+      if(parsed.phone && rt.phone && parsed.phone===rt.phone.replace(/[^0-9]/g,'')) return true;
+      if(parsed.address && rt.address && (rt.address.includes(parsed.address) || parsed.address.includes(rt.address))) return true;
+      if(parsed.customer && rt.customer && (rt.customer.includes(parsed.customer) || parsed.customer.includes(rt.customer))) return true;
+      return false;
+    });
+    if(autoHandled.length>0){
+      autoHandled.forEach(r=>{ r.handled = true; });
+      await saveReturnRequests();
+    }
     renderContent();
     flash('이번 임대가 종료 처리되었습니다. 이어서 새 현장을 골라주세요.');
     if(isWithinVoiceAlertHours()) speakText('입고처리되었습니다.');
