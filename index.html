@@ -9550,7 +9550,7 @@ function showInfoModal(message){
 // 문자오더 원문에서 업체명·주소·담당자·연락처·전압·도착일시·비고(부자재)를 최대한 뽑아냅니다.
 // 100% 정확하진 않으니, 이미 값이 있는 칸은 절대 덮어쓰지 않고 "비어있는 칸만" 채우는 용도로 씁니다.
 function parseSmsOrderText(text){
-  const result = {customer:'', address:'', manager:'', phone:'', voltage:'', arriveTime:'', outDate:'', loadDate:'', note:'', usageDays:''};
+  const result = {customer:'', address:'', manager:'', phone:'', voltage:'', arriveTime:'', outDate:'', loadDate:'', note:'', usageDays:'', fuelRequested:null, fuelActual:null};
   if(!text) return result;
   // 소수점(예: "1.4톤")은 보호해두고, 그 외 줄바꿈/쉼표/마침표를 전부 구분자로 써서 잘게 쪼갭니다.
   // (사모님 문자가 "구형(L9)380볼트.분전반,내일8시도착.OO리820-1번지.2일간사용.다온스틸텍.김신경이사"처럼
@@ -9562,6 +9562,9 @@ function parseSmsOrderText(text){
   const voltageRe = /(\d{2,4})\s*볼트|\b(\d{2,4})\s*v\b/i;
   const addressRe = /(시|도|군|구|읍|면|동|리|로|길)[\s]*\d|산\s*\d|(^|\s)[가-힣]{2,}(시|도|군|구|읍|면|동|리)(\s|$)/;
   const usageDaysRe = /(\d{1,3})\s*일\s*간?\s*사용|사용\s*(\d{1,3})\s*일/;
+  // "연료 100(80)리터"처럼 괄호가 있으면 앞=고객요청, 뒤=실제주입입니다. 괄호가 없으면 같은 값으로 둘 다 채웁니다.
+  const fuelParenRe = /연료\s*(\d+)\s*\(\s*(\d+)\s*\)/;
+  const fuelSimpleRe = /연료\s*(\d+)\s*(리터|l)?/i;
   const supplyKeywords = ['접지봉','깔판','용접기','가설분전함','분전반','전선','케이블','분전함','릴선'];
   const leftover = [];
   const noteParts = [];
@@ -9582,6 +9585,10 @@ function parseSmsOrderText(text){
     if(supplyKeywords.some(k=>l.includes(k)) && l.length<20){ noteParts.push(l); return; }
     const um = l.match(usageDaysRe);
     if(um){ result.usageDays = um[1] || um[2]; return; }
+    const fpm = l.match(fuelParenRe);
+    if(fpm){ result.fuelRequested = Number(fpm[1]); result.fuelActual = Number(fpm[2]); return; }
+    const fsm = l.match(fuelSimpleRe);
+    if(fsm){ result.fuelRequested = Number(fsm[1]); result.fuelActual = Number(fsm[1]); return; }
     const pm = l.match(phoneRe);
     if(pm){
       result.phone = pm[0].replace(/[^0-9]/g,'');
@@ -9596,13 +9603,13 @@ function parseSmsOrderText(text){
   });
 
   // "OO소장님"/"OO이사님"처럼 직급이 붙은 줄은 업체명이 아니라 담당자일 가능성이 높습니다.
-  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장)\s*님?$|님$/;
+  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저)\s*님?$|님$/;
   const titleIdx = leftover.findIndex(l=>titleRe.test(l));
   if(titleIdx>=0 && !result.manager){
-    // 한국 이름은 보통 2~3자(드물게 4자)라, "업체명 OOO소장님"처럼 붙어 있어도 이름+직급 부분만 뽑아냅니다.
-    const nameTitleRe = /([가-힣]{2,4})\s*(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장)\s*(님)?$/;
-    const nm = leftover[titleIdx].match(nameTitleRe);
-    result.manager = nm ? `${nm[1]}${nm[2]}${nm[3]||''}` : leftover[titleIdx];
+    // 직급 단어가 목록에 없어도(예: "OOO매니저님"이 아닌 낯선 직책), 한국 이름은 보통 앞 2~4글자라
+    // 앞부분을 이름으로, 나머지(직급+님)는 그대로 뒤에 붙여둡니다.
+    const nm = leftover[titleIdx].match(/^([가-힣]{2,4})\s*(.*)$/);
+    result.manager = nm ? (nm[2] ? `${nm[1]}${nm[2]}` : nm[1]) : leftover[titleIdx];
     leftover.splice(titleIdx,1);
   }
 
@@ -9701,12 +9708,12 @@ function parseReturnRequestText(text){
     leftover.push(l);
   });
   // 남는 줄(회사명일 가능성이 높은 줄)을 업체명 후보로 씁니다. 담당자를 못 뽑았으면 직급 붙은 줄을 담당자로 먼저 뺍니다.
-  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장)\s*님?$|님$/;
+  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저)\s*님?$|님$/;
   const titleIdx = leftover.findIndex(l=>titleRe.test(l));
   if(titleIdx>=0 && !result.manager){
-    const nameTitleRe = /([가-힣]{2,4})\s*(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장)\s*(님)?$/;
-    const nm = leftover[titleIdx].match(nameTitleRe);
-    result.manager = nm ? `${nm[1]}${nm[2]}${nm[3]||''}` : leftover[titleIdx];
+    // 직급 단어가 목록에 없어도 앞 2~4글자를 이름으로, 나머지(직급+님)는 그대로 뒤에 붙여둡니다.
+    const nm = leftover[titleIdx].match(/^([가-힣]{2,4})\s*(.*)$/);
+    result.manager = nm ? (nm[2] ? `${nm[1]}${nm[2]}` : nm[1]) : leftover[titleIdx];
     leftover.splice(titleIdx,1);
   }
   if(leftover.length>0) result.customer = leftover[0];
@@ -9785,7 +9792,9 @@ function openReserveNoGenModal(resId, draft){
       plannedOutDate: existing.outDate || parsed.outDate,
       loadDate: existing.loadDate || parsed.loadDate,
       note: existing.note || parsed.note,
-      usageDays: existing.usageDays || parsed.usageDays
+      usageDays: existing.usageDays || parsed.usageDays,
+      fuelRequested: existing.fuelRequested!=null ? existing.fuelRequested : parsed.fuelRequested,
+      fuelActual: existing.fuelActual!=null ? existing.fuelActual : parsed.fuelActual
     });
     if(!existing.customer && parsed.customer) autoFields.site = true;
     if(!existing.address && parsed.address) autoFields.address = true;
@@ -9797,6 +9806,7 @@ function openReserveNoGenModal(resId, draft){
     if(!existing.loadDate && parsed.loadDate) autoFields.loaddate = true;
     if(!existing.note && parsed.note) autoFields.note = true;
     if(!existing.usageDays && parsed.usageDays) autoFields.usagedays = true;
+    if(existing.fuelRequested==null && parsed.fuelRequested!=null) autoFields.fuel = true;
     autoFilled = true;
   }
   // 자동으로 채워진 칸만 옅은 노란 배경으로 표시합니다(직접 입력한 칸과 구분되게, 확인 안 하고 지나치지 않도록).
@@ -9891,11 +9901,11 @@ function openReserveNoGenModal(resId, draft){
             <label>연료량(L)</label>
             <div class="consumable-row">
               <div style="flex:1;min-width:0;">
-                <input type="number" id="f-rsv-fuel-req" min="0" value="${(pre&&pre.fuelRequested)||''}" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;" onchange="if(!document.getElementById('f-rsv-fuel-actual').value) document.getElementById('f-rsv-fuel-actual').value=this.value;">
+                <input type="number" id="f-rsv-fuel-req" min="0" value="${(pre&&pre.fuelRequested)||''}" placeholder="고객요청" style="border-color:#2C4A66;color:#2C4A66;font-weight:700;${autoStyle('fuel')}" onchange="if(!document.getElementById('f-rsv-fuel-actual').value) document.getElementById('f-rsv-fuel-actual').value=this.value;">
                 <div class="hint" style="margin:2px 0 0;white-space:nowrap;">고객요청 (공급받는자용에 표시)</div>
               </div>
               <div style="flex:1;min-width:0;">
-                <input type="number" id="f-rsv-fuel-actual" min="0" value="${(pre&&pre.fuelActual)||''}" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;">
+                <input type="number" id="f-rsv-fuel-actual" min="0" value="${(pre&&pre.fuelActual)||''}" placeholder="실제주입" style="border-color:#8A5A00;color:#8A5A00;font-weight:700;${autoStyle('fuel')}">
                 <div class="hint" style="margin:2px 0 0;white-space:nowrap;">실제주입 (공급자용에 표시)</div>
               </div>
             </div>
