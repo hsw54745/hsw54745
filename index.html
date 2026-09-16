@@ -1758,7 +1758,7 @@ async function openQmEditReservation(resId){
         <div><label style="${labelStyle}">거래처명</label><input id="qmre-customer" type="text" style="${styleFor('customer')}" value="${escR(dCustomer)}"></div>
         <div><label style="${labelStyle}">현장 주소</label><input id="qmre-address" type="text" style="${styleFor('address')}" value="${escR(dAddress)}"></div>
         <div><label style="${labelStyle}">담당자</label><input id="qmre-manager" type="text" style="${styleFor('manager')}" value="${escR(dManager)}"></div>
-        <div><label style="${labelStyle}">연락처</label><input id="qmre-phone" type="tel" style="${styleFor('phone')}" value="${escR(dPhone)}" oninput="this.value=formatPhoneNumber(this.value)"></div>
+        <div><label style="${labelStyle}">연락처</label><input id="qmre-phone" type="tel" style="${styleFor('phone')}" value="${escR(formatPhoneNumber(dPhone))}" oninput="this.value=formatPhoneNumber(this.value)"></div>
         <div><label style="${labelStyle}">전압</label><input id="qmre-voltage" type="text" style="${styleFor('voltage')}" value="${escR(dVoltage)}">${voltageButtonsHtml('qmre-voltage')}</div>
         <div><label style="${labelStyle}">출고예정일</label><input id="qmre-outdate" type="date" style="${inputStyle}" value="${escR(r.outDate||'')}"></div>
         <div>
@@ -10447,7 +10447,7 @@ function openReserveNoGenModal(resId, draft){
       <div class="out-row">
         <div class="field f-lg"><label>현장 주소</label><input type="text" id="f-rsv-address" value="${((pre&&pre.address)||'').replace(/"/g,'&quot;')}" placeholder="예: 경기 화성시 남양읍 ○○로 12" style="${autoStyle('address')}"></div>
         <div class="field f-sm"><label>담당자</label><input type="text" id="f-rsv-manager" value="${((pre&&pre.manager)||'').replace(/"/g,'&quot;')}" placeholder="예: 홍길동 과장" style="${autoStyle('manager')}"></div>
-        <div class="field f-sm"><label>연락처</label><input type="text" id="f-rsv-phone" value="${((pre&&pre.phone)||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)" style="${autoStyle('phone')}"></div>
+        <div class="field f-sm"><label>연락처</label><input type="text" id="f-rsv-phone" value="${formatPhoneNumber((pre&&pre.phone)||'').replace(/"/g,'&quot;')}" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)" style="${autoStyle('phone')}"></div>
       </div>
       <div class="out-row stretch">
         <div class="field f-eq"><div class="out-card"><label>전압</label>
@@ -11870,7 +11870,7 @@ function receiptCopyHtml(g, copyLabel, rtIn){
     <div class="r-watermark">${escR(isSupplier ? '해성보관용' : '공급받는자용')}</div>
     <div class="r-title">인&nbsp;&nbsp;&nbsp;수&nbsp;&nbsp;&nbsp;증<span class="r-copy-tag">(${escR(isSupplier ? '해성 보관용' : '공급받는자용')})</span></div>
     <div class="r-row r-top">
-      <div style="font-size:17px;font-weight:800;">도착일&nbsp;&nbsp;${fmtDateKR(rt.outDate)}${rt.arriveTime? ` (${escR(rt.arriveTime)})` : ''}</div>
+      <div style="font-size:17px;font-weight:800;">도착일&nbsp;&nbsp;${fmtDateKR(rt.outDate)}${rt.arriveTime? `<br><span style="font-size:14px;font-weight:700;">${escR(rt.arriveTime)}</span>` : ''}</div>
       <div>거래처명&nbsp;&nbsp;<span class="r-fill" style="font-weight:800;">${escR(rt.customer)}</span></div>
     </div>
     <table class="r-table">
@@ -11886,7 +11886,7 @@ function receiptCopyHtml(g, copyLabel, rtIn){
     <div class="r-row"><div class="r-full">현장 주소&nbsp;&nbsp;<span class="r-fill wide" style="font-weight:700;">${escR(addrFull)}</span></div></div>
     <div class="r-row">
       <div class="r-half">담당자 성명&nbsp;&nbsp;<span class="r-fill" style="font-weight:700;">${escR(rt.manager)}</span></div>
-      <div class="r-half">연락처&nbsp;&nbsp;<span class="r-fill" style="font-weight:700;">${escR(rt.phone)}</span></div>
+      <div class="r-half">연락처&nbsp;&nbsp;<span class="r-fill" style="font-weight:700;">${escR(formatPhoneNumber(rt.phone))}</span></div>
     </div>
     ${rt.note? `<div class="r-row"><div class="r-full">비고&nbsp;&nbsp;<span class="r-fill wide">${escR(rt.note)}</span></div></div>`:''}
     <div class="r-confirm-text">상기 물품을 정히 인수 하였음을 확인 합니다.</div>
@@ -11917,7 +11917,7 @@ function receiptCopyHtmlBatch(items, copyLabel, rt){
     <div class="r-watermark">${escR(isSupplier ? '해성보관용' : '공급받는자용')}</div>
     <div class="r-title">인&nbsp;&nbsp;&nbsp;수&nbsp;&nbsp;&nbsp;증<span class="r-copy-tag">(${escR(isSupplier ? '해성 보관용' : '공급받는자용')})</span></div>
     <div class="r-row r-top">
-      <div style="font-size:17px;font-weight:800;">도착일&nbsp;&nbsp;${fmtDateKR(rt.outDate)}${rt.arriveTime? ` (${escR(rt.arriveTime)})` : ''}</div>
+      <div style="font-size:17px;font-weight:800;">도착일&nbsp;&nbsp;${fmtDateKR(rt.outDate)}${rt.arriveTime? `<br><span style="font-size:14px;font-weight:700;">${escR(rt.arriveTime)}</span>` : ''}</div>
       <div>거래처명&nbsp;&nbsp;<span class="r-fill" style="font-weight:800;">${escR(rt.customer)}</span></div>
     </div>
     <table class="r-table" style="table-layout:fixed;">
@@ -11928,7 +11928,7 @@ function receiptCopyHtmlBatch(items, copyLabel, rt){
     <div class="r-row"><div class="r-full">현장 주소&nbsp;&nbsp;<span class="r-fill wide" style="font-weight:700;">${escR(rt.address||'')}</span></div></div>
     <div class="r-row">
       <div class="r-half">담당자 성명&nbsp;&nbsp;<span class="r-fill" style="font-weight:700;">${escR(rt.manager)}</span></div>
-      <div class="r-half">연락처&nbsp;&nbsp;<span class="r-fill" style="font-weight:700;">${escR(rt.phone)}</span></div>
+      <div class="r-half">연락처&nbsp;&nbsp;<span class="r-fill" style="font-weight:700;">${escR(formatPhoneNumber(rt.phone))}</span></div>
     </div>
     ${rt.note? `<div class="r-row"><div class="r-full">비고&nbsp;&nbsp;<span class="r-fill wide">${escR(rt.note)}</span></div></div>`:''}
     <div class="r-confirm-text">상기 물품(총 ${items.length}대)을 정히 인수 하였음을 확인 합니다.</div>
