@@ -4577,7 +4577,12 @@ function renderOutList(){
     let predTxt = g.hoursKnown? '-' : (g.lastOilChangeDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastOilChangeDate)}일 초과</span>` : '<span style="font-size:12px;color:var(--danger);font-weight:700;">확인불가</span>');
     if(isLT){ predTxt = pred.overdue ? '<span class="pill danger">정비 도래</span>' : `${dow(pred.date)} (약 ${pred.days}일 후)`; }
     const expIn = expectedInDate(rt);
-    return `<tr${rt.forcedOut? ` style="background:var(--danger-tint);"`:''}>
+    const matchedReq = (DB.returnRequests||[]).filter(r=>r && !r.handled).find(r=>{
+      const m = findMatchedGenForReturnRequest(r.text);
+      return m && m.id===g.id;
+    });
+    const rowBg = rt.forcedOut ? 'var(--danger-tint)' : (matchedReq ? '#FFF3E0' : null);
+    return `<tr${rowBg? ` style="background:${rowBg};"`:''}>
       <td><input type="checkbox" class="bulk-in-chk" data-gid="${g.id}" ${bulkInSelection.has(g.id)?'checked':''} onchange="toggleBulkInSelect('${g.id}', this.checked)"></td>
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}${usableCapacityHtml(g)}${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
@@ -4593,14 +4598,7 @@ function renderOutList(){
         ${rt.freightBearer? `<div class="muted" style="font-size:11px;">운임료: ${rt.freightBearer}</div>`:''}
         ${rt.note? `<div class="muted" style="font-size:11px;">비고: ${rt.note}</div>`:''}
         ${rt.smsOrder? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;margin-top:4px;" onclick="showSmsOrderForGen('${g.id}')">📩 출고오더확인</button>`:''}
-        ${(()=>{
-          const matchedReq = (DB.returnRequests||[]).filter(r=>r && !r.handled).find(r=>{
-            const m = findMatchedGenForReturnRequest(r.text);
-            return m && m.id===g.id;
-          });
-          if(!matchedReq) return '';
-          return `<button class="btn sm" style="color:#B23A34;font-weight:700;border-color:#B23A34;background:#FBEAEA;margin-top:4px;margin-left:4px;" onclick="viewMatchedReturnRequest('${g.id}','${matchedReq.id}')">🔻 철수오더확인</button>`;
-        })()}
+        ${matchedReq? `<button class="btn sm" style="color:#B23A34;font-weight:700;border-color:#B23A34;background:#FBEAEA;margin-top:4px;margin-left:4px;" onclick="viewMatchedReturnRequest('${g.id}','${matchedReq.id}')">🔻 철수오더확인</button>`:''}
       </td>
       <td class="muted">${dow(rt.outDate)||'-'}</td>
       <td>${isLT? gaugeHtml(el,rem,getCycle(g)) : (g.hoursKnown? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 확인불가</span>')}</td>
@@ -10324,7 +10322,8 @@ function viewMatchedReturnRequest(genId, reqId){
         <button type="button" class="btn sm primary" style="margin-top:8px;" onclick="applyRecallDateToGen('${g.id}','${parsed.recallDate}')">이 날짜로 반납예정일에 적용</button>
       </div>` : `<div class="hint" style="margin-top:10px;">문자에서 회수예정일을 인식하지 못했습니다. [정보 직접 수정]에서 직접 입력해주세요.</div>`}
       <div class="modal-actions">
-        <button class="btn primary" onclick="closeModal()">닫기</button>
+        <button class="btn" onclick="closeModal()">닫기</button>
+        <button class="btn primary" onclick="markReturnRequestHandled('${r.id}'); closeModal();">✅ 확인완료</button>
       </div>
     </div>
   </div>`;
