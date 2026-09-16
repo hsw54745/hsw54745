@@ -1512,6 +1512,10 @@ async function openQmConfirmLoad(resId){
     if(!r){ body.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">해당 출고대기 건을 찾을 수 없습니다.</div>'; return; }
     const needFuel = (r.fuelRequested!=null || r.fuelActual!=null);
     const fuelAmt = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
+    const noteHasFuel = !needFuel && r.note && r.note.includes('연료');
+    if((needFuel || noteHasFuel) && isWithinVoiceAlertHours()){
+      speakText(needFuel ? `연료 ${fuelAmt}리터 요청건입니다. 주유하셨는지 확인해주세요.` : `비고에 연료 관련 내용이 있습니다. 주유하셨는지 확인해주세요.`);
+    }
     const infoRows = [
       ['거래처', r.customer||r.site||''],
       ['담당자', r.manager||''],
@@ -1560,6 +1564,7 @@ async function submitQmConfirmLoad(resId, needFuel){
     if(!ack || !ack.checked){
       box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
       box.textContent = '연료 주입 확인 체크를 해야 상차 완료할 수 있습니다.';
+      if(isWithinVoiceAlertHours()) speakText('주유하셨는지 확인 후 체크해주세요.');
       return;
     }
   }
@@ -9767,6 +9772,12 @@ function confirmLoadPrompt(resId, isTransfer){
   const g = findGen(r.genId);
   const needFuel = (r.fuelRequested!=null || r.fuelActual!=null);
   const fuelAmt = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
+  // 연료 요청건은 비고에 적어놔도 상차하면서 깜빡 잊는 경우가 많아서, 음성으로도 한 번 더 알려줍니다.
+  // 구조화된 연료 칸(요청량)이 안 채워져 있고 비고에만 "연료"라는 말이 적혀있어도 놓치지 않게 같이 감지합니다.
+  const noteHasFuel = !needFuel && r.note && r.note.includes('연료');
+  if((needFuel || noteHasFuel) && !isTransfer && isWithinVoiceAlertHours()){
+    speakText(needFuel ? `연료 ${fuelAmt}리터 요청건입니다. 주유하셨는지 확인해주세요.` : `비고에 연료 관련 내용이 있습니다. 주유하셨는지 확인해주세요.`);
+  }
   const infoRows = [
     ['거래처', r.customer||r.site||''],
     ['담당자', r.manager||''],
@@ -9821,6 +9832,7 @@ function submitConfirmLoadWithFuelCheck(resId){
   const errEl = document.getElementById('f-loadconfirm-err');
   if(!chk || !chk.checked){
     if(errEl){ errEl.textContent = '연료 주입 확인 체크를 해야 상차 완료할 수 있습니다.'; errEl.style.display = 'block'; }
+    if(isWithinVoiceAlertHours()) speakText('주유하셨는지 확인 후 체크해주세요.');
     return;
   }
   confirmLoad(resId);
@@ -12499,19 +12511,6 @@ async function submitIn(id, isTransfer){
     errEl.textContent = '입력한 누적시간이 출고시 누적시간보다 작습니다. 확인 후 다시 입력해주세요.';
     errEl.style.display='block'; return;
   }
-  // 하루 24시간을 초과하는 물리적으로 불가능한 사용시간 감지 (데이터 입력 실수 방지)
-  // 단, 출고 당시 누적시간을 몰랐던(미확인) 발전기는 이번이 첫 실측이라 정상적으로 큰 값이 나올 수 있으므로 제외
-  if(g.rental.outDate && inDate && g.hoursKnown && endHours!==null){
-    const usedH = endHours - g.rental.startHours;
-    const outD = new Date(g.rental.outDate+'T00:00:00');
-    const inD = new Date(inDate+'T00:00:00');
-    const days = Math.max(1, Math.round((inD-outD)/86400000));
-    const avgDaily = usedH/days;
-    if(avgDaily > 24){
-      errEl.textContent = `입력하신 누적시간 차이(${usedH.toLocaleString()}h)를 임대일수(${days}일)로 나누면 하루 평균 ${avgDaily.toFixed(1)}시간이 됩니다. 하루는 24시간을 넘을 수 없으니, 출고시 누적시간(${g.rental.startHours.toLocaleString()}h) 또는 지금 입력한 누적시간을 다시 확인해주세요.`;
-      errEl.style.display='block'; return;
-    }
-  }
   const conditionEl = document.getElementById('f-in-condition');
   const condition = conditionEl ? conditionEl.value : 'ok';
   const repairNoteEl = document.getElementById('f-in-repairnote');
@@ -12524,6 +12523,31 @@ async function submitIn(id, isTransfer){
   const fuelNotUsed = fuelNotUsedEl && fuelNotUsedEl.value==='yes';
   const fuelHeightEl = document.getElementById('f-fuel-height');
   const measuredFuelHeightCm = (!fuelNotUsed && fuelHeightEl && fuelHeightEl.value!=='') ? Number(fuelHeightEl.value) : null;
+  // 하루 24시간을 초과하는 물리적으로 불가능한 사용시간 감지 (데이터 입력 실수 방지)
+  // 단, 출고 당시 누적시간을 몰랐던(미확인) 발전기는 이번이 첫 실측이라 정상적으로 큰 값이 나올 수 있고,
+  // 최근에 현장이동(공장 미경유)이 있었던 발전기도 그 구간 사용량이 이번에 몰아서 잡히는 게 정상이라 무조건 막지 않고
+  // "정말 맞습니까?" 확인 후 진행할 수 있게 합니다.
+  if(g.rental.outDate && inDate && g.hoursKnown && endHours!==null){
+    const usedH = endHours - g.rental.startHours;
+    const outD = new Date(g.rental.outDate+'T00:00:00');
+    const inD = new Date(inDate+'T00:00:00');
+    const days = Math.max(1, Math.round((inD-outD)/86400000));
+    const avgDaily = usedH/days;
+    if(avgDaily > 24){
+      const recentTransferNote = (g.rental.note && g.rental.note.includes('현장이동')) || (g.rental.note && g.rental.note.includes('누적시간 미확인'));
+      openConfirmModal(
+        `입력하신 누적시간 차이(${usedH.toLocaleString()}h)를 임대일수(${days}일)로 나누면 하루 평균 ${avgDaily.toFixed(1)}시간이 됩니다. 하루는 24시간을 넘을 수 없습니다.\n\n${recentTransferNote? '이 발전기는 최근 현장이동으로 누적시간을 한동안 확인 못한 이력이 있어서, 그 구간 사용량이 이번에 한꺼번에 잡혀 정상적으로 큰 값이 나올 수 있습니다.\n\n' : ''}오타가 아니라 실제로 확인하신 숫자가 맞다면 계속 진행하세요.`,
+        function(){ submitInFinish(id, isTransfer, {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm}); },
+        '맞습니다, 계속 진행', '다시 확인할게요'
+      );
+      return;
+    }
+  }
+  submitInFinish(id, isTransfer, {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm});
+}
+async function submitInFinish(id, isTransfer, vals){
+  const {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm} = vals;
+  const g = findGen(id);
   let remainingFuelLiters = null;
   if(measuredFuelHeightCm!=null){
     remainingFuelLiters = computeFuelLiters(g, measuredFuelHeightCm);
