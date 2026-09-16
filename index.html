@@ -10382,13 +10382,13 @@ function openReserveNoGenModal(resId, draft){
     <div class="modal modal-wide" style="text-align:left;">
       <h3 style="text-align:center;">📝 ${existing? '출고예약 수정' : '출고예약'}</h3>
       <div class="modal-sub">발전기를 아직 정하지 않았어도 거래처 정보를 먼저 등록해둘 수 있습니다. 나중에 [출고 대기]에서 발전기를 배정하면 정상 출고로 이어집니다.</div>
-      ${(!existing && draft) || autoFilled ? `<div class="hint" style="color:var(--danger);font-weight:700;background:var(--danger-tint);padding:8px 10px;border-radius:8px;margin-bottom:6px;">⚠️ 문자 내용에서 자동으로 추출해 채워봤습니다 (노란 배경 칸). 100% 정확하지 않으니 하나씩 확인 후 저장해주세요. 인식하지 못한 칸은 비워뒀습니다.</div>` : ''}
+      ${(!existing && draft) || autoFilled ? `<div class="hint" style="font-size:13px;color:var(--danger);font-weight:700;background:var(--danger-tint);padding:8px 10px;border-radius:8px;margin-bottom:6px;">⚠️ 문자 내용에서 자동으로 추출해 채워봤습니다 (노란 배경 칸). 100% 정확하지 않으니 하나씩 확인 후 저장해주세요. 인식하지 못한 칸은 비워뒀습니다.</div>` : ''}
       ${(!existing && draft && draft.rawText) ? `<details open style="text-align:left;background:var(--surface-alt,#F5F5F5);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:10px;">
         <summary style="cursor:pointer;font-weight:700;">📄 원본 문자 내용 보기</summary>
         <div style="white-space:pre-wrap;font-size:13.5px;margin-top:8px;color:#333;">${escR(draft.rawText)}</div>
       </details>` : ''}
       <div class="out-row stretch">
-        <div class="field f-sm"><div class="out-card"><label>발전기</label>
+        <div class="field f-sm"><div class="out-card"><label>발전기 &nbsp;<button type="button" onclick="submitReserveNoGen(${existing? `'${resId}'` : 'null'}, true)" title="같은 거래처·주소로 발전기 한 대를 더 추가합니다" style="font-size:11px;font-weight:800;color:#1565C0;background:#E8F0FE;border:1px solid #1565C0;border-radius:10px;padding:2px 8px;cursor:pointer;">+추가</button></label>
           <select id="f-rsv-gen" onchange="onRsvGenChange()">${genOptionsHtml}</select>
         </div></div>
         <div class="field f-sm" id="f-rsv-starthours-wrap" style="display:none;"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-rsv-starthours" value="0" min="0"><div class="hint" id="rsv-starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);"></div></div></div>
@@ -10488,7 +10488,6 @@ function openReserveNoGenModal(resId, draft){
       <div id="f-rsv-err" class="err" style="display:none;"></div>
       <div class="modal-actions" style="justify-content:center;">
         <button class="btn" onclick="closeModal()">취소</button>
-        <button class="btn" onclick="submitReserveNoGen(${existing? `'${resId}'` : 'null'}, true)" title="같은 거래처·주소로 발전기 한 대를 더 추가합니다">➕ 발전기 추가</button>
         <button class="btn primary" onclick="submitReserveNoGen(${existing? `'${resId}'` : 'null'})">${existing? '수정 저장' : '출고예약 등록'}</button>
       </div>
     </div>
