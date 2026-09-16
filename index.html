@@ -4710,6 +4710,7 @@ function markReturnRequestHandled(id){
   r.handled = true;
   saveReturnRequests();
   renderContent();
+  flash('✅ 확인완료');
 }
 function unmarkReturnRequestHandled(id){
   const r = (DB.returnRequests||[]).find(x=>x && x.id===id);
@@ -9764,6 +9765,7 @@ function markSmsOrderChecked(resId){
   r.smsOrderChecked = true;
   saveReservations();
   renderContent();
+  flash('✅ 확인완료');
 }
 function unmarkSmsOrderChecked(resId){
   const r = DB.reservations.find(x=>x.id===resId);
@@ -10334,12 +10336,12 @@ async function applyRecallDateToGen(genId, dateStr){
   const end = new Date(dateStr+'T00:00:00');
   if(isNaN(start.getTime()) || isNaN(end.getTime())){ flash('날짜 형식이 올바르지 않아 적용할 수 없습니다'); return; }
   const days = Math.round((end-start)/86400000);
-  if(!(days>0)){ flash('회수예정일이 출고일보다 이전이라 적용할 수 없습니다'); return; }
-  g.rental.usageDays = days;
+  if(days<0){ flash('회수예정일이 출고일보다 이전이라 적용할 수 없습니다'); return; }
+  g.rental.usageDays = Math.max(1, days); // 출고 당일 철수도 있으니, 같은 날짜(0일 차이)는 1일 사용으로 처리합니다.
   await saveWithRetry(saveGens);
   renderContent();
   closeModal();
-  flash(`${g.id} 반납예정일이 ${dateStr}(사용일수 ${days}일)로 적용되었습니다`);
+  flash(`${g.id} 반납예정일이 ${dateStr}(사용일수 ${Math.max(1, days)}일)로 적용되었습니다`);
 }
 function openReserveNoGenModal(resId, draft){
   const existing = resId ? DB.reservations.find(x=>x.id===resId) : null;
