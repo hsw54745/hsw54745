@@ -7262,18 +7262,31 @@ function renderCalendar(){
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;">${cellsHtml}</div>
   `;
 }
-function openCalendarDayModal(dateStr){
+function openCalendarDayModal(dateStr, editingId){
   const holiday = koreanHolidayName(dateStr);
   const evs = [...(DB.calendarEvents||[])].filter(e=>e.date===dateStr).sort((a,b)=>(a.createdDate||'').localeCompare(b.createdDate||''));
-  const evHtml = evs.length? evs.map(e=>`
+  const evHtml = evs.length? evs.map(e=>{
+    if(editingId && e.id===editingId){
+      return `<div style="padding:6px 0;border-bottom:1px dashed var(--border);">
+        <textarea id="f-cal-edit-text" style="min-height:50px;width:100%;box-sizing:border-box;">${escR(e.text)}</textarea>
+        <div style="display:flex;gap:6px;margin-top:4px;justify-content:flex-end;">
+          <button type="button" class="btn sm" onclick="openCalendarDayModal('${dateStr}')">취소</button>
+          <button type="button" class="btn sm primary" onclick="saveCalendarEventEdit('${dateStr}','${e.id}')">저장</button>
+        </div>
+      </div>`;
+    }
+    return `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px dashed var(--border);">
       <div>
         <div style="font-size:13.5px;white-space:pre-wrap;">${escR(e.text)}</div>
         <div class="muted" style="font-size:11px;margin-top:2px;">✍ ${escR(e.authorBy||'이름미상')}</div>
       </div>
-      <button type="button" class="btn sm danger" onclick="removeCalendarEvent('${e.id}','${dateStr}')">삭제</button>
-    </div>
-  `).join('') : `<div class="empty">등록된 일정이 없습니다.</div>`;
+      <div style="display:flex;gap:4px;flex-shrink:0;">
+        <button type="button" class="btn sm" onclick="openCalendarDayModal('${dateStr}','${e.id}')">수정</button>
+        <button type="button" class="btn sm danger" onclick="removeCalendarEvent('${e.id}','${dateStr}')">삭제</button>
+      </div>
+    </div>`;
+  }).join('') : `<div class="empty">등록된 일정이 없습니다.</div>`;
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
@@ -7290,6 +7303,18 @@ function openCalendarDayModal(dateStr){
       <div style="margin-top:14px;max-height:220px;overflow-y:auto;">${evHtml}</div>
     </div>
   </div>`;
+}
+async function saveCalendarEventEdit(dateStr, id){
+  const el = document.getElementById('f-cal-edit-text');
+  const text = el.value.trim();
+  if(!text){ flash('일정 내용을 입력해주세요'); return; }
+  const ev = (DB.calendarEvents||[]).find(e=>e.id===id);
+  if(!ev){ flash('이미 삭제된 일정입니다'); openCalendarDayModal(dateStr); return; }
+  ev.text = text;
+  await saveCalendarEvents();
+  openCalendarDayModal(dateStr);
+  renderCalendar();
+  flash('일정이 수정되었습니다');
 }
 async function addCalendarEvent(dateStr){
   const el = document.getElementById('f-cal-event-text');
