@@ -10285,7 +10285,7 @@ function viewMatchedReturnRequest(genId, reqId){
       <div style="background:#FBEAEA;border:1px solid var(--danger);border-radius:10px;padding:12px 14px;white-space:pre-wrap;font-size:14.5px;line-height:1.6;color:#333;text-align:left;">${escR(r.text||'')}</div>
       ${parsed.recallDate? `<div style="margin-top:12px;background:var(--warn-tint);border:1px solid var(--warn);border-radius:10px;padding:12px 14px;text-align:left;">
         <div style="font-size:13px;font-weight:800;color:var(--warn);">🗓️ 문자에서 인식한 회수예정일: ${escR(parsed.recallDate)}</div>
-        <button type="button" class="btn sm primary" style="margin-top:8px;" onclick="applyRecallDateToGen('${g.id}','${parsed.recallDate}')">이 날짜로 반납예정일에 적용</button>
+        <button type="button" class="btn sm primary" style="margin-top:8px;" onclick="applyRecallDateToGen('${g.id}','${parsed.recallDate}','${r.id}')">이 날짜로 반납예정일에 적용</button>
       </div>` : `<div class="hint" style="margin-top:10px;">문자에서 회수예정일을 인식하지 못했습니다. [정보 직접 수정]에서 직접 입력해주세요.</div>`}
       <div class="modal-actions">
         <button class="btn primary" onclick="closeModal()">닫기</button>
@@ -10293,7 +10293,7 @@ function viewMatchedReturnRequest(genId, reqId){
     </div>
   </div>`;
 }
-async function applyRecallDateToGen(genId, dateStr){
+async function applyRecallDateToGen(genId, dateStr, reqId){
   const g = findGen(genId);
   if(!g || !g.rental || !g.rental.outDate){ flash('출고일 정보가 없어 반납예정일을 계산할 수 없습니다'); return; }
   const start = new Date(g.rental.outDate+'T00:00:00');
@@ -10303,6 +10303,11 @@ async function applyRecallDateToGen(genId, dateStr){
   if(days<0){ flash('회수예정일이 출고일보다 이전이라 적용할 수 없습니다'); return; }
   g.rental.usageDays = Math.max(1, days); // 출고 당일 철수도 있으니, 같은 날짜(0일 차이)는 1일 사용으로 처리합니다.
   await saveWithRetry(saveGens);
+  if(reqId){
+    // 이 철수요청은 방금 반납예정일에 반영해서 처리된 것이니, 카드와 [출고중] 배경 강조를 같이 지웁니다.
+    DB.returnRequests = (DB.returnRequests||[]).filter(r=>!r || r.id!==reqId);
+    await saveWithRetry(saveReturnRequests);
+  }
   renderContent();
   closeModal();
   flash(`${g.id} 반납예정일이 ${dateStr}(사용일수 ${Math.max(1, days)}일)로 적용되었습니다`);
