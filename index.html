@@ -11858,6 +11858,20 @@ function receiptItemLabel(g){
   const cap = capacityOf(g);
   return isFinite(cap) ? `발전기 ${cap}kW` : '발전기';
 }
+// 인수증 상단 "도착일 / 거래처명" 줄은 항상 한 줄에 같이 나와야 해서, 글자수가 많아지면 글씨 크기를 줄여서 맞춥니다 (너무 작아지지는 않게 하한선을 둡니다).
+function receiptTopRowFontSize(dateStr, timeStr, customer){
+  const weightedLen = (s) => {
+    let n = 0;
+    for(const ch of String(s||'')){ n += /[\u3131-\uD79D]/.test(ch) ? 1.7 : 1; }
+    return n;
+  };
+  const total = weightedLen(`도착일  ${dateStr}${timeStr? ` (${timeStr})`:''}   거래처명  ${customer||''}`);
+  if(total <= 46) return 15.5;
+  if(total <= 54) return 14;
+  if(total <= 62) return 12.5;
+  if(total <= 72) return 11.5;
+  return 10.5; // 하한선
+}
 function receiptCopyHtml(g, copyLabel, rtIn){
   const rt = rtIn || g.rental || {};
   const addrFull = rt.address || '';
@@ -11870,9 +11884,9 @@ function receiptCopyHtml(g, copyLabel, rtIn){
   <div class="r-copy">
     <div class="r-watermark">${escR(isSupplier ? '해성보관용' : '공급받는자용')}</div>
     <div class="r-title">인&nbsp;&nbsp;&nbsp;수&nbsp;&nbsp;&nbsp;증<span class="r-copy-tag">(${escR(isSupplier ? '해성 보관용' : '공급받는자용')})</span></div>
-    <div class="r-row r-top">
-      <div style="font-size:17px;font-weight:800;">도착일&nbsp;&nbsp;${fmtDateKR(rt.outDate)}${rt.arriveTime? `<br><span style="font-size:14px;font-weight:700;">${escR(rt.arriveTime)}</span>` : ''}</div>
-      <div>거래처명&nbsp;&nbsp;<span class="r-fill" style="font-weight:800;">${escR(rt.customer)}</span></div>
+    <div class="r-row r-top" style="align-items:baseline;">
+      <div style="font-size:${receiptTopRowFontSize(fmtDateKR(rt.outDate), rt.arriveTime, rt.customer)}px;font-weight:800;white-space:nowrap;">도착일&nbsp;&nbsp;${fmtDateKR(rt.outDate)}${rt.arriveTime? ` (${escR(rt.arriveTime)})` : ''}</div>
+      <div style="font-size:${receiptTopRowFontSize(fmtDateKR(rt.outDate), rt.arriveTime, rt.customer)}px;font-weight:800;white-space:nowrap;">거래처명&nbsp;&nbsp;<span class="r-fill" style="font-weight:800;">${escR(rt.customer)}</span></div>
     </div>
     <table class="r-table">
       <thead><tr><th>품목 및 용량</th><th>전압</th><th>수량</th><th>${fuelFieldLabel}</th></tr></thead>
@@ -11917,9 +11931,9 @@ function receiptCopyHtmlBatch(items, copyLabel, rt){
   <div class="r-copy">
     <div class="r-watermark">${escR(isSupplier ? '해성보관용' : '공급받는자용')}</div>
     <div class="r-title">인&nbsp;&nbsp;&nbsp;수&nbsp;&nbsp;&nbsp;증<span class="r-copy-tag">(${escR(isSupplier ? '해성 보관용' : '공급받는자용')})</span></div>
-    <div class="r-row r-top">
-      <div style="font-size:17px;font-weight:800;">도착일&nbsp;&nbsp;${fmtDateKR(rt.outDate)}${rt.arriveTime? `<br><span style="font-size:14px;font-weight:700;">${escR(rt.arriveTime)}</span>` : ''}</div>
-      <div>거래처명&nbsp;&nbsp;<span class="r-fill" style="font-weight:800;">${escR(rt.customer)}</span></div>
+    <div class="r-row r-top" style="align-items:baseline;">
+      <div style="font-size:${receiptTopRowFontSize(fmtDateKR(rt.outDate), rt.arriveTime, rt.customer)}px;font-weight:800;white-space:nowrap;">도착일&nbsp;&nbsp;${fmtDateKR(rt.outDate)}${rt.arriveTime? ` (${escR(rt.arriveTime)})` : ''}</div>
+      <div style="font-size:${receiptTopRowFontSize(fmtDateKR(rt.outDate), rt.arriveTime, rt.customer)}px;font-weight:800;white-space:nowrap;">거래처명&nbsp;&nbsp;<span class="r-fill" style="font-weight:800;">${escR(rt.customer)}</span></div>
     </div>
     <table class="r-table" style="table-layout:fixed;">
       <thead><tr><th style="width:34%;text-align:left;">품목 및 용량 (총 ${items.length}대)</th><th style="width:18%;">전압</th><th style="width:14%;">수량</th><th>${fuelFieldLabel}</th></tr></thead>
