@@ -3533,11 +3533,8 @@ function inDateLabelFull(dateStr){
   const diff = daysFromToday(dateStr);
   const dateTxt = dow(dateStr);
   if(diff===0) return `${dateTxt} (오늘)`;
-  if(diff===1) return `${dateTxt} (임박)`;
-  if(diff===2) return `${dateTxt} (2일전)`;
-  if(diff===3) return `${dateTxt} (3일전)`;
   if(diff<0) return `${dateTxt} (지연)`;
-  return dateTxt;
+  return `${dateTxt} (${diff}일전)`;
 }
 function rentalDays(r){
   if(!r || !r.outDate || !r.inDate) return null;
