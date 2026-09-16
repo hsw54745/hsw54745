@@ -2644,7 +2644,7 @@ async function submitQuickReturnOrder(){
       try{ rrList = rrCur ? JSON.parse(rrCur.value) : []; }catch(e4){ rrList = []; }
       if(!Array.isArray(rrList)) rrList = [];
       newId = uid();
-      rrList.push({ id: newId, text, handled: false, authorBy: qmLabel(), createdAt: today, createdAtTs: Date.now() });
+      rrList.push({ id: newId, text, authorBy: qmLabel(), createdAt: today, createdAtTs: Date.now() });
       await window.storage.set('gen-return-requests-v1', JSON.stringify(rrList), true);
     }catch(e5){
       box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
@@ -4576,7 +4576,7 @@ function renderOutList(){
     let predTxt = g.hoursKnown? '-' : (g.lastOilChangeDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastOilChangeDate)}일 초과</span>` : '<span style="font-size:12px;color:var(--danger);font-weight:700;">확인불가</span>');
     if(isLT){ predTxt = pred.overdue ? '<span class="pill danger">정비 도래</span>' : `${dow(pred.date)} (약 ${pred.days}일 후)`; }
     const expIn = expectedInDate(rt);
-    const matchedReq = (DB.returnRequests||[]).filter(r=>r && !r.handled).find(r=>{
+    const matchedReq = (DB.returnRequests||[]).find(r=>{
       const m = findMatchedGenForReturnRequest(r.text);
       return m && m.id===g.id;
     });
@@ -4640,12 +4640,10 @@ function renderOutList(){
     </div>`;
 
   const returnReqAll = DB.returnRequests||[];
-  const pendingReturns = returnReqAll.filter(r=>r && !r.handled).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
-  const handledReturns = returnReqAll.filter(r=>r && r.handled).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
-  const returnReqHtml = (pendingReturns.length===0 && handledReturns.length===0) ? '' : `
+  const pendingReturns = [...returnReqAll].filter(Boolean).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
+  const returnReqHtml = pendingReturns.length===0 ? '' : `
     <div class="material-card" style="border:2px solid var(--danger);background:var(--danger-tint);margin-bottom:16px;">
       <div class="section-title" style="margin-top:0;color:var(--danger);">🔻 철수(회수) 요청 <span class="cnt">${pendingReturns.length}건</span></div>
-      ${pendingReturns.length===0 ? `<div class="empty" style="margin-top:4px;">처리할 철수요청이 없습니다.</div>` : `
       <div style="display:flex;flex-wrap:wrap;gap:8px;">
         ${pendingReturns.map(r=>{
           const change = detectReturnRequestChange(r, returnReqAll);
@@ -4656,23 +4654,10 @@ function renderOutList(){
           <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}${r.authorBy? ` · ${escR(r.authorBy)}` : ''}</div>
           <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;flex:1;overflow:hidden;" onclick="viewReturnRequestText('${r.id}')">${escR(r.text||'')}</div>
           <div style="display:flex;gap:4px;margin-top:6px;">
-            <button class="btn sm primary" style="flex:1;font-size:10px;padding:2px 4px;" onclick="markReturnRequestHandled('${r.id}')">✅ 처리완료</button>
             <button class="btn sm danger" style="flex:1;font-size:10px;padding:2px 4px;" onclick="deleteReturnRequestCard('${r.id}')">🗑 삭제</button>
           </div>
         </div>`;}).join('')}
-      </div>`}
-      ${handledReturns.length===0 ? '' : `
-      <details class="list-toggle" style="margin-top:10px;"><summary>▸ 숨김 목록 보기 (${handledReturns.length}건)</summary>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
-        ${handledReturns.map(r=>`
-        <div style="width:170px;flex-shrink:0;background:#F5F5F5;border:1px solid var(--border);border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;opacity:.75;">
-          <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}</div>
-          <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;" onclick="viewReturnRequestText('${r.id}')">${escR(r.text||'')}</div>
-          <button class="btn sm" style="font-size:12px;padding:4px 6px;margin-top:6px;" onclick="unmarkReturnRequestHandled('${r.id}')">↩️ 다시 표시</button>
-          <button class="btn sm danger" style="font-size:12px;padding:4px 6px;margin-top:4px;" onclick="deleteReturnRequestCard('${r.id}')">🗑 삭제</button>
-        </div>`).join('')}
       </div>
-      </details>`}
     </div>`;
   return `
     ${returnReqHtml}
@@ -4700,21 +4685,6 @@ function viewReturnRequestText(id){
   const r = (DB.returnRequests||[]).find(x=>x && x.id===id);
   if(!r) return;
   showInfoModal(r.text||'');
-}
-function markReturnRequestHandled(id){
-  const r = (DB.returnRequests||[]).find(x=>x && x.id===id);
-  if(!r) return;
-  r.handled = true;
-  saveReturnRequests();
-  renderContent();
-  flash('✅ 확인완료');
-}
-function unmarkReturnRequestHandled(id){
-  const r = (DB.returnRequests||[]).find(x=>x && x.id===id);
-  if(!r) return;
-  r.handled = false;
-  saveReturnRequests();
-  renderContent();
 }
 function deleteReturnRequestCard(id){
   const r = (DB.returnRequests||[]).find(x=>x && x.id===id);
@@ -6263,7 +6233,7 @@ function renderManualTab(){
       ['한번에 입고', '왼쪽 체크박스로 여러 대를 선택하면 뜨는 "한번에 입고" 버튼으로, 여러 대를 한 번에 정상입고 처리합니다. 발전기별 입고시 누적 사용시간을 대별로 각각 입력합니다. (고장 등록이 필요하거나 연료 높이 측정이 필요한 경우는 개별 "입고 처리"를 이용해주세요)'],
       ['장기→단기 / 단기→장기', '임대 구분을 전환합니다. 장기임대는 예상 사용시간을 입력해 정비 시점을 추정합니다.'],
       ['입금 확인', '🚨 미입금 출고 건의 입금 확인 처리.'],
-      ['🔻 철수(회수) 요청', '퀵메뉴에서 등록된 철수 요청 문자가 [출고중] 화면 맨 위에 빨간 카드로 표시됩니다. 새로 등록되면 문자오더와 마찬가지로 30초 이내에 음성 알림("철수요청이 등록되었습니다")이 울립니다(음성 알림 사용 시간대 안일 때만). 요청을 확인하고 실제 회수(입고 처리)까지 마쳤으면 "✅ 처리완료"를 눌러 숨김 목록으로 넘길 수 있고("▸ 숨김 목록 보기"에서 다시 확인·"↩️ 다시 표시" 가능), "🗑 삭제"로 바로 지울 수도 있습니다. 철수 문자의 연락처·주소가 지금 출고중인 발전기 중 하나와 일치하면, [출고중] 목록 그 발전기 칸에 "🔻 철수오더확인" 버튼이 자동으로 뜹니다 — 누르면 문자 원문과 함께, 문자에서 인식한 회수예정일(오늘/내일/"OO일 후"/특정 날짜 "18일" 등)을 보여주고, "이 날짜로 반납예정일에 적용" 버튼으로 바로 그 발전기의 반납예정일(사용일수)에 반영할 수 있습니다.'],
+      ['🔻 철수(회수) 요청', '퀵메뉴에서 등록된 철수 요청 문자가 [출고중] 화면 맨 위에 빨간 카드로 표시됩니다. 새로 등록되면 문자오더와 마찬가지로 30초 이내에 음성 알림("철수요청이 등록되었습니다")이 울립니다(음성 알림 사용 시간대 안일 때만). 다 처리했으면 "🗑 삭제"로 지우면 됩니다. 철수 문자의 연락처·주소가 지금 출고중인 발전기 중 하나와 일치하면, [출고중] 목록에서 그 발전기 줄이 주황색 배경으로 강조되고 "🔻 철수오더확인" 버튼이 자동으로 뜹니다 — 누르면 문자 원문과 함께, 문자에서 인식한 회수예정일(오늘/내일/"OO일 후"/특정 날짜 "18일" 등)을 보여주고, "이 날짜로 반납예정일에 적용" 버튼으로 바로 그 발전기의 반납예정일(사용일수)에 반영할 수 있습니다. 배경 강조는 해당 철수요청을 삭제하거나(위 카드에서), 그 발전기가 실제로 입고 처리되면 자동으로 사라집니다.'],
       ['🖨 출고 리스트 인쇄(단기/장기)', '현재 출고중인 발전기 전체를 단기임대 1장·장기임대 1장으로 나눠 인쇄합니다. 번호·모델·거래처·현장·담당자연락처·출고일이 함께 나오고, 장기임대 페이지 맨 아래에는 준비할 부품 합계(같은 품명은 수량을 합산)가 자동으로 표시됩니다. 현장 정기 점검 출장 전에 쓰기 좋습니다.']
     ])}
 
@@ -10321,8 +10291,7 @@ function viewMatchedReturnRequest(genId, reqId){
         <button type="button" class="btn sm primary" style="margin-top:8px;" onclick="applyRecallDateToGen('${g.id}','${parsed.recallDate}')">이 날짜로 반납예정일에 적용</button>
       </div>` : `<div class="hint" style="margin-top:10px;">문자에서 회수예정일을 인식하지 못했습니다. [정보 직접 수정]에서 직접 입력해주세요.</div>`}
       <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">닫기</button>
-        <button class="btn primary" onclick="markReturnRequestHandled('${r.id}'); closeModal();">✅ 확인완료</button>
+        <button class="btn primary" onclick="closeModal()">닫기</button>
       </div>
     </div>
   </div>`;
@@ -12736,21 +12705,8 @@ async function submitInFinish(id, isTransfer, vals){
   }
   await saveGens();
   await saveRentals();
+  await autoClearMatchedReturnRequests(rt); // 이 임대가 어떤 식으로 끝나든(현장이동/일반 입고), 매칭되는 철수요청은 이제 처리된 것이니 자동으로 지웁니다.
   if(isTransfer && condition!=='broken'){
-    // 현장이동으로 임대를 종료했으니, 이 현장과 매칭되는 미처리 철수요청이 있으면 자동으로 처리완료 처리합니다.
-    // (findMatchedGenForReturnRequest는 g.rental이 살아있어야 매칭되는데 이미 비웠으므로, 방금 종료한 rt로 직접 비교합니다)
-    const autoHandled = (DB.returnRequests||[]).filter(r=>{
-      if(!r || r.handled) return false;
-      const parsed = parseReturnRequestText(r.text);
-      if(parsed.phone && rt.phone && parsed.phone===rt.phone.replace(/[^0-9]/g,'')) return true;
-      if(parsed.address && rt.address && (rt.address.includes(parsed.address) || parsed.address.includes(rt.address))) return true;
-      if(parsed.customer && rt.customer && (rt.customer.includes(parsed.customer) || parsed.customer.includes(rt.customer))) return true;
-      return false;
-    });
-    if(autoHandled.length>0){
-      autoHandled.forEach(r=>{ r.handled = true; });
-      await saveReturnRequests();
-    }
     renderContent();
     flash('이번 임대가 종료 처리되었습니다. 이어서 새 현장을 골라주세요.');
     if(isWithinVoiceAlertHours()) speakText('입고처리되었습니다.');
@@ -12766,6 +12722,23 @@ async function submitInFinish(id, isTransfer, vals){
   flash(condition==='broken' ? '입고 처리되었습니다 (고장 등록 - 수리 완료 전까지 출고 불가)' : '입고 처리되었습니다');
   if(isWithinVoiceAlertHours()) speakText('입고처리되었습니다.');
   maybeLogVoltageChange(id, oldVoltageForLog, voltage);
+}
+// 방금 종료한 임대(rt)의 연락처·주소·거래처명과 일치하는 철수요청이 있으면 자동으로 지웁니다.
+// (findMatchedGenForReturnRequest는 g.rental이 살아있어야 매칭되는데 이 시점엔 이미 비웠으므로, 방금 종료한 rt로 직접 비교합니다)
+async function autoClearMatchedReturnRequests(rt){
+  const autoMatched = (DB.returnRequests||[]).filter(r=>{
+    if(!r) return false;
+    const parsed = parseReturnRequestText(r.text);
+    if(parsed.phone && rt.phone && parsed.phone===rt.phone.replace(/[^0-9]/g,'')) return true;
+    if(parsed.address && rt.address && (rt.address.includes(parsed.address) || parsed.address.includes(rt.address))) return true;
+    if(parsed.customer && rt.customer && (rt.customer.includes(parsed.customer) || parsed.customer.includes(rt.customer))) return true;
+    return false;
+  });
+  if(autoMatched.length>0){
+    const autoMatchedIds = new Set(autoMatched.map(r=>r.id));
+    DB.returnRequests = (DB.returnRequests||[]).filter(r=>!autoMatchedIds.has(r.id));
+    await saveReturnRequests();
+  }
 }
 
 // ===== 현장이동: 새 현장을 [출고대기](미지정)에서 골라 바로 이어서 출고 =====
@@ -13215,7 +13188,7 @@ async function init(){
   seenNoticeIds = new Set((DB.notices||[]).map(n=>n.id));
   seenEventIds = new Set((DB.calendarEvents||[]).map(e=>e.id));
   seenReservationIds = new Set((DB.reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID).map(r=>r.id));
-  seenReturnRequestIds = new Set((DB.returnRequests||[]).filter(r=>!r.handled).map(r=>r.id));
+  seenReturnRequestIds = new Set((DB.returnRequests||[]).map(r=>r.id));
   // 사용자 이름은 기기(브라우저)마다 따로 기억해야 하므로, 파이어베이스가 아니라 이 브라우저의 localStorage에서만 불러옵니다.
   try{
     const raw = localStorage.getItem('gen-user-name-v1');
@@ -13330,8 +13303,8 @@ async function syncFrequentData(){
     if(before !== after){
       const newReservations = (reservations||[]).filter(r=>r && (r.pendingLoad || r.genId===UNASSIGNED_GEN_ID) && !seenReservationIds.has(r.id) && r.outProcessedBy!==DB.currentUserName);
       seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID).map(r=>r.id));
-      const newReturnRequests = (returnRequests||[]).filter(r=>r && !r.handled && !seenReturnRequestIds.has(r.id) && r.authorBy!==DB.currentUserName);
-      seenReturnRequestIds = new Set((returnRequests||[]).filter(r=>!r.handled).map(r=>r.id));
+      const newReturnRequests = (returnRequests||[]).filter(r=>r && !seenReturnRequestIds.has(r.id) && r.authorBy!==DB.currentUserName);
+      seenReturnRequestIds = new Set((returnRequests||[]).map(r=>r.id));
       DB.gens = gens; lastSyncedGensSnapshot = snapshotGens(DB.gens); DB.reservations = reservations; lastSyncedReservationsSnapshot = snapshotById(DB.reservations);
       DB.returnRequests = returnRequests || [];
       if(!shouldSkipSync()){
