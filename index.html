@@ -3551,7 +3551,6 @@ function inDCountLabel(dateStr){
   const diff = daysFromToday(dateStr);
   if(diff<0) return `${dow(dateStr)} (지연)`;
   if(diff===0) return '오늘입고';
-  if(diff===1) return '입고임박';
   return `입고${diff}일전`;
 }
 
