@@ -620,24 +620,25 @@ function renderQuickModeUI(){
     <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;position:relative;">
       <button type="button" onclick="changeQmUserName()" title="사용자 변경" style="position:absolute;top:14px;left:14px;padding:6px 10px;font-size:12px;font-weight:700;background:#fff;color:#2C4A66;border:1.5px solid #2C4A66;border-radius:10px;cursor:pointer;">👤 ${escR(qmCurrentUserName||'이름 미선택')}</button>
       <button type="button" onclick="triggerPwaInstall()" title="홈 화면에 앱으로 추가" style="position:absolute;top:14px;right:14px;padding:6px 10px;font-size:12px;font-weight:700;background:#fff;color:#888;border:1.5px solid #ccc;border-radius:10px;cursor:pointer;">📲 앱설치</button>
-      <div style="margin-bottom:20px;">
+      <div style="margin-bottom:14px;">
         <div style="text-align:center;">
           <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
-            <img src="icon-192.png" alt="해성발전기" style="width:40px;height:40px;border-radius:10px;object-fit:cover;box-shadow:0 1px 4px rgba(0,0,0,.2);">
-            <div style="font-size:26px;font-weight:800;color:#2C6E49;">해성발전기</div>
+            <img src="icon-192.png" alt="해성발전기" style="width:36px;height:36px;border-radius:10px;object-fit:cover;box-shadow:0 1px 4px rgba(0,0,0,.2);">
+            <div style="font-size:22px;font-weight:800;color:#2C6E49;">해성발전기</div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:14px;">
-          <button type="button" onclick="renderQmNoticeList()" style="flex:1;padding:12px 8px;font-size:14px;font-weight:800;background:#6A4C93;color:#fff;border:none;border-radius:12px;cursor:pointer;">📢 공지사항</button>
-          <button type="button" onclick="renderQmCalendarView()" style="flex:1;padding:12px 8px;font-size:14px;font-weight:800;background:#1565C0;color:#fff;border:none;border-radius:12px;cursor:pointer;">🗓️ 일정표</button>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button type="button" onclick="renderQmNoticeList()" style="flex:1;padding:10px 8px;font-size:13px;font-weight:800;background:#6A4C93;color:#fff;border:none;border-radius:10px;cursor:pointer;">📢 공지사항</button>
+          <button type="button" onclick="renderQmCalendarView()" style="flex:1;padding:10px 8px;font-size:13px;font-weight:800;background:#1565C0;color:#fff;border:none;border-radius:10px;cursor:pointer;">🗓️ 일정표</button>
         </div>
       </div>
-      <button type="button" onclick="renderQuickModeStockList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📦 입고된 발전기 리스트 보기</button>
-      <button type="button" onclick="renderQuickModeOutList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">🚚 출고중 발전기 리스트 보기</button>
-      <button type="button" onclick="renderQmReservationList()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:28px;">⏳ 출고대기 리스트 보기</button>
-      <button type="button" onclick="renderQuickModePasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">📤 출고 문자 보내기</button>
-      <button type="button" onclick="renderQuickModeReturnPasteUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:14px;">🔻 철수 문자 보내기</button>
-      <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:24px;font-size:22px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:16px;cursor:pointer;">📝 출고예약 등록</button>
+      <button type="button" onclick="renderQuickModeStockList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📦 입고된 발전기 리스트 보기</button>
+      <button type="button" onclick="renderQuickModeOutList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">🚚 출고중 발전기 리스트 보기</button>
+      <button type="button" onclick="renderQuickModeSoonInList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#B2782C;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📅 입고 예정 리스트 보기</button>
+      <button type="button" onclick="renderQmReservationList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:20px;">⏳ 출고대기 리스트 보기</button>
+      <button type="button" onclick="renderQuickModePasteUI()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📤 출고 문자 보내기</button>
+      <button type="button" onclick="renderQuickModeReturnPasteUI()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">🔻 철수 문자 보내기</button>
+      <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:14px;cursor:pointer;">📝 출고예약 등록</button>
       <div id="qm-install-status" style="margin-top:10px;"></div>
     </div>
   `);
@@ -1019,6 +1020,92 @@ async function renderQmOutListInner(){
     }).join('');
   }catch(e){
     if(document.getElementById('qm-out-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">목록을 불러오지 못했습니다.</div>';
+  }
+}
+// ===== 퀵메뉴: 입고 예정(1주일 이내) =====
+let qmSoonRegionFilter = null;
+async function renderQuickModeSoonInList(){
+  qmSoonRegionFilter = null;
+  await renderQmSoonInListInner();
+}
+function clearQmSoonRegionFilter(){
+  qmSoonRegionFilter = null;
+  renderQmSoonInListInner();
+}
+function viewQmSoonRegion(region){
+  qmSoonRegionFilter = region;
+  renderQmSoonInListInner();
+}
+async function renderQmSoonInListInner(){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQuickModeUI()" style="display:inline-block;background:#fff;border:2px solid #B2782C;color:#B2782C;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:24px;font-weight:800;color:#B2782C;">📅 입고 예정 발전기</div>
+        <div style="font-size:14px;color:#555;margin-top:6px;">1주일 이내 입고 예정인 발전기입니다</div>
+      </div>
+      <div id="qm-soon-regionbtns" style="margin-bottom:10px;"></div>
+      <div id="qm-soon-list"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+    </div>
+  `);
+  const regionWrap = document.getElementById('qm-soon-regionbtns');
+  const wrap = document.getElementById('qm-soon-list');
+  try{
+    const cur = await window.storage.get('gen-fleet-v2', true);
+    let gens = [];
+    try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    const soonGens = gens.filter(g=>g && !g.retired && g.status==='out' && g.rental && expectedInDate(g.rental))
+      .map(g=>({g, date: expectedInDate(g.rental)}))
+      .filter(x=>daysFromToday(x.date)<=7)
+      .sort((a,b)=>a.date.localeCompare(b.date));
+    if(!document.getElementById('qm-soon-list')) return; // 화면이 이미 닫혔으면 무시
+    if(soonGens.length===0){
+      if(regionWrap) regionWrap.innerHTML = '';
+      wrap.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">1주일 이내 입고 예정인 발전기가 없습니다.</div>';
+      return;
+    }
+    // 지역별 개수 집계
+    const regionCounts = {};
+    soonGens.forEach(x=>{
+      const region = regionOf((x.g.rental&&(x.g.rental.address||x.g.rental.site))||'');
+      regionCounts[region] = (regionCounts[region]||0) + 1;
+    });
+    const regionEntries = Object.entries(regionCounts).sort((a,b)=>b[1]-a[1]);
+    if(regionWrap){
+      regionWrap.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <button type="button" onclick="clearQmSoonRegionFilter()" style="padding:10px 14px;font-size:14px;font-weight:800;border-radius:10px;border:2px solid #B2782C;background:${qmSoonRegionFilter==null?'#B2782C':'#fff'};color:${qmSoonRegionFilter==null?'#fff':'#B2782C'};cursor:pointer;">전체 (${soonGens.length})</button>
+        ${regionEntries.map(([region,cnt])=>{
+          const active = qmSoonRegionFilter===region;
+          return `<button type="button" onclick="viewQmSoonRegion('${region.replace(/'/g,"\\'")}')" style="padding:10px 14px;font-size:14px;font-weight:800;border-radius:10px;border:2px solid #B2782C;background:${active?'#B2782C':'#fff'};color:${active?'#fff':'#B2782C'};cursor:pointer;">${escR(region)} (${cnt})</button>`;
+        }).join('')}
+      </div>`;
+    }
+    const filtered = qmSoonRegionFilter==null ? soonGens : soonGens.filter(x=>regionOf((x.g.rental&&(x.g.rental.address||x.g.rental.site))||'')===qmSoonRegionFilter);
+    wrap.innerHTML = `<div style="font-size:13px;color:#888;margin:10px 0 8px;text-align:right;">총 ${filtered.length}대</div>` + filtered.map(x=>{
+      const g = x.g;
+      const city = cityOf((g.rental&&(g.rental.address||g.rental.site))||'');
+      const diff = daysFromToday(x.date);
+      const labelColor = diff<0 ? '#B23A34' : diff<=1 ? '#B23A34' : '#B2782C';
+      return `
+      <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+          <div style="text-align:left;min-width:0;">
+            <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
+            <span style="font-size:13px;color:#333;margin-left:6px;">${escR(g.model||'')}</span>
+          </div>
+          <span style="background:${labelColor};color:#fff;font-weight:800;font-size:12px;padding:6px 10px;border-radius:14px;white-space:nowrap;flex-shrink:0;">${inDCountLabel(x.date)}</span>
+        </div>
+        <div style="font-size:11px;color:#888;margin-top:3px;">${escR(g.rental.customer||g.rental.site||'거래처 미기재')}</div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
+          <span class="pill" style="background:#EAF2E9;color:#2C6E49;border:1px solid #2C6E49;font-size:10px;white-space:nowrap;">${escR(g.voltage)||'전압 미설정'}</span>
+          <span class="pill" style="background:#E8EEF4;color:#5B7FA6;border:1px solid #5B7FA6;font-size:10px;">${escR(city)}</span>
+          <button type="button" onclick="openQmOutDetail('${g.id}')" style="margin-left:auto;background:#5B7FA6;border:none;color:#fff;font-weight:800;font-size:11.5px;padding:6px 10px;border-radius:16px;cursor:pointer;white-space:nowrap;">상세보기</button>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    if(document.getElementById('qm-soon-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">목록을 불러오지 못했습니다.</div>';
   }
 }
 async function openQmOutDetail(id){
