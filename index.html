@@ -3969,12 +3969,12 @@ function renderDashboard(){
     </tr>`;
   }).join('');
 
-  // 입고 예정 (5일 이내, 최근 5건)
-  const soonList = active.filter(g=>g.status==='out' && g.rental && expectedInDate(g.rental))
+  // 입고 예정 (기본 5일 이내, 직접 며칠까지 볼지 조절 가능 - 1일 ~ 365일 / 목록은 최대 10대까지만 표시)
+  const soonListAll = active.filter(g=>g.status==='out' && g.rental && expectedInDate(g.rental))
     .map(g=>({g, date: expectedInDate(g.rental)}))
-    .filter(x=>daysFromToday(x.date)<=5)
-    .sort((a,b)=>a.date.localeCompare(b.date))
-    .slice(0,5);
+    .filter(x=>daysFromToday(x.date)<=dashboardSoonDays)
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  const soonList = soonListAll.slice(0,10);
   const soonRows = soonList.map(x=>{
     const rt = x.g.rental;
     const diff = daysFromToday(x.date);
@@ -4112,11 +4112,16 @@ function renderDashboard(){
       <tbody>${recentInRows}</tbody>
     </table></div>`}
 
-    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-      <span>📅 입고 예정 (5일 이내) <span class="cnt">최근 5대</span></span>
-      <button class="btn sm" onclick="switchTab('in')">전체보기</button>
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+      <span>📅 입고 예정 <span class="cnt">${soonListAll.length>10? `10 / ${soonListAll.length}대` : `${soonListAll.length}대`}</span></span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <label for="dash-soon-days" style="font-size:12px;color:var(--ink-soft);font-weight:700;">입고</label>
+        <input type="number" id="dash-soon-days" min="1" max="365" value="${dashboardSoonDays}" style="width:60px;padding:4px 6px;font-size:12px;border:1px solid var(--border-strong);border-radius:6px;" onchange="setDashboardSoonDays(this.value)">
+        <label for="dash-soon-days" style="font-size:12px;color:var(--ink-soft);font-weight:700;">일 전까지</label>
+        <button class="btn sm" onclick="switchTab('in')">전체보기</button>
+      </div>
     </div>
-    ${soonList.length===0? `<div class="empty">5일 이내 입고 예정인 발전기가 없습니다.</div>` : `
+    ${soonList.length===0? `<div class="empty">${dashboardSoonDays}일 이내 입고 예정인 발전기가 없습니다.</div>` : `
     <div class="table-scroll"><table>
       <thead><tr><th>번호</th><th>모델</th><th>거래처/현장</th><th>주소</th><th>전압</th><th>출고일</th><th>입고예정</th></tr></thead>
       <tbody>${soonRows}</tbody>
@@ -4384,6 +4389,16 @@ function clearBulkOutSelection(){
 }
 
 let outRegionFilter = null;
+// [전체현황] "입고 예정" 섹션에서 며칠 이내까지 보여줄지 - 기본 5일, 1~365일 사이에서 직접 조절 가능
+let dashboardSoonDays = Number(localStorage.getItem('dashboardSoonDays')) || 5;
+function setDashboardSoonDays(v){
+  let n = Math.round(Number(v));
+  if(isNaN(n) || n<1) n = 1;
+  if(n>365) n = 365;
+  dashboardSoonDays = n;
+  try{ localStorage.setItem('dashboardSoonDays', String(n)); }catch(e){}
+  renderContent();
+}
 function viewRegionOutList(region){
   outRegionFilter = region;
   switchTab('out');
@@ -6103,7 +6118,7 @@ function renderManualTab(){
       ['용량별 보기 (출고중)', '[출고중] 목록 위에도 자동으로 용량(kW) 버튼이 생겨서, 그 용량의 발전기만 걸러서 볼 수 있습니다. 지역 필터와 같이 켜두면 두 조건이 동시에 적용됩니다. "전체" 버튼으로 용량 필터만 해제할 수 있습니다.'],
       ['정비 임박/필요', '정비 시점이 다가오거나 지난 발전기를 최대 15대까지 보여줍니다.'],
       ['🕐 최근 입고 처리한 발전기', '최근 입고 처리한 발전기 5대를 번호·모델·처리시각·전압·처리자·거래처·지역과 함께 보여줍니다. 방금 전압을 바꿨는지 기억이 안 날 때 여기서 바로 확인할 수 있고, 전압을 클릭하면 곧바로 수정할 수도 있습니다. 연료를 넣어드린 건은 "50L→25L (사용 25L)"처럼 반납시 확인한 사용량이 표시되고, "⛽ 연료사용안함"으로 처리한 건은 회색 "연료사용안함"으로, 아직 확인을 안 한 건은 "연료 미확인"으로 빨갛게 표시됩니다. "전체보기"를 누르면 [입고] 탭으로 이동합니다.'],
-      ['입고 예정 (5일 이내)', '5일 이내 반납 예정인 발전기 중 최근 5대를 보여줍니다. "입고 처리" 버튼으로 바로 처리할 수 있습니다. "전체보기"를 누르면 [입고] 탭으로 이동합니다.'],
+      ['입고 예정', '기본 5일 이내 반납 예정인 발전기를 보여줍니다 (숫자칸에서 1~365일 사이로 직접 조절 가능). "입고 처리" 버튼으로 바로 처리할 수 있습니다. "전체보기"를 누르면 [입고] 탭으로 이동합니다.'],
       ['출고 대기 최근 요약', '출고 대기 중인 건을 상차대기 우선으로 최대 5건 보여줍니다. "전체보기"를 누르면 [출고 대기] 탭으로 이동합니다.'],
       ['출고중 최근 요약', '출고일이 최근인 순서로 최대 5대를 보여줍니다. "전체보기"를 누르면 [출고중] 탭으로 이동합니다.'],
       ['최근 정비 이력', '전체 발전기의 최근 정비 기록을 날짜 최신순으로 최대 10건 보여줍니다.'],
