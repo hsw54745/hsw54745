@@ -4673,9 +4673,32 @@ function renderOutList(){
         </div>`;}).join('')}
       </div>
     </div>`;
+  // 문자오더/철수요청 카드 밑에, [전체현황]에 있는 것과 같은 "입고예정 발전기" 목록을 여기서도 바로 볼 수 있게 넣습니다.
+  const embeddedSoonList = allOutGens.filter(g=>g.rental && expectedInDate(g.rental))
+    .map(g=>({g, date: expectedInDate(g.rental)}))
+    .filter(x=>daysFromToday(x.date)<=dashboardSoonDays)
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  const embeddedSoonHtml = embeddedSoonList.length===0 ? '' : `
+    <div class="material-card" style="border:2px solid #B2782C;background:#FFF8EE;margin-bottom:16px;">
+      <div class="section-title" style="margin-top:0;color:#B2782C;">📅 입고예정 발전기 <span class="cnt">${embeddedSoonList.length}대</span></div>
+      <div class="table-scroll"><table>
+        <thead><tr><th>번호</th><th>모델</th><th>거래처/현장</th><th>입고예정</th></tr></thead>
+        <tbody>${embeddedSoonList.map(x=>{
+          const rt = x.g.rental;
+          const diff = daysFromToday(x.date);
+          return `<tr>
+            <td class="gid">${x.g.id}</td>
+            <td class="wrap-ok">${displayModel(x.g)}</td>
+            <td class="wrap-ok">${rt.customer||'<span class="muted">미기재</span>'}</td>
+            <td><span class="pill ${diff<=1?'danger':'warn'}">📅 ${inDateLabelFull(x.date)}</span></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>`;
   return `
     ${returnReqHtml}
-    <div class="section-title">📤 출고중 발전기 <span class="cnt">${list.length}대</span>${outRegionFilter? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">지역: ${escR(outRegionFilter)} <button onclick="clearOutRegionFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}${outCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${outCapacityFilter}kW <button onclick="clearOutCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''} <button type="button" class="btn sm" style="background:#B2782C;color:#fff;border-color:#B2782C;font-weight:700;" onclick="switchTab('dashboard')">📅 입고예정발전기 목록</button> <button type="button" class="btn sm" onclick="downloadOutFieldListFile()">🖨 출고 리스트 인쇄(단기/장기)</button></div>
+    ${embeddedSoonHtml}
+    <div class="section-title">📤 출고중 발전기 <span class="cnt">${list.length}대</span>${outRegionFilter? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">지역: ${escR(outRegionFilter)} <button onclick="clearOutRegionFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}${outCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${outCapacityFilter}kW <button onclick="clearOutCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''} <button type="button" class="btn sm" onclick="downloadOutFieldListFile()">🖨 출고 리스트 인쇄(단기/장기)</button></div>
     ${capacityButtonsHtml}
     <details class="info-toggle"><summary></summary><p class="muted">같은 거래처에서 여러 대를 한 번에 반납받을 때는 왼쪽 체크박스로 여러 대를 선택한 뒤 "한번에 입고" 버튼을 눌러주세요. 현장 정기 점검 출장 전에는 위 "출고 리스트 인쇄" 버튼으로 단기 1장·장기 1장짜리 리스트를 뽑을 수 있습니다.</p></details>
     <div id="bulk-in-bar">${bulkInBarHtml()}</div>
