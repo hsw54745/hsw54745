@@ -10388,7 +10388,7 @@ function openReserveNoGenModal(resId, draft){
         <div style="white-space:pre-wrap;font-size:13.5px;margin-top:8px;color:#333;">${escR(draft.rawText)}</div>
       </details>` : ''}
       <div class="out-row stretch">
-        <div class="field f-sm"><div class="out-card"><label>발전기</label>
+        <div class="field f-sm"><div class="out-card"><label>발전기 &nbsp;<button type="button" onclick="submitReserveNoGen(${existing? `'${resId}'` : 'null'}, true)" title="같은 거래처·주소로 발전기 한 대를 더 추가합니다" style="font-size:11px;font-weight:800;color:#1565C0;background:#E8F0FE;border:1px solid #1565C0;border-radius:10px;padding:2px 8px;cursor:pointer;">+추가</button></label>
           <select id="f-rsv-gen" onchange="onRsvGenChange()">${genOptionsHtml}</select>
         </div></div>
         <div class="field f-sm" id="f-rsv-starthours-wrap" style="display:none;"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-rsv-starthours" value="0" min="0"><div class="hint" id="rsv-starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);"></div></div></div>
@@ -10559,7 +10559,7 @@ function onRsvArriveTimeSelect(){
     input.value = sel.value;
   }
 }
-function submitReserveNoGen(resId){
+function submitReserveNoGen(resId, addAnother){
   const existing = resId ? DB.reservations.find(x=>x.id===resId) : null;
   const genSel = document.getElementById('f-rsv-gen').value;
   const customer = document.getElementById('f-rsv-site').value.trim();
@@ -10620,6 +10620,16 @@ function submitReserveNoGen(resId){
     } else {
       DB.reservations.push(pendingData);
     }
+    if(addAnother){
+      // 같은 거래처·주소로 발전기 한 대를 더 추가합니다.
+      if(!pendingData.batchId){ pendingData.batchId = uid(); const idx2 = DB.reservations.findIndex(x=>x.id===pendingData.id); if(idx2>=0) DB.reservations[idx2].batchId = pendingData.batchId; }
+      const clone = {...pendingData, id: uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false, plannedOutDate: pendingData.outDate, genAssignedBy: null, genAssignedAt: null, createdAt: todayStr()};
+      DB.reservations.push(clone);
+      saveWithRetry(saveReservations);
+      openReserveNoGenModal(clone.id);
+      flash('발전기가 한 대 더 추가되었습니다. 이어서 정보를 확인·저장해주세요.');
+      return;
+    }
     saveWithRetry(saveReservations);
     closeModal();
     currentTab = 'reserve'; renderTabbar(); renderContent();
@@ -10638,6 +10648,15 @@ function submitReserveNoGen(resId){
     if(idx>=0) DB.reservations[idx] = pendingData;
   } else {
     DB.reservations.push(pendingData);
+  }
+  if(addAnother){
+    if(!pendingData.batchId){ pendingData.batchId = uid(); const idx2 = DB.reservations.findIndex(x=>x.id===pendingData.id); if(idx2>=0) DB.reservations[idx2].batchId = pendingData.batchId; }
+    const clone = {...pendingData, id: uid(), genId: UNASSIGNED_GEN_ID, genAssignedBy: null, genAssignedAt: null, createdAt: todayStr()};
+    DB.reservations.push(clone);
+    saveWithRetry(saveReservations);
+    openReserveNoGenModal(clone.id);
+    flash('발전기가 한 대 더 추가되었습니다. 이어서 정보를 확인·저장해주세요.');
+    return;
   }
   saveWithRetry(saveReservations);
   closeModal();
@@ -11049,7 +11068,7 @@ function openOutModal(id, reservationId){
     if(!isEditingPending) return '';
     const reservedElsewhere = new Set(DB.reservations.filter(r=>r.id!==reservationId).map(r=>r.genId));
     const candidates = activeGens().filter(x=>x.id===g.id || (x.status==='in' && !x.underRepair && !reservedElsewhere.has(x.id))).sort(sortByIdNatural);
-    return candidates.map(x=>`<option value="${x.id}" ${x.id===g.id?'selected':''}>${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
+    return `<option value="${UNASSIGNED_GEN_ID}">🅾 미지정 (나중에 배정)</option>` + candidates.map(x=>`<option value="${x.id}" ${x.id===g.id?'selected':''}>${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
   })();
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
@@ -11166,9 +11185,13 @@ function toggleFuelFields(toggleId, wrapId){
 function onTargetGenChange(){
   const sel = document.getElementById('f-target-gen');
   if(!sel) return;
+  const subEl = document.getElementById('out-modal-sub');
+  if(sel.value===UNASSIGNED_GEN_ID){
+    if(subEl) subEl.textContent = '🅾 미지정 (저장하면 발전기 배정이 취소됩니다)';
+    return;
+  }
   const g = findGen(sel.value);
   if(!g) return;
-  const subEl = document.getElementById('out-modal-sub');
   if(subEl) subEl.textContent = `${g.id} · [${g.model||'미설정'}]`;
   const hoursEl = document.getElementById('f-starthours');
   if(hoursEl){ hoursEl.value = g.hours||0; hoursEl.min = g.hours||0; }
@@ -11182,6 +11205,21 @@ function toggleLongtermField(){
 async function submitOut(idParam, reservationId){
   const targetSelEl = document.getElementById('f-target-gen');
   const id = targetSelEl ? targetSelEl.value : idParam;
+  if(targetSelEl && id===UNASSIGNED_GEN_ID){
+    // 발전기를 다시 "미지정"으로 되돌립니다 (지금 배정된 발전기는 재고로 풀어주고, 이 건은 발전기 없이 대기 상태로 남깁니다).
+    if(!reservationId){ return; }
+    const r = DB.reservations.find(x=>x.id===reservationId);
+    if(!r) return;
+    r.genId = UNASSIGNED_GEN_ID;
+    r.pendingLoad = false;
+    r.genAssignedBy = null;
+    r.genAssignedAt = null;
+    await saveWithRetry(saveReservations);
+    closeModal();
+    currentTab = 'reserve'; renderTabbar(); renderContent();
+    flash('발전기 배정이 취소되어 미지정 상태로 돌아갔습니다.');
+    return;
+  }
   const g = findGen(id);
   const errElGuard = document.getElementById('f-err');
   if(!g){
