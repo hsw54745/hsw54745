@@ -10404,6 +10404,35 @@ async function applyRecallDateToGen(genId, dateStr, reqId){
   flash(`${g.id} 반납예정일이 ${dateStr}(사용일수 ${Math.max(1, days)}일)로 적용되었습니다`);
 }
 let _rsvSmsOrderRaw = '';
+let _rsvGenOptionsHtml = '';
+let _rsvExtraGenIdx = 0;
+function addRsvExtraGenRow(){
+  const wrap = document.getElementById('f-rsv-extra-gens-wrap');
+  if(!wrap) return;
+  const rowId = 'rsv-extra-'+(_rsvExtraGenIdx++);
+  const row = document.createElement('div');
+  row.id = rowId;
+  row.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:6px;';
+  row.innerHTML = `
+    <select class="rsv-extra-gen-select" style="flex:1;min-width:0;padding:5px 6px;font-size:12.5px;" onchange="onRsvExtraGenChange('${rowId}')">${_rsvGenOptionsHtml}</select>
+    <input type="number" class="rsv-extra-gen-hours" id="${rowId}-hours" placeholder="누적h" title="출고시 누적 사용시간(h)" style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;">
+    <button type="button" class="btn sm danger" style="flex:0 0 auto;padding:2px 7px;" onclick="document.getElementById('${rowId}').remove()">×</button>
+  `;
+  wrap.appendChild(row);
+}
+function onRsvExtraGenChange(rowId){
+  const row = document.getElementById(rowId);
+  if(!row) return;
+  const sel = row.querySelector('.rsv-extra-gen-select');
+  const hoursEl = document.getElementById(rowId+'-hours');
+  if(!sel || !hoursEl) return;
+  if(!sel.value){ hoursEl.style.display='none'; return; }
+  const g = findGen(sel.value);
+  if(!g || !g.hoursKnown){ hoursEl.style.display='none'; return; }
+  hoursEl.style.display='inline-block';
+  hoursEl.value = g.hours||0;
+  hoursEl.min = g.hours||0;
+}
 function openReserveNoGenModal(resId, draft){
   const existing = resId ? DB.reservations.find(x=>x.id===resId) : null;
   let autoFilled = false;
@@ -10444,6 +10473,7 @@ function openReserveNoGenModal(resId, draft){
   const candidates = activeGens().filter(x=>x.status==='in' && !x.underRepair && !DB.reservations.some(r=>r.genId===x.id)).sort(sortByIdNatural);
   const genOptionsHtml = `<option value="${UNASSIGNED_GEN_ID}" selected>🅾 미지정 (나중에 발전기 배정)</option>` +
     candidates.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
+  _rsvGenOptionsHtml = `<option value="">선택 안함</option>` + candidates.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
   const prefillReturnDate = (()=>{
     if(!pre || !pre.usageDays || !pre.plannedOutDate) return '';
     const d = new Date(pre.plannedOutDate+'T00:00:00');
@@ -10462,10 +10492,14 @@ function openReserveNoGenModal(resId, draft){
         <div style="white-space:pre-wrap;font-size:13.5px;margin-top:8px;color:#333;">${escR(draft.rawText)}</div>
       </details>` : ''}
       <div class="out-row stretch">
-        <div class="field f-sm" style="flex:1.6 1 170px;"><div class="out-card"><label>발전기</label>
-          <select id="f-rsv-gen" onchange="onRsvGenChange()">${genOptionsHtml}</select>
+        <div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 <button type="button" class="btn sm" style="padding:1px 7px;font-size:11px;margin-left:4px;" onclick="addRsvExtraGenRow()">+ 추가</button></label>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <select id="f-rsv-gen" onchange="onRsvGenChange()" style="flex:1;min-width:0;">${genOptionsHtml}</select>
+            <input type="number" id="f-rsv-starthours" value="0" min="0" placeholder="누적h" title="출고시 누적 사용시간(h)" style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;">
+          </div>
+          <div class="hint" id="rsv-starthours-hint" style="font-size:11px;font-weight:700;color:var(--danger);"></div>
+          <div id="f-rsv-extra-gens-wrap"></div>
         </div></div>
-        <div class="field f-sm" id="f-rsv-starthours-wrap" style="display:none;"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-rsv-starthours" value="0" min="0"><div class="hint" id="rsv-starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);"></div></div></div>
         <div class="field f-sm"><div class="out-card"><label>출고예정일</label>
           <input type="date" id="f-rsv-outdate" value="${(pre&&pre.plannedOutDate)||todayStr()}" onchange="syncRsvReturnDateToUsageDays()" style="${autoStyle('outdate')}">
         </div></div>
@@ -10613,15 +10647,15 @@ function reapplySmsOrderToRsvForm(){
 }
 function onRsvGenChange(){
   const sel = document.getElementById('f-rsv-gen');
-  const wrap = document.getElementById('f-rsv-starthours-wrap');
-  if(!sel || !wrap) return;
-  if(sel.value===UNASSIGNED_GEN_ID){ wrap.style.display='none'; return; }
-  const g = findGen(sel.value);
-  if(!g || !g.hoursKnown){ wrap.style.display='none'; return; }
-  wrap.style.display='block';
   const hoursEl = document.getElementById('f-rsv-starthours');
   const hintEl = document.getElementById('rsv-starthours-hint');
-  if(hoursEl){ hoursEl.value = g.hours||0; hoursEl.min = g.hours||0; }
+  if(!sel || !hoursEl) return;
+  if(sel.value===UNASSIGNED_GEN_ID){ hoursEl.style.display='none'; if(hintEl) hintEl.textContent=''; return; }
+  const g = findGen(sel.value);
+  if(!g || !g.hoursKnown){ hoursEl.style.display='none'; if(hintEl) hintEl.textContent=''; return; }
+  hoursEl.style.display='inline-block';
+  hoursEl.value = g.hours||0;
+  hoursEl.min = g.hours||0;
   if(hintEl) hintEl.textContent = `현재 누적: ${(g.hours||0).toLocaleString()}h`;
 }
 function onRsvCustomerNameInput(){
@@ -10712,6 +10746,28 @@ function submitReserveNoGen(resId){
     errEl.textContent = '출고예정일을 입력해주세요.';
     errEl.style.display='block'; return;
   }
+  // "+ 추가"로 끼워넣은 추가 발전기들도, 위와 똑같은 거래처/현장 정보로 상차대기 건을 새로 만듭니다.
+  const extraRowsEls = Array.from(document.querySelectorAll('#f-rsv-extra-gens-wrap > div'));
+  const seenExtraGen = new Set();
+  const extraPendingList = [];
+  for(const rowEl of extraRowsEls){
+    const selEl = rowEl.querySelector('.rsv-extra-gen-select');
+    if(!selEl || !selEl.value || selEl.value===genSel) continue;
+    if(seenExtraGen.has(selEl.value)) continue;
+    seenExtraGen.add(selEl.value);
+    const eg = findGen(selEl.value);
+    if(!eg) continue;
+    const hoursInputEl = rowEl.querySelector('.rsv-extra-gen-hours');
+    const extraStartHours = (eg.hoursKnown && hoursInputEl && hoursInputEl.style.display!=='none' && hoursInputEl.value!=='') ? Number(hoursInputEl.value) : (eg.hours||0);
+    extraPendingList.push({
+      id: uid(), genId: selEl.value, pendingLoad: true, batchId: null,
+      customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
+      fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
+      outDate: outDate||todayStr(), startHours: extraStartHours, longTerm, estDaily, smsOrder: null, smsOrderAt: null,
+      outProcessedBy: DB.currentUserName || null, createdAt: todayStr(),
+      genAssignedBy: DB.currentUserName||null, genAssignedAt: nowDateTimeStr()
+    });
+  }
   if(genSel !== UNASSIGNED_GEN_ID){
     // 이 자리에서 발전기를 골랐으면(새로 등록이든, 수정중에 배정이든), 일반 출고와 똑같이 상차대기로 등록합니다.
     const g = findGen(genSel);
@@ -10737,10 +10793,11 @@ function submitReserveNoGen(resId){
     } else {
       DB.reservations.push(pendingData);
     }
+    DB.reservations.push(...extraPendingList);
     saveWithRetry(saveReservations);
     closeModal();
     currentTab = 'reserve'; renderTabbar(); renderContent();
-    flash('출고 대기(상차대기)에 등록되었습니다. 상차완료를 눌러야 출고됩니다.');
+    flash(extraPendingList.length? `출고 대기(상차대기)에 총 ${1+extraPendingList.length}건 등록되었습니다. 상차완료를 눌러야 출고됩니다.` : '출고 대기(상차대기)에 등록되었습니다. 상차완료를 눌러야 출고됩니다.');
     return;
   }
   const pendingData = {
@@ -10756,10 +10813,11 @@ function submitReserveNoGen(resId){
   } else {
     DB.reservations.push(pendingData);
   }
+  DB.reservations.push(...extraPendingList);
   saveWithRetry(saveReservations);
   closeModal();
   currentTab = 'reserve'; renderTabbar(); renderContent();
-  flash(existing? '출고예약 내용이 수정되었습니다.' : '출고예약이 등록되었습니다. [출고 대기]에서 발전기를 배정하면 출고로 이어집니다.');
+  flash(existing? '출고예약 내용이 수정되었습니다.' : (extraPendingList.length? `출고예약이 등록되었습니다. (추가 발전기 ${extraPendingList.length}대는 상차대기로 바로 등록됨) [출고 대기]에서 발전기를 배정하면 출고로 이어집니다.` : '출고예약이 등록되었습니다. [출고 대기]에서 발전기를 배정하면 출고로 이어집니다.'));
 }
 function syncUsageDaysToReturnDate(){
   const outEl = document.getElementById('f-outdate');
