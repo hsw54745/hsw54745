@@ -1454,6 +1454,7 @@ async function qmRefreshReservationList(){
         ${r.smsQtyTotal>1? `<div style="font-size:11px;font-weight:800;color:#1565C0;background:#E8F0FE;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;margin-left:4px;">📦 ${r.smsQtyTotal}대 중 ${r.smsQtyIndex}번째</div>` : ''}
         <div style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(dCustomer)}</div>
         <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${r.outDate? fmtDateKR(r.outDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
+        ${r.outDate? arriveCountdownHtml(r.outDate) : ''}
         <div style="font-size:13px;color:#333;margin-top:6px;">
           ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
@@ -1772,10 +1773,10 @@ async function openQmEditReservation(resId){
           </select>
           <input type="text" id="qmre-arrivetime" value="${isCustomArrive? escR(dArriveTime) : ''}" placeholder="예: 오전 6시 30분" style="${inputStyle};display:${isCustomArrive?'block':'none'};margin-top:8px;">
         </div>
-        <div><label style="${labelStyle}">운임료 부담</label>
+        <div><label style="${labelStyle}">배차</label>
           <select id="qmre-freight" style="${inputStyle}">
-            <option value="우리부담" ${r.freightBearer==='우리부담'?'selected':''}>우리부담</option>
-            <option value="고객부담" ${r.freightBearer==='고객부담'?'selected':''}>고객부담(배차하지마세요)</option>
+            <option value="우리배차" ${r.freightBearer==='우리배차'?'selected':''}>우리배차</option>
+            <option value="고객배차" ${r.freightBearer==='고객배차'?'selected':''}>고객배차(직접 배차)</option>
           </select>
         </div>
         <div>
@@ -2177,10 +2178,10 @@ function renderQuickModeReserveUI(){
           </select>
           <input type="text" id="qmr-arrivetime" value="" placeholder="예: 오전 6시 30분" style="${inputStyle};display:none;margin-top:8px;">
         </div>
-        <div><label style="${labelStyle}">⑤ 운임료 부담</label>
+        <div><label style="${labelStyle}">⑤ 배차</label>
           <select id="qmr-freight" style="${inputStyle}">
-            <option value="우리부담">우리부담</option>
-            <option value="고객부담">고객부담(배차하지마세요)</option>
+            <option value="우리배차">우리배차</option>
+            <option value="고객배차">고객배차(직접 배차)</option>
           </select>
         </div>
         <div><label style="${labelStyle}">⑥ 거래처명</label><input id="qmr-customer" type="text" style="${inputStyle}" placeholder="예: 00건설"></div>
@@ -2327,7 +2328,7 @@ function buildQmrSmsText(d){
   if(d.voltage) lines.push('전압: '+d.voltage);
   if(d.outDate) lines.push('출고예정일: '+d.outDate);
   if(d.arriveTime) lines.push('도착시간: '+d.arriveTime);
-  if(d.freightBearer) lines.push('운임: '+(d.freightBearer==='고객부담' ? '고객부담(배차하지마세요)' : d.freightBearer));
+  if(d.freightBearer) lines.push('배차: '+(d.freightBearer==='고객배차' ? '고객배차(직접 배차)' : d.freightBearer));
   if(d.fuelRequested || d.fuelActual) lines.push('연료: '+(d.fuelRequested||d.fuelActual)+'L');
   if(d.note) lines.push('비고: '+d.note);
   return lines.join('\n');
@@ -2457,7 +2458,7 @@ async function submitQuickReserve(){
     const outdateEl = document.getElementById('qmr-outdate'); if(outdateEl) outdateEl.value = today;
     const loaddateEl = document.getElementById('qmr-loaddate'); if(loaddateEl) loaddateEl.value = today;
     setQmrDate(today, 'qmr-quickdate-today');
-    const freightEl = document.getElementById('qmr-freight'); if(freightEl) freightEl.value = '우리부담';
+    const freightEl = document.getElementById('qmr-freight'); if(freightEl) freightEl.value = '우리배차';
     const selEl = document.getElementById('qmr-supplies-selections'); if(selEl) selEl.value = '[]';
     initSuppliesPicker('qmr-supplies');
     loadQmrGenOptions();
@@ -2652,7 +2653,7 @@ async function proceedSubmitQuickOrder(text){
       voltage: '', qty: 1,
       fuelRequested: null, fuelActual: null,
       usageDays: null, loadDate: null, arriveTime: null,
-      freightBearer: '우리부담', paymentNote: '',
+      freightBearer: '우리배차', paymentNote: '',
       note: '',
       smsOrder: text,
       smsQtyIndex: qty>1 ? i+1 : null, smsQtyTotal: qty>1 ? qty : null,
@@ -4697,7 +4698,7 @@ function renderOutList(){
         <div class="muted" style="font-size:11px;">부자재: ${rt.supplies||'없음'}</div>
         ${rt.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${rt.fuelRequested}L${rt.fuelActual && rt.fuelActual!==rt.fuelRequested? ` (실제주입 ${rt.fuelActual}L)`:''}</div>`:''}
         ${(rt.loadDate||rt.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(rt.loadDate),rt.arriveTime].filter(Boolean).join(' · ')}</div>`:''}
-        ${rt.freightBearer? `<div class="muted" style="font-size:11px;">운임료: ${rt.freightBearer}</div>`:''}
+        ${rt.freightBearer? `<div class="muted" style="font-size:11px;">배차: ${rt.freightBearer}</div>`:''}
         ${rt.note? `<div class="muted" style="font-size:11px;">비고: ${rt.note}</div>`:''}
         ${rt.smsOrder? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;margin-top:4px;" onclick="showSmsOrderForGen('${g.id}')">📩 출고오더확인</button>`:''}
         ${matchedReq? `<button class="btn sm" style="color:#B23A34;font-weight:700;border-color:#B23A34;background:#FBEAEA;margin-top:4px;margin-left:4px;" onclick="viewMatchedReturnRequest('${g.id}','${matchedReq.id}')">🔻 철수오더확인</button>`:''}
@@ -5981,7 +5982,7 @@ function renderGenHistory(){
         <td>${dow(r.outDate)||'-'}</td>
         <td>${dow(r.inDate)||'-'}</td>
         <td class="wrap-ok">${r.customer||'-'}${(r.manager||r.phone)? `<div class="muted" style="font-size:11px;">${[r.manager,r.phone].filter(Boolean).join(' · ')}</div>`:''}</td>
-        <td class="wrap-ok">${[r.site,r.address].filter(Boolean).join(' · ')||'-'}${r.supplies? `<div class="muted" style="font-size:11px;">부자재(출고): ${r.supplies}</div>`:''}${r.supplies? `<div class="muted" style="font-size:11px;">부자재 회수: ${r.suppliesRecovered? '<span class="pill ok">회수됨</span>' : `<span class="pill danger">회수안됨</span>${r.suppliesNote? ` - ${r.suppliesNote}`:''}`}</div>`:''}${r.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${r.fuelRequested}L${r.fuelActual && r.fuelActual!==r.fuelRequested? ` (실제주입 ${r.fuelActual}L)`:''}</div>`:''}${r.fuelNotUsed? `<div class="muted" style="font-size:11px;">반납시 연료: <span class="pill gray">연료사용안함</span></div>`:''}${(!r.fuelNotUsed && r.measuredFuelHeightCm!=null)? `<div class="muted" style="font-size:11px;">반납시 연료: ${(()=>{ const L=computeFuelLiters(g, r.measuredFuelHeightCm); return L!=null? `약 ${L}L ` : ''; })()}(측정높이 ${r.measuredFuelHeightCm}cm)</div>`:''}${(()=>{ const given = r.fuelRequested!=null? r.fuelRequested : r.fuelActual; const remain = r.measuredFuelHeightCm!=null? computeFuelLiters(g, r.measuredFuelHeightCm) : null; if(given==null || remain==null) return ''; const used = Math.round((given-remain)*10)/10; return `<div class="muted" style="font-size:11px;font-weight:700;color:var(--primary-dark);">⛽ ${given}L 중 ${remain}L 남아서 반납 → 사용량 약 ${used}L</div>`; })()}${(r.loadDate||r.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(r.loadDate),r.arriveTime].filter(Boolean).join(' · ')}</div>`:''}${r.freightBearer? `<div class="muted" style="font-size:11px;">운임료: ${r.freightBearer}</div>`:''}${r.note? `<div class="muted" style="font-size:11px;">비고: ${r.note}</div>`:''}${(r.loadConfirmedBy||r.outProcessedBy||r.inProcessedBy)? `<div class="muted" style="font-size:11px;">${[(r.loadConfirmedBy||r.outProcessedBy)? `출고: ${escR(r.loadConfirmedBy||r.outProcessedBy)}`:null, r.inProcessedBy? `입고: ${escR(r.inProcessedBy)}`:null].filter(Boolean).join(' · ')}</div>`:''}</td>
+        <td class="wrap-ok">${[r.site,r.address].filter(Boolean).join(' · ')||'-'}${r.supplies? `<div class="muted" style="font-size:11px;">부자재(출고): ${r.supplies}</div>`:''}${r.supplies? `<div class="muted" style="font-size:11px;">부자재 회수: ${r.suppliesRecovered? '<span class="pill ok">회수됨</span>' : `<span class="pill danger">회수안됨</span>${r.suppliesNote? ` - ${r.suppliesNote}`:''}`}</div>`:''}${r.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${r.fuelRequested}L${r.fuelActual && r.fuelActual!==r.fuelRequested? ` (실제주입 ${r.fuelActual}L)`:''}</div>`:''}${r.fuelNotUsed? `<div class="muted" style="font-size:11px;">반납시 연료: <span class="pill gray">연료사용안함</span></div>`:''}${(!r.fuelNotUsed && r.measuredFuelHeightCm!=null)? `<div class="muted" style="font-size:11px;">반납시 연료: ${(()=>{ const L=computeFuelLiters(g, r.measuredFuelHeightCm); return L!=null? `약 ${L}L ` : ''; })()}(측정높이 ${r.measuredFuelHeightCm}cm)</div>`:''}${(()=>{ const given = r.fuelRequested!=null? r.fuelRequested : r.fuelActual; const remain = r.measuredFuelHeightCm!=null? computeFuelLiters(g, r.measuredFuelHeightCm) : null; if(given==null || remain==null) return ''; const used = Math.round((given-remain)*10)/10; return `<div class="muted" style="font-size:11px;font-weight:700;color:var(--primary-dark);">⛽ ${given}L 중 ${remain}L 남아서 반납 → 사용량 약 ${used}L</div>`; })()}${(r.loadDate||r.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(r.loadDate),r.arriveTime].filter(Boolean).join(' · ')}</div>`:''}${r.freightBearer? `<div class="muted" style="font-size:11px;">배차: ${r.freightBearer}</div>`:''}${r.note? `<div class="muted" style="font-size:11px;">비고: ${r.note}</div>`:''}${(r.loadConfirmedBy||r.outProcessedBy||r.inProcessedBy)? `<div class="muted" style="font-size:11px;">${[(r.loadConfirmedBy||r.outProcessedBy)? `출고: ${escR(r.loadConfirmedBy||r.outProcessedBy)}`:null, r.inProcessedBy? `입고: ${escR(r.inProcessedBy)}`:null].filter(Boolean).join(' · ')}</div>`:''}</td>
         <td class="muted">${(r.usedHours||0).toLocaleString()}h</td>
         <td>${r.longTerm?'<span class="pill gray">장기</span>':'<span class="pill gray">단기</span>'}</td>
         <td><button class="btn sm danger" onclick="deleteRental('${r.id}','${id}')">삭제</button></td>
@@ -9910,7 +9911,7 @@ function renderReserveTab(){
     </div>
     ${list.length===0? `<div class="empty" style="margin-top:12px;">등록된 출고 대기가 없습니다.</div>` : `
     <div class="table-scroll" style="margin-top:12px;"><table>
-      <thead><tr><th>번호</th><th style="max-width:130px;">모델</th><th>출고요청</th><th>거래처/현장</th><th>상차일</th><th>도착일</th><th>도착시간</th><th>운임</th><th>전압</th><th>주입연료</th><th>부자재</th><th>사용일수</th><th></th></tr></thead>
+      <thead><tr><th>번호</th><th style="max-width:130px;">모델</th><th>출고요청</th><th>거래처/현장</th><th>상차일</th><th>도착일</th><th>도착시간</th><th>배차</th><th>전압</th><th>주입연료</th><th>부자재</th><th>사용일수</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`}
   `;
@@ -10654,9 +10655,9 @@ function openReserveNoGenModal(resId, draft){
         <div class="field f-sm"><div class="out-card"><label>상차일자</label>
           <input type="date" id="f-rsv-loaddate" value="${(pre&&pre.loadDate)||(pre&&pre.plannedOutDate)||todayStr()}" style="${autoStyle('loaddate')}">
         </div></div>
-        <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="f-rsv-freight">
-          <option value="우리부담" ${!pre||pre.freightBearer!=='고객부담'?'selected':''}>우리부담</option>
-          <option value="고객부담" ${pre&&pre.freightBearer==='고객부담'?'selected':''}>고객부담</option>
+        <div class="field f-xs"><div class="out-card"><label>배차</label><select id="f-rsv-freight">
+          <option value="우리배차" ${!pre||pre.freightBearer!=='고객배차'?'selected':''}>우리배차</option>
+          <option value="고객배차" ${pre&&pre.freightBearer==='고객배차'?'selected':''}>고객배차</option>
         </select></div></div>
       </div>
       <div class="out-row">
@@ -11046,9 +11047,9 @@ function openOutInfoEditModal(id){
         <div class="field f-sm"><div class="out-card"><label>상차일자</label>
           <input type="date" id="f-oie-loaddate" value="${rt.loadDate||rt.outDate||todayStr()}">
         </div></div>
-        <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="f-oie-freight">
-          <option value="우리부담" ${rt.freightBearer!=='고객부담'?'selected':''}>우리부담</option>
-          <option value="고객부담" ${rt.freightBearer==='고객부담'?'selected':''}>고객부담</option>
+        <div class="field f-xs"><div class="out-card"><label>배차</label><select id="f-oie-freight">
+          <option value="우리배차" ${rt.freightBearer!=='고객배차'?'selected':''}>우리배차</option>
+          <option value="고객배차" ${rt.freightBearer==='고객배차'?'selected':''}>고객배차</option>
         </select></div></div>
       </div>
       <div class="out-row">
@@ -11238,7 +11239,7 @@ async function quickForceOut(id){
     customer:'', manager:'', phone:'', site:'', address:'',
     supplies:'', suppliesItems:[], suppliesCustom:'', voltage: g.voltage||'', qty:1,
     fuelRequested:null, fuelActual:null, usageDays:null, loadDate: todayStr(), arriveTime:null,
-    freightBearer:'우리부담', paymentConfirmed:false, forcedOut:false, forceReason:'', forcedBy:null,
+    freightBearer:'우리배차', paymentConfirmed:false, forcedOut:false, forceReason:'', forcedBy:null,
     note:'(정보없이 강제출고됨 - 오입고 수정용)',
     outDate: todayStr(), startHours: g.hours||0, longTerm:false, estDaily:null,
     outProcessedBy: DB.currentUserName||null, loadConfirmedBy: DB.currentUserName||null, outConfirmedAt: Date.now()
@@ -11392,9 +11393,9 @@ function openOutModal(id, reservationId){
         <div class="field f-sm"><div class="out-card"><label>상차일자</label>
           <input type="date" id="f-loaddate" value="${(res&&(res.loadDate||res.plannedOutDate))||todayStr()}">
         </div></div>
-        <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="f-freight">
-          <option value="우리부담" ${!res||res.freightBearer!=='고객부담'?'selected':''}>우리부담</option>
-          <option value="고객부담" ${res&&res.freightBearer==='고객부담'?'selected':''}>고객부담</option>
+        <div class="field f-xs"><div class="out-card"><label>배차</label><select id="f-freight">
+          <option value="우리배차" ${!res||res.freightBearer!=='고객배차'?'selected':''}>우리배차</option>
+          <option value="고객배차" ${res&&res.freightBearer==='고객배차'?'selected':''}>고객배차</option>
         </select></div></div>
       </div>
       <div class="out-row">
@@ -11747,9 +11748,9 @@ function openBulkOutModal(){
         <div class="field f-sm"><div class="out-card"><label>상차일자</label>
           <input type="date" id="fb-loaddate" value="${todayStr()}">
         </div></div>
-        <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="fb-freight">
-          <option value="우리부담" selected>우리부담</option>
-          <option value="고객부담">고객부담</option>
+        <div class="field f-xs"><div class="out-card"><label>배차</label><select id="fb-freight">
+          <option value="우리배차" selected>우리배차</option>
+          <option value="고객배차">고객배차</option>
         </select></div></div>
       </div>
       <div class="out-row">
