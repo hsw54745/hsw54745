@@ -1007,7 +1007,6 @@ async function renderQmOutListInner(){
           <div style="text-align:left;min-width:0;">
             <span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span>
             <span style="font-size:13px;color:#333;margin-left:6px;">${escR(g.model||'')}</span>
-            <span style="font-size:10px;font-weight:800;color:#1565C0;background:#E8F0FE;border:1px solid #1565C0;border-radius:10px;padding:2px 6px;margin-left:4px;">${g.rental&&g.rental.batchId? outGens.filter(x=>x.rental&&x.rental.batchId===g.rental.batchId).length : 1}대</span>
           </div>
           <button type="button" onclick="openQmOutDetail('${g.id}')" style="background:#5B7FA6;border:none;color:#fff;font-weight:800;font-size:12px;padding:8px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0;">상세보기</button>
         </div>
@@ -1697,7 +1696,7 @@ async function submitQmConfirmLoad(resId, needFuel){
       fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
       usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
       outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
-      outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: qmLabel(), genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now(), batchId: r.batchId||null
+      outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: qmLabel(), genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now()
     };
     if(r.suppliesItems && r.suppliesItems.length){
       r.suppliesItems.forEach(it=>{
@@ -4599,7 +4598,7 @@ function renderOutList(){
     return `<tr${rowBg? ` style="background:${rowBg};"`:''}>
       <td><input type="checkbox" class="bulk-in-chk" data-gid="${g.id}" ${bulkInSelection.has(g.id)?'checked':''} onchange="toggleBulkInSelect('${g.id}', this.checked)"></td>
       <td class="gid">${g.id}</td>
-      <td class="wrap-ok">${displayModel(g)}${usableCapacityHtml(g)} <span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">${rt.batchId? (DB.gens||[]).filter(x=>x && x.status==='out' && x.rental && x.rental.batchId===rt.batchId).length : 1}대</span>${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
+      <td class="wrap-ok">${displayModel(g)}${usableCapacityHtml(g)}${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
       <td class="muted" style="font-size:11px;">${rt.loadConfirmedBy? escR(rt.loadConfirmedBy) : (rt.outProcessedBy? escR(rt.outProcessedBy) : '-')}</td>
       <td>${(()=>{ const v=g.voltage||rt.voltage; const c=voltageColor(v); return v? `<span style="${c?`color:${c};font-weight:700;`:''}">${escR(v)}</span>` : '<span class="muted">-</span>'; })()}</td>
       <td class="wrap-ok">
@@ -9590,7 +9589,7 @@ function renderReserveTab(){
       const rowStyle = isRaw ? ' style="background:#FFFDF3;"' : (isDelayed2? ' style="background:var(--danger-tint);"' : '');
       return `<tr${rowStyle}>
         <td class="gid"><span class="pill warn">🅾 미지정</span>${isRaw? `<div style="margin-top:4px;"><span class="pill" style="background:#FFF3C4;color:#8A6D00;border-color:#E8B923;">📩 문자오더</span></div>`:''}</td>
-        <td class="wrap-ok" style="max-width:130px;"><span class="muted">발전기 배정 전</span> <span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">${r.batchId? DB.reservations.filter(x=>x.batchId===r.batchId).length : 1}대</span></td>
+        <td class="wrap-ok" style="max-width:130px;"><span class="muted">발전기 배정 전</span></td>
         <td class="muted" style="font-size:11px;">${r.outProcessedBy? escR(r.outProcessedBy) : '-'}</td>
         <td class="wrap-ok" style="font-size:12px;">
           ${r.customer||r.site||'<span class="muted">미기재</span>'}
@@ -9627,7 +9626,7 @@ function renderReserveTab(){
     const smsMarker = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 출고오더확인</button>` : '';
     return `<tr${isDelayed? ` style="background:var(--danger-tint);"`:''}>
       <td class="gid">${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)}</td>
-      <td class="wrap-ok" style="max-width:130px;">${g? displayModel(g): '-'} <span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">${r.batchId? DB.reservations.filter(x=>x.batchId===r.batchId).length : 1}대</span></td>
+      <td class="wrap-ok" style="max-width:130px;">${g? displayModel(g): '-'}</td>
       <td class="muted" style="font-size:11px;">${r.outProcessedBy? escR(r.outProcessedBy) : '-'}</td>
       <td class="wrap-ok" style="font-size:12px;">
         ${r.customer||r.site||'<span class="muted">미기재</span>'}
@@ -9977,7 +9976,7 @@ async function confirmLoad(resId, isTransfer){
     usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'',
     note: [r.note, transferFuelNote].filter(Boolean).join(' / '), smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
     outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
-    outProcessedBy: r.outProcessedBy || null, loadConfirmedBy: DB.currentUserName || null, genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now(), batchId: r.batchId||null
+    outProcessedBy: r.outProcessedBy || null, loadConfirmedBy: DB.currentUserName || null, genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now()
   };
   if(r.suppliesItems && r.suppliesItems.length){
     DB.suppliesStock = DB.suppliesStock || {};
@@ -10388,7 +10387,7 @@ function openReserveNoGenModal(resId, draft){
         <div style="white-space:pre-wrap;font-size:13.5px;margin-top:8px;color:#333;">${escR(draft.rawText)}</div>
       </details>` : ''}
       <div class="out-row stretch">
-        <div class="field f-sm"><div class="out-card"><label>발전기 &nbsp;<button type="button" onclick="submitReserveNoGen(${existing? `'${resId}'` : 'null'}, true)" title="같은 거래처·주소로 발전기 한 대를 더 추가합니다" style="font-size:11px;font-weight:800;color:#1565C0;background:#E8F0FE;border:1px solid #1565C0;border-radius:10px;padding:2px 8px;cursor:pointer;">+추가</button></label>
+        <div class="field f-sm"><div class="out-card"><label>발전기</label>
           <select id="f-rsv-gen" onchange="onRsvGenChange()">${genOptionsHtml}</select>
         </div></div>
         <div class="field f-sm" id="f-rsv-starthours-wrap" style="display:none;"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-rsv-starthours" value="0" min="0"><div class="hint" id="rsv-starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);"></div></div></div>
@@ -10559,7 +10558,7 @@ function onRsvArriveTimeSelect(){
     input.value = sel.value;
   }
 }
-function submitReserveNoGen(resId, addAnother){
+function submitReserveNoGen(resId){
   const existing = resId ? DB.reservations.find(x=>x.id===resId) : null;
   const genSel = document.getElementById('f-rsv-gen').value;
   const customer = document.getElementById('f-rsv-site').value.trim();
@@ -10620,16 +10619,6 @@ function submitReserveNoGen(resId, addAnother){
     } else {
       DB.reservations.push(pendingData);
     }
-    if(addAnother){
-      // 같은 거래처·주소로 발전기 한 대를 더 추가합니다.
-      if(!pendingData.batchId){ pendingData.batchId = uid(); const idx2 = DB.reservations.findIndex(x=>x.id===pendingData.id); if(idx2>=0) DB.reservations[idx2].batchId = pendingData.batchId; }
-      const clone = {...pendingData, id: uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false, plannedOutDate: pendingData.outDate, genAssignedBy: null, genAssignedAt: null, createdAt: todayStr()};
-      DB.reservations.push(clone);
-      saveWithRetry(saveReservations);
-      openReserveNoGenModal(clone.id);
-      flash('발전기가 한 대 더 추가되었습니다. 이어서 정보를 확인·저장해주세요.');
-      return;
-    }
     saveWithRetry(saveReservations);
     closeModal();
     currentTab = 'reserve'; renderTabbar(); renderContent();
@@ -10648,15 +10637,6 @@ function submitReserveNoGen(resId, addAnother){
     if(idx>=0) DB.reservations[idx] = pendingData;
   } else {
     DB.reservations.push(pendingData);
-  }
-  if(addAnother){
-    if(!pendingData.batchId){ pendingData.batchId = uid(); const idx2 = DB.reservations.findIndex(x=>x.id===pendingData.id); if(idx2>=0) DB.reservations[idx2].batchId = pendingData.batchId; }
-    const clone = {...pendingData, id: uid(), genId: UNASSIGNED_GEN_ID, genAssignedBy: null, genAssignedAt: null, createdAt: todayStr()};
-    DB.reservations.push(clone);
-    saveWithRetry(saveReservations);
-    openReserveNoGenModal(clone.id);
-    flash('발전기가 한 대 더 추가되었습니다. 이어서 정보를 확인·저장해주세요.');
-    return;
   }
   saveWithRetry(saveReservations);
   closeModal();
