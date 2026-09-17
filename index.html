@@ -3990,7 +3990,7 @@ function renderContent(){
   if(currentTab==='improvements') renderImprovementsList();
   if(currentTab==='settings'){ renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); renderQuickOrderQr(); renderVoiceSelect(); }
   if(currentTab==='dashboard') renderRecentMaint();
-  if(currentTab==='notice'){ renderNoticeList(); renderRentalScheduleList(); renderCalendar(); }
+  if(currentTab==='notice'){ renderNoticeList(); renderCalendar(); }
   restoreFocusState(_focus);
 }
 
@@ -7333,19 +7333,6 @@ function renderNoticeTab(){
       <div id="notice-wrap" style="margin-top:14px;"></div>
     </div>
 
-    <div class="material-card" style="margin-top:20px;background:#F3F9F0;border-left:4px solid #2C6E49;">
-      <div class="section-title" style="margin-top:0;">
-        🚚 <span id="rental-schedule-month-label"></span> 임대일정표 (전체 발전기 투입·철수)
-        <span class="btn-row" style="display:inline-flex;margin-left:8px;">
-          <button type="button" class="btn sm" onclick="navCalendar(-1)">◀ 이전달</button>
-          <button type="button" class="btn sm" onclick="calendarGoToday()">오늘</button>
-          <button type="button" class="btn sm" onclick="navCalendar(1)">다음달 ▶</button>
-        </span>
-      </div>
-      <details class="info-toggle"><summary></summary><p class="muted">지금 출고중인 발전기 전체의 실제 출고일(투입)·예상 반납일(철수)과, 아래 일정표에 손으로 적어둔 투입·철수 메모를 한 달 단위로 날짜순으로 모아 보여줍니다. 예상 반납일은 "사용일수"가 입력된 건만 계산됩니다. 아래 달력과 같은 달을 보여줍니다.</p></details>
-      <div id="rental-schedule-wrap" style="margin-top:10px;"></div>
-    </div>
-
     <div class="material-card" style="margin-top:20px;background:#EEF5FB;border-left:4px solid #1E6FA8;">
       <div class="section-title" style="margin-top:0;">
         🗓 <span id="calendar-month-label"></span> 일정표
@@ -7359,47 +7346,6 @@ function renderNoticeTab(){
       <div id="calendar-wrap" style="margin-top:10px;"></div>
     </div>
   `;
-}
-function renderRentalScheduleList(){
-  const wrap = document.getElementById('rental-schedule-wrap');
-  const labelEl = document.getElementById('rental-schedule-month-label');
-  if(!wrap) return;
-  initCalendarView();
-  if(labelEl) labelEl.textContent = `${calYear}년 ${calMonth+1}월`;
-  const monthPrefix = `${calYear}-${pad2(calMonth+1)}-`;
-  const todayS = todayStr();
-  const rows = [];
-  // 1) 지금 출고중인 발전기 전체: 실제 투입일(출고일)과 예상 철수일(반납예정일)
-  activeGens().filter(g=>g.status==='out' && g.rental).forEach(g=>{
-    const rt = g.rental;
-    if(rt.outDate && rt.outDate.startsWith(monthPrefix)){
-      rows.push({date: rt.outDate, kind:'deploy', label: `${g.id} · ${displayModel(g)}`, sub: rt.customer||rt.site||'', clickable:false, gid:g.id});
-    }
-    const ret = expectedInDate(rt);
-    if(ret && ret.startsWith(monthPrefix)){
-      rows.push({date: ret, kind:'withdraw', label: `${g.id} · ${displayModel(g)}`, sub: rt.customer||rt.site||'', clickable:false, gid:g.id});
-    }
-  });
-  // 2) 일정표에 손으로 적어둔 투입/철수 메모
-  (DB.calendarEvents||[]).forEach(e=>{
-    if(e.deployDate && e.deployDate.startsWith(monthPrefix)) rows.push({date: e.deployDate, kind:'deploy', label: e.text, sub: '📝 메모', clickable:true});
-    if(e.withdrawDate && e.withdrawDate.startsWith(monthPrefix)) rows.push({date: e.withdrawDate, kind:'withdraw', label: e.text, sub: '📝 메모', clickable:true});
-  });
-  rows.sort((a,b)=> a.date.localeCompare(b.date) || (a.kind==='deploy'?-1:1));
-  if(rows.length===0){ wrap.innerHTML = `<div class="empty">이번 달 투입·철수 일정이 없습니다.</div>`; return; }
-  wrap.innerHTML = rows.map(r=>{
-    const isToday = r.date===todayS;
-    const isDeploy = r.kind==='deploy';
-    const label = isDeploy? '🚚 투입' : '🔻 철수';
-    const color = isDeploy? '#1E7B45' : 'var(--danger)';
-    const bg = isDeploy? '#E3F2E9' : 'var(--danger-tint)';
-    const onclick = r.clickable? `onclick="openCalendarDayModal('${r.date}')" style="cursor:pointer;` : `style="`;
-    return `<div ${onclick}display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;margin-bottom:5px;background:${bg};${isToday?'border:2px solid '+color+';':'border:1px solid var(--border);'}">
-      <div style="flex:0 0 auto;min-width:74px;font-weight:800;font-size:12.5px;color:${color};">${dow(r.date)}${isToday?' (오늘)':''}</div>
-      <div style="flex:0 0 auto;font-weight:700;font-size:12px;color:${color};white-space:nowrap;">${label}</div>
-      <div style="flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escR(r.label)}${r.sub? ` <span class="muted" style="font-size:11.5px;">· ${escR(r.sub)}</span>`:''}</div>
-    </div>`;
-  }).join('');
 }
 function renderNoticeList(){
   const wrap = document.getElementById('notice-wrap');
@@ -7501,13 +7447,13 @@ function navCalendar(delta){
   calMonth += delta;
   if(calMonth<0){ calMonth = 11; calYear--; }
   else if(calMonth>11){ calMonth = 0; calYear++; }
-  renderCalendar(); renderRentalScheduleList();
+  renderCalendar();
 }
 function calendarGoToday(){
   const now = new Date();
   calYear = now.getFullYear();
   calMonth = now.getMonth();
-  renderCalendar(); renderRentalScheduleList();
+  renderCalendar();
 }
 function pad2(n){ return String(n).padStart(2,'0'); }
 // 이 날짜에 표시할 일정들을 모읍니다: 그 날 작성된 일정 + 다른 날 작성됐지만
@@ -7633,7 +7579,7 @@ async function saveCalendarEventEdit(dateStr, id){
   ev.withdrawDate = withdrawEl ? (withdrawEl.value || null) : (ev.withdrawDate||null);
   await saveCalendarEvents();
   openCalendarDayModal(dateStr);
-  renderCalendar(); renderRentalScheduleList();
+  renderCalendar();
   flash('일정이 수정되었습니다');
 }
 async function addCalendarEvent(dateStr){
@@ -7647,14 +7593,14 @@ async function addCalendarEvent(dateStr){
   seenEventIds.add(newId);
   await saveCalendarEvents();
   openCalendarDayModal(dateStr);
-  renderCalendar(); renderRentalScheduleList();
+  renderCalendar();
   flash('일정이 등록되었습니다');
 }
 async function removeCalendarEvent(id, dateStr){
   DB.calendarEvents = (DB.calendarEvents||[]).filter(e=>e.id!==id);
   await saveCalendarEvents();
   openCalendarDayModal(dateStr);
-  renderCalendar(); renderRentalScheduleList();
+  renderCalendar();
   flash('일정이 삭제되었습니다');
 }
 function tomorrowStr(){
