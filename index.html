@@ -3469,13 +3469,6 @@ function daysFromToday(dateStr){
 function daysSinceDate(dateStr){
   return -daysFromToday(dateStr);
 }
-function arriveDayLabel(dateStr){
-  if(!dateStr) return '';
-  const diff = daysFromToday(dateStr);
-  if(diff===0) return '오늘';
-  if(diff>0) return `${diff}일후`;
-  return `${-diff}일전`;
-}
 // 전화번호 입력칸에서 숫자만 입력해도 자동으로 하이픈(-)을 넣어줍니다.
 // 서울(02) 지역번호는 2-3-4자리, 그 외(휴대폰 010 등, 지역번호)는 3-3-4 또는 3-4-4자리로 나눕니다.
 function formatPhoneNumber(v){
@@ -9654,7 +9647,7 @@ function renderReserveTab(){
           ${r.address? `<div class="muted" style="font-size:11px;">${escR(r.address)}</div>`:''}
         </td>
         <td class="muted">${dow(r.loadDate)||'-'}</td>
-        <td class="muted">${isRaw? `<span class="muted">확인 전</span>` : `${dow(d2)||'-'}${d2? `<div style="font-size:11px;color:#888;">${arriveDayLabel(d2)}</div>`:''}<div><span class="pill">출고예약</span>${isDelayed2? ' <span class="pill danger">지연</span>':''}</div>`}</td>
+        <td class="muted">${isRaw? `<span class="muted">확인 전</span>` : `${dow(d2)||'-'}<div><span class="pill">출고예약</span>${isDelayed2? ' <span class="pill danger">지연</span>':''}</div>`}</td>
         <td class="muted">${r.arriveTime||'-'}</td>
         <td class="muted">${r.freightBearer||'-'}</td>
         <td class="muted">${r.voltage||'-'}</td>
@@ -9694,7 +9687,6 @@ function renderReserveTab(){
       <td class="muted">${dow(r.loadDate||d)||'-'}</td>
       <td class="muted">
         ${dow(r.outDate)||'-'}
-        ${r.outDate? `<div style="font-size:11px;color:#888;">${arriveDayLabel(r.outDate)}</div>`:''}
         ${r.pendingLoad? `<div><span class="pill warn">상차대기</span>${isDelayed? ' <span class="pill danger">지연</span>':''}</div>` : ''}
       </td>
       <td class="muted">${r.arriveTime||'-'}</td>
@@ -9723,10 +9715,11 @@ function renderReserveTab(){
           const change = detectSmsOrderChange(r, smsOrderAll);
           const cardStyle = change ? 'border:2px solid var(--danger);box-shadow:0 0 0 2px var(--danger-tint);' : 'border:1px solid var(--border);';
           return `
-        <div style="width:195px;height:260px;flex-shrink:0;background:#fff;${cardStyle}border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
+        <div style="width:195px;height:260px;flex-shrink:0;background:#fff;${cardStyle}border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;">
+          ${smsOrderNumMap[r.id]? `<div style="position:absolute;top:6px;right:6px;background:#E8B923;color:#fff;font-size:10px;font-weight:800;border-radius:8px;padding:1px 6px;">#${smsOrderNumMap[r.id]}</div>`:''}
           ${change? `<div style="background:var(--danger);color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;line-height:1.3;">⚠️ ${change.diffs.join('·')} 변경됨!<br>(${fmtCardDateTime(change.priorAt)} 문자와 다름)</div>` : ''}
           ${r.smsQtyTotal>1? `<div style="background:#1565C0;color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;">📦 ${r.smsQtyTotal}대 중 ${r.smsQtyIndex}번째</div>` : ''}
-          <div class="muted" style="font-size:11px;margin-bottom:2px;">#${smsOrderNumMap[r.id]||'-'} · ${fmtCardDateTime(r.createdAtTs)}${r.outProcessedBy? ` · ${escR(r.outProcessedBy)}` : ''}</div>
+          <div class="muted" style="font-size:11px;margin-bottom:2px;padding-right:26px;">${fmtCardDateTime(r.createdAtTs)}${r.outProcessedBy? ` · ${escR(r.outProcessedBy)}` : ''}</div>
           <div style="font-size:14px;font-weight:700;color:var(--primary-dark);margin-bottom:4px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
           <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;flex:1;overflow:hidden;" onclick="showSmsOrderModal('${r.id}')">${escR(r.smsOrder||'')}</div>
           <div style="display:flex;gap:4px;margin-top:6px;">
@@ -11495,9 +11488,9 @@ function openBulkOutModal(){
   if(ids.length===0) return;
   const gens = ids.map(findGen).filter(Boolean).sort(sortByIdNatural);
   const hoursRowsHtml = gens.map(g=>`
-    <div class="field-row" style="align-items:flex-end;">
-      <div style="flex:0 0 auto;min-width:90px;font-size:13px;font-weight:700;padding-bottom:8px;">${g.id}${g.model? ` <span class="muted" style="font-weight:400;font-size:11.5px;">· ${escR(g.model)}</span>`:''}</div>
-      ${g.hoursKnown? `<div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">출고시 누적 사용시간(h)</label><input type="number" id="fb-hours-${g.id}" value="${g.hours||0}" min="0"></div>` : `<div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">누적 사용시간</label><div class="hint" style="margin-top:4px;color:var(--danger);font-weight:700;">누적시간 확인불가</div></div>`}
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+      <div style="flex:0 0 auto;font-size:11.5px;font-weight:700;white-space:nowrap;">${g.id}</div>
+      ${g.hoursKnown? `<input type="number" id="fb-hours-${g.id}" value="${g.hours||0}" min="0" style="flex:1;min-width:0;padding:3px 6px;font-size:12px;">` : `<span class="muted" style="font-size:11px;color:var(--danger);font-weight:700;">확인불가</span>`}
     </div>`).join('');
   const fuelRowsHtml = gens.map(g=>`
     <div class="field-row" style="align-items:flex-end;flex-wrap:wrap;margin-bottom:4px;">
@@ -11513,17 +11506,15 @@ function openBulkOutModal(){
     </div>`).join('');
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="text-align:left;">
+    <div class="modal modal-wide" style="text-align:left;">
       <h3 style="text-align:center;">📤 선택한 ${gens.length}대 한번에 출고</h3>
       <div class="modal-sub">아래 거래처/현장 정보는 선택된 발전기 전체에 동일하게 적용됩니다. 발전기별 누적 사용시간·연료는 아래에서 각각 확인·수정해주세요.</div>
-      <div class="field" style="margin:8px 0 4px;">
-        <label>발전기별 출고시 누적 사용시간(h)</label>
-        <div class="detail-card" style="padding:10px 12px;max-height:260px;overflow-y:auto;">${hoursRowsHtml}</div>
-      </div>
       <div class="out-row stretch">
+        <div class="field f-sm"><div class="out-card"><label>발전기별 누적 사용시간(h)</label>
+          <div class="detail-card" style="padding:6px 8px;max-height:150px;overflow-y:auto;">${hoursRowsHtml}</div>
+        </div></div>
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="fb-outdate" value="${todayStr()}" onchange="syncBulkReturnDateToUsageDays()">
-          ${dateQuickButtonsHtml('setBulkOutDate')}
         </div></div>
         <div class="field f-sm"><div class="out-card"><label>도착시간</label>
           ${(()=>{
@@ -11541,7 +11532,6 @@ function openBulkOutModal(){
         </div></div>
         <div class="field f-sm"><div class="out-card"><label>상차일자</label>
           <input type="date" id="fb-loaddate" value="${todayStr()}">
-          ${dateQuickButtonsHtml('setBulkLoadDate')}
         </div></div>
         <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="fb-freight">
           <option value="우리부담" selected>우리부담</option>
@@ -11576,33 +11566,41 @@ function openBulkOutModal(){
         <div class="field f-eq"><div class="out-card"><label>부자재 출고</label><input type="text" id="fb-supplies" placeholder="예: 케이블 50m, 분전반 1대"></div></div>
         <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="fb-note"></textarea></div></div>
       </div>
-      <div class="field">
-        <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;">
-          <input type="checkbox" id="fb-fuel-toggle" onchange="toggleFuelFields('fb-fuel-toggle','fb-fuel-fields-wrap')">
-          <label for="fb-fuel-toggle">⛽ 연료넣고 출고하기 (발전기별로 각각 다르게 입력 가능)</label>
+      <div class="out-row">
+        <div class="field f-lg">
+          <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
+            <input type="checkbox" id="fb-fuel-toggle" onchange="toggleFuelFields('fb-fuel-toggle','fb-fuel-fields-wrap')">
+            <label for="fb-fuel-toggle">⛽ 연료넣고 출고 (발전기별로 각각 다르게 입력 가능)</label>
+          </div>
+          <div id="fb-fuel-fields-wrap" style="display:none;margin-top:8px;">
+            <div class="detail-card" style="padding:10px 12px;max-height:200px;overflow-y:auto;">${fuelRowsHtml}</div>
+            <div class="hint">발전기마다 다르게 입력할 수 있고, 비워두면 그 발전기는 연료 기록 없음으로 처리됩니다.</div>
+          </div>
         </div>
-        <div id="fb-fuel-fields-wrap" style="display:none;margin-top:8px;">
-          <div class="detail-card" style="padding:10px 12px;max-height:260px;overflow-y:auto;">${fuelRowsHtml}</div>
-          <div class="hint">발전기마다 다르게 입력할 수 있고, 비워두면 그 발전기는 연료 기록 없음으로 처리됩니다.</div>
+        <div class="field f-eq">
+          <div class="field chk" style="background:var(--ok-tint);border:1px solid var(--ok);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
+            <input type="checkbox" id="fb-longterm"><label for="fb-longterm">장기 임대 출고 (목록 구분·방문정비 준비 리스트용)</label>
+          </div>
+        </div>
+        <div class="field f-eq">
+          <div class="field chk" style="background:var(--warn-tint);border:1px solid var(--warn);border-radius:8px;padding:10px 12px;">
+            <input type="checkbox" id="fb-payment-confirmed" onchange="toggleBulkForceOutField()">
+            <label for="fb-payment-confirmed">입금을 확인했습니다</label>
+          </div>
+          <div id="fb-forceout-wrap" style="display:block;margin-top:8px;">
+            <div class="field chk" style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:10px 12px;">
+              <input type="checkbox" id="fb-force-out" onchange="toggleBulkForceOutReason()">
+              <label for="fb-force-out">🚨 미입금상태로 출고</label>
+            </div>
+            <div id="fb-force-reason-wrap" class="field" style="margin-top:10px;display:none;">
+              <label for="fb-force-reason">강제출고 사유</label>
+              <textarea id="fb-force-reason" placeholder="예: 현장 긴급요청, 대표님 승인 등"></textarea>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="field chk" style="background:var(--warn-tint);border:1px solid var(--warn);border-radius:8px;padding:10px 12px;">
-        <input type="checkbox" id="fb-payment-confirmed" onchange="toggleBulkForceOutField()">
-        <label for="fb-payment-confirmed">입금을 확인했습니다</label>
-      </div>
-      <div id="fb-forceout-wrap" style="display:block;margin-top:8px;">
-        <div class="field chk" style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:10px 12px;">
-          <input type="checkbox" id="fb-force-out" onchange="toggleBulkForceOutReason()">
-          <label for="fb-force-out">🚨 입금 미확인상태로 출고 합니다</label>
-        </div>
-        <div id="fb-force-reason-wrap" class="field" style="margin-top:10px;display:none;">
-          <label for="fb-force-reason">강제출고 사유</label>
-          <textarea id="fb-force-reason" placeholder="예: 현장 긴급요청, 대표님 승인 등"></textarea>
-        </div>
-      </div>
-      <div class="field chk"><input type="checkbox" id="fb-longterm"><label for="fb-longterm">장기 임대입니다 (목록 구분·방문정비 준비 리스트용)</label></div>
       <div id="fb-err" class="err" style="display:none;"></div>
-      <div class="modal-actions">
+      <div class="modal-actions" style="justify-content:center;">
         <button class="btn" onclick="closeModal()">취소</button>
         <button class="btn primary" onclick="submitBulkOut()">${gens.length}대 한번에 출고</button>
       </div>
