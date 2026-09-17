@@ -9715,11 +9715,11 @@ function renderReserveTab(){
           const change = detectSmsOrderChange(r, smsOrderAll);
           const cardStyle = change ? 'border:2px solid var(--danger);box-shadow:0 0 0 2px var(--danger-tint);' : 'border:1px solid var(--border);';
           return `
-        <div style="width:195px;height:260px;flex-shrink:0;background:#fff;${cardStyle}border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;position:relative;">
-          ${smsOrderNumMap[r.id]? `<div style="position:absolute;top:6px;right:6px;background:#E8B923;color:#fff;font-size:10px;font-weight:800;border-radius:8px;padding:1px 6px;">#${smsOrderNumMap[r.id]}</div>`:''}
+        <div style="width:195px;height:260px;flex-shrink:0;background:#fff;${cardStyle}border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
           ${change? `<div style="background:var(--danger);color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;line-height:1.3;">⚠️ ${change.diffs.join('·')} 변경됨!<br>(${fmtCardDateTime(change.priorAt)} 문자와 다름)</div>` : ''}
           ${r.smsQtyTotal>1? `<div style="background:#1565C0;color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;">📦 ${r.smsQtyTotal}대 중 ${r.smsQtyIndex}번째</div>` : ''}
-          <div class="muted" style="font-size:11px;margin-bottom:2px;padding-right:26px;">${fmtCardDateTime(r.createdAtTs)}${r.outProcessedBy? ` · ${escR(r.outProcessedBy)}` : ''}</div>
+          <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}${r.outProcessedBy? ` · ${escR(r.outProcessedBy)}` : ''}</div>
+          ${smsOrderNumMap[r.id]? `<div style="font-size:10px;color:#8A6D00;font-weight:800;margin-bottom:2px;">#${smsOrderNumMap[r.id]}</div>`:''}
           <div style="font-size:14px;font-weight:700;color:var(--primary-dark);margin-bottom:4px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
           <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;flex:1;overflow:hidden;" onclick="showSmsOrderModal('${r.id}')">${escR(r.smsOrder||'')}</div>
           <div style="display:flex;gap:4px;margin-top:6px;">
