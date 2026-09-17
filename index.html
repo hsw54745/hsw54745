@@ -3454,6 +3454,13 @@ function daysFromToday(dateStr){
 function daysSinceDate(dateStr){
   return -daysFromToday(dateStr);
 }
+function arriveDayLabel(dateStr){
+  if(!dateStr) return '';
+  const diff = daysFromToday(dateStr);
+  if(diff===0) return '오늘';
+  if(diff>0) return `${diff}일후`;
+  return `${-diff}일전`;
+}
 // 전화번호 입력칸에서 숫자만 입력해도 자동으로 하이픈(-)을 넣어줍니다.
 // 서울(02) 지역번호는 2-3-4자리, 그 외(휴대폰 010 등, 지역번호)는 3-3-4 또는 3-4-4자리로 나눕니다.
 function formatPhoneNumber(v){
@@ -4000,7 +4007,7 @@ function longtermMaintBannerHtml(){
   return `
     <div class="detail-card" style="background:var(--danger-tint);border-color:var(--danger);margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
       <div style="font-size:13px;color:var(--danger);font-weight:700;">🛠 장기임대 정비 임박 ${ltUrgent.length}대${dangerN>0? ` (정비필요 ${dangerN}대)`:''} — 방문 정비 준비가 필요합니다.</div>
-      <button class="btn sm danger" onclick="switchTab('out')">정비 준비 리스트 보기</button>
+      <button class="btn sm danger" onclick="switchTab('maint');setTimeout(()=>document.getElementById('longterm-prep-anchor')?.scrollIntoView({behavior:'smooth',block:'start'}),50);">정비 준비 리스트 보기</button>
     </div>`;
 }
 function renderDashboard(){
@@ -4561,7 +4568,7 @@ function longtermPrepListHtml(){
     </div>`;
   }).join('');
   return `
-    <div class="section-title">🔧 장기임대 정비 준비 리스트 <span class="cnt">${ltList.length}대</span>${ltList.length>0? ` <button type="button" class="btn sm" onclick="downloadLongtermPrepFile()">🖨 인쇄</button>`:''}</div>
+    <div id="longterm-prep-anchor" class="section-title">🔧 장기임대 정비 준비 리스트 <span class="cnt">${ltList.length}대</span>${ltList.length>0? ` <button type="button" class="btn sm" onclick="downloadLongtermPrepFile()">🖨 인쇄</button>`:''}</div>
     <details class="info-toggle"><summary></summary><p class="muted">현장에서 실사용 시간을 바로 알 수 없는 장기임대 발전기를, 예상 사용시간을 기준으로 정비 임박 순으로 정렬했습니다. 방문 정비시 챙길 자재(엔진오일량·필터 품명/규격/수량)가 함께 표시됩니다.</p></details>
     ${ltList.length===0? `<div class="empty">장기임대 중인 발전기가 없습니다.</div>` : ltHtml}
   `;
@@ -4614,6 +4621,7 @@ function renderOutList(){
         ${matchedReq? `<button class="btn sm" style="color:#B23A34;font-weight:700;border-color:#B23A34;background:#FBEAEA;margin-top:4px;margin-left:4px;" onclick="viewMatchedReturnRequest('${g.id}','${matchedReq.id}')">🔻 철수오더확인</button>`:''}
       </td>
       <td class="muted">${dow(rt.outDate)||'-'}</td>
+      <td class="muted">${rt.outDate? `${daysSinceDate(rt.outDate)+1}일 사용중` : '-'}</td>
       <td>${isLT? gaugeHtml(el,rem,getCycle(g)) : (g.hoursKnown? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 확인불가</span>')}</td>
       <td style="font-size:12px;">${predTxt}</td>
       <td style="font-size:12px;">${expIn? (()=>{ const diff = daysFromToday(expIn); const isLate = diff!=null && diff<0; const cls = isLate?'danger':(diff<=1?'danger':(diff<=3?'warn':'gray')); return `<span class="pill ${cls}">📅 ${inDateLabelFull(expIn)}</span>`; })() : '<span class="muted">-</span>'}</td>
@@ -4637,7 +4645,7 @@ function renderOutList(){
   const longList = list.filter(g=>g.rental.longTerm);
   const shortRows = shortList.map(rowHtml).join('');
   const longRows = longList.map(rowHtml).join('');
-  const theadHtml = `<thead><tr><th style="width:30px;"><input type="checkbox" onchange="toggleSelectAllBulkIn(this)" title="전체 선택"></th><th>번호</th><th>모델</th><th>출고완료</th><th>전압</th><th>거래처/현장</th><th>도착일</th><th>정비 주기(추정)</th><th>정비 예상시점</th><th>입고예정일</th><th></th></tr></thead>`;
+  const theadHtml = `<thead><tr><th style="width:30px;"><input type="checkbox" onchange="toggleSelectAllBulkIn(this)" title="전체 선택"></th><th>번호</th><th>모델</th><th>출고완료</th><th>전압</th><th>거래처/현장</th><th>도착일</th><th>사용일수</th><th>정비 주기(추정)</th><th>정비 예상시점</th><th>입고예정일</th><th></th></tr></thead>`;
 
   // 용량(kW)별 버튼 목록
   const capacityCounts = {};
@@ -4682,7 +4690,7 @@ function renderOutList(){
     <div class="material-card" style="border:2px solid #B2782C;background:#FFF8EE;margin-bottom:16px;">
       <div class="section-title" style="margin-top:0;color:#B2782C;">📅 입고예정 발전기 <span class="cnt">${embeddedSoonList.length}대</span></div>
       <div class="table-scroll"><table>
-        <thead><tr><th>번호</th><th>모델</th><th>거래처/현장</th><th>입고예정</th></tr></thead>
+        <thead><tr><th>번호</th><th>모델</th><th>거래처/현장</th><th>주소</th><th>담당자</th><th>연락처</th><th>전압</th><th>출고일</th><th>입고예정</th></tr></thead>
         <tbody>${embeddedSoonList.map(x=>{
           const rt = x.g.rental;
           const diff = daysFromToday(x.date);
@@ -4690,6 +4698,11 @@ function renderOutList(){
             <td class="gid">${x.g.id}</td>
             <td class="wrap-ok">${displayModel(x.g)}</td>
             <td class="wrap-ok">${rt.customer||'<span class="muted">미기재</span>'}</td>
+            <td class="wrap-ok" style="font-size:12px;">${rt.address? escR(rt.address) : '<span class="muted">-</span>'}</td>
+            <td class="muted">${rt.manager? escR(rt.manager) : '-'}</td>
+            <td class="muted">${rt.phone? escR(rt.phone) : '-'}</td>
+            <td>${(()=>{ const v=x.g.voltage||rt.voltage; const c=voltageColor(v); return v? `<span style="${c?`color:${c};font-weight:700;`:''}">${escR(v)}</span>` : '<span class="muted">-</span>'; })()}</td>
+            <td class="muted">${dow(rt.outDate)||'-'}</td>
             <td><span class="pill ${diff<=1?'danger':'warn'}">📅 ${inDateLabelFull(x.date)}</span></td>
           </tr>`;
         }).join('')}</tbody>
@@ -9619,7 +9632,7 @@ function renderReserveTab(){
           ${r.address? `<div class="muted" style="font-size:11px;">${escR(r.address)}</div>`:''}
         </td>
         <td class="muted">${dow(r.loadDate)||'-'}</td>
-        <td class="muted">${isRaw? `<span class="muted">확인 전</span>` : `${dow(d2)||'-'}<div><span class="pill">출고예약</span>${isDelayed2? ' <span class="pill danger">지연</span>':''}</div>`}</td>
+        <td class="muted">${isRaw? `<span class="muted">확인 전</span>` : `${dow(d2)||'-'}${d2? `<div style="font-size:11px;color:#888;">${arriveDayLabel(d2)}</div>`:''}<div><span class="pill">출고예약</span>${isDelayed2? ' <span class="pill danger">지연</span>':''}</div>`}</td>
         <td class="muted">${r.arriveTime||'-'}</td>
         <td class="muted">${r.freightBearer||'-'}</td>
         <td class="muted">${r.voltage||'-'}</td>
@@ -9659,6 +9672,7 @@ function renderReserveTab(){
       <td class="muted">${dow(r.loadDate||d)||'-'}</td>
       <td class="muted">
         ${dow(r.outDate)||'-'}
+        ${r.outDate? `<div style="font-size:11px;color:#888;">${arriveDayLabel(r.outDate)}</div>`:''}
         ${r.pendingLoad? `<div><span class="pill warn">상차대기</span>${isDelayed? ' <span class="pill danger">지연</span>':''}</div>` : ''}
       </td>
       <td class="muted">${r.arriveTime||'-'}</td>
@@ -10410,14 +10424,14 @@ function openReserveNoGenModal(resId, draft){
         <div style="white-space:pre-wrap;font-size:13.5px;margin-top:8px;color:#333;">${escR(draft.rawText)}</div>
       </details>` : ''}
       <div class="out-row stretch">
-        <div class="field f-sm"><div class="out-card"><label>발전기</label>
+        <div class="field f-sm" style="flex:1.6 1 170px;"><div class="out-card"><label>발전기</label>
           <select id="f-rsv-gen" onchange="onRsvGenChange()">${genOptionsHtml}</select>
         </div></div>
         <div class="field f-sm" id="f-rsv-starthours-wrap" style="display:none;"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-rsv-starthours" value="0" min="0"><div class="hint" id="rsv-starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);"></div></div></div>
         <div class="field f-sm"><div class="out-card"><label>출고예정일</label>
           <input type="date" id="f-rsv-outdate" value="${(pre&&pre.plannedOutDate)||todayStr()}" onchange="syncRsvReturnDateToUsageDays()" style="${autoStyle('outdate')}">
         </div></div>
-        <div class="field f-sm"><div class="out-card"><label>도착시간</label>
+        <div class="field f-sm" style="flex:0.75 1 95px;"><div class="out-card"><label>도착시간</label>
           ${(()=>{
             const opts = [...Array.from({length:7},(_,i)=>`오전 ${i+6}시`), ...Array.from({length:6},(_,i)=>`오후 ${i+1}시`)];
             const cur = (pre&&pre.arriveTime)||'';
@@ -11443,12 +11457,12 @@ function openBulkOutModal(){
         <label>발전기별 출고시 누적 사용시간(h)</label>
         <div class="detail-card" style="padding:10px 12px;max-height:260px;overflow-y:auto;">${hoursRowsHtml}</div>
       </div>
-      <div class="field-row">
-        <div class="field"><label>도착일</label>
+      <div class="out-row stretch">
+        <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="fb-outdate" value="${todayStr()}" onchange="syncBulkReturnDateToUsageDays()">
           ${dateQuickButtonsHtml('setBulkOutDate')}
-        </div>
-        <div class="field"><label>도착시간</label>
+        </div></div>
+        <div class="field f-sm"><div class="out-card"><label>도착시간</label>
           ${(()=>{
             const opts = [...Array.from({length:7},(_,i)=>`오전 ${i+6}시`), ...Array.from({length:6},(_,i)=>`오후 ${i+1}시`)];
             return `
@@ -11461,44 +11475,44 @@ function openBulkOutModal(){
             <input type="text" id="fb-arrivetime" placeholder="예: 오전 6시 30분" style="margin-top:6px;display:none;">
             `;
           })()}
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>상차일자</label>
+        </div></div>
+        <div class="field f-sm"><div class="out-card"><label>상차일자</label>
           <input type="date" id="fb-loaddate" value="${todayStr()}">
           ${dateQuickButtonsHtml('setBulkLoadDate')}
-        </div>
-        <div class="field"><label>운임료 부담</label><select id="fb-freight">
+        </div></div>
+        <div class="field f-xs"><div class="out-card"><label>운임료 부담</label><select id="fb-freight">
           <option value="우리부담" selected>우리부담</option>
           <option value="고객부담">고객부담</option>
-        </select></div>
+        </select></div></div>
       </div>
-      <div class="field"><label>거래처명</label>
-        <input type="text" id="fb-site" list="customer-datalist" placeholder="예: 00건설" oninput="onBulkCustomerNameInput()">
-        <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>사용일수(일)</label>
+      <div class="out-row">
+        <div class="field f-lg"><label>거래처명</label>
+          <input type="text" id="fb-site" list="customer-datalist" placeholder="예: 00건설" oninput="onBulkCustomerNameInput()">
+          <datalist id="customer-datalist">${knownCustomerRecords().map(r=>`<option value="${r.customer.replace(/"/g,'&quot;')}">`).join('')}</datalist>
+        </div>
+        <div class="field f-xs"><label>사용일수(일)</label>
           <input type="number" id="fb-usagedays" min="0" placeholder="예: 7" oninput="syncBulkUsageDaysToReturnDate()">
         </div>
-        <div class="field"><label>예상가동시간(h/일, 대당)</label>
+        <div class="field f-xs"><label>예상가동시간(h/일, 대당)</label>
           <input type="number" id="fb-estdaily" step="0.5" min="0" placeholder="예: 8">
         </div>
-        <div class="field"><label>반납 예정일 (선택)</label>
+        <div class="field f-sm"><label>반납 예정일 (선택)</label>
           <input type="date" id="fb-returndate" onchange="syncBulkReturnDateToUsageDays()">
         </div>
       </div>
-      <div class="field"><label>현장 주소</label><input type="text" id="fb-address" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
-      <div class="field-row">
-        <div class="field"><label>담당자</label><input type="text" id="fb-manager" placeholder="예: 홍길동 과장"></div>
-        <div class="field"><label>연락처</label><input type="text" id="fb-phone" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
+      <div class="out-row">
+        <div class="field f-lg"><label>현장 주소</label><input type="text" id="fb-address" placeholder="예: 경기 화성시 남양읍 ○○로 12"></div>
+        <div class="field f-sm"><label>담당자</label><input type="text" id="fb-manager" placeholder="예: 홍길동 과장"></div>
+        <div class="field f-sm"><label>연락처</label><input type="text" id="fb-phone" placeholder="예: 010-1234-5678" oninput="this.value=formatPhoneNumber(this.value)"></div>
       </div>
-      <div class="field"><label>전압 (전체 공통)</label>
-        <input type="text" id="fb-voltage" placeholder="예: 380V">
-        ${voltageButtonsHtml('fb-voltage')}
+      <div class="out-row stretch">
+        <div class="field f-eq"><div class="out-card"><label>전압 (전체 공통)</label>
+          <input type="text" id="fb-voltage" placeholder="예: 380V">
+          ${voltageButtonsHtml('fb-voltage')}
+        </div></div>
+        <div class="field f-eq"><div class="out-card"><label>부자재 출고</label><input type="text" id="fb-supplies" placeholder="예: 케이블 50m, 분전반 1대"></div></div>
+        <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="fb-note"></textarea></div></div>
       </div>
-      <div class="field"><label>부자재 출고</label><input type="text" id="fb-supplies" placeholder="예: 케이블 50m, 분전반 1대"></div>
-      <div class="field"><label>비고</label><textarea id="fb-note"></textarea></div>
       <div class="field">
         <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;">
           <input type="checkbox" id="fb-fuel-toggle" onchange="toggleFuelFields('fb-fuel-toggle','fb-fuel-fields-wrap')">
@@ -12509,7 +12523,7 @@ function openInModal(id, isTransfer){
           <input type="date" id="f-indate" value="${todayStr()}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
         </div></div>
         ${g.hoursKnown? `<div class="field f-md"><div class="out-card">
-          <label>입고시(반납) 누적 사용시간(h)${isTransfer? ' <span class="muted" style="font-weight:400;">(선택 - 계기판 못 보면 비워두세요)</span>':''}</label>
+          <label>입고시(반납) 누적 사용시간(h)</label>
           <input type="number" id="f-endhours" placeholder="${isTransfer? '모르면 비워두세요' : `예: ${suggested}`}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
           <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
         </div></div>` : `<div class="field f-md"><div class="out-card">
