@@ -10388,7 +10388,7 @@ function openReserveNoGenModal(resId, draft){
         <div style="white-space:pre-wrap;font-size:13.5px;margin-top:8px;color:#333;">${escR(draft.rawText)}</div>
       </details>` : ''}
       <div class="out-row stretch">
-        <div class="field f-sm"><div class="out-card"><label>발전기 &nbsp;<button type="button" onclick="submitReserveNoGen(${existing? `'${resId}'` : 'null'}, true)" title="같은 거래처·주소로 발전기 한 대를 더 추가합니다" style="font-size:11px;font-weight:800;color:#1565C0;background:#E8F0FE;border:1px solid #1565C0;border-radius:10px;padding:2px 8px;cursor:pointer;">+추가</button></label>
+        <div class="field f-sm"><div class="out-card"><label>발전기</label>
           <select id="f-rsv-gen" onchange="onRsvGenChange()">${genOptionsHtml}</select>
         </div></div>
         <div class="field f-sm" id="f-rsv-starthours-wrap" style="display:none;"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-rsv-starthours" value="0" min="0"><div class="hint" id="rsv-starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);"></div></div></div>
@@ -10559,7 +10559,7 @@ function onRsvArriveTimeSelect(){
     input.value = sel.value;
   }
 }
-function submitReserveNoGen(resId, addAnother){
+function submitReserveNoGen(resId){
   const existing = resId ? DB.reservations.find(x=>x.id===resId) : null;
   const genSel = document.getElementById('f-rsv-gen').value;
   const customer = document.getElementById('f-rsv-site').value.trim();
@@ -10620,16 +10620,6 @@ function submitReserveNoGen(resId, addAnother){
     } else {
       DB.reservations.push(pendingData);
     }
-    if(addAnother){
-      // 같은 거래처·주소로 발전기 한 대를 더 추가합니다.
-      if(!pendingData.batchId){ pendingData.batchId = uid(); const idx2 = DB.reservations.findIndex(x=>x.id===pendingData.id); if(idx2>=0) DB.reservations[idx2].batchId = pendingData.batchId; }
-      const clone = {...pendingData, id: uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false, plannedOutDate: pendingData.outDate, genAssignedBy: null, genAssignedAt: null, createdAt: todayStr()};
-      DB.reservations.push(clone);
-      saveWithRetry(saveReservations);
-      openReserveNoGenModal(clone.id);
-      flash('발전기가 한 대 더 추가되었습니다. 이어서 정보를 확인·저장해주세요.');
-      return;
-    }
     saveWithRetry(saveReservations);
     closeModal();
     currentTab = 'reserve'; renderTabbar(); renderContent();
@@ -10648,15 +10638,6 @@ function submitReserveNoGen(resId, addAnother){
     if(idx>=0) DB.reservations[idx] = pendingData;
   } else {
     DB.reservations.push(pendingData);
-  }
-  if(addAnother){
-    if(!pendingData.batchId){ pendingData.batchId = uid(); const idx2 = DB.reservations.findIndex(x=>x.id===pendingData.id); if(idx2>=0) DB.reservations[idx2].batchId = pendingData.batchId; }
-    const clone = {...pendingData, id: uid(), genId: UNASSIGNED_GEN_ID, genAssignedBy: null, genAssignedAt: null, createdAt: todayStr()};
-    DB.reservations.push(clone);
-    saveWithRetry(saveReservations);
-    openReserveNoGenModal(clone.id);
-    flash('발전기가 한 대 더 추가되었습니다. 이어서 정보를 확인·저장해주세요.');
-    return;
   }
   saveWithRetry(saveReservations);
   closeModal();
