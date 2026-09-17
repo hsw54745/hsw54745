@@ -5259,7 +5259,10 @@ function recomputeLastMaint(genId){
     return;
   }
   const maxHours = Math.max(...recs.map(r=>r.hours||0));
-  g.lastMaintHours = maxHours;
+  // 정비 기록 중 하나가 0이거나 비정상적으로 낮은 값으로 잘못 저장되어 있어도,
+  // "마지막 정비시 누적시간"이 실수로 확 떨어지는 일이 없도록 기존 값보다 낮아지지는 않게 막습니다.
+  // (진짜로 정정해야 하면 [정비관리 → 직접수정]에서 의도적으로 낮출 수 있습니다)
+  g.lastMaintHours = Math.max(maxHours, g.lastMaintHours||0);
   if((g.hours||0) < maxHours) g.hours = maxHours;
   g.hoursUpdatedAt = nowDateTimeStr();
   g.hoursUpdatedBy = DB.currentUserName || null;
@@ -10211,7 +10214,8 @@ async function confirmLoad(resId, isTransfer){
   const skippedFuel = isTransfer && (r.fuelRequested!=null || r.fuelActual!=null);
   const transferFuelNote = skippedFuel ? `⛽ 현장이동으로 연료 미주입 (고객요청 ${r.fuelRequested!=null?r.fuelRequested:r.fuelActual}L 미반영)` : '';
   g.status = 'out';
-  g.hours = r.startHours;
+  // 누적시간이 실수로 확 떨어지지 않도록, 지금까지 알고 있던 값보다 낮아지는 경우는 막습니다.
+  g.hours = g.hoursKnown ? Math.max(r.startHours||0, g.hours||0) : r.startHours;
   g.rental = {
     customer: r.customer, manager: r.manager, phone: r.phone, site: r.site, address: r.address,
     supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', voltage: r.voltage, qty: r.qty,
@@ -10585,7 +10589,7 @@ function addRsvExtraGenRow(){
   row.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:6px;';
   row.innerHTML = `
     <select class="rsv-extra-gen-select" style="flex:1;min-width:0;padding:5px 6px;font-size:12.5px;" onchange="onRsvExtraGenChange('${rowId}')">${_rsvGenOptionsHtml}</select>
-    <input type="number" class="rsv-extra-gen-hours" id="${rowId}-hours" placeholder="누적h" title="출고시 누적 사용시간(h)" style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;">
+    <input type="number" class="rsv-extra-gen-hours" id="${rowId}-hours" placeholder="누적h" title="출고시 누적 사용시간(h) - 마지막으로 확인된 값" readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;background:var(--surface-2);color:var(--ink-soft);">
     <button type="button" class="btn sm danger" style="flex:0 0 auto;padding:2px 7px;" onclick="document.getElementById('${rowId}').remove()">×</button>
   `;
   wrap.appendChild(row);
@@ -10665,7 +10669,7 @@ function openReserveNoGenModal(resId, draft){
         <div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 <button type="button" class="btn sm" style="padding:1px 7px;font-size:11px;margin-left:4px;" onclick="addRsvExtraGenRow()">+ 추가</button></label>
           <div style="display:flex;align-items:center;gap:4px;">
             <select id="f-rsv-gen" onchange="onRsvGenChange()" style="flex:1;min-width:0;">${genOptionsHtml}</select>
-            <input type="number" id="f-rsv-starthours" value="0" min="0" placeholder="누적h" title="출고시 누적 사용시간(h)" style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;">
+            <input type="number" id="f-rsv-starthours" value="0" min="0" placeholder="누적h" title="출고시 누적 사용시간(h) - 마지막으로 확인된 값이 자동으로 들어가며, 실제 값과 다르면 [정비관리 → 직접수정]에서 먼저 바로잡아주세요." readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;background:var(--surface-2);color:var(--ink-soft);">
           </div>
           <div class="hint" id="rsv-starthours-hint" style="font-size:11px;font-weight:700;color:var(--danger);"></div>
           <div id="f-rsv-extra-gens-wrap"></div>
