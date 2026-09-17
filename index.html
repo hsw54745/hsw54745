@@ -3469,6 +3469,15 @@ function daysFromToday(dateStr){
 function daysSinceDate(dateStr){
   return -daysFromToday(dateStr);
 }
+function arriveCountdownHtml(dateStr){
+  if(!dateStr) return '';
+  const diff = daysFromToday(dateStr);
+  let txt, color;
+  if(diff<0){ txt = `${-diff}일 지남`; color = 'var(--danger)'; }
+  else if(diff===0){ txt = '오늘 출고'; color = 'var(--danger)'; }
+  else { txt = `${diff}일후 출고`; color = diff<=2? 'var(--danger)' : 'var(--primary-dark)'; }
+  return `<div style="font-size:12px;font-weight:800;color:${color};margin-top:2px;">${txt}</div>`;
+}
 // 전화번호 입력칸에서 숫자만 입력해도 자동으로 하이픈(-)을 넣어줍니다.
 // 서울(02) 지역번호는 2-3-4자리, 그 외(휴대폰 010 등, 지역번호)는 3-3-4 또는 3-4-4자리로 나눕니다.
 function formatPhoneNumber(v){
@@ -9647,7 +9656,7 @@ function renderReserveTab(){
           ${r.address? `<div class="muted" style="font-size:11px;">${escR(r.address)}</div>`:''}
         </td>
         <td class="muted">${dow(r.loadDate)||'-'}</td>
-        <td class="muted">${isRaw? `<span class="muted">확인 전</span>` : `${dow(d2)||'-'}<div><span class="pill">출고예약</span>${isDelayed2? ' <span class="pill danger">지연</span>':''}</div>`}</td>
+        <td class="muted">${isRaw? `<span class="muted">확인 전</span>` : `${dow(d2)||'-'}${d2? arriveCountdownHtml(d2):''}<div><span class="pill">출고예약</span>${isDelayed2? ' <span class="pill danger">지연</span>':''}</div>`}</td>
         <td class="muted">${r.arriveTime||'-'}</td>
         <td class="muted">${r.freightBearer||'-'}</td>
         <td class="muted">${r.voltage||'-'}</td>
@@ -9687,6 +9696,7 @@ function renderReserveTab(){
       <td class="muted">${dow(r.loadDate||d)||'-'}</td>
       <td class="muted">
         ${dow(r.outDate)||'-'}
+        ${r.outDate? arriveCountdownHtml(r.outDate):''}
         ${r.pendingLoad? `<div><span class="pill warn">상차대기</span>${isDelayed? ' <span class="pill danger">지연</span>':''}</div>` : ''}
       </td>
       <td class="muted">${r.arriveTime||'-'}</td>
