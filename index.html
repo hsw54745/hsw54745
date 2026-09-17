@@ -3656,13 +3656,14 @@ function inDCountLabel(dateStr){
   return `입고${diff}일전`;
 }
 
-function gaugeHtml(elapsed, remaining, cycle){
+function gaugeHtml(elapsed, remaining, cycle, isEstimate){
   const cyc = cycle || DEFAULT_CYCLE;
   const pct = Math.min(100, Math.max(0,(elapsed/cyc)*100));
   const st = maintStatus(remaining);
   const color = st==='danger'?'var(--danger)':st==='warn'?'var(--warn)':'var(--ok)';
   const txt = remaining<0 ? (Math.abs(Math.round(remaining))+'h 초과') : (Math.round(remaining)+'h 남음');
-  return `<div class="gauge-wrap"><div class="gauge"><div class="gauge-fill" style="width:${pct}%;background:${color}"></div></div><span class="gauge-txt" style="color:${color}">${txt}</span></div><div style="font-size:11px;margin-top:2px;color:var(--primary);">마지막 정비 후 ${Math.round(elapsed).toLocaleString()}시간 사용</div>`;
+  const estNote = isEstimate? `<div style="font-size:10.5px;color:var(--danger);font-weight:700;margin-top:1px;">(실측 아님 · 추정치)</div>` : '';
+  return `<div class="gauge-wrap"><div class="gauge"><div class="gauge-fill" style="width:${pct}%;background:${color}"></div></div><span class="gauge-txt" style="color:${color}">${txt}</span></div><div style="font-size:11px;margin-top:2px;color:var(--primary);">마지막 정비 후 ${Math.round(elapsed).toLocaleString()}시간 사용</div>${estNote}`;
 }
 function pillHtml(status){
   const map={ok:['정상','ok'],warn:['임박','warn'],danger:['정비필요','danger']};
@@ -4121,7 +4122,7 @@ function renderDashboard(){
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
       <td>${g.status==='in'?'<span class="pill gray">입고</span>':'<span class="pill gray">출고중(추정)</span>'}</td>
-      <td>${gaugeHtml(el, r, getCycle(g))}</td>
+      <td>${gaugeHtml(el, r, getCycle(g), g.status!=='in' && g.rental && g.rental.estDaily>0)}</td>
       <td>${pillHtml(maintStatus(r))}</td>
     </tr>`;
   }).join('');
@@ -4705,7 +4706,7 @@ function renderOutList(){
       </td>
       <td class="muted">${dow(rt.outDate)||'-'}</td>
       <td class="muted">${rt.outDate? `${daysSinceDate(rt.outDate)+1}일 사용중` : '-'}</td>
-      <td>${isLT? gaugeHtml(el,rem,getCycle(g)) : (g.hoursKnown? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 확인불가</span>')}</td>
+      <td>${isLT? gaugeHtml(el,rem,getCycle(g),true) : (g.hoursKnown? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 확인불가</span>')}</td>
       <td style="font-size:12px;">${predTxt}</td>
       <td style="font-size:12px;">${expIn? (()=>{ const diff = daysFromToday(expIn); const isLate = diff!=null && diff<0; const cls = isLate?'danger':(diff<=1?'danger':(diff<=3?'warn':'gray')); return `<span class="pill ${cls}">📅 ${inDateLabelFull(expIn)}</span>`; })() : '<span class="muted">-</span>'}</td>
       <td>
@@ -4987,7 +4988,7 @@ function renderMaintList(){
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
       <td class="muted" style="font-size:12px;">${g.status==='in'?'입고':'출고중'}</td>
-      <td>${known? gaugeHtml(el,rem,getCycle(g)) : '<span style="color:var(--danger);font-weight:700;font-size:12px;">확인불가</span>'}</td>
+      <td>${known? gaugeHtml(el,rem,getCycle(g),g.status!=='in' && g.rental && g.rental.estDaily>0) : '<span style="color:var(--danger);font-weight:700;font-size:12px;">확인불가</span>'}</td>
       <td>${known? pillHtml(maintStatus(rem)) : '<span class="pill danger">확인불가</span>'}</td>
       <td><div class="btn-row" style="align-items:center;">
         <button class="btn sm" onclick="openMaintModal('${g.id}')">정비 등록</button>
