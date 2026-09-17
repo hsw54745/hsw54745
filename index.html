@@ -2575,6 +2575,19 @@ async function submitQuickOrder(){
     box.textContent = '문자 내용을 먼저 붙여넣어주세요.';
     return;
   }
+  // 같은 내용을 짧은 시간 안에 다시 누르면(실수로 여러 번 탭한 경우) 중복 등록/중복 문자발송을 막습니다.
+  try{
+    const lastRaw = localStorage.getItem('qmLastSmsSubmit');
+    if(lastRaw){
+      const last = JSON.parse(lastRaw);
+      if(last.text === text && (Date.now() - last.ts) < 60000){
+        box.style.display = 'block'; box.style.background = '#FFF3C4'; box.style.color = '#8A6D00';
+        box.textContent = '⚠️ 같은 내용을 방금 등록했습니다 (중복 방지). 정말 다시 등록하시려면 "등록하기"를 한번 더 눌러주세요.';
+        localStorage.removeItem('qmLastSmsSubmit');
+        return;
+      }
+    }
+  }catch(e0){}
   btn.disabled = true; btn.textContent = '등록 중...';
   try{
     const today = todayStr();
@@ -2624,6 +2637,7 @@ async function submitQuickOrder(){
       ? `✅ 등록 완료되었습니다!\n문자에서 ${qty}대로 인식되어 ${qty}건으로 나눠 등록했습니다. 대수가 다르면 사무실에서 건수를 조정해주세요.\n사무실 화면에 곧 나타납니다.`
       : '✅ 등록 완료되었습니다!\n사무실 화면에 곧 나타납니다.';
     const smsToggle = document.getElementById('qm-sms-toggle');
+    try{ localStorage.setItem('qmLastSmsSubmit', JSON.stringify({text, ts: Date.now()})); }catch(e1){}
     if(smsToggle && smsToggle.checked){
       const smsBody = text.startsWith(QM_ORDER_PREFIX) ? text : (QM_ORDER_PREFIX + text);
       location.href = buildSmsHref(smsBody);
@@ -10459,11 +10473,12 @@ function openReserveNoGenModal(resId, draft){
           ${(()=>{
             const opts = [...Array.from({length:7},(_,i)=>`오전 ${i+6}시`), ...Array.from({length:6},(_,i)=>`오후 ${i+1}시`)];
             const cur = (pre&&pre.arriveTime)||'';
-            const isCustom = cur && cur!=='지금즉시' && !opts.includes(cur);
+            const isCustom = cur && cur!=='지금즉시' && cur!=='알수없음' && !opts.includes(cur);
             return `
             <select id="f-rsv-arrivetime-select" onchange="onRsvArriveTimeSelect()" style="${autoStyle('arriveTime')}">
               <option value="">선택 안함</option>
               <option value="지금즉시" ${cur==='지금즉시'?'selected':''}>지금즉시</option>
+              <option value="알수없음" ${cur==='알수없음'?'selected':''}>알수없음</option>
               ${opts.map(v=>`<option value="${v}" ${cur===v?'selected':''}>${v}</option>`).join('')}
               <option value="__custom__" ${isCustom?'selected':''}>직접 입력...</option>
             </select>
