@@ -4738,8 +4738,19 @@ function renderOutList(){
     capacityCounts[cap] = (capacityCounts[cap]||0) + 1;
   });
   const capacityEntries = Object.entries(capacityCounts).map(([k,v])=>[parseFloat(k),v]).sort((a,b)=>a[0]-b[0]);
+  let defaultEstDailyShort = ''; try{ defaultEstDailyShort = localStorage.getItem('defaultEstDailyShort')||''; }catch(eDE1){}
+  let defaultEstDailyLong = ''; try{ defaultEstDailyLong = localStorage.getItem('defaultEstDailyLong')||''; }catch(eDE2){}
+  const estDailyDefaultHtml = `
+    <span style="display:inline-flex;align-items:center;gap:6px;margin-left:8px;padding-left:10px;border-left:1px solid var(--border);flex-wrap:wrap;">
+      <label style="font-weight:700;font-size:12.5px;white-space:nowrap;">📊 발전기 하루평균 사용예상시간(h/일)</label>
+      <span style="font-size:11.5px;color:#666;">단기</span>
+      <input type="number" id="default-est-daily-short" value="${escR(defaultEstDailyShort)}" step="0.5" min="0" placeholder="예: 4.5" style="width:56px;padding:4px 6px;font-size:13px;">
+      <span style="font-size:11.5px;color:#666;">장기</span>
+      <input type="number" id="default-est-daily-long" value="${escR(defaultEstDailyLong)}" step="0.5" min="0" placeholder="예: 6" style="width:56px;padding:4px 6px;font-size:13px;">
+      <button type="button" class="btn sm primary" onclick="applyDefaultEstDailyToAll()">비어있는 발전기에 전체 적용</button>
+    </span>`;
   const capacityButtonsHtml = capacityEntries.length===0 ? '' : `
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;">
       <button class="btn sm${outCapacityFilter==null?' primary':''}" onclick="clearOutCapacityFilter()">전체</button>
       ${capacityEntries.map(([cap,cnt])=>`<button class="btn sm${outCapacityFilter===cap?' primary':''}" onclick="viewCapacityOutList(${cap})">${cap}kW <span class="muted" style="font-size:11px;">(${cnt})</span></button>`).join('')}
     </div>`;
@@ -4795,7 +4806,7 @@ function renderOutList(){
   return `
     ${returnReqHtml}
     ${embeddedSoonHtml}
-    <div class="section-title">📤 출고중 발전기 <span class="cnt">${list.length}대</span>${outRegionFilter? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">지역: ${escR(outRegionFilter)} <button onclick="clearOutRegionFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}${outCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${outCapacityFilter}kW <button onclick="clearOutCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''} <button type="button" class="btn sm" onclick="downloadOutFieldListFile()">🖨 출고 리스트 인쇄(단기/장기)</button></div>
+    <div class="section-title" style="flex-wrap:wrap;">📤 출고중 발전기 <span class="cnt">${list.length}대</span>${outRegionFilter? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">지역: ${escR(outRegionFilter)} <button onclick="clearOutRegionFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}${outCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${outCapacityFilter}kW <button onclick="clearOutCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''} <button type="button" class="btn sm" onclick="downloadOutFieldListFile()">🖨 출고 리스트 인쇄(단기/장기)</button>${estDailyDefaultHtml}</div>
     ${capacityButtonsHtml}
     <details class="info-toggle"><summary></summary><p class="muted">같은 거래처에서 여러 대를 한 번에 반납받을 때는 왼쪽 체크박스로 여러 대를 선택한 뒤 "한번에 입고" 버튼을 눌러주세요. 현장 정기 점검 출장 전에는 위 "출고 리스트 인쇄" 버튼으로 단기 1장·장기 1장짜리 리스트를 뽑을 수 있습니다.</p></details>
     <div id="bulk-in-bar">${bulkInBarHtml()}</div>
@@ -4875,6 +4886,32 @@ async function submitLongtermConvert(id){
   closeModal();
   renderContent();
   flash('장기로 변경되었습니다');
+}
+async function applyDefaultEstDailyToAll(){
+  const shortEl = document.getElementById('default-est-daily-short');
+  const longEl = document.getElementById('default-est-daily-long');
+  const vShort = Number(shortEl.value);
+  const vLong = Number(longEl.value);
+  if(!(vShort>0) && !(vLong>0)){ flash('단기 또는 장기 시간을 먼저 입력해주세요'); return; }
+  try{
+    if(vShort>0) localStorage.setItem('defaultEstDailyShort', String(vShort));
+    if(vLong>0) localStorage.setItem('defaultEstDailyLong', String(vLong));
+  }catch(e0){}
+  const targetsShort = vShort>0 ? activeGens().filter(g=>g.status==='out' && g.rental && !g.rental.longTerm && !(g.rental.estDaily>0)) : [];
+  const targetsLong = vLong>0 ? activeGens().filter(g=>g.status==='out' && g.rental && g.rental.longTerm && !(g.rental.estDaily>0)) : [];
+  const total = targetsShort.length + targetsLong.length;
+  if(total===0){ flash('이미 모든 발전기에 예상가동시간이 입력되어 있습니다'); return; }
+  const msgLines = [];
+  if(targetsShort.length) msgLines.push(`단기 ${targetsShort.length}대 → 하루 ${vShort}h`);
+  if(targetsLong.length) msgLines.push(`장기 ${targetsLong.length}대 → 하루 ${vLong}h`);
+  openConfirmModal(`예상가동시간이 비어있는 발전기에 적용할까요?\n\n${msgLines.join('\n')}`, async function(){
+    targetsShort.forEach(g=>{ g.rental.estDaily = vShort; });
+    targetsLong.forEach(g=>{ g.rental.estDaily = vLong; });
+    saveWithRetry(saveGens);
+    closeModal();
+    renderContent();
+    flash(`총 ${total}대에 적용했습니다`);
+  }, '전체 적용');
 }
 
 function renderMaintTab(){
@@ -6108,7 +6145,7 @@ function renderSettlementTab(){
 
   return `
     <div class="section-title">📊 발전기별 임대율 (최근 90일)</div>
-    <details class="info-toggle"><summary></summary><p class="muted">최근 90일 중 출고(임대)되어 있던 일수 비율입니다. 낮은 순으로 확인하면 놀고 있는 장비를 파악할 수 있습니다.</p></details>
+    <details class="info-toggle"><summary></summary><p class="muted">최근 90일 중 출고(임대)되어 있던 비율입니다. 낮은 순으로 확인하면 놀고 있는 장비를 파악할 수 있습니다.</p></details>
     <div class="util-two-col">
       <div class="util-table"><table>
         <thead><tr><th>번호</th><th>모델</th><th>출고일수</th><th>임대율</th></tr></thead>
