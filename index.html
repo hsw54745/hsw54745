@@ -636,7 +636,7 @@ function renderQuickModeUI(){
       <button type="button" onclick="renderQuickModeOutList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">🚚 출고중 발전기 리스트 보기</button>
       <button type="button" onclick="renderQuickModeSoonInList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#B2782C;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📅 입고 예정 리스트 보기</button>
       <button type="button" onclick="renderQmReservationList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:20px;">⏳ 출고대기 리스트 보기</button>
-      <button type="button" onclick="renderQuickModeTextUI('out')" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📝 문자 등록하기 (출고/철수)</button>
+      <button type="button" onclick="renderQuickModeTextChoice()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📝 문자 등록하기 (출고/철수)</button>
       <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:14px;cursor:pointer;">📝 출고예약 등록</button>
       <div id="qm-install-status" style="margin-top:10px;"></div>
     </div>
@@ -647,6 +647,16 @@ function renderQuickModeUI(){
   }
 }
 let qmTextMode = 'out'; // 'out' | 'return'
+function renderQuickModeTextChoice(){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;text-align:center;">
+      <button type="button" onclick="renderQuickModeUI()" style="display:inline-block;background:#fff;border:2px solid #666;color:#666;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:20px;float:left;">← 뒤로가기</button>
+      <div style="clear:both;font-size:22px;font-weight:800;color:#333;margin:10px 0 24px;">📝 어떤 문자를 등록할까요?</div>
+      <button type="button" onclick="renderQuickModeTextUI('out')" style="width:100%;padding:28px;font-size:24px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:16px;">📤 출고 문자</button>
+      <button type="button" onclick="renderQuickModeTextUI('return')" style="width:100%;padding:28px;font-size:24px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:16px;cursor:pointer;">🔻 철수 문자</button>
+    </div>
+  `);
+}
 function renderQuickModeTextUI(mode){
   if(mode) qmTextMode = mode;
   const isOut = qmTextMode==='out';
@@ -660,9 +670,7 @@ function renderQuickModeTextUI(mode){
   const recentId = isOut? 'qm-recent' : 'qmret-recent';
   pwGateShow(`
     <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
-      <button type="button" onclick="renderQuickModeUI()" style="display:inline-block;background:#fff;border:2px solid #666;color:#666;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
-      <div style="display:flex;gap:8px;margin-bottom:16px;">
-        <button type="button" onclick="renderQuickModeTextUI('out')" style="flex:1;padding:14px;font-size:16px;font-weight:800;border-radius:12px;border:2px solid #2C4A66;background:${isOut?'#2C4A66':'#fff'};color:${isOut?'#fff':'#2C4A66'};cursor:pointer;">📤 출고</button>
+      <button type="button" onclick="renderQuickModeTextChoice()" style="display:inline-block;background:#fff;border:2px solid #666;color:#666;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
         <button type="button" onclick="renderQuickModeTextUI('return')" style="flex:1;padding:14px;font-size:16px;font-weight:800;border-radius:12px;border:2px solid #B23A34;background:${!isOut?'#B23A34':'#fff'};color:${!isOut?'#fff':'#B23A34'};cursor:pointer;">🔻 철수</button>
       </div>
       <div style="text-align:center;margin-bottom:14px;">
@@ -4523,6 +4531,7 @@ function renderInList(){
               : `<button class="btn sm primary" onclick="openOutModal('${g.id}')" style="white-space:nowrap;">출고하기</button>
                  <button class="btn sm" onclick="quickForceOutPrompt('${g.id}')" style="white-space:nowrap;" title="거래처·날짜 등 정보 입력 없이 바로 출고중 상태로 전환합니다. 잘못 입고 처리한 발전기를 되돌릴 때 사용하세요. 정보는 나중에 [출고중]에서 수정할 수 있습니다.">⚡ 정보없이 강제출고</button>
                  ${g.borrowed? `<button class="btn sm danger" onclick="returnBorrowedGenPrompt('${g.id}')" style="white-space:nowrap;">↩ 반납</button>`:''}`)}
+        <button class="btn sm" onclick="openPrevRentalPopup('${g.id}')" style="white-space:nowrap;">📜 직전 임대 보기</button>
       </div></td>
     </tr>`;
   }).join('');
@@ -5032,7 +5041,6 @@ function renderMaintList(){
       <td><div class="btn-row" style="align-items:center;">
         <button class="btn sm" onclick="openMaintModal('${g.id}')">정비 등록</button>
         <button class="btn sm" onclick="openMaintHistoryModal('${g.id}')">정비이력조회</button>
-        <button class="btn sm" onclick="goToHistory('${g.id}')">임대이력조회</button>
         <button class="btn sm" onclick="openAdjustModal('${g.id}')">직접수정</button>
         <button class="btn sm" onclick="openCycleModal('${g.id}')" style="${getCycle(g)!==DEFAULT_CYCLE? 'color:var(--danger);font-weight:700;border-color:var(--danger);':''}">정비주기(${getCycle(g)}h)</button>
         <label style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--danger);white-space:nowrap;cursor:pointer;margin-left:4px;" title="체크하면 이 발전기는 목록·정비관리·장기임대 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;확인불가&quot;로 고정 표시됩니다. 강제입고 없이 이 화면에서 바로 켜고 끌 수 있습니다.">
@@ -5371,7 +5379,7 @@ function renderCustomerHistoryView(){
     .map(r=>({...r, cnt: customerRentalStats(r.customer).length}))
     .sort((a,b)=>b.cnt-a.cnt || a.customer.localeCompare(b.customer,'ko'));
   if(records.length===0){ wrap.innerHTML = `<div class="empty">임대 이력이 없습니다.</div>`; return; }
-  const rows = records.map(r=>{
+  const rowHtml = r=>{
     const notes = DB.customerNotes && DB.customerNotes[r.customer];
     const tags = (notes && notes.tags) || [];
     return `<tr${tags.length>0? ` style="background:var(--danger-tint);"`:''}>
@@ -5381,11 +5389,15 @@ function renderCustomerHistoryView(){
       <td class="muted" style="font-size:12px;">${notes&&notes.note? escR(notes.note) : '-'}</td>
       <td><button class="btn sm" onclick="openCustomerNotesModal('${r.customer.replace(/'/g,"\\'")}')">주의사항 설정</button></td>
     </tr>`;
-  }).join('');
-  wrap.innerHTML = `<div class="table-scroll"><table>
+  };
+  const half = Math.ceil(records.length/2);
+  const rows1 = records.slice(0, half).map(rowHtml).join('');
+  const rows2 = records.slice(half).map(rowHtml).join('');
+  const tableHtml = rows => `<div class="table-scroll"><table>
     <thead><tr><th>거래처명</th><th>임대건수</th><th>주의태그</th><th>주의사항</th><th></th></tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
+  wrap.innerHTML = `<div class="util-two-col">${tableHtml(rows1)}${rows2? tableHtml(rows2) : ''}</div>`;
 }
 function openCustomerNotesModal(customer){
   const notes = (DB.customerNotes && DB.customerNotes[customer]) || {tags:[], note:''};
