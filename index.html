@@ -657,7 +657,12 @@ function renderQuickModeTextChoice(){
     </div>
   `);
 }
-function renderQuickModeTextUI(mode){
+function switchQmTextMode(mode){
+  const curTextEl = document.getElementById(qmTextMode==='out'? 'qm-text' : 'qmret-text');
+  const curText = curTextEl ? curTextEl.value : '';
+  renderQuickModeTextUI(mode, curText);
+}
+function renderQuickModeTextUI(mode, presetText){
   if(mode) qmTextMode = mode;
   const isOut = qmTextMode==='out';
   const themeColor = isOut? '#2C4A66' : '#B23A34';
@@ -671,14 +676,16 @@ function renderQuickModeTextUI(mode){
   pwGateShow(`
     <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
       <button type="button" onclick="renderQuickModeTextChoice()" style="display:inline-block;background:#fff;border:2px solid #666;color:#666;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
-        <button type="button" onclick="renderQuickModeTextUI('return')" style="flex:1;padding:14px;font-size:16px;font-weight:800;border-radius:12px;border:2px solid #B23A34;background:${!isOut?'#B23A34':'#fff'};color:${!isOut?'#fff':'#B23A34'};cursor:pointer;">🔻 철수</button>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button type="button" onclick="switchQmTextMode('out')" style="flex:1;padding:14px;font-size:16px;font-weight:800;border-radius:12px;border:2px solid #2C4A66;background:${isOut?'#2C4A66':'#fff'};color:${isOut?'#fff':'#2C4A66'};cursor:pointer;">📤 출고</button>
+        <button type="button" onclick="switchQmTextMode('return')" style="flex:1;padding:14px;font-size:16px;font-weight:800;border-radius:12px;border:2px solid #B23A34;background:${!isOut?'#B23A34':'#fff'};color:${!isOut?'#fff':'#B23A34'};cursor:pointer;">🔻 철수</button>
       </div>
       <div style="text-align:center;margin-bottom:14px;">
         <div style="font-size:24px;font-weight:800;color:${titleColor};">${isOut? '📤 출고 문자 간편등록' : '🔻 철수 문자 간편등록'}</div>
         <div style="font-size:15px;color:#555;margin-top:8px;line-height:1.5;">${isOut? '문자 앱에서 내용을 복사한 다음<br>아래 버튼을 누르면 바로 채워집니다' : '회수(철수) 요청 문자를 복사한 다음<br>아래 버튼을 누르면 바로 채워집니다'}</div>
       </div>
       <button id="${pasteBtnId}" type="button" onclick="${isOut? 'pasteFromClipboard()' : 'pasteFromClipboardReturn()'}" style="width:100%;padding:22px;font-size:24px;font-weight:800;background:${themeColor};color:#fff;border:none;border-radius:16px;cursor:pointer;margin-bottom:16px;">📋 복사한 문자 붙여넣기</button>
-      <textarea id="${textId}" rows="8" style="width:100%;font-size:20px;line-height:1.5;padding:14px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;" placeholder="여기를 길게 눌러서 직접 붙여넣기도 가능합니다"></textarea>
+      <textarea id="${textId}" rows="8" style="width:100%;font-size:20px;line-height:1.5;padding:14px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;" placeholder="여기를 길게 눌러서 직접 붙여넣기도 가능합니다">${presetText? escR(presetText) : ''}</textarea>
       <div style="margin-top:14px;background:#fff;border:2px solid #ccc;border-radius:14px;padding:12px 14px;">
         <label style="display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:#333;cursor:pointer;">
           <input type="checkbox" id="${smsToggleId}" style="width:22px;height:22px;flex-shrink:0;">
@@ -2579,7 +2586,7 @@ async function pasteFromClipboard(){
     textEl.value = QM_ORDER_PREFIX + text;
     if(detectQmTextType(text)==='return'){
       box.style.display='block'; box.style.background='#FFF3C4'; box.style.color='#8A6D00';
-      box.innerHTML = '⚠️ "철수/회수" 문구가 있는 문자예요. 철수 문자가 맞으면 <button type="button" onclick="renderQuickModeTextUI(\'return\')" style="margin-left:4px;padding:6px 12px;font-size:15px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:8px;cursor:pointer;">🔻 철수로 전환</button>';
+      box.innerHTML = '⚠️ "철수/회수" 문구가 있는 문자예요. 철수 문자가 맞으면 <button type="button" onclick="switchQmTextMode(\'return\')" style="margin-left:4px;padding:6px 12px;font-size:15px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:8px;cursor:pointer;">🔻 철수로 전환</button>';
     }
   }catch(e){
     box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
@@ -2600,7 +2607,7 @@ async function pasteFromClipboardReturn(){
     textEl.value = QM_RETURN_PREFIX + text;
     if(detectQmTextType(text)==='out'){
       box.style.display='block'; box.style.background='#FFF3C4'; box.style.color='#8A6D00';
-      box.innerHTML = '⚠️ "철수/회수" 문구가 안 보이는 문자예요. 출고 문자가 맞으면 <button type="button" onclick="renderQuickModeTextUI(\'out\')" style="margin-left:4px;padding:6px 12px;font-size:15px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:8px;cursor:pointer;">📤 출고로 전환</button>';
+      box.innerHTML = '⚠️ "철수/회수" 문구가 안 보이는 문자예요. 출고 문자가 맞으면 <button type="button" onclick="switchQmTextMode(\'out\')" style="margin-left:4px;padding:6px 12px;font-size:15px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:8px;cursor:pointer;">📤 출고로 전환</button>';
     }
   }catch(e){
     box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
