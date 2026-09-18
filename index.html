@@ -10676,7 +10676,6 @@ function openReserveNoGenModal(resId, draft){
             <select id="f-rsv-gen" onchange="onRsvGenChange()" style="flex:1;min-width:0;">${genOptionsHtml}</select>
             <input type="number" id="f-rsv-starthours" value="0" min="0" placeholder="누적h" title="출고시 누적 사용시간(h) - 마지막으로 확인된 값이 자동으로 들어가며, 실제 값과 다르면 [정비관리 → 직접수정]에서 먼저 바로잡아주세요." readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;background:var(--surface-2);color:var(--ink-soft);">
           </div>
-          <div class="hint" id="rsv-starthours-hint" style="font-size:11px;font-weight:700;color:var(--danger);"></div>
           <div id="f-rsv-extra-gens-wrap"></div>
         </div></div>
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
@@ -10827,15 +10826,13 @@ function reapplySmsOrderToRsvForm(){
 function onRsvGenChange(){
   const sel = document.getElementById('f-rsv-gen');
   const hoursEl = document.getElementById('f-rsv-starthours');
-  const hintEl = document.getElementById('rsv-starthours-hint');
   if(!sel || !hoursEl) return;
-  if(sel.value===UNASSIGNED_GEN_ID){ hoursEl.style.display='none'; if(hintEl) hintEl.textContent=''; return; }
+  if(sel.value===UNASSIGNED_GEN_ID){ hoursEl.style.display='none'; return; }
   const g = findGen(sel.value);
-  if(!g || !g.hoursKnown){ hoursEl.style.display='none'; if(hintEl) hintEl.textContent=''; return; }
+  if(!g || !g.hoursKnown){ hoursEl.style.display='none'; return; }
   hoursEl.style.display='inline-block';
   hoursEl.value = g.hours||0;
   hoursEl.min = g.hours||0;
-  if(hintEl) hintEl.textContent = `현재 누적: ${(g.hours||0).toLocaleString()}h`;
 }
 function onRsvCustomerNameInput(){
   const el = document.getElementById('f-rsv-site');
@@ -11413,9 +11410,11 @@ function openOutModal(id, reservationId){
       ${isEditingPending? `<div class="hint" style="margin-bottom:10px;color:var(--danger);">이 발전기는 이미 [출고 대기]에 상차대기로 등록되어 있습니다. 여기서 수정하면 상차대기 내용이 갱신됩니다.</div>` : ''}
       <div class="out-row stretch">
         ${isEditingPending? `<div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 번호 (변경 가능)</label>
-          <select id="f-target-gen" onchange="onTargetGenChange()">${targetGenOptionsHtml}</select>
-          ${g.hoursKnown? `<input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="margin-top:4px;width:100%;box-sizing:border-box;background:var(--surface-2);color:var(--ink-soft);">` : ''}
-          <details class="info-toggle" style="margin-top:4px;"><summary></summary><p class="muted" style="font-size:12px;">다른 발전기로 바꾸면 위 누적 사용시간이 그 발전기의 현재 누적시간으로 자동으로 바뀝니다. 이미 입고중이고 다른 곳에 예약되지 않은 발전기만 고를 수 있습니다. 누적시간은 이미 등록된 값이라 여기서 수정할 수 없고, 틀렸으면 [정비관리 → 직접수정]에서 먼저 바로잡아야 합니다.</p></details>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <select id="f-target-gen" onchange="onTargetGenChange()" style="flex:1;min-width:0;">${targetGenOptionsHtml}</select>
+            ${g.hoursKnown? `<input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;background:var(--surface-2);color:var(--ink-soft);">` : ''}
+          </div>
+          <details class="info-toggle" style="margin-top:4px;"><summary></summary><p class="muted" style="font-size:12px;">다른 발전기로 바꾸면 옆 누적 사용시간이 그 발전기의 현재 누적시간으로 자동으로 바뀝니다. 이미 입고중이고 다른 곳에 예약되지 않은 발전기만 고를 수 있습니다. 누적시간은 이미 등록된 값이라 여기서 수정할 수 없고, 틀렸으면 [정비관리 → 직접수정]에서 먼저 바로잡아야 합니다.</p></details>
         </div></div>` : (g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}"><div class="hint" id="starthours-hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 누적: ${(g.hours||0).toLocaleString()}h</div></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 확인불가</div></div></div>`)}
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="f-outdate" value="${(res&&(res.outDate||res.plannedOutDate))||todayStr()}" onchange="syncReturnDateToUsageDays()">
