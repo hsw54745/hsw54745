@@ -1379,6 +1379,7 @@ async function submitQmInProcess(id){
 
     g.status = 'in';
     if(g.hoursKnown && endHours!==null) g.hours = endHours;
+    const oldVoltageForMaintLog = g.voltage||'';
     g.voltage = voltage;
     g.voltageUpdatedAt = nowDateTimeStr();
     g.voltageUpdatedAtMs = Date.now();
@@ -1389,6 +1390,45 @@ async function submitQmInProcess(id){
       window.storage.set('gen-fleet-v2', JSON.stringify(gens), true),
       window.storage.set('gen-rentals-v2', JSON.stringify(rentals), true)
     ]);
+
+    // 사무실에서 입고처리시 전압이 바뀌면 "정비 기록에 전압변경 내역"을 남기는 것과 동일하게,
+    // 퀵메뉴에서도 전압이 바뀌었으면 정비이력에 자동으로 기록해둡니다(퀵메뉴는 확인창 없이 바로 기록).
+    try{
+      if(voltage && voltage!==oldVoltageForMaintLog){
+        const maintCur = await window.storage.get('gen-maintenance-v2', true);
+        let maintList = []; try{ maintList = maintCur ? JSON.parse(maintCur.value) : []; }catch(eMt){ maintList = []; }
+        if(!Array.isArray(maintList)) maintList = [];
+        const dateStr = todayStr();
+        const timeStr = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
+        maintList.push({
+          id: uid(), genId: g.id, model: g.model||'', date: dateStr, hours: g.hours||0,
+          content: `⚡ 전압변경: ${oldVoltageForMaintLog||'미설정'} → ${voltage} (${qmLabel()} · ${dateStr} ${timeStr})`,
+          contentItems: [], contentEtc: '', technician: qmLabel(), partsUsed: [], type: '전압변경', photo: null
+        });
+        await window.storage.set('gen-maintenance-v2', JSON.stringify(maintList), true);
+      }
+    }catch(eMaint){ /* 전압변경 정비기록 저장 실패는 입고처리 자체를 막지 않습니다 */ }
+
+    // 사무실 입고처리와 동일하게, 이 발전기와 연락처·주소·거래처명이 일치하는 철수요청 카드가 있으면
+    // 이제 처리된 것으로 보고 자동으로 지웁니다 (안 지우면 이미 처리된 철수요청이 계속 남아있게 됩니다).
+    try{
+      const rrCur2 = await window.storage.get('gen-return-requests-v1', true);
+      let rrList2 = []; try{ rrList2 = rrCur2 ? JSON.parse(rrCur2.value) : []; }catch(eRr){ rrList2 = []; }
+      if(Array.isArray(rrList2) && rrList2.length>0){
+        const autoMatched2 = rrList2.filter(rr=>{
+          if(!rr) return false;
+          const parsed = parseReturnRequestText(rr.text);
+          if(parsed.phone && r.phone && parsed.phone===r.phone.replace(/[^0-9]/g,'')) return true;
+          if(parsed.address && r.address && (r.address.includes(parsed.address) || parsed.address.includes(r.address))) return true;
+          if(parsed.customer && r.customer && (r.customer.includes(parsed.customer) || parsed.customer.includes(r.customer))) return true;
+          return false;
+        });
+        if(autoMatched2.length>0){
+          const autoMatchedIds2 = new Set(autoMatched2.map(rr=>rr.id));
+          await window.storage.set('gen-return-requests-v1', JSON.stringify(rrList2.filter(rr=>!autoMatchedIds2.has(rr.id))), true);
+        }
+      }
+    }catch(eClear){ /* 철수요청 자동정리 실패는 입고처리 자체를 막지 않습니다 */ }
 
     box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
     box.textContent = '✅ 입고처리 완료되었습니다!';
@@ -1689,7 +1729,8 @@ async function submitQmConfirmLoad(resId, needFuel){
     }
 
     g.status = 'out';
-    if(g.hoursKnown) g.hours = r.startHours||0;
+    // 사무실 상차완료와 동일하게, 누적시간이 실수로 확 떨어지지 않도록 지금까지 알고 있던 값보다 낮아지는 경우는 막습니다.
+    if(g.hoursKnown) g.hours = Math.max(r.startHours||0, g.hours||0);
     g.rental = {
       customer: r.customer, manager: r.manager, phone: r.phone, site: r.site, address: r.address,
       supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', voltage: r.voltage, qty: r.qty,
@@ -4713,7 +4754,16 @@ function renderOutList(){
     const el = isLT? estElapsed(g) : elapsedHours(g);
     const rem = isLT? estRemaining(g) : remainingHours(g);
     const pred = predictedDate(g);
-    let predTxt = (g.hoursKnown && hasRealBaseline)? '-' : (g.lastOilChangeDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastOilChangeDate)}일 초과</span>` : '<span style="font-size:12px;color:var(--danger);font-weight:700;">확인불가</span>');
+    let predTxt;
+    if(g.hoursKnown && hasRealBaseline){ predTxt = '-'; }
+    else if(!g.hoursKnown){
+      // 설정에서 "누적시간 확인불가"로 체크된, 계기 자체가 없는 구형 모델입니다.
+      predTxt = g.lastOilChangeDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastOilChangeDate)}일 초과</span>` : '<span style="font-size:12px;color:var(--danger);font-weight:700;">확인불가</span>';
+    } else {
+      // 체크는 안 되어 있어(누적시간 추적 대상) 있지만, 시스템 도입 후 아직 한 번도 입고되지 않아
+      // 실측치가 없는 경우입니다 - 계기가 없는 구형 모델과는 다른 상태이므로 문구를 다르게 표시합니다.
+      predTxt = '<span style="font-size:12px;color:var(--ink-soft);">입고 시 확인</span>';
+    }
     if(isLT){ predTxt = pred.overdue ? '<span class="pill danger">정비 도래</span>' : `${dow(pred.date)} (약 ${pred.days}일 후)`; }
     const expIn = expectedInDate(rt);
     const matchedReq = (DB.returnRequests||[]).find(r=>{
@@ -4741,7 +4791,7 @@ function renderOutList(){
       </td>
       <td class="muted">${dow(rt.outDate)||'-'}</td>
       <td class="muted">${rt.outDate? `${daysSinceDate(rt.outDate)+1}일 사용중` : '-'}</td>
-      <td>${isLT? gaugeHtml(el,rem,getCycle(g),true) : ((g.hoursKnown && hasRealBaseline)? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</span>')}</td>
+      <td>${isLT? gaugeHtml(el,rem,getCycle(g),true) : ((g.hoursKnown && hasRealBaseline)? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : (g.hoursKnown? '<span style="font-size:12px;color:var(--ink-soft);">입고 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</span>'))}</td>
       <td style="font-size:12px;">${predTxt}</td>
       <td style="font-size:12px;">${expIn? (()=>{ const diff = daysFromToday(expIn); const isLate = diff!=null && diff<0; const cls = isLate?'danger':(diff<=1?'danger':(diff<=3?'warn':'gray')); return `<span class="pill ${cls}">📅 ${inDateLabelFull(expIn)}</span>`; })() : '<span class="muted">-</span>'}</td>
       <td>
@@ -5037,15 +5087,26 @@ function renderMaintList(){
     </div>`;
 
   let rows = sorted.map(g=>{
-    const known = hasHourData(g) && (g.status==='in' || g.hours>0 || g.lastMaintHours>0);
+    const hasRealBaseline5 = (g.hours>0 || g.lastMaintHours>0);
+    const known = g.hoursKnown && (g.status==='in' || hasRealBaseline5);
     const el = g.status==='in'? elapsedHours(g): estElapsed(g);
     const rem = g.status==='in'? remainingHours(g): estRemaining(g);
+    // 체크박스(g.hoursKnown)는 켜져 있는데(누적시간 추적 대상), 시스템 도입 후 아직 한 번도
+    // 입고된 적이 없어 실측치가 없는 경우 - 계기 자체가 없는 구형(hoursKnown=false) 모델과는
+    // 다른 상태이므로 "확인불가" 대신 "입고 시 확인"으로 다르게 표시합니다.
+    const notYetChecked = g.hoursKnown && !known;
+    const unknownCellHtml = notYetChecked
+      ? '<span style="font-size:12px;color:var(--ink-soft);">입고 시 확인</span>'
+      : '<span style="color:var(--danger);font-weight:700;font-size:12px;">확인불가</span>';
+    const unknownPillHtml = notYetChecked
+      ? '<span class="pill" style="color:var(--ink-soft);border-color:var(--border-strong);">입고 시 확인</span>'
+      : '<span class="pill danger">확인불가</span>';
     return `<tr>
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
       <td class="muted" style="font-size:12px;">${g.status==='in'?'입고':'출고중'}</td>
-      <td>${known? gaugeHtml(el,rem,getCycle(g),g.status!=='in' && g.rental && g.rental.estDaily>0) : '<span style="color:var(--danger);font-weight:700;font-size:12px;">확인불가</span>'}</td>
-      <td>${known? pillHtml(maintStatus(rem)) : '<span class="pill danger">확인불가</span>'}</td>
+      <td>${known? gaugeHtml(el,rem,getCycle(g),g.status!=='in' && g.rental && g.rental.estDaily>0) : unknownCellHtml}</td>
+      <td>${known? pillHtml(maintStatus(rem)) : unknownPillHtml}</td>
       <td><div class="btn-row" style="align-items:center;">
         <button class="btn sm" onclick="openMaintModal('${g.id}')">정비 등록</button>
         <button class="btn sm" onclick="openMaintHistoryModal('${g.id}')">정비이력조회</button>
@@ -7862,6 +7923,21 @@ function showNewSmsOrderPopup(items){
     </div>
   </div>`;
 }
+function showNewReturnRequestPopup(items){
+  const cards = items.map(r=>`<div style="background:#FBEAEA;border:2px solid #B23A34;border-radius:12px;padding:14px 16px;margin-bottom:10px;text-align:left;white-space:pre-wrap;font-size:15px;line-height:1.6;color:#333;">${escR(r.text||'')}</div>`).join('');
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal" style="max-width:640px;">
+      <h3 style="font-size:24px;">🔻 새 철수요청 등록됨${items.length>1? ` (${items.length}건)`:''}</h3>
+      <div class="modal-sub" style="font-size:15px;">[출고중] 화면 상단 빨간 카드에서도 확인할 수 있습니다.</div>
+      ${cards}
+      <div class="modal-actions">
+        <button class="btn" style="font-size:16px;padding:10px 18px;" onclick="closeModal()">닫기</button>
+        <button class="btn primary" style="font-size:16px;padding:10px 18px;" onclick="closeModal();switchTab('out');">출고중 보기</button>
+      </div>
+    </div>
+  </div>`;
+}
 function showLoadingPopupOnLogin(){
   showLoadingListPopup(false);
 }
@@ -7956,14 +8032,7 @@ function renderSettingsTab(){
           <div class="field"><label>알림 주기(분)</label>
             <input type="number" id="f-voice-interval" min="1" value="${getVoiceAlertIntervalMin()}" onchange="setVoiceAlertIntervalMin(this.value)">
           </div>
-          <div class="field"><label>시작 시간</label>
-            <input type="time" id="f-voice-start" value="${getVoiceAlertRange().start}" onchange="setVoiceAlertStartTime(this.value)">
-          </div>
-          <div class="field"><label>종료 시간</label>
-            <input type="time" id="f-voice-end" value="${getVoiceAlertRange().end}" onchange="setVoiceAlertEndTime(this.value)">
-          </div>
         </div>
-        <details class="info-toggle"><summary></summary><p class="muted">설정한 시간대 안에서만 음성이 재생됩니다 (예: 08:00~18:00으로 두면 그 시간 밖에서는 조용합니다).</p></details>
         <div class="field-row" style="margin-top:8px;flex-wrap:nowrap;">
           <div class="field"><label>안내 목소리</label>
             <select id="f-voice-select" onchange="setVoiceAlertVoiceName(this.value)"></select>
@@ -13896,8 +13965,9 @@ async function syncFrequentData(){
         renderContent();
         renderUserBadge();
         if(newReservations.length>0) showLoadingListPopup(true, newReservations);
-        if(newReturnRequests.length>0 && isWithinVoiceAlertHours()){
+        if(newReturnRequests.length>0){
           speakText(newReturnRequests.length>1 ? `철수요청이 등록되었습니다. ${koNativeCount(newReturnRequests.length)}건입니다.` : '철수요청이 등록되었습니다. 출고중 화면을 확인해주세요.');
+          showNewReturnRequestPopup(newReturnRequests);
         }
       }
     }
@@ -14023,14 +14093,7 @@ function getVoiceAlertRange(){
 function setVoiceAlertStartTime(v){ localStorage.setItem('voiceAlertStartTime', v||'08:00'); }
 function setVoiceAlertEndTime(v){ localStorage.setItem('voiceAlertEndTime', v||'18:00'); }
 function isWithinVoiceAlertHours(){
-  const {start, end} = getVoiceAlertRange();
-  const now = new Date();
-  const cur = now.getHours()*60 + now.getMinutes();
-  const [sh,sm] = start.split(':').map(Number);
-  const [eh,em] = end.split(':').map(Number);
-  const startMin = sh*60+(sm||0), endMin = eh*60+(em||0);
-  if(startMin<=endMin) return cur>=startMin && cur<=endMin;
-  return cur>=startMin || cur<=endMin; // 시작시간이 종료시간보다 늦으면(자정 넘김) 그 범위로 처리
+  return true; // 시작/종료 시간 제한을 없애고 항상 알림이 울리도록 변경 (사무실 PC 전용이라 시간 제한이 필요 없음)
 }
 function getQuickOrderUrl(){ return localStorage.getItem('quickOrderUrl') || 'https://hsw54745.github.io/hsw54745/?quick=1'; }
 function setQuickOrderUrl(v){ localStorage.setItem('quickOrderUrl', (v||'').trim()); }
