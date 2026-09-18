@@ -1453,8 +1453,8 @@ async function qmRefreshReservationList(){
         ${auto? `<div style="font-size:11px;font-weight:800;color:#8A6D00;background:#FFF8E1;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;">🤖 문자 자동인식 (사무실 확인 전)</div>` : ''}
         ${r.smsQtyTotal>1? `<div style="font-size:11px;font-weight:800;color:#1565C0;background:#E8F0FE;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;margin-left:4px;">📦 ${r.smsQtyTotal}대 중 ${r.smsQtyIndex}번째</div>` : ''}
         <div style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(dCustomer)}</div>
-        <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${r.outDate? fmtDateKR(r.outDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
-        ${r.outDate? arriveCountdownHtml(r.outDate) : ''}
+        <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${(r.outDate||r.plannedOutDate)? fmtDateKR(r.outDate||r.plannedOutDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
+        ${(r.outDate||r.plannedOutDate)? arriveCountdownHtml(r.outDate||r.plannedOutDate) : ''}
         <div style="font-size:13px;color:#333;margin-top:6px;">
           ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
@@ -3535,7 +3535,8 @@ function daysSinceDate(dateStr){
 }
 function arriveCountdownHtml(dateStr){
   if(!dateStr) return '';
-  const diff = daysFromToday(dateStr);
+  // 출고(상차)는 도착일 하루 전날에 나가는 게 기준이라, 도착일에서 하루를 뺀 날짜를 기준으로 계산합니다.
+  const diff = daysFromToday(dateStr) - 1;
   let txt, color;
   if(diff<0){ txt = `${-diff}일 지남`; color = 'var(--danger)'; }
   else if(diff===0){ txt = '오늘 출고'; color = 'var(--danger)'; }
@@ -4102,6 +4103,7 @@ function renderDashboard(){
   const resCount = DB.reservations.length;
   const urgent = active.filter(g=>{
     if(!hasHourData(g)) return false;
+    if(g.status!=='in' && !(g.hours>0 || g.lastMaintHours>0)) return false; // 실측 없이 hoursKnown만 켜진 경우 제외
     const r = g.status==='in'? remainingHours(g) : estRemaining(g);
     return maintStatus(r)!=='ok';
   });
@@ -4674,11 +4676,14 @@ function renderOutList(){
   }
   const rowHtml = (g)=>{
     const rt = g.rental;
-    const isLT = g.hoursKnown && rt.estDaily>0;
+    // 누적시간을 안다고(hoursKnown) 되어있어도, 실제로는 현재시간·마지막정비시간이 둘 다 0이면
+    // (아직 공장에 안 들어와서 한 번도 실측한 적 없는 경우) 진짜 값이 아니므로 추정 계산을 하지 않습니다.
+    const hasRealBaseline = (g.hours>0 || g.lastMaintHours>0);
+    const isLT = g.hoursKnown && hasRealBaseline && rt.estDaily>0;
     const el = isLT? estElapsed(g) : elapsedHours(g);
     const rem = isLT? estRemaining(g) : remainingHours(g);
     const pred = predictedDate(g);
-    let predTxt = g.hoursKnown? '-' : (g.lastOilChangeDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastOilChangeDate)}일 초과</span>` : '<span style="font-size:12px;color:var(--danger);font-weight:700;">확인불가</span>');
+    let predTxt = (g.hoursKnown && hasRealBaseline)? '-' : (g.lastOilChangeDate? `<span style="font-size:12px;color:var(--warn);font-weight:700;">마지막 엔진오일교체후 ${daysSinceDate(g.lastOilChangeDate)}일 초과</span>` : '<span style="font-size:12px;color:var(--danger);font-weight:700;">확인불가</span>');
     if(isLT){ predTxt = pred.overdue ? '<span class="pill danger">정비 도래</span>' : `${dow(pred.date)} (약 ${pred.days}일 후)`; }
     const expIn = expectedInDate(rt);
     const matchedReq = (DB.returnRequests||[]).find(r=>{
@@ -4706,7 +4711,7 @@ function renderOutList(){
       </td>
       <td class="muted">${dow(rt.outDate)||'-'}</td>
       <td class="muted">${rt.outDate? `${daysSinceDate(rt.outDate)+1}일 사용중` : '-'}</td>
-      <td>${isLT? gaugeHtml(el,rem,getCycle(g),true) : (g.hoursKnown? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 확인불가</span>')}</td>
+      <td>${isLT? gaugeHtml(el,rem,getCycle(g),true) : ((g.hoursKnown && hasRealBaseline)? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 확인불가</span>')}</td>
       <td style="font-size:12px;">${predTxt}</td>
       <td style="font-size:12px;">${expIn? (()=>{ const diff = daysFromToday(expIn); const isLate = diff!=null && diff<0; const cls = isLate?'danger':(diff<=1?'danger':(diff<=3?'warn':'gray')); return `<span class="pill ${cls}">📅 ${inDateLabelFull(expIn)}</span>`; })() : '<span class="muted">-</span>'}</td>
       <td>
@@ -4981,7 +4986,7 @@ function renderMaintList(){
     </div>`;
 
   let rows = sorted.map(g=>{
-    const known = hasHourData(g);
+    const known = hasHourData(g) && (g.status==='in' || g.hours>0 || g.lastMaintHours>0);
     const el = g.status==='in'? elapsedHours(g): estElapsed(g);
     const rem = g.status==='in'? remainingHours(g): estRemaining(g);
     return `<tr>
