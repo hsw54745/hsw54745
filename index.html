@@ -10138,6 +10138,9 @@ function confirmLoadPrompt(resId, isTransfer){
   // 연료 요청건은 비고에 적어놔도 상차하면서 깜빡 잊는 경우가 많아서, 음성으로도 한 번 더 알려줍니다.
   // 구조화된 연료 칸(요청량)이 안 채워져 있고 비고에만 "연료"라는 말이 적혀있어도 놓치지 않게 같이 감지합니다.
   const noteHasFuel = !needFuel && r.note && r.note.includes('연료');
+  if(isWithinVoiceAlertHours()){
+    speakText(`${r.genId.replace(/-/g,'')}번 발전기, ${g? (g.model||'') : ''} 상차합니다. 번호가 맞는지 확인해주세요.`);
+  }
   if((needFuel || noteHasFuel) && !isTransfer && isWithinVoiceAlertHours()){
     speakText(needFuel ? `연료 ${fuelAmt}리터 요청건입니다. 주유하셨는지 확인해주세요.` : `비고에 연료 관련 내용이 있습니다. 주유하셨는지 확인해주세요.`);
   }
@@ -10152,6 +10155,11 @@ function confirmLoadPrompt(resId, isTransfer){
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal" style="text-align:left;">
       <h3>🚚 상차 완료 확인</h3>
+      <div style="text-align:center;background:var(--warn-tint);border:2px solid var(--warn);border-radius:10px;padding:10px 14px;margin-bottom:6px;">
+        <div style="font-size:22px;font-weight:900;color:#8A5A00;">${escR(r.genId)}</div>
+        <div style="font-size:14px;font-weight:700;color:#333;">${g? escR(g.model||'') : ''}</div>
+        <div style="font-size:12px;color:#8A5A00;font-weight:700;margin-top:2px;">⚠️ 발전기 번호가 맞는지 꼭 확인해주세요</div>
+      </div>
       <div class="modal-sub">${escR(r.genId)}${g? ` · ${escR(g.model||'')}`:''}</div>
       <div class="detail-card" style="margin-bottom:14px;padding:12px 14px;">
         <div class="muted" style="font-size:11px;font-weight:700;margin-bottom:6px;">출고 등록된 내용</div>
