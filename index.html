@@ -5065,10 +5065,10 @@ function openAdjustModal(id){
       <div class="out-row stretch">
         <div id="f-adj-fields">
           <div class="field f-eq"><div class="out-card">
-            <label>현재 누적 사용시간(h)</label><input type="number" id="f-adj-hours" min="0" value="${g.hours||0}">
+            <label>마지막 정비시 누적시간(h)</label><input type="number" id="f-adj-lastmaint" min="0" value="${g.lastMaintHours||0}"><div class="hint">모르면 현재 누적시간과 같은 값으로 입력해두면 "정비필요"로 잘못 표시되지 않습니다.</div>
           </div></div>
           <div class="field f-eq"><div class="out-card">
-            <label>마지막 정비시 누적시간(h)</label><input type="number" id="f-adj-lastmaint" min="0" value="${g.lastMaintHours||0}"><div class="hint">모르면 현재 누적시간과 같은 값으로 입력해두면 "정비필요"로 잘못 표시되지 않습니다.</div>
+            <label>현재 누적 사용시간(h)</label><input type="number" id="f-adj-hours" min="0" value="${g.hours||0}">
           </div></div>
           <div class="field f-eq"><div class="out-card">
             <label>마지막 정비일자</label><input type="date" id="f-adj-lastmaintdate" value="${g.lastMaintDate||''}">
@@ -12825,6 +12825,11 @@ function openInModal(id, isTransfer){
     <div class="modal modal-wide" style="text-align:left;">
       <h3 style="text-align:center;">${isTransfer? '🔀 현장이동 (입고 없이 바로 재출고)' : '📥 입고 처리'}</h3>
       ${isTransfer? `<div class="hint" style="text-align:center;color:#8A5A00;font-weight:700;margin-top:-6px;">이번 임대를 종료 처리한 뒤, 곧바로 이 발전기로 새 출고 화면이 열립니다.</div>`:''}
+      <div style="text-align:center;background:var(--warn-tint);border:2px solid var(--warn);border-radius:10px;padding:10px 14px;margin-bottom:6px;">
+        <div style="font-size:22px;font-weight:900;color:#8A5A00;">${g.id}</div>
+        <div style="font-size:14px;font-weight:700;color:#333;">${displayModel(g)} · ${g.rental.customer||'-'}</div>
+        <div style="font-size:12px;color:#8A5A00;font-weight:700;margin-top:2px;">⚠️ 발전기 번호가 맞는지 꼭 확인해주세요</div>
+      </div>
       <div class="modal-sub">${g.id} · ${displayModel(g)} · ${g.rental.customer||'-'}</div>
       <div class="out-row stretch">
         <div class="field f-md"><div class="out-card">
@@ -12908,6 +12913,9 @@ function openInModal(id, isTransfer){
     </div>
   </div>`;
   renderSuppliesButtons();
+  if(isWithinVoiceAlertHours()){
+    speakText(`${g.id.replace(/-/g,'')}번 발전기 ${isTransfer? '현장이동':'입고'} 처리합니다. 번호가 맞는지 확인해주세요.`);
+  }
   if(rt.note && isWithinVoiceAlertHours()){
     speakText(`비고 내용이 있습니다. ${rt.note}. 확인해주세요.`);
   }
@@ -13064,7 +13072,10 @@ async function submitIn(id, isTransfer){
       return;
     }
   }
-  submitInFinish(id, isTransfer, {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm});
+  const finishVals = {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm};
+  openConfirmModal(`⚠️ [${g.id}] ${displayModel(g)} 발전기를 ${isTransfer? '현장이동':'입고'} 처리합니다.\n\n번호가 맞습니까?`, function(){
+    submitInFinish(id, isTransfer, finishVals);
+  }, '맞습니다, 처리', '다시 확인');
 }
 async function submitInFinish(id, isTransfer, vals){
   const {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm} = vals;
