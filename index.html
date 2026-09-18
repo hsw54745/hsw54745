@@ -2950,6 +2950,11 @@ function adminModeSectionHtml(){
         </table></div>`;
       })()}
     </div>
+    <div style="border:1px solid var(--primary);border-radius:var(--radius);padding:14px 16px;margin-top:20px;background:var(--primary-tint);">
+      <div class="section-title" style="margin-top:0;">🔄 마지막 정비시점 다시 계산</div>
+      <details class="info-toggle"><summary></summary><p class="muted">전압변경 기록이 "마지막 정비"로 잘못 잡혀있던 예전 버그를 고친 뒤, 이미 저장된 발전기들의 값을 한 번에 바로잡는 버튼입니다. 전압변경 기록은 빼고, 진짜 정비(정기정비·고장수리) 기록만으로 "마지막 정비일"·"마지막 정비시 누적시간"을 다시 계산합니다. 진짜 정비 기록이 하나도 없는 발전기는 정비 이력 없음(현재 누적시간과 동일)으로 정리됩니다. 되돌릴 수 없는 삭제 작업이 아니라 안전하게 몇 번이든 다시 눌러도 됩니다.</p></details>
+      <button class="btn primary" onclick="recalcAllLastMaint()">전체 발전기 마지막 정비시점 다시 계산</button>
+    </div>
     <div style="border:1px solid var(--danger);border-radius:var(--radius);padding:14px 16px;margin-top:20px;background:var(--danger-tint);">
       <div class="section-title" style="margin-top:0;color:var(--danger);">⚠️ 위험 구역</div>
       <details class="info-toggle"><summary></summary><p class="muted">아래 작업들은 모두 되돌릴 수 없습니다. 실행 전 먼저 백업을 받아두시길 권장합니다. 각 버튼에 마우스를 올리면 무엇이 지워지는지 설명이 나옵니다.</p></details>
@@ -5022,7 +5027,7 @@ function renderMaintByGen(){
   if(recs.length===0){ el.innerHTML = `<div class="empty">"${genId}" 발전기의 정비 이력이 없습니다.</div>`; return; }
   el.innerHTML = `<div class="table-scroll"><table>
     <thead><tr><th>정비일</th><th>번호</th><th>정비시 누적시간</th><th>구분</th><th>정비자</th><th>사용부품</th><th>정비 내용</th></tr></thead>
-    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':'<span class="pill gray">정기정비</span>'}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;">${(r.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td><td class="wrap-ok">${r.content||'-'}</td></tr>`).join('')}</tbody>
+    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':(r.type==='전압변경'?'<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>':'<span class="pill gray">정기정비</span>')}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;">${(r.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td><td class="wrap-ok">${r.content||'-'}</td></tr>`).join('')}</tbody>
   </table></div>`;
 }
 function renderMaintByModel(){
@@ -5033,7 +5038,7 @@ function renderMaintByModel(){
   if(recs.length===0){ el.innerHTML = `<div class="empty">"${model}" 모델의 정비 이력이 없습니다.</div>`; return; }
   el.innerHTML = `<div class="table-scroll"><table>
     <thead><tr><th>정비일</th><th>번호</th><th>정비시 누적시간</th><th>구분</th><th>정비자</th><th>사용부품</th><th>정비 내용</th></tr></thead>
-    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':'<span class="pill gray">정기정비</span>'}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;">${(r.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td><td class="wrap-ok">${r.content||'-'}</td></tr>`).join('')}</tbody>
+    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':(r.type==='전압변경'?'<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>':'<span class="pill gray">정기정비</span>')}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;">${(r.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td><td class="wrap-ok">${r.content||'-'}</td></tr>`).join('')}</tbody>
   </table></div>`;
 }
 
@@ -5065,13 +5070,13 @@ function openAdjustModal(id){
       <div class="out-row stretch">
         <div id="f-adj-fields">
           <div class="field f-eq"><div class="out-card">
-            <label>마지막 정비시 누적시간(h)</label><input type="number" id="f-adj-lastmaint" min="0" value="${g.lastMaintHours||0}"><div class="hint">모르면 현재 누적시간과 같은 값으로 입력해두면 "정비필요"로 잘못 표시되지 않습니다.</div>
+            <label>마지막 엔진오일교환시 누적시간(h)</label><input type="number" id="f-adj-lastmaint" min="0" value="${g.lastMaintHours||0}"><div class="hint">모르면 현재 누적시간과 같은 값으로 입력해두면 "정비필요"로 잘못 표시되지 않습니다.</div>
           </div></div>
           <div class="field f-eq"><div class="out-card">
             <label>현재 누적 사용시간(h)</label><input type="number" id="f-adj-hours" min="0" value="${g.hours||0}">
           </div></div>
           <div class="field f-eq"><div class="out-card">
-            <label>마지막 정비일자</label><input type="date" id="f-adj-lastmaintdate" value="${g.lastMaintDate||''}">
+            <label>마지막 엔진오일교환일자</label><input type="date" id="f-adj-lastmaintdate" value="${g.lastMaintDate||''}">
           </div></div>
         </div>
       </div>` : `
@@ -5242,7 +5247,9 @@ async function submitCycle(id){
 function recomputeLastMaint(genId){
   const g = findGen(genId);
   if(!g) return;
-  const recs = DB.maint.filter(m=>m.genId===genId);
+  // 전압변경 자동기록은 실제 정비(엔진오일교체·부품교체 등)가 아니므로,
+  // "마지막 정비" 계산에서는 제외합니다. 전압변경만 있고 진짜 정비 기록이 없으면 정비 이력 없음으로 취급합니다.
+  const recs = DB.maint.filter(m=>m.genId===genId && m.type!=='전압변경');
   if(recs.length===0){
     // 정비 이력이 전부 삭제된 경우 "마지막 정비시 누적시간"이 예전 값에 그대로 남아있으면
     // 실제 상태와 어긋나므로, 현재 누적시간과 같은 값으로 맞춰 "정비필요"가 잘못 표시되지 않게 합니다.
@@ -5533,7 +5540,7 @@ function renderRecentMaint(){
       <td class="gid">${m.genId}</td>
       <td class="wrap-ok">${g? displayModel(g): '-'}</td>
       <td class="muted">${(m.hours||0).toLocaleString()}h</td>
-      <td>${m.type==='고장수리'? '<span class="pill danger">고장수리</span>' : '<span class="pill gray">정기정비</span>'}</td>
+      <td>${m.type==='고장수리'? '<span class="pill danger">고장수리</span>' : (m.type==='전압변경'? '<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>' : '<span class="pill gray">정기정비</span>')}</td>
       <td>${m.technician||'-'}</td>
       <td class="wrap-ok" style="font-size:12px;">${(m.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td>
       <td class="wrap-ok">${m.content||'-'}</td>
@@ -5602,6 +5609,18 @@ function resetAllToOut(){
       saveWithRetry(saveReservations);
     
   }, '초기화');
+}
+function recalcAllLastMaint(){
+  let count = 0;
+  activeGens().forEach(g=>{
+    if(g.hoursKnown){
+      recomputeLastMaint(g.id);
+      count++;
+    }
+  });
+  saveWithRetry(saveGens);
+  renderContent();
+  flash(`${count}대의 마지막 정비시점을 다시 계산했습니다 (전압변경 기록은 제외).`);
 }
 function resetMaintHistory(){
   openConfirmModal('정비 내역을 전부 초기화할까요?\n\n모든 발전기의 정비 등록 기록이 삭제되고, 누적 사용시간이 "누적시간 확인불가" 상태로 초기화됩니다. 부품 재고 차감 내역은 복원되지 않습니다. 되돌릴 수 없는 작업이니 먼저 백업을 받아두시길 권장합니다.', function(){
@@ -6041,7 +6060,7 @@ function renderGenHistory(){
       <tbody>${maints.map(m=>`<tr>
         <td>${dow(m.date)}</td>
         <td class="muted">${(m.hours||0).toLocaleString()}h</td>
-        <td>${m.type==='고장수리'? '<span class="pill danger">고장수리</span>' : '<span class="pill gray">정기정비</span>'}</td>
+        <td>${m.type==='고장수리'? '<span class="pill danger">고장수리</span>' : (m.type==='전압변경'? '<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>' : '<span class="pill gray">정기정비</span>')}</td>
         <td>${m.technician||'-'}</td>
         <td style="font-size:12px;">${(m.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td>
         <td class="wrap-ok">${m.content||'-'}</td>
@@ -8776,7 +8795,7 @@ async function logVoltageChangeMaint(genId, oldVoltage, newVoltage){
   DB.maint.push({
     id: uid(), genId, model: g? g.model : '', date: dateStr, hours: g? (g.hours||0) : 0,
     content: `⚡ 전압변경: ${oldVoltage||'미설정'} → ${newVoltage} (${DB.currentUserName||'이름미상'} · ${dateStr} ${timeStr})`,
-    contentItems: [], contentEtc: '', technician: DB.currentUserName||'', partsUsed: [], type: '정기정비', photo: null
+    contentItems: [], contentEtc: '', technician: DB.currentUserName||'', partsUsed: [], type: '전압변경', photo: null
   });
   recomputeLastMaint(genId);
   await saveMaint();
@@ -13221,7 +13240,7 @@ function pickTransferReservation(genId, resId){
 function setMaintType(type){
   const el = document.getElementById('f-mtype');
   if(el) el.value = type;
-  ['정기정비','고장수리'].forEach(t=>{
+  ['정기정비','고장수리','전압변경'].forEach(t=>{
     const btn = document.getElementById(`f-mtype-btn-${t}`);
     if(btn) btn.classList.toggle('primary', t===type);
   });
@@ -13299,12 +13318,14 @@ function openMaintModal(id, editId, repairComplete){
   const techs = (DB.technicians||[]).filter(t=>t && t.trim());
   const candidates = materialCandidateParts(g.model);
   const selectedLabels = new Set(((rec && rec.partsUsed) || []).map(p=>typeof p==='string'?p:p.label));
-  const currentType = repairComplete ? '고장수리' : (rec&&rec.type==='고장수리' ? '고장수리' : '정기정비');
+  const isVoltageChangeRec = !!(rec && (rec.type==='전압변경' || (rec.content||'').includes('전압변경')));
+  const currentType = repairComplete ? '고장수리' : (rec&&rec.type==='고장수리' ? '고장수리' : (isVoltageChangeRec ? '전압변경' : '정기정비'));
   const typeButtonsHtml = `
     <input type="hidden" id="f-mtype" value="${currentType}">
     <div class="btn-row">
       <button type="button" class="btn sm${currentType==='정기정비'?' primary':''}" id="f-mtype-btn-정기정비" onclick="setMaintType('정기정비')">정기정비</button>
       <button type="button" class="btn sm${currentType==='고장수리'?' primary':''}" id="f-mtype-btn-고장수리" onclick="setMaintType('고장수리')">고장/긴급수리</button>
+      ${isVoltageChangeRec? `<button type="button" class="btn sm${currentType==='전압변경'?' primary':''}" id="f-mtype-btn-전압변경" onclick="setMaintType('전압변경')" title="전압변경 자동기록은 정비가 아니라 언제·누가 바꿨는지 남기는 기록입니다.">전압변경</button>` : ''}
     </div>`;
   const currentTech = rec ? (rec.technician||'') : '';
   const techButtonOptions = techs;
