@@ -4833,7 +4833,8 @@ function renderOutList(){
       <input type="number" id="default-est-daily-short" value="${escR(defaultEstDailyShort)}" step="0.5" min="0" placeholder="예: 4.5" style="width:56px;padding:4px 6px;font-size:13px;">
       <span style="font-size:11.5px;color:#666;">장기</span>
       <input type="number" id="default-est-daily-long" value="${escR(defaultEstDailyLong)}" step="0.5" min="0" placeholder="예: 6" style="width:56px;padding:4px 6px;font-size:13px;">
-      <button type="button" class="btn sm primary" onclick="applyDefaultEstDailyToAll()">비어있는 발전기에 전체 적용</button>
+      <button type="button" class="btn sm primary" onclick="applyDefaultEstDailyToAll()">출고중인 발전기에 전체 적용</button>
+      <button type="button" class="btn sm" onclick="clearEstDailyFromAll()" title="출고중인 발전기 전체의 예상가동시간을 다시 비웁니다(모르거나 필요 없을 때)">미적용</button>
     </span>`;
   const capacityButtonsHtml = capacityEntries.length===0 ? '' : `
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;">
@@ -4976,21 +4977,27 @@ async function submitLongtermConvert(id){
 async function applyDefaultEstDailyToAll(){
   const shortEl = document.getElementById('default-est-daily-short');
   const longEl = document.getElementById('default-est-daily-long');
-  const vShort = Number(shortEl.value);
-  const vLong = Number(longEl.value);
-  if(!(vShort>0) && !(vLong>0)){ flash('단기 또는 장기 시간을 먼저 입력해주세요'); return; }
+  // 입력칸이 비어있는지(적용 안 함) vs 0을 직접 입력했는지(0으로 적용)를 구분합니다.
+  const shortRaw = shortEl.value.trim();
+  const longRaw = longEl.value.trim();
+  const hasShort = shortRaw!=='' && !isNaN(Number(shortRaw)) && Number(shortRaw)>=0;
+  const hasLong = longRaw!=='' && !isNaN(Number(longRaw)) && Number(longRaw)>=0;
+  const vShort = hasShort ? Number(shortRaw) : null;
+  const vLong = hasLong ? Number(longRaw) : null;
+  if(!hasShort && !hasLong){ flash('단기 또는 장기 시간을 먼저 입력해주세요'); return; }
   try{
-    if(vShort>0) localStorage.setItem('defaultEstDailyShort', String(vShort));
-    if(vLong>0) localStorage.setItem('defaultEstDailyLong', String(vLong));
+    if(hasShort) localStorage.setItem('defaultEstDailyShort', String(vShort));
+    if(hasLong) localStorage.setItem('defaultEstDailyLong', String(vLong));
   }catch(e0){}
-  const targetsShort = vShort>0 ? activeGens().filter(g=>g.status==='out' && g.rental && !g.rental.longTerm && !(g.rental.estDaily>0)) : [];
-  const targetsLong = vLong>0 ? activeGens().filter(g=>g.status==='out' && g.rental && g.rental.longTerm && !(g.rental.estDaily>0)) : [];
+  // "비어있는 발전기"가 아니라, 출고중인 발전기 전체(이미 값이 있어도 덮어씀)에 적용합니다.
+  const targetsShort = hasShort ? activeGens().filter(g=>g.status==='out' && g.rental && !g.rental.longTerm) : [];
+  const targetsLong = hasLong ? activeGens().filter(g=>g.status==='out' && g.rental && g.rental.longTerm) : [];
   const total = targetsShort.length + targetsLong.length;
-  if(total===0){ flash('이미 모든 발전기에 예상가동시간이 입력되어 있습니다'); return; }
+  if(total===0){ flash('현재 출고중인 발전기가 없습니다'); return; }
   const msgLines = [];
   if(targetsShort.length) msgLines.push(`단기 ${targetsShort.length}대 → 하루 ${vShort}h`);
   if(targetsLong.length) msgLines.push(`장기 ${targetsLong.length}대 → 하루 ${vLong}h`);
-  openConfirmModal(`예상가동시간이 비어있는 발전기에 적용할까요?\n\n${msgLines.join('\n')}`, async function(){
+  openConfirmModal(`출고중인 발전기 전체에 적용할까요? (이미 입력된 값이 있어도 덮어씁니다)\n\n${msgLines.join('\n')}`, async function(){
     targetsShort.forEach(g=>{ g.rental.estDaily = vShort; });
     targetsLong.forEach(g=>{ g.rental.estDaily = vLong; });
     saveWithRetry(saveGens);
@@ -4998,6 +5005,17 @@ async function applyDefaultEstDailyToAll(){
     renderContent();
     flash(`총 ${total}대에 적용했습니다`);
   }, '전체 적용');
+}
+function clearEstDailyFromAll(){
+  const targets = activeGens().filter(g=>g.status==='out' && g.rental && g.rental.estDaily!=null);
+  if(targets.length===0){ flash('현재 예상가동시간이 입력된 출고중 발전기가 없습니다'); return; }
+  openConfirmModal(`출고중인 발전기 전체(${targets.length}대)의 예상가동시간을 다시 비울까요?\n\n(단기·장기 구분 없이 모두 비웁니다)`, async function(){
+    targets.forEach(g=>{ g.rental.estDaily = null; });
+    saveWithRetry(saveGens);
+    closeModal();
+    renderContent();
+    flash(`${targets.length}대의 예상가동시간을 비웠습니다`);
+  }, '전체 미적용');
 }
 
 function renderMaintTab(){
