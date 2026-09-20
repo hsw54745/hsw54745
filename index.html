@@ -13290,7 +13290,7 @@ async function submitIn(id, isTransfer){
     }
   }
   const finishVals = {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm};
-  openConfirmModal(`⚠️ [${g.id}] ${displayModel(g)} 발전기를 ${isTransfer? '현장이동':'입고'} 처리합니다.\n\n번호가 맞습니까?`, function(){
+  openConfirmModal(`⚠️ [${g.id}] ${g.model||'미설정'} 발전기를 ${isTransfer? '현장이동':'입고'} 처리합니다.\n\n번호가 맞습니까?`, function(){
     submitInFinish(id, isTransfer, finishVals);
   }, '맞습니다, 처리', '다시 확인');
 }
