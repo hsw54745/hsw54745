@@ -5548,7 +5548,7 @@ function renderCustomerHistoryView(){
       <td class="wrap-ok" style="cursor:pointer;text-decoration:underline dotted;" onclick="openCustomerNotesModal('${r.customer.replace(/'/g,"\\'")}')">${escR(r.customer)}</td>
       <td class="muted">${r.cnt}건</td>
       <td>${tags.length>0? tags.map(t=>`<span class="pill danger" style="margin-right:3px;">${escR(t)}</span>`).join('') : `<span class="muted">-</span>`}</td>
-      <td class="muted" style="font-size:12px;">${notes&&notes.note? escR(notes.note) : '-'}</td>
+      <td class="muted" style="font-size:12px;">${notes&&notes.note? `${escR(notes.note)}${notes.updatedAt? `<div style="font-size:10.5px;color:var(--ink-faint);margin-top:2px;">${dow(notes.updatedAt)||notes.updatedAt} 작성</div>`:''}` : '-'}</td>
       <td><button class="btn sm" onclick="openCustomerNotesModal('${r.customer.replace(/'/g,"\\'")}')">주의사항 설정</button></td>
     </tr>`;
   };
@@ -5609,7 +5609,7 @@ function openCustomerNotesModal(customer){
           <button type="button" class="btn sm" onclick="addCustomCustomerTag()">태그 추가</button>
         </div>
       </div>
-      <div class="field"><label>주의사항 (자유 입력)</label><textarea id="cn-note" placeholder="예: 2026년 3월 대금 3주 지연 지급됨" style="min-height:110px;">${escR(notes.note||'')}</textarea></div>
+      <div class="field"><label>주의사항 (자유 입력)${notes.updatedAt? ` <span class="muted" style="font-weight:400;font-size:11.5px;">(마지막 작성: ${dow(notes.updatedAt)||notes.updatedAt}${notes.updatedBy? ` · ${escR(notes.updatedBy)}`:''})</span>`:''}</label><textarea id="cn-note" placeholder="예: 2026년 3월 대금 3주 지연 지급됨" style="min-height:110px;">${escR(notes.note||'')}</textarea></div>
       <div class="section-title" style="font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <span>📜 이 거래처 임대 이력 <span class="cnt">${rentals.length}건</span></span>
         <button type="button" class="btn sm" onclick="downloadCustomerHistoryPrintFile('${customer.replace(/'/g,"\\'")}')">🖨 인쇄</button>
@@ -5741,7 +5741,7 @@ function customerWarningHtml(customer){
   const notes = DB.customerNotes && DB.customerNotes[(customer||'').trim()];
   if(!notes || (notes.tags.length===0 && !notes.note)) return '';
   return `<div style="background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:10px 12px;margin-top:6px;">
-    <div style="font-weight:800;font-size:13.5px;color:var(--danger);margin-bottom:4px;">⚠️ 이 거래처 주의사항</div>
+    <div style="font-weight:800;font-size:13.5px;color:var(--danger);margin-bottom:4px;">⚠️ 이 거래처 주의사항${notes.updatedAt? ` <span style="font-weight:400;font-size:11.5px;color:var(--ink-soft);">(${dow(notes.updatedAt)||notes.updatedAt} 작성${notes.updatedBy? ` · ${escR(notes.updatedBy)}`:''})</span>`:''}</div>
     ${notes.tags.length>0? `<div style="margin-bottom:4px;">${notes.tags.map(t=>`<span class="pill danger" style="margin-right:3px;">${escR(t)}</span>`).join('')}</div>`:''}
     ${notes.note? `<div style="font-size:12.5px;color:var(--ink);white-space:pre-wrap;">${escR(notes.note)}</div>`:''}
   </div>`;
