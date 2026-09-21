@@ -636,6 +636,7 @@ function renderQuickModeUI(){
       <button type="button" onclick="renderQuickModeOutList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">🚚 출고중 발전기 리스트 보기</button>
       <button type="button" onclick="renderQuickModeSoonInList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#B2782C;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📅 입고 예정 리스트 보기</button>
       <button type="button" onclick="renderQmReservationList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:20px;">⏳ 출고대기 리스트 보기</button>
+      <button type="button" onclick="renderQmReturnRequestList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:20px;position:relative;">🔻 철수요청 확인<span id="qm-return-count-badge"></span></button>
       <button type="button" onclick="renderQuickModeTextChoice()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📝 문자 등록하기 (출고/철수)</button>
       <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:14px;cursor:pointer;">📝 출고예약 등록</button>
       <div id="qm-install-status" style="margin-top:10px;"></div>
@@ -645,6 +646,17 @@ function renderQuickModeUI(){
     const st = document.getElementById('qm-install-status');
     if(st) st.innerHTML = '<div style="text-align:center;color:#2C6E49;font-weight:700;font-size:13px;">✅ 이미 앱으로 실행 중입니다</div>';
   }
+  qmRefreshReturnCountBadge();
+}
+async function qmRefreshReturnCountBadge(){
+  try{
+    const cur = await window.storage.get('gen-return-requests-v1', true);
+    let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    const n = list.filter(Boolean).length;
+    const badge = document.getElementById('qm-return-count-badge');
+    if(badge) badge.innerHTML = n>0 ? ` <span style="display:inline-block;background:#fff;color:#B23A34;font-size:13px;font-weight:900;border-radius:999px;padding:1px 9px;margin-left:4px;vertical-align:middle;">${n}</span>` : '';
+  }catch(e){ /* 배지 표시 실패는 화면 진입 자체를 막지 않습니다 */ }
 }
 let qmTextMode = 'out'; // 'out' | 'return'
 function renderQuickModeTextChoice(){
@@ -1516,6 +1528,58 @@ async function qmRefreshReservationList(){
     }).join('');
   }catch(e){
     if(document.getElementById('qm-res-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">목록을 불러오지 못했습니다.</div>';
+  }
+}
+async function renderQmReturnRequestList(){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQuickModeUI()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:24px;font-weight:800;color:#B23A34;">🔻 철수요청 확인</div>
+        <div style="font-size:14px;color:#555;margin-top:6px;">접수된 순서대로 보여드려요</div>
+      </div>
+      <div id="qm-return-list"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+    </div>
+  `);
+  await qmRefreshReturnRequestList();
+}
+async function qmRefreshReturnRequestList(){
+  const wrap = document.getElementById('qm-return-list');
+  try{
+    const [cur, curFleet] = await Promise.all([
+      window.storage.get('gen-return-requests-v1', true),
+      window.storage.get('gen-fleet-v2', true).catch(()=>null)
+    ]);
+    let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    let gens = []; try{ gens = curFleet ? JSON.parse(curFleet.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    list = list.filter(Boolean).sort((a,b)=>(a.createdAtTs||0)-(b.createdAtTs||0));
+    if(!document.getElementById('qm-return-list')) return; // 화면이 이미 닫혔으면 무시
+    if(list.length===0){
+      wrap.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">지금 확인할 철수요청이 없습니다.</div>';
+      return;
+    }
+    // 사무실 화면과 똑같은 기준(연락처 → 주소 → 거래처명 순)으로 어느 발전기인지 추정해봅니다.
+    const outGens = gens.filter(g=>g && g.status==='out' && g.rental);
+    wrap.innerHTML = list.map((r,i)=>{
+      const parsed = parseReturnRequestText(r.text);
+      let matched = null;
+      if(parsed.phone) matched = outGens.find(g=>g.rental.phone && g.rental.phone.replace(/[^0-9]/g,'')===parsed.phone);
+      if(!matched && parsed.address) matched = outGens.find(g=>g.rental.address && (g.rental.address.includes(parsed.address) || parsed.address.includes(g.rental.address)));
+      if(!matched && parsed.customer) matched = outGens.find(g=>g.rental.customer && (g.rental.customer.includes(parsed.customer) || parsed.customer.includes(g.rental.customer)));
+      const matchHtml = matched
+        ? `<div style="font-size:13px;font-weight:800;color:#1E7B45;background:#E7F5EC;display:inline-block;padding:3px 10px;border-radius:8px;margin-top:6px;">✅ [${escR(matched.id)}] ${escR(matched.model||'')} 로 추정됨</div>`
+        : `<div style="font-size:13px;font-weight:800;color:#B23A34;background:#FBEAEA;display:inline-block;padding:3px 10px;border-radius:8px;margin-top:6px;">🅾 어느 발전기인지 자동으로 못 찾았어요, 문자 내용 보고 직접 확인해주세요</div>`;
+      return `
+      <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+        <div style="font-size:11px;color:#999;">#${i+1} · ${fmtCardDateTime(r.createdAtTs)}${r.authorBy? ` · ${escR(r.authorBy)}`:''}</div>
+        ${matchHtml}
+        <div style="font-size:14px;line-height:1.5;white-space:pre-wrap;margin-top:8px;color:#333;">${escR(r.text||'')}</div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    if(document.getElementById('qm-return-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">목록을 불러오지 못했습니다.</div>';
   }
 }
 function cancelQmReservation(resId){
