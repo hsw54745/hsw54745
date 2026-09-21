@@ -10037,10 +10037,10 @@ function renderReserveTab(){
         ? `<button class="btn sm" style="color:var(--danger);font-weight:700;border-color:var(--danger);" onclick="showSuppliesModal('${r.id}')">부자재확인</button>`
         : `<span class="muted">부자재없음</span>`;
       const noteMarker2 = (r.note && r.note.trim()) ? `<button class="btn sm" style="color:var(--primary-dark);font-weight:700;border-color:var(--primary);text-align:center;margin-top:4px;" onclick="showNoteModal('${r.id}')">비고확인</button>` : '';
-      const smsMarker2 = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 출고오더확인</button>` : '';
+      const smsMarker2 = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 출고오더확인${smsOrderNumMap[r.id]? ` #${smsOrderNumMap[r.id]}`:''}</button>` : '';
       const rowStyle = isRaw ? ' style="background:#FFFDF3;"' : (isDelayed2? ' style="background:var(--danger-tint);"' : '');
       return `<tr${rowStyle}>
-        <td class="gid"><span class="pill warn">🅾 미지정</span>${isRaw? `<div style="margin-top:4px;"><span class="pill" style="background:#FFF3C4;color:#8A6D00;border-color:#E8B923;">📩 문자오더</span></div>`:''}${smsOrderNumMap[r.id]? `<div style="font-size:10px;color:#8A6D00;font-weight:700;margin-top:2px;">#${smsOrderNumMap[r.id]}</div>`:''}</td>
+        <td class="gid"><span class="pill warn">🅾 미지정</span>${isRaw? `<div style="margin-top:4px;"><span class="pill" style="background:#FFF3C4;color:#8A6D00;border-color:#E8B923;">📩 문자오더</span></div>`:''}</td>
         <td class="wrap-ok" style="max-width:130px;"><span class="muted">발전기 배정 전</span></td>
         <td class="muted" style="font-size:11px;">${r.outProcessedBy? escR(r.outProcessedBy) : '-'}</td>
         <td class="wrap-ok" style="font-size:12px;">
@@ -10075,9 +10075,9 @@ function renderReserveTab(){
       ? `<button class="btn sm" style="color:var(--danger);font-weight:700;border-color:var(--danger);" onclick="showSuppliesModal('${r.id}')">부자재확인</button>`
       : `<span class="muted">부자재없음</span>`;
     const noteMarker = (r.note && r.note.trim()) ? `<button class="btn sm" style="color:var(--primary-dark);font-weight:700;border-color:var(--primary);text-align:center;margin-top:4px;" onclick="showNoteModal('${r.id}')">비고확인</button>` : '';
-    const smsMarker = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 출고오더확인</button>` : '';
+    const smsMarker = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 출고오더확인${smsOrderNumMap[r.id]? ` #${smsOrderNumMap[r.id]}`:''}</button>` : '';
     return `<tr${isDelayed? ` style="background:var(--danger-tint);"`:''}>
-      <td class="gid">${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)}${smsOrderNumMap[r.id]? `<div style="font-size:10px;color:#8A6D00;font-weight:700;margin-top:2px;">#${smsOrderNumMap[r.id]}</div>`:''}</td>
+      <td class="gid">${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)}</td>
       <td class="wrap-ok" style="max-width:130px;">${g? displayModel(g): '-'}</td>
       <td class="muted" style="font-size:11px;">${r.outProcessedBy? escR(r.outProcessedBy) : '-'}</td>
       <td class="wrap-ok" style="font-size:12px;">
