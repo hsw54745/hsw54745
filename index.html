@@ -1800,7 +1800,7 @@ async function submitQmConfirmLoad(resId, needFuel){
       supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', voltage: r.voltage, qty: r.qty,
       fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
       usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
-      outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
+      outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: (r.estDaily!=null ? r.estDaily : getDefaultEstDailyValue(r.longTerm)),
       outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: qmLabel(), genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now()
     };
     if(r.suppliesItems && r.suppliesItems.length){
@@ -5048,6 +5048,15 @@ async function submitLongtermConvert(id){
   closeModal();
   renderContent();
   flash('장기로 변경되었습니다');
+}
+function getDefaultEstDailyValue(longTerm){
+  // "출고중인 발전기에 전체 적용" 버튼으로 저장해둔 기본 예상가동시간을, 개별 건에 estDaily가 없을 때 자동으로 가져다 씁니다.
+  try{
+    const raw = localStorage.getItem(longTerm ? 'defaultEstDailyLong' : 'defaultEstDailyShort');
+    if(raw==null || raw==='') return null;
+    const n = Number(raw);
+    return isNaN(n) ? null : n;
+  }catch(e){ return null; }
 }
 async function applyDefaultEstDailyToAll(){
   const shortEl = document.getElementById('default-est-daily-short');
@@ -10502,7 +10511,7 @@ async function confirmLoad(resId, isTransfer){
     fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
     usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'',
     note: [r.note, transferFuelNote].filter(Boolean).join(' / '), smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
-    outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
+    outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: (r.estDaily!=null ? r.estDaily : getDefaultEstDailyValue(r.longTerm)),
     outProcessedBy: r.outProcessedBy || null, loadConfirmedBy: DB.currentUserName || null, genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now()
   };
   if(r.suppliesItems && r.suppliesItems.length){
@@ -11560,7 +11569,7 @@ async function quickForceOut(id){
     fuelRequested:null, fuelActual:null, usageDays:null, loadDate: todayStr(), arriveTime:null,
     freightBearer:'우리배차', paymentConfirmed:false, forcedOut:false, forceReason:'', forcedBy:null,
     note:'(정보없이 강제출고됨 - 오입고 수정용)',
-    outDate: todayStr(), startHours: g.hours||0, longTerm:false, estDaily:null,
+    outDate: todayStr(), startHours: g.hours||0, longTerm:false, estDaily: getDefaultEstDailyValue(false),
     outProcessedBy: DB.currentUserName||null, loadConfirmedBy: DB.currentUserName||null, outConfirmedAt: Date.now()
   };
   closeModal();
