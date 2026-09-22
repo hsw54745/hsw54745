@@ -4636,7 +4636,7 @@ function renderInList(){
     const isPendingOut = pendingGenIds.has(g.id);
     const isBroken = !!g.underRepair;
     const selectable = !isBroken && !isPendingOut;
-    return `<tr${isBroken? ` style="background:var(--danger-tint);"`:''}>
+    return `<tr${isBroken? ` style="background:var(--danger-tint);"` : (isPendingOut? ` style="background:var(--warn-tint);"` : '')}>
       <td>${selectable? `<input type="checkbox" class="bulk-out-chk" data-gid="${g.id}" ${bulkOutSelection.has(g.id)?'checked':''} onchange="toggleBulkOutSelect('${g.id}', this.checked)">` : ''}</td>
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}${g.borrowed? ` <span class="pill" style="background:var(--primary-tint);color:var(--primary-dark);border:1px solid var(--primary);">🤝 임대</span>`:''}${isPendingOut? ` <span class="pill warn">출고대기</span>`:''}${isBroken? `<div class="muted" style="font-size:11px;color:var(--danger);font-weight:700;">⚠ 고장: ${escR(g.repairNote||'-')}${g.repairPhoto? ` <img src="${g.repairPhoto}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;cursor:pointer;" onclick="openImageViewModal('${g.repairPhoto}','고장 사진')">`:''}</div>`:''}</td>
