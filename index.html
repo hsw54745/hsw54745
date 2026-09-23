@@ -6824,8 +6824,29 @@ function submitSalesUnlock(){
   sessionStorage.setItem('sales-unlocked-for', DB.salesPassword);
   renderContent();
 }
-function billingMatchKey(genId, outDate, customer){
-  return `${genId}__${outDate||''}__${(customer||'').trim()}`;
+function billingMatchKey(rec){
+  const ids = billingGenIds(rec).slice().sort().join(',');
+  return `${ids}__${rec.outDate||''}__${(rec.customer||'').trim()}`;
+}
+// 한 매출 기록(rec)에 묶인 발전기 번호들을 항상 배열로 돌려줍니다.
+// 예전 기록(발전기 1대당 rec.genId 하나)도, 새 방식(rec.genIds 배열)도 똑같이 다룰 수 있게 해줍니다.
+function billingGenIds(rec){
+  if(rec.genIds && rec.genIds.length) return rec.genIds;
+  if(rec.genId) return [rec.genId];
+  return [];
+}
+function billingCapacities(rec){
+  if(rec.capacities && rec.capacities.length) return rec.capacities;
+  if(rec.capacity!=null) return [rec.capacity];
+  return [];
+}
+// 같은 업체+현장+출고일로 묶을 기존 매출 기록을 찾습니다. (수동 등록 건은 자동 묶기 대상에서 제외)
+function findBillingGroupToJoin(customer, site, outDate){
+  return (DB.salesBillingRecords||[]).find(r=>
+    !r.hidden && !r.manual && r.outDate===outDate &&
+    (r.customer||'').trim()===(customer||'').trim() &&
+    (r.site||'').trim()===(site||'').trim()
+  );
 }
 function dedupRepeatedText(s){
   s = (s||'').trim();
@@ -6833,18 +6854,25 @@ function dedupRepeatedText(s){
   return s.replace(/(\S+)(\s+\1)+(?=\s|$)/g, '$1');
 }
 function recIsLiveOut(rec){
-  const g = findGen(rec.genId);
-  return !!(g && g.status==='out' && g.rental && g.rental.outDate===rec.outDate);
+  return billingGenIds(rec).some(gid=>{
+    const g = findGen(gid);
+    return !!(g && g.status==='out' && g.rental && g.rental.outDate===rec.outDate);
+  });
+}
+// 그룹에 속한 발전기 중 이번 출고건(같은 출고일)으로 이미 입고 완료된 이력들.
+function billingCompletedRentals(rec){
+  const ids = billingGenIds(rec);
+  return (DB.rentals||[]).filter(r=>ids.includes(r.genId) && r.outDate===rec.outDate && r.inDate);
 }
 function billingUsageDays(rec){
   if(rec.manual || !rec.outDate) return null;
   if(recIsLiveOut(rec)){
     return -daysFromToday(rec.outDate) + 1;
   }
-  const completed = (DB.rentals||[]).find(r=>r.genId===rec.genId && r.outDate===rec.outDate && r.inDate);
-  if(completed){
+  const end = billingEndDate(rec);
+  if(end){
     const out = new Date(rec.outDate+'T00:00:00');
-    const inD = new Date(completed.inDate+'T00:00:00');
+    const inD = new Date(end+'T00:00:00');
     if(!isNaN(out.getTime()) && !isNaN(inD.getTime())){
       return Math.max(1, Math.round((inD-out)/86400000) + 1);
     }
@@ -6853,8 +6881,10 @@ function billingUsageDays(rec){
 }
 function billingEndDate(rec){
   if(rec.manual || !rec.outDate || recIsLiveOut(rec)) return null;
-  const completed = (DB.rentals||[]).find(r=>r.genId===rec.genId && r.outDate===rec.outDate && r.inDate);
-  return completed ? completed.inDate : null;
+  // 여러 대가 묶인 건이면, 가장 마지막에 들어온 날짜를 전체 사용 종료일로 봅니다.
+  const completed = billingCompletedRentals(rec);
+  if(completed.length===0) return null;
+  return completed.reduce((max,r)=> (!max || r.inDate>max)? r.inDate : max, null);
 }
 function parseCustomerString(raw){
   let customer = (raw||'').trim();
@@ -6882,26 +6912,41 @@ function nextBillSeqNoFrom(list){
 }
 function getOrCreateBillingRecord(g){
   const rt = g.rental||{};
-  const key = billingMatchKey(g.id, rt.outDate, rt.customer);
   DB.salesBillingRecords = DB.salesBillingRecords || [];
-  let rec = DB.salesBillingRecords.find(r=>r.matchKey===key);
-  if(!rec){
-    const cap = capacityOf(g);
-    const parsed = parseCustomerString(rt.customer);
-    rec = {
-      id: uid(), matchKey: key, billSeqNo: nextBillSeqNo(), genId: g.id, outDate: rt.outDate||'',
-      customer: parsed.customer||'(업체명 미상)', site: rt.address||rt.site||'-', capacity: isFinite(cap)? cap : null,
-      manager: rt.manager||parsed.name||'', phone: rt.phone||parsed.phone||'',
-      billDate:'', billUnitPrice:0, billTax:0, billTotal:0,
-      billFreightOut:0, billFreightOutTax:0, billFreightIn:0, billFreightInTax:0, billInvoiceIssued:false,
-      billPay1Date:'', billPay1Amount:0, billPay2Date:'', billPay2Amount:0, billPay3Date:'', billPay3Amount:0,
-      billManager:null, billPhone:null, billNote: rt.paymentNote||'',
-      borrowed: !!g.borrowed, borrowRentalCost: 0, borrowedFrom: '',
-      hidden:false, createdAt: nowDateTimeStr()
-    };
-    DB.salesBillingRecords.push(rec);
+  const site = rt.address||rt.site||'-';
+  const parsed = parseCustomerString(rt.customer);
+  const customer = parsed.customer||'(업체명 미상)';
+  // 이미 이 발전기가 들어간 기록이 있으면(같은 발전기가 다시 이 함수를 통과하는 매 렌더마다) 그대로 반환.
+  let rec = DB.salesBillingRecords.find(r=>billingGenIds(r).includes(g.id) && r.outDate===(rt.outDate||''));
+  if(rec) return rec;
+  const cap = capacityOf(g);
+  const capVal = isFinite(cap)? cap : null;
+  // 같은 업체+현장+출고일로 이미 나간 기록이 있으면(오늘 같이 출고된 다른 발전기), 새로 만들지 않고 거기에 합류합니다.
+  const group = findBillingGroupToJoin(customer, site, rt.outDate||'');
+  if(group){
+    billingGenIds(group); // no-op, ensures arrays exist below
+    if(!group.genIds || !group.genIds.length) group.genIds = billingGenIds(group);
+    if(!group.capacities || !group.capacities.length) group.capacities = billingCapacities(group);
+    group.genIds.push(g.id);
+    group.capacities.push(capVal);
+    if(g.borrowed) group.borrowed = true;
+    group.matchKey = billingMatchKey(group);
     saveSalesBillingRecords();
+    return group;
   }
+  rec = {
+    id: uid(), billSeqNo: nextBillSeqNo(), genIds: [g.id], capacities: [capVal], outDate: rt.outDate||'',
+    customer, site, manager: rt.manager||parsed.name||'', phone: rt.phone||parsed.phone||'',
+    billDate:'', billUnitPrice:0, billTax:0, billTotal:0,
+    billFreightOut:0, billFreightOutTax:0, billFreightIn:0, billFreightInTax:0, billInvoiceIssued:false,
+    billPay1Date:'', billPay1Amount:0, billPay2Date:'', billPay2Amount:0, billPay3Date:'', billPay3Amount:0,
+    billManager:null, billPhone:null, billNote: rt.paymentNote||'',
+    borrowed: !!g.borrowed, borrowRentalCost: 0, borrowedFrom: '',
+    hidden:false, createdAt: nowDateTimeStr()
+  };
+  rec.matchKey = billingMatchKey(rec);
+  DB.salesBillingRecords.push(rec);
+  saveSalesBillingRecords();
   return rec;
 }
 function findBillingRecord(recId){
@@ -6966,7 +7011,7 @@ function dedupBillingRecords(){
   if(list.length===0) return false;
   const groups = {};
   list.forEach(rec=>{
-    const k = billingMatchKey(rec.genId, rec.outDate, rec.customer);
+    const k = billingMatchKey(rec);
     (groups[k] = groups[k]||[]).push(rec);
   });
   let changed = false;
@@ -6984,7 +7029,7 @@ function dedupBillingRecords(){
         if(isEmptyVal(keeper[key]) && !isEmptyVal(loser[key])) keeper[key] = loser[key];
       });
     }
-    keeper.matchKey = billingMatchKey(keeper.genId, keeper.outDate, keeper.customer);
+    keeper.matchKey = billingMatchKey(keeper);
     survivors.push(keeper);
     changed = true;
   });
@@ -7005,12 +7050,13 @@ function dedupBillingRecords(){
 }
 // 며칠 이내(발전기를 바꿔서 다시 출고하는 등) 있었던 출고취소 이력 중, "이 매출기록 자체(같은 발전기)"가 취소된 경우만 찾습니다.
 // (예전엔 같은 거래처·현장이면 다 같이 떴는데, 그러면 발전기를 바꿔서 새로 나간 정상 건에도 남의 취소이력이 같이 붙어서 헷갈렸습니다.)
-function findRelatedCancelHistory(customer, site, outDate, genId){
-  if(!customer || !outDate || !genId) return [];
+function findRelatedCancelHistory(customer, site, outDate, genIds){
+  const ids = Array.isArray(genIds) ? genIds : (genIds? [genIds] : []);
+  if(!customer || !outDate || !ids.length) return [];
   const t = new Date(outDate+'T00:00:00').getTime();
   if(isNaN(t)) return [];
   return (DB.cancelOutHistory||[]).filter(h=>{
-    if(!h || h.customer!==customer || h.genId!==genId) return false;
+    if(!h || h.customer!==customer || !ids.includes(h.genId)) return false;
     if(site && h.site && h.site!==site) return false;
     const ht = new Date((h.outDate||'')+'T00:00:00').getTime();
     if(isNaN(ht)) return false;
@@ -7032,7 +7078,7 @@ function renderSalesTab(){
       }
     }
     if(!rec.manual && rec.site && rec.site===rec.customer){
-      const g = findGen(rec.genId);
+      const g = findGen(billingGenIds(rec)[0]);
       const rt = g && g.rental;
       if(rt && rt.outDate===rec.outDate && rt.address){
         rec.site = rt.address;
@@ -7048,7 +7094,7 @@ function renderSalesTab(){
   });
   const visibleScopeRecs = allRecs.filter(r=> salesShowBorrowedOnly ? (r.borrowed && !r.hidden) : (salesShowHiddenOnly ? r.hidden : !r.hidden));
   const custOptions = [...new Set(visibleScopeRecs.map(r=>r.customer||'(업체명 미상)'))].sort((a,b)=>a.localeCompare(b,'ko'));
-  const genIdOptions = [...new Set(visibleScopeRecs.map(r=>r.genId))].sort((a,b)=>a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'}));
+  const genIdOptions = [...new Set(visibleScopeRecs.flatMap(r=>billingGenIds(r)))].sort((a,b)=>a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'}));
   let recs = visibleScopeRecs;
   if(salesFilterBillNo){
     recs = recs.filter(r=>String(r.billSeqNo||'')===salesFilterBillNo);
@@ -7068,13 +7114,16 @@ function renderSalesTab(){
     recs = recs.filter(r=>(r.customer||'(업체명 미상)')===salesFilterCustomer);
   }
   if(salesFilterGenId){
-    recs = recs.filter(r=>r.genId===salesFilterGenId);
+    recs = recs.filter(r=>billingGenIds(r).includes(salesFilterGenId));
   }
   let grandTotal = 0, grandBalance = 0, grandCashTotal = 0, grandBorrowCost = 0, grandBorrowRevenue = 0;
   const rowsHtml = recs.length===0 ? '' : recs.map(rec=>{
-    const g = findGen(rec.genId);
-    const cap = rec.capacity;
-    const capStr = (cap!=null && isFinite(cap))? `${cap}kW` : '-';
+    const recGenIds = billingGenIds(rec);
+    const recCaps = billingCapacities(rec);
+    const capStr = recCaps.length
+      ? recCaps.map(c=> (c!=null && isFinite(c))? `${c}kW` : '-').join('<br>')
+      : '-';
+    const genIdStr = recGenIds.length ? recGenIds.join('<br>') : '-';
     const endDate = billingEndDate(rec);
     const period = rec.manual ? (rec.period||'-') : (rec.outDate? `${dow(rec.outDate)} ~ ${recIsLiveOut(rec)?'진행중':(endDate? dow(endDate) : '종료')}` : '-');
     const usageDays = billingUsageDays(rec);
@@ -7126,7 +7175,7 @@ function renderSalesTab(){
           <span style="font-size:19px;font-weight:900;letter-spacing:0.5px;color:var(--primary-dark);white-space:nowrap;">HS-${rec.billSeqNo}</span>
         </div>` : ''}
         ${(()=>{
-          const cancels = findRelatedCancelHistory(rec.customer, rec.site, rec.outDate, rec.genId);
+          const cancels = findRelatedCancelHistory(rec.customer, rec.site, rec.outDate, recGenIds);
           if(cancels.length===0) return '';
           return `<div class="detail-card" style="margin-top:8px;padding:9px 8px;min-width:110px;text-align:center;background:var(--danger-tint);border:1px solid var(--danger);">
             <div style="font-size:11px;font-weight:800;color:var(--danger);margin-bottom:4px;">🚫 출고취소 이력</div>
@@ -7136,8 +7185,8 @@ function renderSalesTab(){
           </div>`;
         })()}
       </td>
-      <td rowspan="2">${rec.manual? `<input type="number" min="0" value="${rec.capacity!=null? rec.capacity:''}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','capacity', this.value===''?null:Number(this.value))">` : capStr}</td>
-      <td rowspan="2" class="gid">${rec.manual? `<input type="text" value="${escR(rec.genId).replace(/"/g,'&quot;')}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','genId', this.value)">` : rec.genId}</td>
+      <td rowspan="2">${rec.manual? `<input type="text" value="${recCaps.join(', ')}" placeholder="예: 250, 400" style="width:80px;" onchange="updateBillingRecordCapacities('${rec.id}', this.value)">` : capStr}</td>
+      <td rowspan="2" class="gid">${rec.manual? `<input type="text" value="${escR(recGenIds.join(', ')).replace(/"/g,'&quot;')}" placeholder="예: S-1, S-2" style="width:90px;" onchange="updateBillingRecordGenIds('${rec.id}', this.value)">` : genIdStr}</td>
       <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.period||'').replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','period', this.value)">` : `<div>${period}</div>${usageDays!=null? `<div class="muted" style="text-align:center;font-size:11px;margin-top:3px;">${recIsLiveOut(rec)? `사용 ${usageDays}일째` : `총 ${usageDays}일 사용`}</div>`:''}`}</td>
       <td rowspan="2">
         ${rec.isCashSale ? `
@@ -7336,7 +7385,7 @@ function printSalesList(){
     recs = recs.filter(r=>(r.customer||'(업체명 미상)')===salesFilterCustomer);
   }
   if(salesFilterGenId){
-    recs = recs.filter(r=>r.genId===salesFilterGenId);
+    recs = recs.filter(r=>billingGenIds(r).includes(salesFilterGenId));
   }
   if(recs.length===0){ showInfoModal('인쇄할 내역이 없습니다.'); return; }
   let grandTotal = 0, grandBalance = 0;
@@ -7347,7 +7396,7 @@ function printSalesList(){
     const balance = total-paid;
     grandTotal += quoteOnly;
     grandBalance += balance;
-    return `<tr><td style="font-weight:800;">${rec.billSeqNo? `HS-${rec.billSeqNo}`:'-'}</td><td>${rec.billDate? dow(rec.billDate):'-'}</td><td class="name">${escR(rec.customer)}</td><td class="name">${escR(dedupRepeatedText(rec.site))}</td><td>${escR(rec.genId)}</td><td>${total.toLocaleString()}원</td><td>${paid.toLocaleString()}원</td><td>${balance.toLocaleString()}원</td><td>${rec.billInvoiceIssued?'유':'무'}</td><td>${escR((rec.billManager!=null? rec.billManager : rec.manager)||'-')}</td></tr>`;
+    return `<tr><td style="font-weight:800;">${rec.billSeqNo? `HS-${rec.billSeqNo}`:'-'}</td><td>${rec.billDate? dow(rec.billDate):'-'}</td><td class="name">${escR(rec.customer)}</td><td class="name">${escR(dedupRepeatedText(rec.site))}</td><td>${escR(billingGenIds(rec).join(', '))}</td><td>${total.toLocaleString()}원</td><td>${paid.toLocaleString()}원</td><td>${balance.toLocaleString()}원</td><td>${rec.billInvoiceIssued?'유':'무'}</td><td>${escR((rec.billManager!=null? rec.billManager : rec.manager)||'-')}</td></tr>`;
   }).join('');
   const filterLabel = [
     salesFilterBillNo? `매출번호: HS-${salesFilterBillNo}` : '',
@@ -7466,6 +7515,22 @@ function updateBillingRecordField(recId, field, value){
   const rec = findBillingRecord(recId);
   if(!rec) return;
   rec[field] = value;
+  saveSalesBillingRecords();
+  renderContent();
+}
+function updateBillingRecordGenIds(recId, value){
+  const rec = findBillingRecord(recId);
+  if(!rec) return;
+  rec.genIds = (value||'').split(',').map(s=>s.trim()).filter(Boolean);
+  delete rec.genId;
+  saveSalesBillingRecords();
+  renderContent();
+}
+function updateBillingRecordCapacities(recId, value){
+  const rec = findBillingRecord(recId);
+  if(!rec) return;
+  rec.capacities = (value||'').split(',').map(s=>s.trim()).filter(s=>s!=='').map(Number).map(n=>isNaN(n)?null:n);
+  delete rec.capacity;
   saveSalesBillingRecords();
   renderContent();
 }
