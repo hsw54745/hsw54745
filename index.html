@@ -6848,6 +6848,111 @@ function findBillingGroupToJoin(customer, site, outDate){
     (r.site||'').trim()===(site||'').trim()
   );
 }
+// 같은 업체+현장+출고일로 아직 나뉘어 있는 기존 매출 기록들을 찾습니다(숨김·수동 등록 건은 대상에서 제외).
+function findMergeCandidateGroups(){
+  const list = (DB.salesBillingRecords||[]).filter(r=>!r.hidden && !r.manual);
+  const groups = {};
+  list.forEach(r=>{
+    const k = `${(r.customer||'').trim()}__${(r.site||'').trim()}__${r.outDate||''}`;
+    (groups[k]=groups[k]||[]).push(r);
+  });
+  return Object.values(groups).filter(g=>g.length>1);
+}
+// 여러 매출 기록을 하나로 합칩니다. 매출번호(HS-)가 가장 빠른 기록을 대표로 남기고,
+// 금액(견적·운임·입금액)은 전부 더해서 합계로, 입금일은 그 중 가장 빠른 날짜 하나로 합칩니다.
+function mergeBillingGroup(records){
+  records = records.slice().sort((a,b)=>(a.billSeqNo||0)-(b.billSeqNo||0));
+  const keeper = records[0];
+  const losers = records.slice(1);
+  let genIds = billingGenIds(keeper).slice();
+  let capacities = billingCapacities(keeper).slice();
+  let sumUnitPrice = Number(keeper.billUnitPrice)||0;
+  let sumTax = Number(keeper.billTax)||0;
+  let sumFreightOut = Number(keeper.billFreightOut)||0;
+  let sumFreightOutTax = Number(keeper.billFreightOutTax)||0;
+  let sumFreightIn = Number(keeper.billFreightIn)||0;
+  let sumFreightInTax = Number(keeper.billFreightInTax)||0;
+  let sumPaid = (Number(keeper.billPay1Amount)||0)+(Number(keeper.billPay2Amount)||0)+(Number(keeper.billPay3Amount)||0);
+  let earliestPayDate = [keeper.billPay1Date, keeper.billPay2Date, keeper.billPay3Date].filter(Boolean).sort()[0] || '';
+  let notes = [keeper.billNote].filter(Boolean);
+  let invoiceIssued = !!keeper.billInvoiceIssued;
+  let borrowed = !!keeper.borrowed;
+  let borrowCost = Number(keeper.borrowRentalCost)||0;
+  let borrowedFrom = [keeper.borrowedFrom].filter(Boolean);
+  let billDate = keeper.billDate||'';
+  losers.forEach(r=>{
+    genIds = genIds.concat(billingGenIds(r));
+    capacities = capacities.concat(billingCapacities(r));
+    sumUnitPrice += Number(r.billUnitPrice)||0;
+    sumTax += Number(r.billTax)||0;
+    sumFreightOut += Number(r.billFreightOut)||0;
+    sumFreightOutTax += Number(r.billFreightOutTax)||0;
+    sumFreightIn += Number(r.billFreightIn)||0;
+    sumFreightInTax += Number(r.billFreightInTax)||0;
+    sumPaid += (Number(r.billPay1Amount)||0)+(Number(r.billPay2Amount)||0)+(Number(r.billPay3Amount)||0);
+    const d = [r.billPay1Date,r.billPay2Date,r.billPay3Date].filter(Boolean).sort()[0];
+    if(d && (!earliestPayDate || d<earliestPayDate)) earliestPayDate = d;
+    if(r.billNote) notes.push(r.billNote);
+    if(r.billInvoiceIssued) invoiceIssued = true;
+    if(r.borrowed){ borrowed = true; borrowCost += Number(r.borrowRentalCost)||0; if(r.borrowedFrom) borrowedFrom.push(r.borrowedFrom); }
+    if(!billDate && r.billDate) billDate = r.billDate;
+  });
+  keeper.genIds = genIds;
+  keeper.capacities = capacities;
+  delete keeper.genId; delete keeper.capacity;
+  keeper.billUnitPrice = sumUnitPrice;
+  keeper.billTax = sumTax;
+  keeper.billFreightOut = sumFreightOut;
+  keeper.billFreightOutTax = sumFreightOutTax;
+  keeper.billFreightIn = sumFreightIn;
+  keeper.billFreightInTax = sumFreightInTax;
+  keeper.billTotal = sumUnitPrice+sumTax+sumFreightOut+sumFreightOutTax+sumFreightIn+sumFreightInTax;
+  keeper.billPay1Date = earliestPayDate;
+  keeper.billPay1Amount = sumPaid;
+  keeper.billPay2Date=''; keeper.billPay2Amount=0;
+  keeper.billPay3Date=''; keeper.billPay3Amount=0;
+  keeper.billNote = notes.join(' / ');
+  keeper.billInvoiceIssued = invoiceIssued;
+  keeper.borrowed = borrowed;
+  keeper.borrowRentalCost = borrowCost;
+  keeper.borrowedFrom = borrowedFrom.join(', ');
+  keeper.billDate = billDate;
+  keeper.matchKey = billingMatchKey(keeper);
+  return keeper.id;
+}
+function runBillingAutoMerge(){
+  const groups = findMergeCandidateGroups();
+  if(groups.length===0){ showInfoModal('합칠 수 있는 기록이 없습니다. (같은 업체+현장+출고일로 나뉘어 있는 기록이 없어요)'); return; }
+  let totalRecs = 0; groups.forEach(g=>totalRecs+=g.length);
+  const preview = groups.map(g=>{
+    const first = g[0];
+    return `${escR(first.customer)} · ${escR(dedupRepeatedText(first.site))} · ${first.outDate||'-'} → ${g.map(r=>billingGenIds(r).join(',')).join(' + ')} (${g.length}건 → 1건)`;
+  }).join('<br>');
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal" style="max-width:640px;text-align:left;">
+      <h3>🔗 기존 매출 기록 합치기</h3>
+      <div class="modal-sub">같은 업체+현장+출고일로 나뉘어 있던 기록 ${totalRecs}건이 ${groups.length}건으로 합쳐집니다. 견적금액·세액·운임·입금액은 전부 더해서 합계로 들어가고, 입금일은 그 중 가장 빠른 날짜 하나로 합쳐집니다(입금2·3은 비워짐). 매출번호(HS-)는 가장 빠른 번호가 대표로 남고 나머지 번호는 사라집니다. 되돌릴 수 없으니 확인 후 진행해주세요.</div>
+      <div style="max-height:40vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12.5px;line-height:1.7;">${preview}</div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">취소</button>
+        <button class="btn primary" onclick="confirmBillingAutoMerge()">${groups.length}건 합치기</button>
+      </div>
+    </div>
+  </div>`;
+}
+function confirmBillingAutoMerge(){
+  const groups = findMergeCandidateGroups();
+  const survivorIds = new Set();
+  groups.forEach(g=>{ survivorIds.add(mergeBillingGroup(g)); });
+  const allLoserIds = new Set();
+  groups.forEach(g=>{ g.forEach(r=>{ if(!survivorIds.has(r.id)) allLoserIds.add(r.id); }); });
+  DB.salesBillingRecords = (DB.salesBillingRecords||[]).filter(r=>!allLoserIds.has(r.id));
+  saveSalesBillingRecords();
+  closeModal();
+  renderContent();
+  flash(`${groups.length}건으로 합쳤습니다`);
+}
 function dedupRepeatedText(s){
   s = (s||'').trim();
   if(!s) return s;
@@ -7247,7 +7352,10 @@ function renderSalesTab(){
   const hiddenCount = allRecs.filter(r=>r.hidden).length;
   const borrowedCount = allRecs.filter(r=>r.borrowed && !r.hidden).length;
   return `
-    <div class="section-title">💰 업체별 매출현황 <span class="cnt">${recs.length}건</span> <button type="button" class="btn" style="font-size:15px;" onclick="printSalesList()">🖨 인쇄</button></div>
+    <div class="section-title">💰 업체별 매출현황 <span class="cnt">${recs.length}건</span> <button type="button" class="btn" style="font-size:15px;" onclick="printSalesList()">🖨 인쇄</button>${(()=>{
+      const mergeGroups = findMergeCandidateGroups();
+      return mergeGroups.length ? `<button type="button" class="btn warn" style="font-size:15px;" onclick="runBillingAutoMerge()">🔗 같은 업체/현장/출고일 건 합치기 (${mergeGroups.length}건)</button>` : '';
+    })()}</div>
     <details class="info-toggle"><summary></summary><p class="muted">발전기가 출고될 때 매출 기록이 자동으로 생성되고, 이후 출고취소·입고가 되어도 이 기록은 지워지지 않고 그대로 남습니다(발생한 비용은 취소돼도 청구 대상이라서요). 청구일자·공급가·세액·출고운임·입고운임·계산서 발행 여부·입금일자를 입력하면 바로 저장됩니다. 같은 거래처·같은 현장에 며칠 이내 출고취소 이력이 있으면(발전기를 바꿔서 다시 출고한 경우 등) 현장명 밑에 빨간 카드로 바로 표시됩니다.</p></details>
     <div style="display:flex;gap:14px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">
       <div class="detail-card" style="padding:14px 16px;flex:none;">
