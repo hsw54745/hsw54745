@@ -540,6 +540,7 @@ let salesShowHiddenOnly = false;
 let salesShowBorrowedOnly = false;
 let salesFilterCustomer = '';
 let salesFilterGenId = '';
+let salesMergeSelection = new Set();
 let seenNoticeIds = new Set();
 let seenEventIds = new Set();
 let seenReservationIds = new Set();
@@ -6953,6 +6954,62 @@ function confirmBillingAutoMerge(){
   renderContent();
   flash(`${groups.length}건으로 합쳤습니다`);
 }
+// 체크박스로 직접 골라서 합치기 (업체·현장·출고일이 달라도 사용자가 고른 건끼리 합칠 수 있음)
+function salesMergeBarHtml(){
+  const n = salesMergeSelection.size;
+  if(n===0) return '';
+  return `<div class="detail-card" style="background:var(--primary-tint);border-color:var(--primary);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+    <div style="font-size:13px;font-weight:700;color:var(--primary-dark);">✅ ${n}건 선택됨</div>
+    <div class="btn-row">
+      <button class="btn sm" onclick="clearSalesMergeSelection()">선택 해제</button>
+      <button class="btn sm primary" ${n<2?'disabled':''} onclick="runManualMergeSelected()">선택한 ${n}건 합치기</button>
+    </div>
+  </div>`;
+}
+function updateSalesMergeBar(){
+  const bar = document.getElementById('sales-merge-bar');
+  if(bar) bar.innerHTML = salesMergeBarHtml();
+}
+function toggleSalesMergeSelect(recId, checked){
+  if(checked) salesMergeSelection.add(recId); else salesMergeSelection.delete(recId);
+  updateSalesMergeBar();
+}
+function clearSalesMergeSelection(){
+  salesMergeSelection.clear();
+  renderContent();
+}
+function runManualMergeSelected(){
+  const records = [...salesMergeSelection].map(id=>findBillingRecord(id)).filter(Boolean);
+  if(records.length<2){ showInfoModal('2건 이상 선택해주세요.'); return; }
+  const mixedCustomer = new Set(records.map(r=>(r.customer||'').trim())).size>1;
+  const mixedDate = new Set(records.map(r=>r.outDate||'')).size>1;
+  const preview = records.map(r=>`HS-${r.billSeqNo||'-'} · ${escR(r.customer)} · ${escR(dedupRepeatedText(r.site))} · ${r.outDate||'-'} · ${billingGenIds(r).join(', ')}`).join('<br>');
+  const warnLine = (mixedCustomer||mixedDate) ? `<div style="margin-top:8px;padding:8px 10px;background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;color:var(--danger);font-weight:700;">⚠ 선택한 건들의 ${mixedCustomer?'업체명':''}${mixedCustomer&&mixedDate?'·':''}${mixedDate?'출고일':''}이 서로 다릅니다. 그래도 합치면, 매출번호가 가장 빠른 건(대표)의 업체명·현장명·출고일 기준으로 하나가 됩니다.</div>` : '';
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal" style="max-width:640px;text-align:left;">
+      <h3>🔗 선택한 매출 ${records.length}건 합치기</h3>
+      <div class="modal-sub">견적금액·세액·운임·입금액은 전부 더해서 합계로 들어가고, 입금일은 그 중 가장 빠른 날짜 하나로 합쳐집니다(입금2·3은 비워짐). 매출번호(HS-)는 가장 빠른 번호가 대표로 남고 나머지 번호는 사라집니다. 되돌릴 수 없습니다.</div>
+      <div style="max-height:40vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12.5px;line-height:1.7;">${preview}</div>
+      ${warnLine}
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal()">취소</button>
+        <button class="btn primary" onclick="confirmManualMergeSelected()">${records.length}건 합치기</button>
+      </div>
+    </div>
+  </div>`;
+}
+function confirmManualMergeSelected(){
+  const records = [...salesMergeSelection].map(id=>findBillingRecord(id)).filter(Boolean);
+  if(records.length<2){ closeModal(); return; }
+  const survivorId = mergeBillingGroup(records);
+  DB.salesBillingRecords = (DB.salesBillingRecords||[]).filter(r=>r.id===survivorId || !records.some(x=>x.id===r.id));
+  saveSalesBillingRecords();
+  salesMergeSelection.clear();
+  closeModal();
+  renderContent();
+  flash(`${records.length}건을 하나로 합쳤습니다`);
+}
 function dedupRepeatedText(s){
   s = (s||'').trim();
   if(!s) return s;
@@ -7244,6 +7301,7 @@ function renderSalesTab(){
     const rowBg = total>0? (isPaid? 'var(--ok-tint)' : 'var(--danger-tint)') : '';
     const bgAttr = rowBg? ` style="background:${rowBg};"` : '';
     return `<tr${bgAttr}>
+      <td rowspan="2" style="text-align:center;"><input type="checkbox" class="sales-merge-chk" data-recid="${rec.id}" ${salesMergeSelection.has(rec.id)?'checked':''} onchange="toggleSalesMergeSelect('${rec.id}', this.checked)"></td>
       <td rowspan="2">
         <div style="display:flex;gap:4px;align-items:center;">
           <input type="date" id="bill-date-${rec.id}" value="${rec.billDate||''}" style="width:125px;" onchange="updateBillingRecordField('${rec.id}','billDate', this.value)">
@@ -7346,7 +7404,7 @@ function renderSalesTab(){
   }).join('');
   const tableHtml = recs.length===0 ? `<div class="empty">조건에 맞는 매출 내역이 없습니다.</div>` : `
     <div class="table-scroll"><table class="sales-table">
-      <thead><tr><th>청구일자</th><th>업체명</th><th>현장명</th><th>용량</th><th>발전기번호</th><th>사용기간</th><th>견적금액</th>${salesShowFreight? `<th>운임/세액</th>`:''}<th>입금일/입금금액</th><th>미수금</th><th>담당자</th><th>담당자 연락처</th></tr></thead>
+      <thead><tr><th></th><th>청구일자</th><th>업체명</th><th>현장명</th><th>용량</th><th>발전기번호</th><th>사용기간</th><th>견적금액</th>${salesShowFreight? `<th>운임/세액</th>`:''}<th>입금일/입금금액</th><th>미수금</th><th>담당자</th><th>담당자 연락처</th></tr></thead>
       <tbody>${rowsHtml}</tbody>
     </table></div>`;
   const hiddenCount = allRecs.filter(r=>r.hidden).length;
@@ -7356,7 +7414,8 @@ function renderSalesTab(){
       const mergeGroups = findMergeCandidateGroups();
       return mergeGroups.length ? `<button type="button" class="btn warn" style="font-size:15px;" onclick="runBillingAutoMerge()">🔗 같은 업체/현장/출고일 건 합치기 (${mergeGroups.length}건)</button>` : '';
     })()}</div>
-    <details class="info-toggle"><summary></summary><p class="muted">발전기가 출고될 때 매출 기록이 자동으로 생성되고, 이후 출고취소·입고가 되어도 이 기록은 지워지지 않고 그대로 남습니다(발생한 비용은 취소돼도 청구 대상이라서요). 청구일자·공급가·세액·출고운임·입고운임·계산서 발행 여부·입금일자를 입력하면 바로 저장됩니다. 같은 거래처·같은 현장에 며칠 이내 출고취소 이력이 있으면(발전기를 바꿔서 다시 출고한 경우 등) 현장명 밑에 빨간 카드로 바로 표시됩니다.</p></details>
+    <div id="sales-merge-bar">${salesMergeBarHtml()}</div>
+    <details class="info-toggle"><summary></summary><p class="muted">발전기가 출고될 때 매출 기록이 자동으로 생성되고, 이후 출고취소·입고가 되어도 이 기록은 지워지지 않고 그대로 남습니다(발생한 비용은 취소돼도 청구 대상이라서요). 청구일자·공급가·세액·출고운임·입고운임·계산서 발행 여부·입금일자를 입력하면 바로 저장됩니다. 같은 거래처·같은 현장에 며칠 이내 출고취소 이력이 있으면(발전기를 바꿔서 다시 출고한 경우 등) 현장명 밑에 빨간 카드로 바로 표시됩니다. 체크박스로 매출 건을 여러 개 골라 "선택한 건 합치기"를 누르면, 업체·현장·출고일이 달라도 직접 고른 건들끼리 하나로 합칠 수 있습니다.</p></details>
     <div style="display:flex;gap:14px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">
       <div class="detail-card" style="padding:14px 16px;flex:none;">
         <label style="display:block;font-size:14px;font-weight:700;margin-bottom:6px;white-space:nowrap;">매출번호로 보기</label>
