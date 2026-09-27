@@ -540,7 +540,6 @@ let salesShowHiddenOnly = false;
 let salesShowBorrowedOnly = false;
 let salesFilterCustomer = '';
 let salesFilterGenId = '';
-let salesMergeSelection = new Set();
 let seenNoticeIds = new Set();
 let seenEventIds = new Set();
 let seenReservationIds = new Set();
@@ -1801,7 +1800,7 @@ async function submitQmConfirmLoad(resId, needFuel){
       supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', voltage: r.voltage, qty: r.qty,
       fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
       usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
-      outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: (r.estDaily!=null ? r.estDaily : getDefaultEstDailyValue(r.longTerm)),
+      outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
       outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: qmLabel(), genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now()
     };
     if(r.suppliesItems && r.suppliesItems.length){
@@ -4637,7 +4636,7 @@ function renderInList(){
     const isPendingOut = pendingGenIds.has(g.id);
     const isBroken = !!g.underRepair;
     const selectable = !isBroken && !isPendingOut;
-    return `<tr${isBroken? ` style="background:var(--danger-tint);"` : (isPendingOut? ` style="background:var(--warn-tint);"` : '')}>
+    return `<tr${isBroken? ` style="background:var(--danger-tint);"`:''}>
       <td>${selectable? `<input type="checkbox" class="bulk-out-chk" data-gid="${g.id}" ${bulkOutSelection.has(g.id)?'checked':''} onchange="toggleBulkOutSelect('${g.id}', this.checked)">` : ''}</td>
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}${g.borrowed? ` <span class="pill" style="background:var(--primary-tint);color:var(--primary-dark);border:1px solid var(--primary);">🤝 임대</span>`:''}${isPendingOut? ` <span class="pill warn">출고대기</span>`:''}${isBroken? `<div class="muted" style="font-size:11px;color:var(--danger);font-weight:700;">⚠ 고장: ${escR(g.repairNote||'-')}${g.repairPhoto? ` <img src="${g.repairPhoto}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;cursor:pointer;" onclick="openImageViewModal('${g.repairPhoto}','고장 사진')">`:''}</div>`:''}</td>
@@ -5049,15 +5048,6 @@ async function submitLongtermConvert(id){
   closeModal();
   renderContent();
   flash('장기로 변경되었습니다');
-}
-function getDefaultEstDailyValue(longTerm){
-  // "출고중인 발전기에 전체 적용" 버튼으로 저장해둔 기본 예상가동시간을, 개별 건에 estDaily가 없을 때 자동으로 가져다 씁니다.
-  try{
-    const raw = localStorage.getItem(longTerm ? 'defaultEstDailyLong' : 'defaultEstDailyShort');
-    if(raw==null || raw==='') return null;
-    const n = Number(raw);
-    return isNaN(n) ? null : n;
-  }catch(e){ return null; }
 }
 async function applyDefaultEstDailyToAll(){
   const shortEl = document.getElementById('default-est-daily-short');
@@ -5544,32 +5534,45 @@ function customerRentalStats(customer){
   DB.gens.forEach(g=>{ if(g.rental && g.rental.customer===customer) all.push({...g.rental, genId:g.id, status:'진행중'}); });
   return all;
 }
+const CHOSUNG_LIST = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+function getChosung(str){
+  const ch = (str||'').trim().charAt(0);
+  const code = ch.charCodeAt(0);
+  if(code>=0xAC00 && code<=0xD7A3){
+    return CHOSUNG_LIST[Math.floor((code-0xAC00)/588)];
+  }
+  return '기타';
+}
 function renderCustomerHistoryView(){
   const wrap = document.getElementById('customer-history-wrap');
   if(!wrap) return;
   const records = knownCustomerRecords()
     .map(r=>({...r, cnt: customerRentalStats(r.customer).length}))
-    .sort((a,b)=>b.cnt-a.cnt || a.customer.localeCompare(b.customer,'ko'));
+    .sort((a,b)=>a.customer.localeCompare(b.customer,'ko'));
   if(records.length===0){ wrap.innerHTML = `<div class="empty">임대 이력이 없습니다.</div>`; return; }
-  const rowHtml = r=>{
+  const groups = {};
+  records.forEach(r=>{
+    const key = getChosung(r.customer);
+    (groups[key] = groups[key] || []).push(r);
+  });
+  const orderedKeys = [...CHOSUNG_LIST.filter(k=>groups[k]), ...(groups['기타']? ['기타']:[])];
+  const chipHtml = r=>{
     const notes = DB.customerNotes && DB.customerNotes[r.customer];
-    const tags = (notes && notes.tags) || [];
-    return `<tr${tags.length>0? ` style="background:var(--danger-tint);"`:''}>
-      <td class="wrap-ok" style="cursor:pointer;text-decoration:underline dotted;" onclick="openCustomerNotesModal('${r.customer.replace(/'/g,"\\'")}')">${escR(r.customer)}</td>
-      <td class="muted">${r.cnt}건</td>
-      <td>${tags.length>0? tags.map(t=>`<span class="pill danger" style="margin-right:3px;">${escR(t)}</span>`).join('') : `<span class="muted">-</span>`}</td>
-      <td class="muted" style="font-size:12px;">${notes&&notes.note? `${escR(notes.note)}${notes.updatedAt? `<div style="font-size:10.5px;color:var(--ink-faint);margin-top:2px;">${dow(notes.updatedAt)||notes.updatedAt} 작성</div>`:''}` : '-'}</td>
-      <td><button class="btn sm" onclick="openCustomerNotesModal('${r.customer.replace(/'/g,"\\'")}')">주의사항 설정</button></td>
-    </tr>`;
+    const hasWarn = notes && (notes.tags.length>0 || notes.note);
+    return `<div style="display:inline-flex;align-items:center;gap:6px;background:${hasWarn?'var(--danger-tint)':'var(--surface)'};border:1px solid ${hasWarn?'var(--danger)':'var(--border)'};border-radius:10px;padding:8px 12px;margin:0 8px 8px 0;cursor:pointer;" onclick="openCustomerNotesModal('${r.customer.replace(/'/g,"\\'")}')">
+      ${hasWarn? '<span style="color:var(--danger);">⚠️</span>':''}
+      <span style="font-weight:700;font-size:13.5px;">${escR(r.customer)}</span>
+      <span class="muted" style="font-size:11.5px;">${r.cnt}건</span>
+    </div>`;
   };
-  const half = Math.ceil(records.length/2);
-  const rows1 = records.slice(0, half).map(rowHtml).join('');
-  const rows2 = records.slice(half).map(rowHtml).join('');
-  const tableHtml = rows => `<div class="table-scroll"><table>
-    <thead><tr><th>거래처명</th><th>임대건수</th><th>주의태그</th><th>주의사항</th><th></th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table></div>`;
-  wrap.innerHTML = `<div class="util-two-col">${tableHtml(rows1)}${rows2? tableHtml(rows2) : ''}</div>`;
+  wrap.innerHTML = orderedKeys.map(key=>`
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--primary-dark);color:#fff;font-weight:800;font-size:14px;">${escR(key)}</span>
+        <span class="muted" style="font-size:12px;">${groups[key].length}개 거래처</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;">${groups[key].map(chipHtml).join('')}</div>
+    </div>`).join('');
 }
 function openCustomerNotesModal(customer){
   const notes = (DB.customerNotes && DB.customerNotes[customer]) || {tags:[], note:''};
@@ -5646,7 +5649,9 @@ function addCustomCustomerTag(){
   if(existing){ existing.classList.add('danger'); input.value=''; return; }
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.className = 'btn sm danger';
+  // 다른 태그들처럼 처음엔 선택 안 된 상태(흰색)로 만듭니다.
+  // 눌러야 선택(빨간색)되도록 해서, "등록 → 클릭해서 선택" 순서로 눌러도 꺼지지 않게 합니다.
+  btn.className = 'btn sm';
   btn.dataset.tag = val;
   btn.textContent = val;
   btn.onclick = function(){ toggleCustomerTag(btn); };
@@ -6825,190 +6830,8 @@ function submitSalesUnlock(){
   sessionStorage.setItem('sales-unlocked-for', DB.salesPassword);
   renderContent();
 }
-function billingMatchKey(rec){
-  const ids = billingGenIds(rec).slice().sort().join(',');
-  return `${ids}__${rec.outDate||''}__${(rec.customer||'').trim()}`;
-}
-// 한 매출 기록(rec)에 묶인 발전기 번호들을 항상 배열로 돌려줍니다.
-// 예전 기록(발전기 1대당 rec.genId 하나)도, 새 방식(rec.genIds 배열)도 똑같이 다룰 수 있게 해줍니다.
-function billingGenIds(rec){
-  if(rec.genIds && rec.genIds.length) return rec.genIds;
-  if(rec.genId) return [rec.genId];
-  return [];
-}
-function billingCapacities(rec){
-  if(rec.capacities && rec.capacities.length) return rec.capacities;
-  if(rec.capacity!=null) return [rec.capacity];
-  return [];
-}
-// 같은 업체+현장+출고일로 묶을 기존 매출 기록을 찾습니다. (수동 등록 건은 자동 묶기 대상에서 제외)
-function findBillingGroupToJoin(customer, site, outDate){
-  return (DB.salesBillingRecords||[]).find(r=>
-    !r.hidden && !r.manual && r.outDate===outDate &&
-    (r.customer||'').trim()===(customer||'').trim() &&
-    (r.site||'').trim()===(site||'').trim()
-  );
-}
-// 같은 업체+현장+출고일로 아직 나뉘어 있는 기존 매출 기록들을 찾습니다(숨김·수동 등록 건은 대상에서 제외).
-function findMergeCandidateGroups(){
-  const list = (DB.salesBillingRecords||[]).filter(r=>!r.hidden && !r.manual);
-  const groups = {};
-  list.forEach(r=>{
-    const k = `${(r.customer||'').trim()}__${(r.site||'').trim()}__${r.outDate||''}`;
-    (groups[k]=groups[k]||[]).push(r);
-  });
-  return Object.values(groups).filter(g=>g.length>1);
-}
-// 여러 매출 기록을 하나로 합칩니다. 매출번호(HS-)가 가장 빠른 기록을 대표로 남기고,
-// 금액(견적·운임·입금액)은 전부 더해서 합계로, 입금일은 그 중 가장 빠른 날짜 하나로 합칩니다.
-function mergeBillingGroup(records){
-  records = records.slice().sort((a,b)=>(a.billSeqNo||0)-(b.billSeqNo||0));
-  const keeper = records[0];
-  const losers = records.slice(1);
-  let genIds = billingGenIds(keeper).slice();
-  let capacities = billingCapacities(keeper).slice();
-  let sumUnitPrice = Number(keeper.billUnitPrice)||0;
-  let sumTax = Number(keeper.billTax)||0;
-  let sumFreightOut = Number(keeper.billFreightOut)||0;
-  let sumFreightOutTax = Number(keeper.billFreightOutTax)||0;
-  let sumFreightIn = Number(keeper.billFreightIn)||0;
-  let sumFreightInTax = Number(keeper.billFreightInTax)||0;
-  let sumPaid = (Number(keeper.billPay1Amount)||0)+(Number(keeper.billPay2Amount)||0)+(Number(keeper.billPay3Amount)||0);
-  let earliestPayDate = [keeper.billPay1Date, keeper.billPay2Date, keeper.billPay3Date].filter(Boolean).sort()[0] || '';
-  let notes = [keeper.billNote].filter(Boolean);
-  let invoiceIssued = !!keeper.billInvoiceIssued;
-  let borrowed = !!keeper.borrowed;
-  let borrowCost = Number(keeper.borrowRentalCost)||0;
-  let borrowedFrom = [keeper.borrowedFrom].filter(Boolean);
-  let billDate = keeper.billDate||'';
-  losers.forEach(r=>{
-    genIds = genIds.concat(billingGenIds(r));
-    capacities = capacities.concat(billingCapacities(r));
-    sumUnitPrice += Number(r.billUnitPrice)||0;
-    sumTax += Number(r.billTax)||0;
-    sumFreightOut += Number(r.billFreightOut)||0;
-    sumFreightOutTax += Number(r.billFreightOutTax)||0;
-    sumFreightIn += Number(r.billFreightIn)||0;
-    sumFreightInTax += Number(r.billFreightInTax)||0;
-    sumPaid += (Number(r.billPay1Amount)||0)+(Number(r.billPay2Amount)||0)+(Number(r.billPay3Amount)||0);
-    const d = [r.billPay1Date,r.billPay2Date,r.billPay3Date].filter(Boolean).sort()[0];
-    if(d && (!earliestPayDate || d<earliestPayDate)) earliestPayDate = d;
-    if(r.billNote) notes.push(r.billNote);
-    if(r.billInvoiceIssued) invoiceIssued = true;
-    if(r.borrowed){ borrowed = true; borrowCost += Number(r.borrowRentalCost)||0; if(r.borrowedFrom) borrowedFrom.push(r.borrowedFrom); }
-    if(!billDate && r.billDate) billDate = r.billDate;
-  });
-  keeper.genIds = genIds;
-  keeper.capacities = capacities;
-  delete keeper.genId; delete keeper.capacity;
-  keeper.billUnitPrice = sumUnitPrice;
-  keeper.billTax = sumTax;
-  keeper.billFreightOut = sumFreightOut;
-  keeper.billFreightOutTax = sumFreightOutTax;
-  keeper.billFreightIn = sumFreightIn;
-  keeper.billFreightInTax = sumFreightInTax;
-  keeper.billTotal = sumUnitPrice+sumTax+sumFreightOut+sumFreightOutTax+sumFreightIn+sumFreightInTax;
-  keeper.billPay1Date = earliestPayDate;
-  keeper.billPay1Amount = sumPaid;
-  keeper.billPay2Date=''; keeper.billPay2Amount=0;
-  keeper.billPay3Date=''; keeper.billPay3Amount=0;
-  keeper.billNote = notes.join(' / ');
-  keeper.billInvoiceIssued = invoiceIssued;
-  keeper.borrowed = borrowed;
-  keeper.borrowRentalCost = borrowCost;
-  keeper.borrowedFrom = borrowedFrom.join(', ');
-  keeper.billDate = billDate;
-  keeper.matchKey = billingMatchKey(keeper);
-  return keeper.id;
-}
-function runBillingAutoMerge(){
-  const groups = findMergeCandidateGroups();
-  if(groups.length===0){ showInfoModal('합칠 수 있는 기록이 없습니다. (같은 업체+현장+출고일로 나뉘어 있는 기록이 없어요)'); return; }
-  let totalRecs = 0; groups.forEach(g=>totalRecs+=g.length);
-  const preview = groups.map(g=>{
-    const first = g[0];
-    return `${escR(first.customer)} · ${escR(dedupRepeatedText(first.site))} · ${first.outDate||'-'} → ${g.map(r=>billingGenIds(r).join(',')).join(' + ')} (${g.length}건 → 1건)`;
-  }).join('<br>');
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:640px;text-align:left;">
-      <h3>🔗 기존 매출 기록 합치기</h3>
-      <div class="modal-sub">같은 업체+현장+출고일로 나뉘어 있던 기록 ${totalRecs}건이 ${groups.length}건으로 합쳐집니다. 견적금액·세액·운임·입금액은 전부 더해서 합계로 들어가고, 입금일은 그 중 가장 빠른 날짜 하나로 합쳐집니다(입금2·3은 비워짐). 매출번호(HS-)는 가장 빠른 번호가 대표로 남고 나머지 번호는 사라집니다. 되돌릴 수 없으니 확인 후 진행해주세요.</div>
-      <div style="max-height:40vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12.5px;line-height:1.7;">${preview}</div>
-      <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">취소</button>
-        <button class="btn primary" onclick="confirmBillingAutoMerge()">${groups.length}건 합치기</button>
-      </div>
-    </div>
-  </div>`;
-}
-function confirmBillingAutoMerge(){
-  const groups = findMergeCandidateGroups();
-  const survivorIds = new Set();
-  groups.forEach(g=>{ survivorIds.add(mergeBillingGroup(g)); });
-  const allLoserIds = new Set();
-  groups.forEach(g=>{ g.forEach(r=>{ if(!survivorIds.has(r.id)) allLoserIds.add(r.id); }); });
-  DB.salesBillingRecords = (DB.salesBillingRecords||[]).filter(r=>!allLoserIds.has(r.id));
-  saveSalesBillingRecords();
-  closeModal();
-  renderContent();
-  flash(`${groups.length}건으로 합쳤습니다`);
-}
-// 체크박스로 직접 골라서 합치기 (업체·현장·출고일이 달라도 사용자가 고른 건끼리 합칠 수 있음)
-function salesMergeBarHtml(){
-  const n = salesMergeSelection.size;
-  if(n===0) return '';
-  return `<div class="detail-card" style="background:var(--primary-tint);border-color:var(--primary);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
-    <div style="font-size:13px;font-weight:700;color:var(--primary-dark);">✅ ${n}건 선택됨</div>
-    <div class="btn-row">
-      <button class="btn sm" onclick="clearSalesMergeSelection()">선택 해제</button>
-      <button class="btn sm primary" ${n<2?'disabled':''} onclick="runManualMergeSelected()">선택한 ${n}건 합치기</button>
-    </div>
-  </div>`;
-}
-function updateSalesMergeBar(){
-  const bar = document.getElementById('sales-merge-bar');
-  if(bar) bar.innerHTML = salesMergeBarHtml();
-}
-function toggleSalesMergeSelect(recId, checked){
-  if(checked) salesMergeSelection.add(recId); else salesMergeSelection.delete(recId);
-  updateSalesMergeBar();
-}
-function clearSalesMergeSelection(){
-  salesMergeSelection.clear();
-  renderContent();
-}
-function runManualMergeSelected(){
-  const records = [...salesMergeSelection].map(id=>findBillingRecord(id)).filter(Boolean);
-  if(records.length<2){ showInfoModal('2건 이상 선택해주세요.'); return; }
-  const mixedCustomer = new Set(records.map(r=>(r.customer||'').trim())).size>1;
-  const mixedDate = new Set(records.map(r=>r.outDate||'')).size>1;
-  const preview = records.map(r=>`HS-${r.billSeqNo||'-'} · ${escR(r.customer)} · ${escR(dedupRepeatedText(r.site))} · ${r.outDate||'-'} · ${billingGenIds(r).join(', ')}`).join('<br>');
-  const warnLine = (mixedCustomer||mixedDate) ? `<div style="margin-top:8px;padding:8px 10px;background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;color:var(--danger);font-weight:700;">⚠ 선택한 건들의 ${mixedCustomer?'업체명':''}${mixedCustomer&&mixedDate?'·':''}${mixedDate?'출고일':''}이 서로 다릅니다. 그래도 합치면, 매출번호가 가장 빠른 건(대표)의 업체명·현장명·출고일 기준으로 하나가 됩니다.</div>` : '';
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:640px;text-align:left;">
-      <h3>🔗 선택한 매출 ${records.length}건 합치기</h3>
-      <div class="modal-sub">견적금액·세액·운임·입금액은 전부 더해서 합계로 들어가고, 입금일은 그 중 가장 빠른 날짜 하나로 합쳐집니다(입금2·3은 비워짐). 매출번호(HS-)는 가장 빠른 번호가 대표로 남고 나머지 번호는 사라집니다. 되돌릴 수 없습니다.</div>
-      <div style="max-height:40vh;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:10px;font-size:12.5px;line-height:1.7;">${preview}</div>
-      ${warnLine}
-      <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">취소</button>
-        <button class="btn primary" onclick="confirmManualMergeSelected()">${records.length}건 합치기</button>
-      </div>
-    </div>
-  </div>`;
-}
-function confirmManualMergeSelected(){
-  const records = [...salesMergeSelection].map(id=>findBillingRecord(id)).filter(Boolean);
-  if(records.length<2){ closeModal(); return; }
-  const survivorId = mergeBillingGroup(records);
-  DB.salesBillingRecords = (DB.salesBillingRecords||[]).filter(r=>r.id===survivorId || !records.some(x=>x.id===r.id));
-  saveSalesBillingRecords();
-  salesMergeSelection.clear();
-  closeModal();
-  renderContent();
-  flash(`${records.length}건을 하나로 합쳤습니다`);
+function billingMatchKey(genId, outDate, customer){
+  return `${genId}__${outDate||''}__${(customer||'').trim()}`;
 }
 function dedupRepeatedText(s){
   s = (s||'').trim();
@@ -7016,25 +6839,18 @@ function dedupRepeatedText(s){
   return s.replace(/(\S+)(\s+\1)+(?=\s|$)/g, '$1');
 }
 function recIsLiveOut(rec){
-  return billingGenIds(rec).some(gid=>{
-    const g = findGen(gid);
-    return !!(g && g.status==='out' && g.rental && g.rental.outDate===rec.outDate);
-  });
-}
-// 그룹에 속한 발전기 중 이번 출고건(같은 출고일)으로 이미 입고 완료된 이력들.
-function billingCompletedRentals(rec){
-  const ids = billingGenIds(rec);
-  return (DB.rentals||[]).filter(r=>ids.includes(r.genId) && r.outDate===rec.outDate && r.inDate);
+  const g = findGen(rec.genId);
+  return !!(g && g.status==='out' && g.rental && g.rental.outDate===rec.outDate);
 }
 function billingUsageDays(rec){
   if(rec.manual || !rec.outDate) return null;
   if(recIsLiveOut(rec)){
     return -daysFromToday(rec.outDate) + 1;
   }
-  const end = billingEndDate(rec);
-  if(end){
+  const completed = (DB.rentals||[]).find(r=>r.genId===rec.genId && r.outDate===rec.outDate && r.inDate);
+  if(completed){
     const out = new Date(rec.outDate+'T00:00:00');
-    const inD = new Date(end+'T00:00:00');
+    const inD = new Date(completed.inDate+'T00:00:00');
     if(!isNaN(out.getTime()) && !isNaN(inD.getTime())){
       return Math.max(1, Math.round((inD-out)/86400000) + 1);
     }
@@ -7043,10 +6859,8 @@ function billingUsageDays(rec){
 }
 function billingEndDate(rec){
   if(rec.manual || !rec.outDate || recIsLiveOut(rec)) return null;
-  // 여러 대가 묶인 건이면, 가장 마지막에 들어온 날짜를 전체 사용 종료일로 봅니다.
-  const completed = billingCompletedRentals(rec);
-  if(completed.length===0) return null;
-  return completed.reduce((max,r)=> (!max || r.inDate>max)? r.inDate : max, null);
+  const completed = (DB.rentals||[]).find(r=>r.genId===rec.genId && r.outDate===rec.outDate && r.inDate);
+  return completed ? completed.inDate : null;
 }
 function parseCustomerString(raw){
   let customer = (raw||'').trim();
@@ -7074,41 +6888,26 @@ function nextBillSeqNoFrom(list){
 }
 function getOrCreateBillingRecord(g){
   const rt = g.rental||{};
+  const key = billingMatchKey(g.id, rt.outDate, rt.customer);
   DB.salesBillingRecords = DB.salesBillingRecords || [];
-  const site = rt.address||rt.site||'-';
-  const parsed = parseCustomerString(rt.customer);
-  const customer = parsed.customer||'(업체명 미상)';
-  // 이미 이 발전기가 들어간 기록이 있으면(같은 발전기가 다시 이 함수를 통과하는 매 렌더마다) 그대로 반환.
-  let rec = DB.salesBillingRecords.find(r=>billingGenIds(r).includes(g.id) && r.outDate===(rt.outDate||''));
-  if(rec) return rec;
-  const cap = capacityOf(g);
-  const capVal = isFinite(cap)? cap : null;
-  // 같은 업체+현장+출고일로 이미 나간 기록이 있으면(오늘 같이 출고된 다른 발전기), 새로 만들지 않고 거기에 합류합니다.
-  const group = findBillingGroupToJoin(customer, site, rt.outDate||'');
-  if(group){
-    billingGenIds(group); // no-op, ensures arrays exist below
-    if(!group.genIds || !group.genIds.length) group.genIds = billingGenIds(group);
-    if(!group.capacities || !group.capacities.length) group.capacities = billingCapacities(group);
-    group.genIds.push(g.id);
-    group.capacities.push(capVal);
-    if(g.borrowed) group.borrowed = true;
-    group.matchKey = billingMatchKey(group);
+  let rec = DB.salesBillingRecords.find(r=>r.matchKey===key);
+  if(!rec){
+    const cap = capacityOf(g);
+    const parsed = parseCustomerString(rt.customer);
+    rec = {
+      id: uid(), matchKey: key, billSeqNo: nextBillSeqNo(), genId: g.id, outDate: rt.outDate||'',
+      customer: parsed.customer||'(업체명 미상)', site: rt.address||rt.site||'-', capacity: isFinite(cap)? cap : null,
+      manager: rt.manager||parsed.name||'', phone: rt.phone||parsed.phone||'',
+      billDate:'', billUnitPrice:0, billTax:0, billTotal:0,
+      billFreightOut:0, billFreightOutTax:0, billFreightIn:0, billFreightInTax:0, billInvoiceIssued:false,
+      billPay1Date:'', billPay1Amount:0, billPay2Date:'', billPay2Amount:0, billPay3Date:'', billPay3Amount:0,
+      billManager:null, billPhone:null, billNote: rt.paymentNote||'',
+      borrowed: !!g.borrowed, borrowRentalCost: 0, borrowedFrom: '',
+      hidden:false, createdAt: nowDateTimeStr()
+    };
+    DB.salesBillingRecords.push(rec);
     saveSalesBillingRecords();
-    return group;
   }
-  rec = {
-    id: uid(), billSeqNo: nextBillSeqNo(), genIds: [g.id], capacities: [capVal], outDate: rt.outDate||'',
-    customer, site, manager: rt.manager||parsed.name||'', phone: rt.phone||parsed.phone||'',
-    billDate:'', billUnitPrice:0, billTax:0, billTotal:0,
-    billFreightOut:0, billFreightOutTax:0, billFreightIn:0, billFreightInTax:0, billInvoiceIssued:false,
-    billPay1Date:'', billPay1Amount:0, billPay2Date:'', billPay2Amount:0, billPay3Date:'', billPay3Amount:0,
-    billManager:null, billPhone:null, billNote: rt.paymentNote||'',
-    borrowed: !!g.borrowed, borrowRentalCost: 0, borrowedFrom: '',
-    hidden:false, createdAt: nowDateTimeStr()
-  };
-  rec.matchKey = billingMatchKey(rec);
-  DB.salesBillingRecords.push(rec);
-  saveSalesBillingRecords();
   return rec;
 }
 function findBillingRecord(recId){
@@ -7173,7 +6972,7 @@ function dedupBillingRecords(){
   if(list.length===0) return false;
   const groups = {};
   list.forEach(rec=>{
-    const k = billingMatchKey(rec);
+    const k = billingMatchKey(rec.genId, rec.outDate, rec.customer);
     (groups[k] = groups[k]||[]).push(rec);
   });
   let changed = false;
@@ -7191,7 +6990,7 @@ function dedupBillingRecords(){
         if(isEmptyVal(keeper[key]) && !isEmptyVal(loser[key])) keeper[key] = loser[key];
       });
     }
-    keeper.matchKey = billingMatchKey(keeper);
+    keeper.matchKey = billingMatchKey(keeper.genId, keeper.outDate, keeper.customer);
     survivors.push(keeper);
     changed = true;
   });
@@ -7212,13 +7011,12 @@ function dedupBillingRecords(){
 }
 // 며칠 이내(발전기를 바꿔서 다시 출고하는 등) 있었던 출고취소 이력 중, "이 매출기록 자체(같은 발전기)"가 취소된 경우만 찾습니다.
 // (예전엔 같은 거래처·현장이면 다 같이 떴는데, 그러면 발전기를 바꿔서 새로 나간 정상 건에도 남의 취소이력이 같이 붙어서 헷갈렸습니다.)
-function findRelatedCancelHistory(customer, site, outDate, genIds){
-  const ids = Array.isArray(genIds) ? genIds : (genIds? [genIds] : []);
-  if(!customer || !outDate || !ids.length) return [];
+function findRelatedCancelHistory(customer, site, outDate, genId){
+  if(!customer || !outDate || !genId) return [];
   const t = new Date(outDate+'T00:00:00').getTime();
   if(isNaN(t)) return [];
   return (DB.cancelOutHistory||[]).filter(h=>{
-    if(!h || h.customer!==customer || !ids.includes(h.genId)) return false;
+    if(!h || h.customer!==customer || h.genId!==genId) return false;
     if(site && h.site && h.site!==site) return false;
     const ht = new Date((h.outDate||'')+'T00:00:00').getTime();
     if(isNaN(ht)) return false;
@@ -7240,7 +7038,7 @@ function renderSalesTab(){
       }
     }
     if(!rec.manual && rec.site && rec.site===rec.customer){
-      const g = findGen(billingGenIds(rec)[0]);
+      const g = findGen(rec.genId);
       const rt = g && g.rental;
       if(rt && rt.outDate===rec.outDate && rt.address){
         rec.site = rt.address;
@@ -7256,7 +7054,7 @@ function renderSalesTab(){
   });
   const visibleScopeRecs = allRecs.filter(r=> salesShowBorrowedOnly ? (r.borrowed && !r.hidden) : (salesShowHiddenOnly ? r.hidden : !r.hidden));
   const custOptions = [...new Set(visibleScopeRecs.map(r=>r.customer||'(업체명 미상)'))].sort((a,b)=>a.localeCompare(b,'ko'));
-  const genIdOptions = [...new Set(visibleScopeRecs.flatMap(r=>billingGenIds(r)))].sort((a,b)=>a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'}));
+  const genIdOptions = [...new Set(visibleScopeRecs.map(r=>r.genId))].sort((a,b)=>a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'}));
   let recs = visibleScopeRecs;
   if(salesFilterBillNo){
     recs = recs.filter(r=>String(r.billSeqNo||'')===salesFilterBillNo);
@@ -7276,16 +7074,13 @@ function renderSalesTab(){
     recs = recs.filter(r=>(r.customer||'(업체명 미상)')===salesFilterCustomer);
   }
   if(salesFilterGenId){
-    recs = recs.filter(r=>billingGenIds(r).includes(salesFilterGenId));
+    recs = recs.filter(r=>r.genId===salesFilterGenId);
   }
   let grandTotal = 0, grandBalance = 0, grandCashTotal = 0, grandBorrowCost = 0, grandBorrowRevenue = 0;
   const rowsHtml = recs.length===0 ? '' : recs.map(rec=>{
-    const recGenIds = billingGenIds(rec);
-    const recCaps = billingCapacities(rec);
-    const capStr = recCaps.length
-      ? recCaps.map(c=> (c!=null && isFinite(c))? `${c}kW` : '-').join('<br>')
-      : '-';
-    const genIdStr = recGenIds.length ? recGenIds.join('<br>') : '-';
+    const g = findGen(rec.genId);
+    const cap = rec.capacity;
+    const capStr = (cap!=null && isFinite(cap))? `${cap}kW` : '-';
     const endDate = billingEndDate(rec);
     const period = rec.manual ? (rec.period||'-') : (rec.outDate? `${dow(rec.outDate)} ~ ${recIsLiveOut(rec)?'진행중':(endDate? dow(endDate) : '종료')}` : '-');
     const usageDays = billingUsageDays(rec);
@@ -7301,7 +7096,6 @@ function renderSalesTab(){
     const rowBg = total>0? (isPaid? 'var(--ok-tint)' : 'var(--danger-tint)') : '';
     const bgAttr = rowBg? ` style="background:${rowBg};"` : '';
     return `<tr${bgAttr}>
-      <td rowspan="2" style="text-align:center;"><input type="checkbox" class="sales-merge-chk" data-recid="${rec.id}" ${salesMergeSelection.has(rec.id)?'checked':''} onchange="toggleSalesMergeSelect('${rec.id}', this.checked)"></td>
       <td rowspan="2">
         <div style="display:flex;gap:4px;align-items:center;">
           <input type="date" id="bill-date-${rec.id}" value="${rec.billDate||''}" style="width:125px;" onchange="updateBillingRecordField('${rec.id}','billDate', this.value)">
@@ -7338,7 +7132,7 @@ function renderSalesTab(){
           <span style="font-size:19px;font-weight:900;letter-spacing:0.5px;color:var(--primary-dark);white-space:nowrap;">HS-${rec.billSeqNo}</span>
         </div>` : ''}
         ${(()=>{
-          const cancels = findRelatedCancelHistory(rec.customer, rec.site, rec.outDate, recGenIds);
+          const cancels = findRelatedCancelHistory(rec.customer, rec.site, rec.outDate, rec.genId);
           if(cancels.length===0) return '';
           return `<div class="detail-card" style="margin-top:8px;padding:9px 8px;min-width:110px;text-align:center;background:var(--danger-tint);border:1px solid var(--danger);">
             <div style="font-size:11px;font-weight:800;color:var(--danger);margin-bottom:4px;">🚫 출고취소 이력</div>
@@ -7348,8 +7142,8 @@ function renderSalesTab(){
           </div>`;
         })()}
       </td>
-      <td rowspan="2">${rec.manual? `<input type="text" value="${recCaps.join(', ')}" placeholder="예: 250, 400" style="width:80px;" onchange="updateBillingRecordCapacities('${rec.id}', this.value)">` : capStr}</td>
-      <td rowspan="2" class="gid">${rec.manual? `<input type="text" value="${escR(recGenIds.join(', ')).replace(/"/g,'&quot;')}" placeholder="예: S-1, S-2" style="width:90px;" onchange="updateBillingRecordGenIds('${rec.id}', this.value)">` : genIdStr}</td>
+      <td rowspan="2">${rec.manual? `<input type="number" min="0" value="${rec.capacity!=null? rec.capacity:''}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','capacity', this.value===''?null:Number(this.value))">` : capStr}</td>
+      <td rowspan="2" class="gid">${rec.manual? `<input type="text" value="${escR(rec.genId).replace(/"/g,'&quot;')}" style="width:70px;" onchange="updateBillingRecordField('${rec.id}','genId', this.value)">` : rec.genId}</td>
       <td rowspan="2" class="wrap-ok">${rec.manual? `<input type="text" value="${escR(rec.period||'').replace(/"/g,'&quot;')}" style="width:110px;" onchange="updateBillingRecordField('${rec.id}','period', this.value)">` : `<div>${period}</div>${usageDays!=null? `<div class="muted" style="text-align:center;font-size:11px;margin-top:3px;">${recIsLiveOut(rec)? `사용 ${usageDays}일째` : `총 ${usageDays}일 사용`}</div>`:''}`}</td>
       <td rowspan="2">
         ${rec.isCashSale ? `
@@ -7404,18 +7198,14 @@ function renderSalesTab(){
   }).join('');
   const tableHtml = recs.length===0 ? `<div class="empty">조건에 맞는 매출 내역이 없습니다.</div>` : `
     <div class="table-scroll"><table class="sales-table">
-      <thead><tr><th></th><th>청구일자</th><th>업체명</th><th>현장명</th><th>용량</th><th>발전기번호</th><th>사용기간</th><th>견적금액</th>${salesShowFreight? `<th>운임/세액</th>`:''}<th>입금일/입금금액</th><th>미수금</th><th>담당자</th><th>담당자 연락처</th></tr></thead>
+      <thead><tr><th>청구일자</th><th>업체명</th><th>현장명</th><th>용량</th><th>발전기번호</th><th>사용기간</th><th>견적금액</th>${salesShowFreight? `<th>운임/세액</th>`:''}<th>입금일/입금금액</th><th>미수금</th><th>담당자</th><th>담당자 연락처</th></tr></thead>
       <tbody>${rowsHtml}</tbody>
     </table></div>`;
   const hiddenCount = allRecs.filter(r=>r.hidden).length;
   const borrowedCount = allRecs.filter(r=>r.borrowed && !r.hidden).length;
   return `
-    <div class="section-title">💰 업체별 매출현황 <span class="cnt">${recs.length}건</span> <button type="button" class="btn" style="font-size:15px;" onclick="printSalesList()">🖨 인쇄</button>${(()=>{
-      const mergeGroups = findMergeCandidateGroups();
-      return mergeGroups.length ? `<button type="button" class="btn warn" style="font-size:15px;" onclick="runBillingAutoMerge()">🔗 같은 업체/현장/출고일 건 합치기 (${mergeGroups.length}건)</button>` : '';
-    })()}</div>
-    <div id="sales-merge-bar">${salesMergeBarHtml()}</div>
-    <details class="info-toggle"><summary></summary><p class="muted">발전기가 출고될 때 매출 기록이 자동으로 생성되고, 이후 출고취소·입고가 되어도 이 기록은 지워지지 않고 그대로 남습니다(발생한 비용은 취소돼도 청구 대상이라서요). 청구일자·공급가·세액·출고운임·입고운임·계산서 발행 여부·입금일자를 입력하면 바로 저장됩니다. 같은 거래처·같은 현장에 며칠 이내 출고취소 이력이 있으면(발전기를 바꿔서 다시 출고한 경우 등) 현장명 밑에 빨간 카드로 바로 표시됩니다. 체크박스로 매출 건을 여러 개 골라 "선택한 건 합치기"를 누르면, 업체·현장·출고일이 달라도 직접 고른 건들끼리 하나로 합칠 수 있습니다.</p></details>
+    <div class="section-title">💰 업체별 매출현황 <span class="cnt">${recs.length}건</span> <button type="button" class="btn" style="font-size:15px;" onclick="printSalesList()">🖨 인쇄</button></div>
+    <details class="info-toggle"><summary></summary><p class="muted">발전기가 출고될 때 매출 기록이 자동으로 생성되고, 이후 출고취소·입고가 되어도 이 기록은 지워지지 않고 그대로 남습니다(발생한 비용은 취소돼도 청구 대상이라서요). 청구일자·공급가·세액·출고운임·입고운임·계산서 발행 여부·입금일자를 입력하면 바로 저장됩니다. 같은 거래처·같은 현장에 며칠 이내 출고취소 이력이 있으면(발전기를 바꿔서 다시 출고한 경우 등) 현장명 밑에 빨간 카드로 바로 표시됩니다.</p></details>
     <div style="display:flex;gap:14px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-bottom:14px;">
       <div class="detail-card" style="padding:14px 16px;flex:none;">
         <label style="display:block;font-size:14px;font-weight:700;margin-bottom:6px;white-space:nowrap;">매출번호로 보기</label>
@@ -7552,7 +7342,7 @@ function printSalesList(){
     recs = recs.filter(r=>(r.customer||'(업체명 미상)')===salesFilterCustomer);
   }
   if(salesFilterGenId){
-    recs = recs.filter(r=>billingGenIds(r).includes(salesFilterGenId));
+    recs = recs.filter(r=>r.genId===salesFilterGenId);
   }
   if(recs.length===0){ showInfoModal('인쇄할 내역이 없습니다.'); return; }
   let grandTotal = 0, grandBalance = 0;
@@ -7563,7 +7353,7 @@ function printSalesList(){
     const balance = total-paid;
     grandTotal += quoteOnly;
     grandBalance += balance;
-    return `<tr><td style="font-weight:800;">${rec.billSeqNo? `HS-${rec.billSeqNo}`:'-'}</td><td>${rec.billDate? dow(rec.billDate):'-'}</td><td class="name">${escR(rec.customer)}</td><td class="name">${escR(dedupRepeatedText(rec.site))}</td><td>${escR(billingGenIds(rec).join(', '))}</td><td>${total.toLocaleString()}원</td><td>${paid.toLocaleString()}원</td><td>${balance.toLocaleString()}원</td><td>${rec.billInvoiceIssued?'유':'무'}</td><td>${escR((rec.billManager!=null? rec.billManager : rec.manager)||'-')}</td></tr>`;
+    return `<tr><td style="font-weight:800;">${rec.billSeqNo? `HS-${rec.billSeqNo}`:'-'}</td><td>${rec.billDate? dow(rec.billDate):'-'}</td><td class="name">${escR(rec.customer)}</td><td class="name">${escR(dedupRepeatedText(rec.site))}</td><td>${escR(rec.genId)}</td><td>${total.toLocaleString()}원</td><td>${paid.toLocaleString()}원</td><td>${balance.toLocaleString()}원</td><td>${rec.billInvoiceIssued?'유':'무'}</td><td>${escR((rec.billManager!=null? rec.billManager : rec.manager)||'-')}</td></tr>`;
   }).join('');
   const filterLabel = [
     salesFilterBillNo? `매출번호: HS-${salesFilterBillNo}` : '',
@@ -7682,22 +7472,6 @@ function updateBillingRecordField(recId, field, value){
   const rec = findBillingRecord(recId);
   if(!rec) return;
   rec[field] = value;
-  saveSalesBillingRecords();
-  renderContent();
-}
-function updateBillingRecordGenIds(recId, value){
-  const rec = findBillingRecord(recId);
-  if(!rec) return;
-  rec.genIds = (value||'').split(',').map(s=>s.trim()).filter(Boolean);
-  delete rec.genId;
-  saveSalesBillingRecords();
-  renderContent();
-}
-function updateBillingRecordCapacities(recId, value){
-  const rec = findBillingRecord(recId);
-  if(!rec) return;
-  rec.capacities = (value||'').split(',').map(s=>s.trim()).filter(s=>s!=='').map(Number).map(n=>isNaN(n)?null:n);
-  delete rec.capacity;
   saveSalesBillingRecords();
   renderContent();
 }
@@ -10743,7 +10517,7 @@ async function confirmLoad(resId, isTransfer){
     fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
     usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'',
     note: [r.note, transferFuelNote].filter(Boolean).join(' / '), smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
-    outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: (r.estDaily!=null ? r.estDaily : getDefaultEstDailyValue(r.longTerm)),
+    outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
     outProcessedBy: r.outProcessedBy || null, loadConfirmedBy: DB.currentUserName || null, genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now()
   };
   if(r.suppliesItems && r.suppliesItems.length){
@@ -11801,7 +11575,7 @@ async function quickForceOut(id){
     fuelRequested:null, fuelActual:null, usageDays:null, loadDate: todayStr(), arriveTime:null,
     freightBearer:'우리배차', paymentConfirmed:false, forcedOut:false, forceReason:'', forcedBy:null,
     note:'(정보없이 강제출고됨 - 오입고 수정용)',
-    outDate: todayStr(), startHours: g.hours||0, longTerm:false, estDaily: getDefaultEstDailyValue(false),
+    outDate: todayStr(), startHours: g.hours||0, longTerm:false, estDaily:null,
     outProcessedBy: DB.currentUserName||null, loadConfirmedBy: DB.currentUserName||null, outConfirmedAt: Date.now()
   };
   closeModal();
