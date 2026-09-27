@@ -11260,10 +11260,23 @@ function submitReserveNoGen(resId){
       DB.reservations.push(pendingData);
     }
     DB.reservations.push(...extraPendingList);
+    // 같은 묶음(batchId)으로 같이 출고 대기중인 다른 건에도 거래처 관련 정보만 똑같이 반영합니다.
+    let batchSiblingCount = 0;
+    if(existing && existing.batchId){
+      DB.reservations.forEach(x=>{
+        if(x.id!==pendingData.id && x.batchId===existing.batchId){
+          x.customer = customer; x.site = site; x.manager = manager; x.phone = phone; x.address = address;
+          x.arriveTime = arriveTime; x.loadDate = loadDate; x.freightBearer = freightBearer;
+          x.usageDays = usageDays; x.estDaily = estDaily;
+          if(x.genId===UNASSIGNED_GEN_ID) x.plannedOutDate = outDate; else x.outDate = outDate;
+          batchSiblingCount++;
+        }
+      });
+    }
     saveWithRetry(saveReservations);
     closeModal();
     currentTab = 'reserve'; renderTabbar(); renderContent();
-    flash(extraPendingList.length? `출고 대기(상차대기)에 총 ${1+extraPendingList.length}건 등록되었습니다. 상차완료를 눌러야 출고됩니다.` : '출고 대기(상차대기)에 등록되었습니다. 상차완료를 눌러야 출고됩니다.');
+    flash((extraPendingList.length? `출고 대기(상차대기)에 총 ${1+extraPendingList.length}건 등록되었습니다. 상차완료를 눌러야 출고됩니다.` : '출고 대기(상차대기)에 등록되었습니다. 상차완료를 눌러야 출고됩니다.') + (batchSiblingCount>0? ` (같이 묶인 ${batchSiblingCount}건에도 거래처 정보 반영됨)`:''));
     return;
   }
   const pendingData = {
@@ -11280,10 +11293,23 @@ function submitReserveNoGen(resId){
     DB.reservations.push(pendingData);
   }
   DB.reservations.push(...extraPendingList);
+  // 같은 묶음(batchId)으로 같이 출고 대기중인 다른 건에도 거래처 관련 정보만 똑같이 반영합니다.
+  let batchSiblingCount2 = 0;
+  if(existing && existing.batchId){
+    DB.reservations.forEach(x=>{
+      if(x.id!==pendingData.id && x.batchId===existing.batchId){
+        x.customer = customer; x.site = site; x.manager = manager; x.phone = phone; x.address = address;
+        x.arriveTime = arriveTime; x.loadDate = loadDate; x.freightBearer = freightBearer;
+        x.usageDays = usageDays; x.estDaily = estDaily;
+        if(x.genId===UNASSIGNED_GEN_ID) x.plannedOutDate = outDate; else x.outDate = outDate;
+        batchSiblingCount2++;
+      }
+    });
+  }
   saveWithRetry(saveReservations);
   closeModal();
   currentTab = 'reserve'; renderTabbar(); renderContent();
-  flash(existing? '출고예약 내용이 수정되었습니다.' : (extraPendingList.length? `출고예약이 등록되었습니다. (추가 발전기 ${extraPendingList.length}대는 상차대기로 바로 등록됨) [출고 대기]에서 발전기를 배정하면 출고로 이어집니다.` : '출고예약이 등록되었습니다. [출고 대기]에서 발전기를 배정하면 출고로 이어집니다.'));
+  flash((existing? '출고예약 내용이 수정되었습니다.' : (extraPendingList.length? `출고예약이 등록되었습니다. (추가 발전기 ${extraPendingList.length}대는 상차대기로 바로 등록됨) [출고 대기]에서 발전기를 배정하면 출고로 이어집니다.` : '출고예약이 등록되었습니다. [출고 대기]에서 발전기를 배정하면 출고로 이어집니다.')) + (batchSiblingCount2>0? ` (같이 묶인 ${batchSiblingCount2}건에도 거래처 정보 반영됨)`:''));
 }
 function syncUsageDaysToReturnDate(){
   const outEl = document.getElementById('f-outdate');
@@ -11527,6 +11553,10 @@ async function submitOutInfoEdit(id){
       }
     }
   }
+  // 같이 출고된(같은 거래처명+주소로 묶여 나간) 다른 발전기를 찾기 위해, 덮어쓰기 전의 값을 미리 저장해둡니다.
+  const oldCustomerForBatch = g.rental.customer;
+  const oldAddressForBatch = g.rental.address;
+  const oldOutDateForBatch = g.rental.outDate;
   g.rental = {
     ...g.rental,
     customer: site,
@@ -11550,9 +11580,26 @@ async function submitOutInfoEdit(id){
   };
   if(newVoltageVal) g.voltage = newVoltageVal;
   if(!isNaN(startHours)) g.hours = startHours;
+  // 같은 묶음으로 같이 출고된 다른 발전기들에도 거래처 관련 정보(거래처명·주소·담당자·연락처)만 똑같이 반영합니다.
+  // 부자재·연료·전압·출고시 누적시간처럼 발전기마다 다를 수 있는 항목은 각자 값을 그대로 둡니다.
+  const batchSiblings = (DB.gens||[]).filter(og=>og.id!==g.id && og.status==='out' && og.rental
+    && og.rental.customer===oldCustomerForBatch && og.rental.address===oldAddressForBatch && og.rental.outDate===oldOutDateForBatch);
+  batchSiblings.forEach(og=>{
+    og.rental.customer = site;
+    og.rental.site = site;
+    og.rental.manager = newManager;
+    og.rental.phone = newPhone;
+    og.rental.address = newAddress;
+    og.rental.outDate = newOutDate;
+    og.rental.arriveTime = document.getElementById('f-oie-arrivetime').value.trim() || null;
+    og.rental.loadDate = document.getElementById('f-oie-loaddate').value || null;
+    og.rental.freightBearer = document.getElementById('f-oie-freight').value;
+    og.rental.usageDays = usageDays;
+    og.rental.estDaily = estDailyOie;
+  });
   closeModal();
   renderContent();
-  flash('출고 정보가 저장되었습니다');
+  flash(batchSiblings.length>0 ? `출고 정보가 저장되었습니다 (같이 나간 ${batchSiblings.length}대에도 거래처 정보 반영됨)` : '출고 정보가 저장되었습니다');
   saveWithRetry(saveGens);
   maybeLogVoltageChange(id, oldVoltage, newVoltageVal);
 }
