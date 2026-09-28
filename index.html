@@ -4549,6 +4549,17 @@ function tankDimsOf(g){
     height: (g && g.tankHeight>0) ? g.tankHeight : ((m && m.tankHeight) || null)
   };
 }
+// 탱크 전체 용량(L) = 가로×세로×높이(cm) ÷ 1000. 규격이 없으면 null
+function tankCapacityL(g){
+  const {width:w, depth:d, height:h} = tankDimsOf(g);
+  return (w>0 && d>0 && h>0) ? Math.round(w*d*h/1000) : null;
+}
+function tankCapacityCellHtml(g){
+  const cap = tankCapacityL(g);
+  return cap!=null
+    ? `<span style="font-weight:700;white-space:nowrap;">${cap.toLocaleString()}L</span>`
+    : '<span class="muted" style="font-size:11.5px;white-space:nowrap;">미입력</span>';
+}
 function fuelBaselineOf(g){
   const m = DB.materials && g && DB.materials[g.model];
   const modelDefault = (m && m.fuelBaselineHeight>0) ? m.fuelBaselineHeight : 0;
@@ -5161,6 +5172,8 @@ function renderMaintList(){
     return `<tr>
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
+      <td>${tankCapacityCellHtml(g)}</td>
+      <td>${g.weightT>0 ? `<span style="font-weight:700;white-space:nowrap;">${g.weightT}t</span>` : '<span class="muted" style="font-size:11.5px;white-space:nowrap;">미입력</span>'}</td>
       <td class="muted" style="font-size:12px;">${g.status==='in'?'입고':'출고중'}</td>
       <td>${known? gaugeHtml(el,rem,getCycle(g),g.status!=='in' && g.rental && g.rental.estDaily>0) : unknownCellHtml}</td>
       <td>${known? pillHtml(maintStatus(rem)) : unknownPillHtml}</td>
@@ -5179,7 +5192,7 @@ function renderMaintList(){
     ${capacityButtonsHtml}
     ${sorted.length===0 ? `<div class="empty">${maintCapacityFilter!=null? `${maintCapacityFilter}kW 용량의 발전기가 없습니다.` : '검색 결과가 없습니다.'}</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
+      <thead><tr><th>번호</th><th>모델</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`}`;
 }
@@ -7426,10 +7439,10 @@ function renderSettingsTab(){
         const modelRowHtml = g=>{
           const cap = capacityOf(g);
           const ratioOptions = [100,90,80,70,60,50,40,30].map(r=>`<option value="${r}" ${(g.usageRatio||100)===r?'selected':''}>${r}%</option>`).join('');
-          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·장기임대 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
+          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="0" max="100" step="0.1" value="${g.weightT>0? g.weightT : ''}" placeholder="예: 2.5" onchange="updateGenWeight('${g.id}', this.value)" style="text-align:right;"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·장기임대 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
         };
         const half = Math.ceil(activeList.length/2);
-        const thead = `<thead><tr><th style="width:42px;">번호</th><th style="width:112px;">모델/용량</th><th style="width:56px;">년식</th><th style="width:78px;">정격대비사용</th><th style="width:64px;">가동시간<br>확인가능</th><th style="width:74px;"></th></tr></thead>`;
+        const thead = `<thead><tr><th style="width:42px;">번호</th><th style="width:112px;">모델/용량</th><th style="width:62px;">총중량(t)</th><th style="width:56px;">년식</th><th style="width:78px;">정격대비사용</th><th style="width:64px;">가동시간<br>확인가능</th><th style="width:74px;"></th></tr></thead>`;
         return `<div class="util-two-col model-settings-table">
           <div class="settings-table"><table>${thead}<tbody>${activeList.slice(0,half).map(modelRowHtml).join('')}</tbody></table></div>
           <div class="settings-table"><table>${thead}<tbody>${activeList.slice(half).map(modelRowHtml).join('')}</tbody></table></div>
@@ -7963,6 +7976,14 @@ async function toggleHoursKnownSetting(id, checked){
   await saveGens();
   renderContent();
   flash(checked? `${g.id} 가동시간 확인가능으로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 실제 값을 입력해주세요.` : `${g.id} 누적시간 확인불가로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 마지막 엔진오일교체일을 입력해주세요.`);
+}
+// 발전기 무게(톤, t). 비우거나 0 이하면 삭제합니다.
+async function updateGenWeight(id, value){
+  const g = findGen(id);
+  const v = Number(String(value||'').replace(/[^0-9.]/g,''));
+  if(v>0) g.weightT = Math.round(v*100)/100; else delete g.weightT;
+  await saveGens();
+  flash('저장되었습니다');
 }
 async function updateManufactureDate(id, value){
   const g = findGen(id);
