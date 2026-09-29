@@ -1475,7 +1475,7 @@ async function qmRefreshReservationList(){
       // 사무실에서 아직 "내용보기/수정"으로 확인·저장하기 전이면 칸이 비어있는 게 정상입니다.
       // 그래도 문자오더 원문이 있으면, 사무실 화면처럼 자동인식된 내용을 미리보기로 보여줍니다.
       const hasManualInfo = r.customer || r.address || r.manager || r.phone;
-      const auto = (!hasManualInfo && r.smsOrder) ? parseSmsOrderText(r.smsOrder) : null;
+      const auto = (!hasManualInfo && r.smsOrder) ? parseSmsOrderText(r.smsOrder, r.smsOrderAt||r.createdAtTs) : null;
       const dCustomer = r.customer || (auto&&auto.customer) || r.site || '거래처 미기재';
       const infoRows = [
         ['담당자', r.manager || (auto&&auto.manager)],
@@ -1833,7 +1833,7 @@ async function openQmEditReservation(resId){
     const arriveTimeOpts = [...Array.from({length:7},(_,i)=>`오전 ${i+6}시`), ...Array.from({length:6},(_,i)=>`오후 ${i+1}시`)];
     // 사무실 확인 전, 문자오더 원문에서 자동인식된 값을 미리 채워서 보여줍니다 (빈칸으로 남겨두는 것보다
     // 무엇이 인식됐는지 바로 보이는 게, 붙여넣은 사람 입장에서 "잘 들어갔구나" 확인이 되니까요).
-    const auto = (r.smsOrder && !(r.customer||r.address||r.manager||r.phone)) ? parseSmsOrderText(r.smsOrder) : null;
+    const auto = (r.smsOrder && !(r.customer||r.address||r.manager||r.phone)) ? parseSmsOrderText(r.smsOrder, r.smsOrderAt||r.createdAtTs) : null;
     const autoBg = 'background:#FFF8DC;border-color:#E8B923;';
     const av = (field) => r[field] || (auto&&auto[field]) || '';
     const styleFor = (field) => (!r[field] && auto && auto[field]) ? (inputStyle+autoBg) : inputStyle;
@@ -9765,117 +9765,180 @@ function showInfoModal(message){
   </div>`;
   document.getElementById('info-ok-btn').addEventListener('click', closeModal);
 }
-// 문자오더 원문에서 업체명·주소·담당자·연락처·전압·도착일시·비고(부자재)를 최대한 뽑아냅니다.
+// 문자오더 원문에서 업체명·현장·주소·담당자·연락처·전압·도착일시·비고(부자재)를 최대한 뽑아냅니다.
 // 100% 정확하진 않으니, 이미 값이 있는 칸은 절대 덮어쓰지 않고 "비어있는 칸만" 채우는 용도로 씁니다.
-function parseSmsOrderText(text){
+// baseTs: 문자가 들어온 시각. "내일/오늘/27일"은 사무실에서 여는 날이 아니라 문자가 온 날 기준으로 계산해야 합니다.
+function parseSmsOrderText(text, baseTs){
   const result = {customer:'', address:'', manager:'', phone:'', voltage:'', arriveTime:'', outDate:'', loadDate:'', note:'', usageDays:'', fuelRequested:null, fuelActual:null};
   if(!text) return result;
-  // 소수점(예: "1.4kw")은 보호해두고, 그 외 줄바꿈/쉼표/마침표를 전부 구분자로 써서 잘게 쪼갭니다.
-  // (사모님 문자가 "구형(L9)380볼트.분전반,내일8시도착.OO리820-1번지.2일간사용.다온스틸텍.김신경이사"처럼
-  //  한 줄에 여러 정보를 마침표/쉼표로만 구분해서 보내는 경우가 있어서, 줄바꿈만으론 못 나눕니다)
-  const protectedText = text.replace(/(\d)\.(\d)/g, '$1\u2027$2');
-  const lines = protectedText.split(/[\n,]+|\.+/).map(l=>l.replace(/\u2027/g,'.').trim()).filter(Boolean);
+  const base = baseTs ? new Date(baseTs) : new Date();
+  const baseDay = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+  // 소수점(1.4톤, 2.5T)과 괄호 안의 마침표·쉼표("분전반(메인250.분기150A.4P,3P 100)")는 보호해두고,
+  // 그 외 줄바꿈/쉼표/마침표를 전부 구분자로 써서 잘게 쪼갭니다.
+  // (문자가 "구형(L9)380볼트.분전반,내일8시도착.OO리820-1번지.다온스틸텍.김신경이사"처럼 마침표/쉼표로만 구분되는 경우가 많습니다)
+  const DOT='\u2027', COMMA='\u201A';
+  let protectedText = text.replace(/(\d)\.(\d)/g, '$1'+DOT+'$2');
+  protectedText = protectedText.replace(/\([^)\n]*\)/g, m=>m.replace(/\./g,DOT).replace(/,/g,COMMA));
+  const restore = s=>s.split(DOT).join('.').split(COMMA).join(',');
+  const pieces = protectedText.split(/[\n,]+|\.+/).map(l=>restore(l).trim()).filter(Boolean);
+
   const phoneRe = /01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/;
   const capacityRe = /\d+(\.\d+)?\s*(키로|kw)/i;
   const voltageRe = /(\d{2,4})\s*볼트|\b(\d{2,4})\s*v\b/i;
   const addressRe = /(시|도|군|구|읍|면|동|리|로|길)[\s]*\d|산\s*\d|(^|\s)[가-힣]{2,}(시|도|군|구|읍|면|동|리)(\s|$)/;
   const usageDaysRe = /(\d{1,3})\s*일\s*간?\s*사용|사용\s*(\d{1,3})\s*일/;
+  const usageMonthRe = /(\d{1,2})\s*개?월\s*간?\s*사용/;
   // "연료 100(80)리터"처럼 괄호가 있으면 앞=고객요청, 뒤=실제주입입니다. 괄호가 없으면 같은 값으로 둘 다 채웁니다.
   const fuelParenRe = /연료\s*(\d+)\s*\(\s*(\d+)\s*\)/;
   const fuelSimpleRe = /연료\s*(\d+)\s*(리터|l)?/i;
-  const supplyKeywords = ['접지봉','깔판','용접기','가설분전함','분전반','전선','케이블','분전함','릴선'];
-  const leftover = [];
+  // 부자재·차량·길이 등 비고로 보낼 조각 (업체명으로 잘못 잡히던 "ATS 2대", "2대", "1.4톤", "3미터40센치" 등)
+  const supplyRe = /(접지봉|깔판|용접기|가설분전함|분전반|분전함|전선|케이블|릴선|ATS|\d\s*sq|휀스|펜스|캠락|말통|지게차|카고|크레인|가닥|세트|\d\s*톤|\d\s*t\b|\d\s*미터|\d\s*m\b|센치|\d\s*cm)/i;
+  const qtyOnlyRe = /^\d+\s*(대|개|장|ea)$/i;
+  const payRe = /^(착불|선불|현불|현금|계산서|카드)/;
+  const requestRe = /(주세요|바랍니다|부탁|해서|같이|요$)/;
+  // 날짜/시간이 들어있는 조각 ("27일", "10월 1일(목)", "오후5시투입", "내일 9시 도착")
+  const arrivalRe = /도착|상차|투입|오늘|내일|모레|\d{1,2}\s*월\s*\d{1,2}\s*일|^\d{1,2}\s*일\s*(\([^)]*\))?$|^(오전|오후|아침|저녁)?\s*\d{1,2}\s*시/;
+  const titleAlt = '지점장|본부장|소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저|매니져|제작팀|팀';
+  // "정현산업종봉섭대표" → 업체 "정현산업" + 담당자 "종봉섭대표", "씨앤오 정윤석부장님" → "씨앤오" + "정윤석부장님"
+  const personRe = new RegExp(`^(.*?)([가-힣]{2,3})?\\s*(${titleAlt})\\s*(님)?$`);
+  const splitCompanyPerson = s=>{
+    const m = s.match(personRe);
+    if(!m) return null;
+    return {company: m[1].trim(), person: `${m[2]||''}${m[3]}${m[4]||''}`};
+  };
+
+  const leftover = []; // {text, pos}
   const noteParts = [];
-  let arrivalLine = '';
+  const arrivalParts = [];
+  let managerPos = -1, customerFromManager = '';
   let isLoadDateHint = false; // "상차"라고만 되어 있으면(도착 언급 없이) 그 날짜 자체가 상차일이라 -1일 계산을 안 합니다.
 
-  lines.forEach(line=>{
-    let l = line.replace(/[★☆]+\s*해성발전기\s*(출고|철수)?\s*요청\s*[★☆]+/g, '').trim();
+  const fillerRe = /\s*(입니다|이에요|예요|이요|요)\s*$/;
+  // 한 조각 처리. 날짜·주소·전화번호가 띄어쓰기 없이 붙은 조각("30일10시도착천안동남구…입니다01096861959")은
+  // 알아본 부분을 떼어내고 남은 부분을 다시 이 함수로 처리합니다.
+  const processPiece = (piece, pos)=>{
+    let l = piece.replace(/[★☆]+\s*해성발전기\s*(출고|철수)?\s*요청\s*[★☆]+/g, '').trim();
     if(!l) return; // 헤더만 있던 조각
+    if(/^제목\s/.test(l)) return; // "제목 100kw 208볼트 3" 같은 제목 줄은 아래 본문과 중복이라 건너뜁니다
     const vm = l.match(voltageRe);
     if(vm && !result.voltage) result.voltage = `${vm[1]||vm[2]}V`;
+    // "*연료 20리터"처럼 별표가 붙어도 연료 줄이면 연료 정보로 인식합니다.
+    const fpm0 = l.match(fuelParenRe);
+    if(fpm0){ result.fuelRequested = Number(fpm0[1]); result.fuelActual = Number(fpm0[2]); return; }
+    const fsm0 = l.match(fuelSimpleRe);
+    if(fsm0){ result.fuelRequested = Number(fsm0[1]); result.fuelActual = Number(fsm0[1]); return; }
+    if(/구형|신형/.test(l) && !noteParts.some(n=>/구형|신형/.test(n))) noteParts.push((l.match(/구형|신형/)||[''])[0]);
     if(capacityRe.test(l)){
       const um0 = l.match(usageDaysRe);
       if(um0) result.usageDays = um0[1] || um0[2];
       return;
     }
-    // "*연료 20리터"처럼 별표가 붙어도 연료 줄이면 비고가 아니라 연료 정보로 인식해야 합니다.
-    const fpm0 = l.match(fuelParenRe);
-    if(fpm0){ result.fuelRequested = Number(fpm0[1]); result.fuelActual = Number(fpm0[2]); return; }
-    const fsm0 = l.match(fuelSimpleRe);
-    if(fsm0){ result.fuelRequested = Number(fsm0[1]); result.fuelActual = Number(fsm0[1]); return; }
     if(l.startsWith('*')){ noteParts.push(l.slice(1).trim()); return; }
-    if(supplyKeywords.some(k=>l.includes(k)) && l.length<20){ noteParts.push(l); return; }
+    if(l.includes('철수') || l.includes('회수')){ noteParts.push(l); return; } // "10월 11일(일) 철수"는 출고일이 아니라 참고사항
     const um = l.match(usageDaysRe);
     if(um){ result.usageDays = um[1] || um[2]; return; }
+    const mm = l.match(usageMonthRe);
+    if(mm){ result.usageDays = String(Number(mm[1])*30); noteParts.push(l); return; }
     const pm = l.match(phoneRe);
     if(pm){
       result.phone = pm[0].replace(/[^0-9]/g,'');
-      const rest = l.replace(phoneRe,'').trim();
-      if(rest) result.manager = rest;
+      const rest = l.replace(phoneRe,' ').replace(fillerRe,'').replace(/\s+/g,' ').trim();
+      if(managerPos<0) managerPos = pos;
+      if(rest){
+        const sp = splitCompanyPerson(rest);
+        if(sp){ result.manager = sp.person; if(sp.company) customerFromManager = sp.company; }
+        else { managerPos = -1; processPiece(rest, pos); } // 담당자가 아니면(날짜·주소 등) 다시 처리
+      }
       return;
     }
-    if(l.includes('도착')||l.includes('상차')||l.includes('투입')){ arrivalLine = l; isLoadDateHint = l.includes('상차') && !l.includes('도착'); return; }
+    // "30일10시도착천안동남구…"처럼 도착/투입/상차 뒤에 다른 내용이 붙어 있으면 잘라서 따로 처리합니다.
+    const am = l.match(/^(.*?(도착|투입|상차))\s*(\S.*)$/);
+    if(am && !/^(예정|요망|바랍니다|해주세요|부탁)/.test(am[3])){
+      processPiece(am[1], pos);
+      processPiece(am[3], pos);
+      return;
+    }
+    if(arrivalRe.test(l)){
+      arrivalParts.push(l);
+      if(l.includes('상차') && !l.includes('도착')) isLoadDateHint = true;
+      if(l.includes('~')) noteParts.push(l); // "10월 5일(월)~ 10월24일" 같은 기간은 비고에도 남겨둡니다
+      return;
+    }
+    if(payRe.test(l)){ noteParts.push(l); return; }
+    if(qtyOnlyRe.test(l) || (supplyRe.test(l) && l.length<40)){ noteParts.push(l); return; }
     // "2시간대기후철수"처럼 대기시간을 설명하는 조각은 거래처명이 아니라 비고로 보내야 합니다.
     if(/\d+\s*시간.*(대기|후|뒤)/.test(l)){ noteParts.push(l); return; }
     if(addressRe.test(l)){ result.address = result.address ? result.address+' '+l : l; return; }
     if(vm) return; // 전압만 있고 다른 정보가 없는 조각(예: "380볼트")은 업체명 후보에서 제외합니다.
-    leftover.push(l);
-  });
+    if(requestRe.test(l) && l.length>=8){ noteParts.push(l); return; } // "군산거하고 같이 한차로 해주세요"
+    l = l.replace(fillerRe,'').trim();
+    if(l) leftover.push({text:l, pos});
+  };
+  pieces.forEach((piece, pos)=>processPiece(piece, pos));
 
-  // "OO소장님"/"OO이사님"처럼 직급이 붙은 줄은 업체명이 아니라 담당자일 가능성이 높습니다.
-  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저)\s*님?$|님$/;
-  const titleIdx = leftover.findIndex(l=>titleRe.test(l));
-  if(titleIdx>=0 && !result.manager){
-    const raw = leftover[titleIdx];
-    // 목록에 있는 직급이면(예: "대륙종합건설 정규삼소장님") 그 직급 바로 앞 이름만 담당자로 뽑고,
-    // 앞에 남는 글자(회사명 등)는 업체명 후보로 다시 넣어둡니다.
-    const knownTitleRe = /([가-힣]{2,4})\s*(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저)\s*(님)?$/;
-    const km = raw.match(knownTitleRe);
-    if(km){
-      result.manager = `${km[1]}${km[2]}${km[3]||''}`;
-      const prefix = raw.slice(0, km.index).trim();
-      leftover.splice(titleIdx,1);
-      if(prefix) leftover.push(prefix);
-    } else {
-      // 목록에 없는 낯선 직급이면(예: "박지훈지점장님") 앞뒤를 나눌 근거가 없으니 통째로 담당자로 씁니다.
-      result.manager = raw;
-      leftover.splice(titleIdx,1);
+  // 전화번호 줄에서 담당자를 못 찾았으면, 직급이 붙은 조각("이종성이사님", "백억ENC 반장님")을 담당자로 씁니다.
+  if(!result.manager){
+    const idx = leftover.findIndex(x=>splitCompanyPerson(x.text));
+    if(idx>=0){
+      const sp = splitCompanyPerson(leftover[idx].text);
+      result.manager = sp.person;
+      if(sp.company) customerFromManager = sp.company;
+      managerPos = leftover[idx].pos;
+      leftover.splice(idx,1);
     }
+  } else {
+    // 담당자가 이미 있으면 남은 조각 중 직급만 있는 조각은 버립니다(중복 방지)
+    for(let i=leftover.length-1;i>=0;i--){ const sp=splitCompanyPerson(leftover[i].text); if(sp && !sp.company) leftover.splice(i,1); }
   }
 
-  if(leftover.length===1) result.customer = leftover[0];
-  else if(leftover.length>=2){
-    result.customer = leftover[0];
-    // 남는 줄이 더 있으면(현장명 등) 주소 뒤에 참고로 붙여둡니다.
-    result.address = result.address ? `${result.address} (${leftover.slice(1).join(' ')})` : leftover.slice(1).join(' ');
+  // 업체명: ① 담당자 앞에 붙은 회사명("씨앤오 정윤석부장님"의 "씨앤오") ② 담당자 바로 앞 조각 ③ 첫 번째 남은 조각
+  let custIdx = -1;
+  if(customerFromManager){
+    result.customer = customerFromManager;
+  } else if(leftover.length){
+    if(managerPos>=0){
+      for(let i=leftover.length-1;i>=0;i--){ if(leftover[i].pos < managerPos){ custIdx = i; break; } }
+    }
+    if(custIdx<0) custIdx = 0;
+    result.customer = leftover[custIdx].text;
+  }
+  // 나머지 조각(현장명 등)은 주소 뒤에 괄호로 붙여둡니다.
+  const siteParts = leftover.filter((x,i)=>i!==custIdx).map(x=>x.text);
+  if(siteParts.length){
+    result.address = result.address ? `${result.address} (${siteParts.join(' ')})` : siteParts.join(' ');
   }
   result.note = noteParts.join(', ');
 
-  // 도착 시간/날짜 파싱
+  // 도착 시간/날짜 파싱 (여러 조각에 나뉘어 있어도 합쳐서 봅니다. 예: "27일" + "오후5시투입")
+  const arrivalLine = arrivalParts.join(' ');
   if(arrivalLine){
     if(arrivalLine.includes('지금')) result.arriveTime = '지금즉시';
     else{
-      const tm = arrivalLine.match(/(오전|오후)?\s*(\d{1,2})\s*시\s*(반|(\d{1,2})\s*분)?/);
+      const tm = arrivalLine.match(/(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시\s*(반|(\d{1,2})\s*분)?/);
       if(tm){
-        let ampm = tm[1];
+        let ampm = tm[1]==='아침' ? '오전' : ((tm[1]==='저녁'||tm[1]==='밤') ? '오후' : tm[1]);
         const hour = Number(tm[2]);
         if(!ampm) ampm = (hour>=7 && hour<=12) ? '오전' : '오후';
         const minute = tm[3]==='반' ? 30 : (tm[4]? Number(tm[4]) : 0);
         result.arriveTime = minute>0 ? `${ampm} ${hour}시 ${minute}분` : `${ampm} ${hour}시`;
-      }
+      } else if(/오전\s*중/.test(arrivalLine)) result.arriveTime = '오전중';
+      else if(/오후\s*중/.test(arrivalLine)) result.arriveTime = '오후중';
     }
-    const today = new Date();
-    if(arrivalLine.includes('오늘') || arrivalLine.includes('지금')) result.outDate = toLocalDateStr(today);
-    else if(arrivalLine.includes('내일')){
-      const d = new Date(today); d.setDate(d.getDate()+1);
+    const md = arrivalLine.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    if(arrivalLine.includes('오늘') || arrivalLine.includes('지금')) result.outDate = toLocalDateStr(baseDay);
+    else if(arrivalLine.includes('모레')){ const d = new Date(baseDay); d.setDate(d.getDate()+2); result.outDate = toLocalDateStr(d); }
+    else if(arrivalLine.includes('내일')){ const d = new Date(baseDay); d.setDate(d.getDate()+1); result.outDate = toLocalDateStr(d); }
+    else if(md){
+      // "9월28일", "10월 1일(목)"처럼 월이 있으면 그 월을 그대로 씁니다. 두 달 넘게 지난 날짜면 내년으로 봅니다.
+      let d = new Date(baseDay.getFullYear(), Number(md[1])-1, Number(md[2]));
+      if(d < new Date(baseDay.getFullYear(), baseDay.getMonth()-2, baseDay.getDate())) d = new Date(baseDay.getFullYear()+1, Number(md[1])-1, Number(md[2]));
       result.outDate = toLocalDateStr(d);
     } else {
       const dm = arrivalLine.match(/(\d{1,2})\s*일/);
       if(dm){
         const day = Number(dm[1]);
-        let d = new Date(today.getFullYear(), today.getMonth(), day);
-        if(d < new Date(today.getFullYear(), today.getMonth(), today.getDate())) d = new Date(today.getFullYear(), today.getMonth()+1, day);
+        let d = new Date(baseDay.getFullYear(), baseDay.getMonth(), day);
+        if(d < baseDay) d = new Date(baseDay.getFullYear(), baseDay.getMonth()+1, day);
         result.outDate = toLocalDateStr(d);
       }
       // 날짜를 명확히 알 수 없으면 절대 추정하지 않고 비워둡니다 (잘못 채우면 출고일 사고로 이어질 수 있음).
@@ -9963,14 +10026,14 @@ function parseReturnRequestText(text){
 const SMS_CHANGE_WINDOW_MS = 24*60*60*1000;
 function detectSmsOrderChange(item, allItems){
   if(!item || !item.smsOrder || !item.createdAtTs) return null;
-  const cur = parseSmsOrderText(item.smsOrder);
+  const cur = parseSmsOrderText(item.smsOrder, item.smsOrderAt||item.createdAtTs);
   if(!cur.phone && !cur.customer) return null;
   let prior = null, priorParsed = null;
   (allItems||[]).forEach(o=>{
     if(!o || o.id===item.id || !o.smsOrder || !o.createdAtTs) return;
     if(o.createdAtTs >= item.createdAtTs) return; // 이 문자보다 먼저 온 것만 비교
     if(item.createdAtTs - o.createdAtTs > SMS_CHANGE_WINDOW_MS) return;
-    const op = parseSmsOrderText(o.smsOrder);
+    const op = parseSmsOrderText(o.smsOrder, o.smsOrderAt||o.createdAtTs);
     const samePhone = cur.phone && op.phone && cur.phone===op.phone;
     const sameCustomer = !samePhone && cur.customer && op.customer && cur.customer===op.customer;
     if(!samePhone && !sameCustomer) return;
@@ -10065,6 +10128,7 @@ async function applyRecallDateToGen(genId, dateStr, reqId){
   flash(`${g.id} 반납예정일이 ${dateStr}(사용일수 ${Math.max(1, days)}일)로 적용되었습니다`);
 }
 let _rsvSmsOrderRaw = '';
+let _rsvSmsOrderAt = null; // 문자가 들어온 시각("내일" 계산 기준)
 let _rsvGenOptionsHtml = '';
 let _rsvExtraGenIdx = 0;
 function addRsvExtraGenRow(){
@@ -10100,7 +10164,7 @@ function openReserveNoGenModal(resId, draft){
   const autoFields = {}; // 실제로 자동으로 채워진 칸만 표시(파랑 배경)하기 위한 기록
   let pre = existing || draft || null;
   if(existing && existing.smsOrder && !existing.customer && !existing.site && !existing.address){
-    const parsed = parseSmsOrderText(existing.smsOrder);
+    const parsed = parseSmsOrderText(existing.smsOrder, existing.smsOrderAt||existing.createdAtTs);
     pre = Object.assign({}, existing, {
       customer: existing.customer || parsed.customer,
       site: existing.site || parsed.customer,
@@ -10142,6 +10206,7 @@ function openReserveNoGenModal(resId, draft){
     return toLocalDateStr(d);
   })();
   _rsvSmsOrderRaw = (pre && pre.smsOrder) || '';
+  _rsvSmsOrderAt = (pre && (pre.smsOrderAt||pre.createdAtTs)) || null;
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal modal-wide" style="text-align:left;">
@@ -10268,7 +10333,7 @@ function openReserveNoGenModal(resId, draft){
 }
 function reapplySmsOrderToRsvForm(){
   if(!_rsvSmsOrderRaw){ return; }
-  const parsed = parseSmsOrderText(_rsvSmsOrderRaw);
+  const parsed = parseSmsOrderText(_rsvSmsOrderRaw, _rsvSmsOrderAt);
   const setVal = (id, v)=>{ const el=document.getElementById(id); if(el) el.value = (v==null? '' : v); };
   setVal('f-rsv-site', parsed.customer||'');
   setVal('f-rsv-address', parsed.address||'');
