@@ -693,12 +693,6 @@ function renderQuickModeTextUI(mode, presetText){
   `);
   loadQuickRecentList(isOut? 'quickOrderLog-v1':'quickReturnLog-v1', recentId);
 }
-function renderQuickModePasteUI(){
-  renderQuickModeTextUI('out');
-}
-function renderQuickModeReturnPasteUI(){
-  renderQuickModeTextUI('return');
-}
 let qmStockCapacityFilter = null;
 async function renderQuickModeStockList(){
   qmStockCapacityFilter = null;
@@ -1438,7 +1432,6 @@ async function submitQmInProcess(id){
     if(btn){ btn.disabled = false; btn.textContent = '입고처리 완료'; }
   }
 }
-let qmResListCache = null; // 최근 불러온 출고대기 목록(뒤로가기 시 재사용)
 async function renderQmReservationList(){
   pwGateShow(`
     <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
@@ -3195,97 +3188,6 @@ async function storageSetChecked(key, value, shared){
     endSaving();
   }
 }
-// ---------- 공용 양식 · 문서 (엑셀 견적서, 관리문서 등 — 필요할 때만 따로 불러옴, 전체 로딩 속도에 영향 없음) ----------
-const DOC_TEMPLATE_STORAGE_KEY = 'gen-doc-templates-v1';
-const DOC_TEMPLATE_MAX_FILE_BYTES = 5*1024*1024; // 파일 1개당 5MB 제한
-let docTemplatesCache = null; // null=아직 안 불러옴, 배열=불러온 상태
-async function loadDocTemplates(force){
-  if(docTemplatesCache!==null && !force) return docTemplatesCache;
-  try{
-    const r = await window.storage.get(DOC_TEMPLATE_STORAGE_KEY, true);
-    docTemplatesCache = r ? JSON.parse(r.value) : [];
-  }catch(e){ docTemplatesCache = []; }
-  return docTemplatesCache;
-}
-async function saveDocTemplates(){
-  await storageSetChecked(DOC_TEMPLATE_STORAGE_KEY, JSON.stringify(docTemplatesCache), true);
-}
-function fileToDataUrl(file){
-  return new Promise((resolve, reject)=>{
-    const reader = new FileReader();
-    reader.onload = ()=> resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-async function uploadDocTemplate(){
-  const input = document.getElementById('f-doctpl-file');
-  const file = input && input.files && input.files[0];
-  if(!file) return;
-  if(file.size > DOC_TEMPLATE_MAX_FILE_BYTES){
-    showInfoModal(`파일이 너무 큽니다 (${(file.size/1024/1024).toFixed(1)}MB). 5MB 이하 파일만 올릴 수 있습니다.`);
-    input.value = '';
-    return;
-  }
-  const dataUrl = await fileToDataUrl(file);
-  const list = await loadDocTemplates();
-  list.push({
-    id: uid(), fileName: file.name, dataUrl, sizeKB: Math.round(file.size/1024),
-    uploadedBy: DB.currentUserName||'이름미상', uploadedDate: todayStr()
-  });
-  await saveDocTemplates();
-  input.value = '';
-  renderDocTemplatesWrap();
-  flash('양식 파일이 저장되었습니다');
-}
-function downloadDocTemplate(id){
-  const item = (docTemplatesCache||[]).find(t=>t.id===id);
-  if(!item) return;
-  const a = document.createElement('a');
-  a.href = item.dataUrl;
-  a.download = item.fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-}
-async function removeDocTemplate(id){
-  const item = (docTemplatesCache||[]).find(t=>t.id===id);
-  if(!item) return;
-  openConfirmModal(`"${item.fileName}" 파일을 삭제할까요?`, async function(){
-    docTemplatesCache = (docTemplatesCache||[]).filter(t=>t.id!==id);
-    await saveDocTemplates();
-    closeModal();
-    renderDocTemplatesWrap();
-    flash('삭제되었습니다');
-  }, '삭제');
-}
-async function renderDocTemplatesWrap(force){
-  const wrap = document.getElementById('doc-templates-wrap');
-  if(!wrap) return;
-  wrap.innerHTML = `<p class="muted" style="font-size:12.5px;">불러오는 중…</p>`;
-  const list = await loadDocTemplates(force);
-  const wrapNow = document.getElementById('doc-templates-wrap');
-  if(!wrapNow) return; // 그 사이 화면을 벗어난 경우
-  const totalKB = list.reduce((s,t)=>s+(t.sizeKB||0), 0);
-  const cardHtml = t=>`
-    <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;">
-      <div style="font-weight:700;font-size:13.5px;margin-bottom:4px;">${escR(t.fileName)}</div>
-      <div class="muted" style="font-size:11.5px;margin-bottom:8px;">${t.sizeKB}KB · ${escR(t.uploadedDate||'-')} · ${escR(t.uploadedBy||'-')}</div>
-      <div class="btn-row">
-        <button class="btn sm primary" onclick="downloadDocTemplate('${t.id}')">다운로드</button>
-        <button class="btn sm danger" onclick="removeDocTemplate('${t.id}')">삭제</button>
-      </div>
-    </div>`;
-  const rows = list.length===0 ? `<div class="empty">등록된 양식이 없습니다.</div>` : `<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:8px;">${list.map(cardHtml).join('')}</div>`;
-  wrapNow.innerHTML = `
-    <details class="info-toggle"><summary></summary><p class="muted">견적서·관리문서 등 자주 쓰는 엑셀/문서 양식을 올려두면, 팀원 누구나 다운로드해서 쓸 수 있습니다. 파일 1개당 최대 5MB까지 올릴 수 있습니다.</p></details>
-    <div class="muted" style="font-size:12.5px;margin-top:6px;">(총 ${list.length}개 · ${(totalKB/1024).toFixed(1)}MB) <button type="button" class="btn sm" onclick="renderDocTemplatesWrap(true)">🔄 목록 새로고침</button></div>
-    <div class="consumable-row" style="margin-bottom:10px;">
-      <input type="file" id="f-doctpl-file" accept=".xlsx,.xls,.doc,.docx,.pdf,.hwp,.ppt,.pptx" onchange="uploadDocTemplate()">
-    </div>
-    ${rows}
-  `;
-}
 function updateDateTimeIndicator(){
   const el = document.getElementById('datetime-indicator');
   if(!el) return;
@@ -3812,11 +3714,6 @@ function voltageButtonsHtml(targetInputId, opts){
     return `<button type="button" style="${btnStyle}" onclick="document.getElementById('${targetInputId}').value='${v}'">${v}</button>`;
   }).join('')}</div>`;
 }
-function dateQuickButtonsHtml(fnName){
-  return `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:nowrap;">${[1,2,3].map(n=>
-    `<button type="button" style="flex:1;min-width:0;padding:4px 2px;font-size:11px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface);cursor:pointer;" onclick="${fnName}(${n})">${n}일후</button>`
-  ).join('')}</div>`;
-}
 function suppliesPickerHtml(prefix, currentItems, currentCustom, genModel){
   const initialSelections = [];
   (currentItems||[]).forEach(it=>{ if(it && it.name) initialSelections.push({name: it.name, qty: it.qty||1, tracked: true}); });
@@ -4119,7 +4016,7 @@ function renderContent(){
   if(currentTab==='materials') { renderPartsStockTable(); renderSuppliesCatalogTable(); }
   if(currentTab==='consumable-order') renderConsumableOrderTable();
   if(currentTab==='improvements') renderImprovementsList();
-  if(currentTab==='settings'){ renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderDocTemplatesWrap(); renderQuickOrderQr(); renderVoiceSelect(); }
+  if(currentTab==='settings'){ renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderQuickOrderQr(); renderVoiceSelect(); }
   if(currentTab==='dashboard') renderRecentMaint();
   if(currentTab==='notice'){ renderNoticeList(); renderCalendar(); }
   restoreFocusState(_focus);
@@ -4584,11 +4481,22 @@ function tankCapacityL(g){
   const {width:w, depth:d, height:h} = tankDimsOf(g);
   return (w>0 && d>0 && h>0) ? Math.round(w*d*h/1000) : null;
 }
-// 총중량(톤): 설정 → 연료탱크 규격에서 모델별로 입력한 값
+// 총중량(톤): 설정 → 모델별 제원에서 모델별로 입력한 값
 function genWeightT(g){
   if(g && g.weightT>0) return g.weightT;
   const m = (g && DB.materials[g.model]) || {};
   return m.weightT>0 ? m.weightT : null;
+}
+// 시간당 연료소모량(L/h): 설정 → 모델별 제원에서 모델별로 입력한 값
+function genFuelPerHour(g){
+  const m = (g && DB.materials[g.model]) || {};
+  return m.fuelPerHour>0 ? m.fuelPerHour : null;
+}
+function fuelPerHourCellHtml(g){
+  const v = genFuelPerHour(g);
+  return v!=null
+    ? `<span style="font-weight:700;white-space:nowrap;">${v.toLocaleString()}L/h</span>`
+    : '<span class="muted" style="font-size:11.5px;white-space:nowrap;">미입력</span>';
 }
 function tankCapacityCellHtml(g){
   const cap = tankCapacityL(g);
@@ -5216,6 +5124,7 @@ function renderMaintList(){
     return `<tr>
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
+      <td>${fuelPerHourCellHtml(g)}</td>
       <td>${tankCapacityCellHtml(g)}</td>
       <td>${(()=>{ const wt = genWeightT(g); return wt ? `<span style="font-weight:700;white-space:nowrap;">${wt}t</span>` : '<span class="muted" style="font-size:11.5px;white-space:nowrap;">미입력</span>'; })()}</td>
       <td class="muted" style="font-size:12px;">${g.status==='in'?'입고':'출고중'}</td>
@@ -5236,7 +5145,7 @@ function renderMaintList(){
     ${capacityButtonsHtml}
     ${sorted.length===0 ? `<div class="empty">${maintCapacityFilter!=null? `${maintCapacityFilter}kW 용량의 발전기가 없습니다.` : '검색 결과가 없습니다.'}</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
+      <thead><tr><th>번호</th><th>모델</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`}`;
 }
@@ -5975,7 +5884,13 @@ function resetEverything(){
       saveWithRetry(saveSuppliesStock);
       saveWithRetry(saveSuppliesSizes);
       saveWithRetry(saveSuppliesSpecs);
-      saveWithRetry(saveVehicleTypes);
+      saveWithRetry(saveSuppliesCategories);
+      saveWithRetry(savePartsUnit);
+      saveWithRetry(savePartsCategory);
+      saveWithRetry(saveCustomerNotes);
+      saveWithRetry(saveReadMarkers);
+      saveWithRetry(saveReturnRequests);
+      saveWithRetry(saveIncomingSmsOrders);
       saveWithRetry(saveModelColors);
       saveWithRetry(saveNotices);
       saveWithRetry(saveCalendarEvents);
@@ -6207,9 +6122,8 @@ function handleRestoreFile(input){
       await saveConsumableOrders();
       await saveSuppliesCatalog();
       await saveSuppliesStock();
-      await saveVehicleTypes();
-      await saveVehicleSuggestEnabled();
-      await saveGenSizeDisplayEnabled();
+      await savePartsUnit();
+      await savePartsCategory();
       await saveModelColors();
       await saveNotices();
       await saveCalendarEvents();
@@ -6218,6 +6132,12 @@ function handleRestoreFile(input){
       await saveSuppliesSpecs();
       await saveOrderMarks();
       await saveImprovements();
+      await saveSuppliesCategories();
+      await saveCustomerNotes();
+      await saveReadMarkers();
+      await saveReturnRequests();
+      await saveIncomingSmsOrders();
+      await saveCancelOutHistory();
       await saveCompanyInfo();
       applyCompanyBranding();
       renderTabbar();
@@ -6731,8 +6651,8 @@ function renderManualTab(){
       ['발전기 모델 설정', '번호별 모델(용량), 년식, 정격대비사용을 입력합니다. "관리" 버튼으로 번호(ID) 수정, 매각/폐기 처리, 완전 삭제(등록을 잘못했을 때만)까지 한 곳에서 할 수 있습니다. 폐기 처리시 폐기일자·폐기업체명·전화번호·처리방법·폐기사유·폐차수익을 함께 기록할 수 있습니다.'],
       ['모델별 색상 설정', '모델마다 색상을 지정하면 발전기 목록(입고/출고중/출고대기 등)에서 모델명 옆에 색상 점으로 표시되어 구분하기 쉽습니다. 용량대별로 묶어서 모델명과 함께 보여줍니다.'],
       ['발전기별 색상 고정', '특정 발전기 번호에 색을 고정하면, 모델명이 바뀌거나 그 모델의 색상이 바뀌어도 그 발전기만은 항상 지정한 색으로 표시됩니다. 모델별 색상보다 우선 적용됩니다. 번호·색상을 등록하는 카드와, 지금 색상이 지정된 발전기 목록을 보여주는 카드가 나란히 있습니다.'],
-      ['연료탱크 규격 · 전압 설정 방법', '모델별 탱크 크기(자동 연료환산용), 220V/380V/380V 이상/기타참고 셋팅법 사진(종류별 최대 3장)을 등록합니다. 사진 등록·수정·삭제는 이 화면(설정)에서만 가능하며, 입고 목록의 전압 클릭·입고 처리 화면에는 등록된 사진이 보기 전용(클릭하면 크게 보기)으로만 나타납니다.'],
-      ['발전기별 탱크 규격 · 기준높이 (개별 설정)', '같은 모델이라도 실제 탱크 크기가 다른 발전기가 있으면, 왼쪽 카드에서 번호로 찾아 그 발전기만 가로×세로×높이와 바닥 기준높이(모델 기본값과 다른 경우)를 한 번에 입력할 수 있습니다. 비워두면 위 "연료탱크 규격 · 전압 설정 방법"에서 등록한 모델 기본값이 그대로 적용됩니다. 계산되는 "남은 연료량"은 이 기준높이만큼(항상 남아있어 실제로 쓸 수 없는 양)을 자동으로 빼고 계산됩니다. 개별 설정된 발전기는 오른쪽 카드 목록에 바로 표시되고, "삭제" 버튼으로 지울 수 있습니다. 높이가 세로(깊이)에 비해 유난히 낮게 입력된 경우(세로·높이를 바꿔 입력하는 실수가 흔함) 그 항목이 빨간색으로 표시되어 바로 눈에 띕니다.'],
+      ['모델별 제원 (탱크 · 총중량 · 연료소모량) · 전압 설정', '모델별 탱크 크기(자동 연료환산용), 총중량, 시간당 연료소모량(L/h), 220V/380V/380V 이상/기타참고 셋팅법 사진(종류별 최대 3장)을 등록합니다. 사진 등록·수정·삭제는 이 화면(설정)에서만 가능하며, 입고 목록의 전압 클릭·입고 처리 화면에는 등록된 사진이 보기 전용(클릭하면 크게 보기)으로만 나타납니다.'],
+      ['발전기별 탱크 규격 · 기준높이 (개별 설정)', '같은 모델이라도 실제 탱크 크기가 다른 발전기가 있으면, 왼쪽 카드에서 번호로 찾아 그 발전기만 가로×세로×높이와 바닥 기준높이(모델 기본값과 다른 경우)를 한 번에 입력할 수 있습니다. 비워두면 위 "모델별 제원 (탱크 · 총중량 · 연료소모량) · 전압 설정"에서 등록한 모델 기본값이 그대로 적용됩니다. 계산되는 "남은 연료량"은 이 기준높이만큼(항상 남아있어 실제로 쓸 수 없는 양)을 자동으로 빼고 계산됩니다. 개별 설정된 발전기는 오른쪽 카드 목록에 바로 표시되고, "삭제" 버튼으로 지울 수 있습니다. 높이가 세로(깊이)에 비해 유난히 낮게 입력된 경우(세로·높이를 바꿔 입력하는 실수가 흔함) 그 항목이 빨간색으로 표시되어 바로 눈에 띕니다.'],
       ['폐기된/매각된 발전기', '처리된 발전기 목록입니다. "복원" 버튼으로 다시 살릴 수 있습니다.']
     ])}
 
@@ -7580,7 +7500,7 @@ function renderSettingsTab(){
     </div>
 
     <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">⛽ 연료탱크 규격 · 전압 설정 방법 <span class="cnt">${[...new Set(activeList.map(g=>g.model).filter(Boolean))].length}종</span></div>
+      <div class="section-title" style="margin-top:0;">⛽ 모델별 제원 (탱크 · 총중량 · 연료소모량) · 전압 설정 <span class="cnt">${[...new Set(activeList.map(g=>g.model).filter(Boolean))].length}종</span></div>
       <details class="info-toggle"><summary></summary><p class="muted">모델별로 한 번만 입력하면, 그 모델을 쓰는 모든 발전기에 동일하게 적용됩니다. 탱크 내부 가로·세로(cm)를 입력해두면 입고 처리시 기름 높이만 재서 남은 연료량(L)을 자동으로 계산합니다. (직육면체 탱크 기준) 220V/380V/380V 이상 출력 셋팅방법을 각각 사진으로 등록해두면 입고/출고 처리 화면에서 누구나 클릭해서 볼 수 있습니다.</p></details>
       ${(()=>{
         const models = sortModelsByCapacity([...new Set(activeList.map(g=>g.model).filter(Boolean))]);
@@ -7629,6 +7549,9 @@ function renderSettingsTab(){
               <span style="font-weight:700;color:var(--ink);white-space:nowrap;">🏋️ 총중량</span>
               <input type="number" min="0" step="0.1" value="${m.weightT||''}" placeholder="예: 2.5" style="width:64px;padding:6px 6px;text-align:center;flex:none;border:1px solid ${weightEmpty?'var(--warn)':'var(--border-strong)'};border-radius:6px;font-size:14px;font-family:var(--sans);background:${weightEmpty?'var(--warn-tint)':'#fff'};color:var(--ink);" onchange="updateModelTankDim('${escM}','weightT', this.value)">
               <span class="muted">t (톤)</span>
+              <span style="font-weight:700;color:var(--ink);white-space:nowrap;margin-left:14px;">⛽ 연료소모량</span>
+              <input type="number" min="0" step="0.1" value="${m.fuelPerHour||''}" placeholder="예: 12" style="width:64px;padding:6px 6px;text-align:center;flex:none;border:1px solid ${!(m.fuelPerHour>0)?'var(--warn)':'var(--border-strong)'};border-radius:6px;font-size:14px;font-family:var(--sans);background:${!(m.fuelPerHour>0)?'var(--warn-tint)':'#fff'};color:var(--ink);" onchange="updateModelTankDim('${escM}','fuelPerHour', this.value)">
+              <span class="muted">L/h (시간당)</span>
             </div>`;
           const guideRow = `<div style="display:flex;align-items:flex-start;flex-wrap:wrap;gap:4px;margin-top:8px;">${VOLTAGE_GUIDE_KINDS.map(k=>guideBtn(model,escM,m,k)).join('')}</div>`;
           return `<div class="material-card" style="background:var(--surface-2);">
@@ -8064,7 +7987,7 @@ function voltageGuideGalleryHtml(model){
     const label = VOLTAGE_GUIDE_LABELS[kind];
     return `<button type="button" class="btn sm" style="margin:3px 4px 3px 0;color:var(--primary-dark);border-color:var(--primary);" onclick="viewVoltageGuidePhoto('${escM}','${kind}',0)">${label} (${photos.length}장)</button>`;
   }).join('');
-  if(!blocks) return `<div class="hint" style="margin-top:8px;">등록된 전압 설정 방법 사진이 없습니다. (설정 → 연료탱크 규격 · 전압 설정 방법에서 등록할 수 있습니다)</div>`;
+  if(!blocks) return `<div class="hint" style="margin-top:8px;">등록된 전압 설정 방법 사진이 없습니다. (설정 → 모델별 제원 (탱크 · 총중량 · 연료소모량) · 전압 설정에서 등록할 수 있습니다)</div>`;
   return `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
     <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:4px;">🔧 전압 설정 방법 (모델: ${escR(model)})</div>
     <div class="hint" style="margin:0 0 6px;">사진을 보시려면 글자 클릭</div>
@@ -8091,7 +8014,7 @@ function openVoltageGuidePicker(model){
       <div class="modal-sub">${escR(model)}</div>
       <div class="hint" style="margin:0 0 6px;">사진을 보시려면 글자 클릭</div>
       <div>${rows}</div>
-      <div class="hint" style="margin-top:8px;">사진 등록·수정·삭제는 [설정 → 연료탱크 규격 · 전압 설정 방법]에서 할 수 있습니다.</div>
+      <div class="hint" style="margin-top:8px;">사진 등록·수정·삭제는 [설정 → 모델별 제원 (탱크 · 총중량 · 연료소모량) · 전압 설정]에서 할 수 있습니다.</div>
       <div class="modal-actions">
         <button class="btn primary" onclick="closeModal()">닫기</button>
       </div>
@@ -11489,21 +11412,6 @@ function openBulkOutModal(){
     </div>
   </div>`;
 }
-function setBulkOutDate(daysFromNow){
-  const outEl = document.getElementById('fb-outdate');
-  if(!outEl) return;
-  const d = new Date();
-  d.setDate(d.getDate()+daysFromNow);
-  outEl.value = toLocalDateStr(d);
-  syncBulkReturnDateToUsageDays();
-}
-function setBulkLoadDate(daysFromNow){
-  const el = document.getElementById('fb-loaddate');
-  if(!el) return;
-  const d = new Date();
-  d.setDate(d.getDate()+daysFromNow);
-  el.value = toLocalDateStr(d);
-}
 function onBulkArriveTimeSelect(){
   const sel = document.getElementById('fb-arrivetime-select');
   const input = document.getElementById('fb-arrivetime');
@@ -11551,9 +11459,6 @@ function toggleBulkForceOutField(){
 function toggleBulkForceOutReason(){
   const on = document.getElementById('fb-force-out').checked;
   document.getElementById('fb-force-reason-wrap').style.display = on ? 'block' : 'none';
-}
-function toggleBulkLongtermField(){
-  // 예상가동시간 입력칸이 항상 보이도록 옮겨서 더 이상 이 필드를 토글하지 않습니다.
 }
 async function submitBulkOut(){
   const ids = [...bulkOutSelection];
@@ -12468,6 +12373,8 @@ function openPrevRentalPopup(id){
 }
 function openInModal(id, isTransfer){
   const g = findGen(id);
+  // 다른 팀원이 방금 입고 처리해서 이미 출고중이 아닌 경우(화면이 아직 갱신 전) 오류 대신 안내합니다.
+  if(!g || g.status!=='out' || !g.rental){ flash('이미 입고 처리되었거나 출고중이 아닌 발전기입니다'); renderContent(); return; }
   const suggested = Math.round(estCurrentHours(g));
   const rt = g.rental;
   const tankDims = tankDimsOf(g);
@@ -13505,11 +13412,6 @@ function setVoiceAlertIntervalMin(v){
   localStorage.setItem('voiceAlertIntervalMin', n);
   restartVoiceAlertTimer();
 }
-function getVoiceAlertRange(){
-  return { start: localStorage.getItem('voiceAlertStartTime') || '08:00', end: localStorage.getItem('voiceAlertEndTime') || '18:00' };
-}
-function setVoiceAlertStartTime(v){ localStorage.setItem('voiceAlertStartTime', v||'08:00'); }
-function setVoiceAlertEndTime(v){ localStorage.setItem('voiceAlertEndTime', v||'18:00'); }
 function isWithinVoiceAlertHours(){
   return true; // 시작/종료 시간 제한을 없애고 항상 알림이 울리도록 변경 (사무실 PC 전용이라 시간 제한이 필요 없음)
 }
