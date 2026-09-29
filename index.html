@@ -2691,12 +2691,27 @@ function buildSmsHref(body){
 }
 // 문자에 "2대", "두대"처럼 수량이 적혀있으면 인식해서, 그 대수만큼 출고대기 건을 나눠 등록합니다.
 // (발전기 1대 = 출고대기 1건 구조라, 여러 대 주문은 여러 건으로 만들어야 각각 다른 발전기를 배정할 수 있습니다)
+// 문자에서 발전기 대수를 찾습니다. 같은 줄 안에서만 찾고(줄바꿈 너머 "3⏎대운산…"을 3대로 읽던 버그 수정),
+// "ATS 2대"·"*연료(3대가득)"처럼 부자재/연료 줄의 수량은 발전기 대수로 보지 않습니다.
 function detectSmsQty(text){
-  const digitMatch = text.match(/(\d+)\s*대(?!\s*표|리)/); // "대표"·"대리" 같은 오탐 방지
-  if(digitMatch){ const n = parseInt(digitMatch[1],10); if(n>=1 && n<=10) return n; }
   const numMap = {한:1,하나:1,두:2,세:3,네:4,다섯:5,여섯:6,일곱:7,여덟:8,아홉:9,열:10};
-  const koreanMatch = text.match(/(한|하나|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*대(?!\s*표|리)/);
-  if(koreanMatch && numMap[koreanMatch[1]]) return numMap[koreanMatch[1]];
+  const qtyIn = line=>{
+    const dm = line.match(/(?:^|[^\d.\-])(\d{1,2})[ \t]*대(?![ \t]*(표|리|기|운|작|형|로|교|학|전))/);
+    if(dm){ const n = parseInt(dm[1],10); if(n>=1 && n<=10) return n; }
+    const km = line.match(/(?:^|[^가-힣])(한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)[ \t]*대(?![ \t]*(표|리|기|운|작|형|로|교|학|전))/);
+    if(km && numMap[km[1]]) return numMap[km[1]];
+    return 0;
+  };
+  // "150kw 2대, 350kw 3대, 500kw 1대 총 7대"처럼 용량이 여러 가지 섞인 오더는 똑같은 건 N개로 나누면 안 되니
+  // 1건으로만 등록합니다(대수·용량은 사무실에서 원문 보고 배정).
+  const capQty = [...String(text||'').matchAll(/(\d+(?:\.\d+)?)\s*(kw|키로)[^\n,]*?(\d{1,2})[ \t]*대/gi)].map(m=>m[1]);
+  if(new Set(capQty).size >= 2) return 1;
+  const lines = String(text||'').split(/\n/).map(l=>l.trim()).filter(Boolean);
+  const skipRe = /(ATS|케이블|전선|분전반|분전함|휀스|펜스|연료|말통|가닥|sq)/i;
+  // ① 용량이 적힌 줄("50키로 380볼트 2대") ② "2대"만 있거나 "2대 ,"로 시작하는 줄 순서로 봅니다.
+  for(const l of lines){ if(/\d\s*(키로|kw)/i.test(l)){ const n = qtyIn(l.replace(/\([^)]*\)/g,'')); if(n) return n; } }
+  for(const l of lines){ if(/^(\d{1,2}|한|두|세|네)[ \t]*대(\s|,|$)/.test(l)){ const n = qtyIn(l); if(n) return n; } }
+  for(const l of lines){ if(!skipRe.test(l)){ const n = qtyIn(l); if(n) return n; } }
   return 1;
 }
 async function submitQuickOrder(){
