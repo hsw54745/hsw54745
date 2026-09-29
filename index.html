@@ -4569,6 +4569,12 @@ function tankCapacityL(g){
   const {width:w, depth:d, height:h} = tankDimsOf(g);
   return (w>0 && d>0 && h>0) ? Math.round(w*d*h/1000) : null;
 }
+// 총중량(톤): 설정 → 연료탱크 규격에서 모델별로 입력한 값
+function genWeightT(g){
+  if(g && g.weightT>0) return g.weightT;
+  const m = (g && DB.materials[g.model]) || {};
+  return m.weightT>0 ? m.weightT : null;
+}
 function tankCapacityCellHtml(g){
   const cap = tankCapacityL(g);
   return cap!=null
@@ -5188,7 +5194,7 @@ function renderMaintList(){
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
       <td>${tankCapacityCellHtml(g)}</td>
-      <td>${g.weightT>0 ? `<span style="font-weight:700;white-space:nowrap;">${g.weightT}t</span>` : '<span class="muted" style="font-size:11.5px;white-space:nowrap;">미입력</span>'}</td>
+      <td>${(()=>{ const wt = genWeightT(g); return wt ? `<span style="font-weight:700;white-space:nowrap;">${wt}t</span>` : '<span class="muted" style="font-size:11.5px;white-space:nowrap;">미입력</span>'; })()}</td>
       <td class="muted" style="font-size:12px;">${g.status==='in'?'입고':'출고중'}</td>
       <td>${known? gaugeHtml(el,rem,getCycle(g),g.status!=='in' && g.rental && g.rental.estDaily>0) : unknownCellHtml}</td>
       <td>${known? pillHtml(maintStatus(rem)) : unknownPillHtml}</td>
@@ -7454,10 +7460,10 @@ function renderSettingsTab(){
         const modelRowHtml = g=>{
           const cap = capacityOf(g);
           const ratioOptions = [100,90,80,70,60,50,40,30].map(r=>`<option value="${r}" ${(g.usageRatio||100)===r?'selected':''}>${r}%</option>`).join('');
-          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="0" max="100" step="0.1" value="${g.weightT>0? g.weightT : ''}" placeholder="예: 2.5" onchange="updateGenWeight('${g.id}', this.value)" style="text-align:right;"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·장기임대 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
+          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·장기임대 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
         };
         const half = Math.ceil(activeList.length/2);
-        const thead = `<thead><tr><th style="width:42px;">번호</th><th style="width:112px;">모델/용량</th><th style="width:62px;">총중량(t)</th><th style="width:56px;">년식</th><th style="width:78px;">정격대비사용</th><th style="width:64px;">가동시간<br>확인가능</th><th style="width:74px;"></th></tr></thead>`;
+        const thead = `<thead><tr><th style="width:42px;">번호</th><th style="width:112px;">모델/용량</th><th style="width:56px;">년식</th><th style="width:78px;">정격대비사용</th><th style="width:64px;">가동시간<br>확인가능</th><th style="width:74px;"></th></tr></thead>`;
         return `<div class="util-two-col model-settings-table">
           <div class="settings-table"><table>${thead}<tbody>${activeList.slice(0,half).map(modelRowHtml).join('')}</tbody></table></div>
           <div class="settings-table"><table>${thead}<tbody>${activeList.slice(half).map(modelRowHtml).join('')}</tbody></table></div>
@@ -7595,6 +7601,12 @@ function renderSettingsTab(){
               <span class="muted">cm</span>
               <span class="muted" style="white-space:nowrap;">— 탱크 바닥에 항상 남아있는 기름 높이. 개별 발전기가 다르면 아래 "발전기별 탱크 규격 · 기준높이"에서 따로 설정하세요.</span>
             </div>`;
+          const weightEmpty = !(m.weightT>0);
+          const weightRow = `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12.5px;margin-top:6px;">
+              <span style="font-weight:700;color:var(--ink);white-space:nowrap;">🏋️ 총중량</span>
+              <input type="number" min="0" step="0.1" value="${m.weightT||''}" placeholder="예: 2.5" style="width:64px;padding:6px 6px;text-align:center;flex:none;border:1px solid ${weightEmpty?'var(--warn)':'var(--border-strong)'};border-radius:6px;font-size:14px;font-family:var(--sans);background:${weightEmpty?'var(--warn-tint)':'#fff'};color:var(--ink);" onchange="updateModelTankDim('${escM}','weightT', this.value)">
+              <span class="muted">t (톤)</span>
+            </div>`;
           const guideRow = `<div style="display:flex;align-items:flex-start;flex-wrap:wrap;gap:4px;margin-top:8px;">${VOLTAGE_GUIDE_KINDS.map(k=>guideBtn(model,escM,m,k)).join('')}</div>`;
           return `<div class="material-card" style="background:var(--surface-2);">
             <div class="m-title"><span>${model} <span class="muted" style="font-size:11px;font-weight:400;">(${genIds.length}대)</span></span></div>
@@ -7603,6 +7615,7 @@ function renderSettingsTab(){
               <div style="flex:1;min-width:0;">${tankRow}</div>
             </div>
             ${baselineRow}
+            ${weightRow}
             ${guideRow}
           </div>`;
         }).join('');
@@ -7991,14 +8004,6 @@ async function toggleHoursKnownSetting(id, checked){
   await saveGens();
   renderContent();
   flash(checked? `${g.id} 가동시간 확인가능으로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 실제 값을 입력해주세요.` : `${g.id} 누적시간 확인불가로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 마지막 엔진오일교체일을 입력해주세요.`);
-}
-// 발전기 무게(톤, t). 비우거나 0 이하면 삭제합니다.
-async function updateGenWeight(id, value){
-  const g = findGen(id);
-  const v = Number(String(value||'').replace(/[^0-9.]/g,''));
-  if(v>0) g.weightT = Math.round(v*100)/100; else delete g.weightT;
-  await saveGens();
-  flash('저장되었습니다');
 }
 async function updateManufactureDate(id, value){
   const g = findGen(id);
@@ -9257,10 +9262,26 @@ async function submitMaterials(){
 // ---------- 출고 예약 ----------
 function renderReserveTab(){
   const isRawSms = r => !!(r.smsOrder && !r.arriveTime);
+  // 출고(도착)일이 빠른 순으로 정렬합니다. 화면을 그릴 때마다 다시 정렬하므로 날짜를 고치면 바로 자리가 바뀝니다.
+  // (예전엔 상차일(loadDate)을 먼저 봐서, 예약일을 고쳐도 옛 상차일이 남아 있으면 엉뚱한 자리에 있었습니다)
+  const sortDateOf = r => r.pendingLoad ? (r.outDate||r.loadDate||'') : (r.plannedOutDate||r.outDate||r.loadDate||'');
+  const sortHourOf = r => {
+    const t = String(r.arriveTime||'');
+    if(t.includes('지금')) return 0;
+    const m = t.match(/(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분)?/);
+    if(m){ let h = Number(m[1]); if(t.includes('오후') && h<12) h += 12; return h + (m[2]? Number(m[2])/60 : 0); }
+    if(t.includes('오전')) return 10;
+    if(t.includes('오후')) return 15;
+    return 99; // 시간 모름은 같은 날짜 안에서 맨 뒤
+  };
   const list = [...DB.reservations].sort((a,b)=>{
+    // 아직 사무실에서 확인 안 한 문자오더(도착시간 미입력)는 예약일이 등록한 날로 임시로 들어가 있어서 맨 아래에 둡니다.
     const aRaw = isRawSms(a), bRaw = isRawSms(b);
-    if(aRaw !== bRaw) return aRaw ? 1 : -1; // 아직 도착일 확인 안 된 문자오더는 맨 아래로 정렬
-    return ((a.loadDate||a.outDate||a.plannedOutDate||'')).localeCompare((b.loadDate||b.outDate||b.plannedOutDate||''));
+    if(aRaw !== bRaw) return aRaw ? 1 : -1;
+    const da = sortDateOf(a), db = sortDateOf(b);
+    if(!da !== !db) return da ? -1 : 1; // 날짜가 아예 없는 건(아직 확인 안 된 문자오더 등)은 맨 아래
+    if(da !== db) return da.localeCompare(db);
+    return sortHourOf(a) - sortHourOf(b);
   });
   const dateOf = r => r.pendingLoad ? (r.loadDate||r.outDate) : r.plannedOutDate;
   const delayedCount = list.filter(r=>!isRawSms(r) && dateOf(r) && daysFromToday(dateOf(r))<0).length;
