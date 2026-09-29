@@ -9532,16 +9532,62 @@ function openAssignGenModal(resId){
     <div class="modal">
       <h3>🔧 발전기 배정</h3>
       <div class="modal-sub">${escR(r.customer||r.site||'-')} · 출고예약</div>
-      <div class="field" style="text-align:left;">
-        <label>배정할 발전기 (현재 입고 상태만 표시됩니다)</label>
-        <select id="f-assign-gen">${candidates.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('')}</select>
-      </div>
+      <input type="hidden" id="f-assign-gen" value="${candidates[0].id}">
+      <div id="assign-picked" style="text-align:left;margin-top:6px;padding:8px 12px;border-radius:10px;background:var(--primary-tint);font-size:14px;">선택한 발전기: <b>${candidates[0].id}</b> · ${escR(candidates[0].model||'미설정')}</div>
+      ${assignGenCapacityBoardHtml(candidates)}
       <div class="modal-actions">
         <button class="btn" onclick="closeModal()">취소</button>
         <button class="btn primary" onclick="confirmAssignGen('${resId}')">다음 (출고 정보 입력)</button>
       </div>
     </div>
   </div>`;
+}
+// 발전기 배정 창 아래에 "현재 입고된 발전기"를 용량별로 전부 보여주고, 눌러서 바로 선택할 수 있게 합니다.
+// 수리중이거나 이미 다른 예약에 잡힌 발전기도 보이지만 회색으로 표시되고 선택은 안 됩니다.
+function assignGenCapacityBoardHtml(candidates){
+  const okIds = new Set(candidates.map(x=>x.id));
+  const inGens = activeGens().filter(x=>x.status==='in');
+  const groups = {};
+  inGens.forEach(g=>{ const cap = capacityOf(g); (groups[cap] = groups[cap] || []).push(g); });
+  const caps = Object.keys(groups).map(Number).sort((a,b)=>a-b);
+  const firstId = candidates.length ? candidates[0].id : '';
+  const rows = caps.map(cap=>{
+    const list = groups[cap].sort(sortByIdNatural);
+    const okCnt = list.filter(g=>okIds.has(g.id)).length;
+    const chips = list.map(g=>{
+      if(okIds.has(g.id)){
+        const on = g.id===firstId;
+        return `<button type="button" class="assign-chip" data-gen="${g.id}" onclick="pickAssignGen('${g.id}')" title="${escR(g.model||'')}"
+          style="padding:5px 9px;border-radius:14px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;border:1.5px solid var(--primary);${on?'background:var(--primary);color:#fff;':'background:#fff;color:var(--primary);'}">${g.id}</button>`;
+      }
+      const why = g.underRepair ? '수리중' : '예약됨';
+      return `<span title="${escR(g.model||'')} · ${why}" style="padding:5px 9px;border-radius:14px;font-size:12px;white-space:nowrap;border:1.5px dashed #bbb;color:#999;background:#f4f4f4;">${g.id} <small>${why}</small></span>`;
+    }).join('');
+    const label = cap===Infinity ? '용량 미설정' : `${cap}kW`;
+    return `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line, #e5e5e5);">
+      <div style="min-width:74px;font-weight:800;font-size:13px;padding-top:5px;">${label}<div class="muted" style="font-size:11px;font-weight:400;">${okCnt}/${list.length}대 가능</div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>
+    </div>`;
+  }).join('');
+  return `<div style="text-align:left;margin-top:12px;">
+    <div style="font-weight:800;font-size:13.5px;margin-bottom:4px;">📋 현재 입고된 발전기 (용량별) · 눌러서 선택</div>
+    <div style="max-height:320px;overflow-y:auto;">${rows || '<div class="muted">입고된 발전기가 없습니다.</div>'}</div>
+  </div>`;
+}
+function pickAssignGen(id){
+  const sel = document.getElementById('f-assign-gen');
+  if(sel){ sel.value = id; }
+  highlightAssignChip(id);
+}
+function highlightAssignChip(id){
+  const g = findGen(id);
+  const box = document.getElementById('assign-picked');
+  if(box && g) box.innerHTML = `선택한 발전기: <b>${escR(g.id)}</b> · ${escR(g.model||'미설정')}`;
+  document.querySelectorAll('.assign-chip').forEach(b=>{
+    const on = b.dataset.gen===id;
+    b.style.background = on ? 'var(--primary)' : '#fff';
+    b.style.color = on ? '#fff' : 'var(--primary)';
+  });
 }
 function confirmAssignGen(resId){
   const r = DB.reservations.find(x=>x.id===resId);
