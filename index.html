@@ -205,17 +205,15 @@
   .tag-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;}
   .tag{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:2px 7px;font-size:11px;}
   .prep-card{background:var(--warn-tint);border:1px solid var(--warn);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px;}
-  .prep-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start;}
-  @media (max-width:900px){ .prep-cols{grid-template-columns:1fr;} }
+  .prep-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start;}
+  @media (max-width:760px){ .prep-cols{grid-template-columns:1fr;} }
   .prep-col{border:1px solid var(--border);border-radius:var(--radius);background:#fff;overflow:hidden;}
   .prep-col-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-weight:800;font-size:14px;border-bottom:1px solid var(--border);}
   .prep-col-body{padding:10px;}
   .prep-col.c-danger .prep-col-head{background:var(--danger-tint);color:var(--danger);}
   .prep-col.c-warn .prep-col-head{background:var(--warn-tint);color:var(--warn);}
-  .prep-col.c-ok .prep-col-head{background:var(--ok-tint, #E8F5EC);color:var(--ok, #2E7D4F);}
   .prep-col.c-danger .prep-card{background:#fff;border-color:var(--danger);border-left-width:4px;}
   .prep-col.c-warn .prep-card{background:#fff;border-color:var(--warn);border-left-width:4px;}
-  .prep-col.c-ok .prep-card{background:#fff;border-color:var(--border);}
   .prep-col .prep-card:last-child{margin-bottom:0;}
   .prep-col-empty{color:var(--ink-soft);font-size:12.5px;text-align:center;padding:14px 4px;}
   .prep-card .p-head{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:13px;margin-bottom:6px;}
@@ -4718,7 +4716,9 @@ function clearBulkInSelection(){
 function longtermPrepListHtml(){
   // 실측 누적시간이 한 번도 없는 발전기(현재·마지막정비 둘 다 0)는 추정이 의미가 없어 출고중 탭과 같이 제외합니다.
   const ltList = activeGens().filter(g=>g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && g.rental.longTerm && effEstDaily(g)>0);
-  ltList.sort((a,b)=>estRemaining(a)-estRemaining(b));
+  // 정상(여유 있음)은 보여주지 않고, 초과·임박만 모읍니다.
+  const prepList = ltList.filter(g=>maintStatus(estRemaining(g))!=='ok');
+  prepList.sort((a,b)=>estRemaining(a)-estRemaining(b));
   const cardHtml = g=>{
     const rem = estRemaining(g);
     const pred = predictedDate(g);
@@ -4731,9 +4731,8 @@ function longtermPrepListHtml(){
     </div>`;
   };
   const groups = [
-    {key:'danger', title:'🚨 초과', list: ltList.filter(g=>maintStatus(estRemaining(g))==='danger'), empty:'초과된 발전기가 없습니다'},
-    {key:'warn',   title:'⚠️ 임박', list: ltList.filter(g=>maintStatus(estRemaining(g))==='warn'),   empty:'임박한 발전기가 없습니다'},
-    {key:'ok',     title:'✅ 정상', list: ltList.filter(g=>maintStatus(estRemaining(g))==='ok'),     empty:'정상 발전기가 없습니다'}
+    {key:'danger', title:'🚨 초과', list: prepList.filter(g=>maintStatus(estRemaining(g))==='danger'), empty:'초과된 발전기가 없습니다'},
+    {key:'warn',   title:'⚠️ 임박', list: prepList.filter(g=>maintStatus(estRemaining(g))==='warn'),   empty:'임박한 발전기가 없습니다'}
   ];
   const colsHtml = `<div class="prep-cols">${groups.map(gr=>`
     <div class="prep-col c-${gr.key}">
@@ -4741,9 +4740,9 @@ function longtermPrepListHtml(){
       <div class="prep-col-body">${gr.list.length? gr.list.map(cardHtml).join('') : `<div class="prep-col-empty">${gr.empty}</div>`}</div>
     </div>`).join('')}</div>`;
   return `
-    <div id="longterm-prep-anchor" class="section-title">🔧 장기임대 정비 준비 리스트 <span class="cnt">${ltList.length}대</span>${ltList.length>0? ` <button type="button" class="btn sm" onclick="downloadLongtermPrepFile()">🖨 인쇄</button>`:''}</div>
-    <details class="info-toggle"><summary></summary><p class="muted">현장에서 실사용 시간을 바로 알 수 없는 장기임대 발전기를, 예상 사용시간을 기준으로 초과·임박·정상으로 나눠 정비가 급한 순으로 보여줍니다. 방문 정비시 챙길 자재(엔진오일량·필터 품명/규격/수량)가 함께 표시됩니다.</p></details>
-    ${ltList.length===0? `<div class="empty">장기임대 중인 발전기가 없습니다.</div>` : colsHtml}
+    <div id="longterm-prep-anchor" class="section-title">🔧 장기임대 정비 준비 리스트 <span class="cnt">${prepList.length}대</span>${prepList.length>0? ` <button type="button" class="btn sm" onclick="downloadLongtermPrepFile()">🖨 인쇄</button>`:''}</div>
+    <details class="info-toggle"><summary></summary><p class="muted">현장에서 실사용 시간을 바로 알 수 없는 장기임대 발전기를, 예상 사용시간을 기준으로 정비가 필요한(초과) 것과 곧 필요한(임박) 것만 나눠 급한 순으로 보여줍니다. 방문 정비시 챙길 자재(엔진오일량·필터 품명/규격/수량)가 함께 표시됩니다.</p></details>
+    ${ltList.length===0? `<div class="empty">장기임대 중인 발전기가 없습니다.</div>` : prepList.length===0? `<div class="empty">정비가 임박하거나 초과된 장기임대 발전기가 없습니다. (장기임대 ${ltList.length}대 모두 정상)</div>` : colsHtml}
   `;
 }
 function renderOutList(){
@@ -11932,9 +11931,10 @@ function longtermPrepCardPrintHtml(g){
   </div>`;
 }
 function downloadLongtermPrepFile(){
-  const ltList = activeGens().filter(g=>g.hoursKnown && g.status==='out' && g.rental && g.rental.longTerm && effEstDaily(g)>0);
+  // 화면과 같게: 실측값 있는 장기임대 중 초과·임박만 인쇄합니다.
+  const ltList = activeGens().filter(g=>g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && g.rental.longTerm && effEstDaily(g)>0 && maintStatus(estRemaining(g))!=='ok');
   ltList.sort((a,b)=>estRemaining(a)-estRemaining(b));
-  if(ltList.length===0){ showInfoModal('출고중인 장기임대 발전기가 없습니다.'); return; }
+  if(ltList.length===0){ showInfoModal('정비가 임박하거나 초과된 장기임대 발전기가 없습니다.'); return; }
   const cards = ltList.map(longtermPrepCardPrintHtml).join('');
   const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <title>장기임대 정비 준비 리스트</title>
