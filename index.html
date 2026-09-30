@@ -205,6 +205,19 @@
   .tag-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;}
   .tag{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:2px 7px;font-size:11px;}
   .prep-card{background:var(--warn-tint);border:1px solid var(--warn);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px;}
+  .prep-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start;}
+  @media (max-width:900px){ .prep-cols{grid-template-columns:1fr;} }
+  .prep-col{border:1px solid var(--border);border-radius:var(--radius);background:#fff;overflow:hidden;}
+  .prep-col-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-weight:800;font-size:14px;border-bottom:1px solid var(--border);}
+  .prep-col-body{padding:10px;}
+  .prep-col.c-danger .prep-col-head{background:var(--danger-tint);color:var(--danger);}
+  .prep-col.c-warn .prep-col-head{background:var(--warn-tint);color:var(--warn);}
+  .prep-col.c-ok .prep-col-head{background:var(--ok-tint, #E8F5EC);color:var(--ok, #2E7D4F);}
+  .prep-col.c-danger .prep-card{background:#fff;border-color:var(--danger);border-left-width:4px;}
+  .prep-col.c-warn .prep-card{background:#fff;border-color:var(--warn);border-left-width:4px;}
+  .prep-col.c-ok .prep-card{background:#fff;border-color:var(--border);}
+  .prep-col .prep-card:last-child{margin-bottom:0;}
+  .prep-col-empty{color:var(--ink-soft);font-size:12.5px;text-align:center;padding:14px 4px;}
   .prep-card .p-head{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:13px;margin-bottom:6px;}
   .tech-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;}
   .tech-grid .field{min-width:0;}
@@ -1131,8 +1144,7 @@ async function openQmOutDetail(id){
       ['출고일', r.outDate? `${fmtDateKR(r.outDate)}${r.arriveTime? ` (${r.arriveTime})` : ''}` : null],
       ['임대구분', r.longTerm? '장기임대' : '단기임대'],
       ['출고시 누적사용시간', hoursDisplay],
-      ['예상 일일 사용시간', r.longTerm && r.estDaily? `${r.estDaily}h/일` : null],
-      ['연료 요청/실제(L)', (r.fuelRequested!=null || r.fuelActual!=null) ? `요청 ${r.fuelRequested!=null?r.fuelRequested:'-'} / 실제 ${r.fuelActual!=null?r.fuelActual:'-'}` : null],
+            ['연료 요청/실제(L)', (r.fuelRequested!=null || r.fuelActual!=null) ? `요청 ${r.fuelRequested!=null?r.fuelRequested:'-'} / 실제 ${r.fuelActual!=null?r.fuelActual:'-'}` : null],
       ['부자재', r.supplies],
       ['비고', r.note]
     ];
@@ -1881,7 +1893,6 @@ async function openQmEditReservation(resId){
         <div><label style="${labelStyle}">상차일자</label><input id="qmre-loaddate" type="date" style="${inputStyle}" value="${escR(r.loadDate||r.outDate||'')}"></div>
         <div style="display:flex;gap:10px;">
           <div style="flex:1;"><label style="${labelStyle}">사용일수</label><input id="qmre-usagedays" type="number" min="0" style="${inputStyle}" value="${r.usageDays!=null?r.usageDays:''}"></div>
-          <div style="flex:1;"><label style="${labelStyle}">예상가동시간(h/일)</label><input id="qmre-estdaily" type="number" step="0.5" min="0" style="${inputStyle}" value="${r.estDaily!=null?r.estDaily:''}"></div>
         </div>
         <div><label style="${labelStyle}">부자재</label>${suppliesPickerHtml('qmre-supplies', r.suppliesItems, r.suppliesCustom, '')}</div>
         <div><label style="${labelStyle}">비고</label><textarea id="qmre-note" style="${styleFor('note')}" rows="3">${escR(dNote)}</textarea></div>
@@ -1929,7 +1940,7 @@ async function submitQmEditReservation(resId){
   const loadDateEl = document.getElementById('qmre-loaddate');
   const loadDate = (loadDateEl && loadDateEl.value) ? loadDateEl.value : outDate;
   const usageDays = Number(document.getElementById('qmre-usagedays').value)||null;
-  const estDailyRaw = Number(document.getElementById('qmre-estdaily').value||0);
+  const estDailyRaw = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
   const estDaily = estDailyRaw>0 ? estDailyRaw : null;
 
   if(!customer || !address || !phone){
@@ -2303,7 +2314,6 @@ function renderQuickModeReserveUI(){
           <div><label style="${labelStyle}">상차일자</label><input id="qmr-loaddate" type="date" style="${inputStyle}" value="${today}"></div>
           <div style="display:flex;gap:10px;">
             <div style="flex:1;"><label style="${labelStyle}">사용일수</label><input id="qmr-usagedays" type="number" min="0" style="${inputStyle}" placeholder="예: 7" oninput="syncQmrUsageDaysToReturnDate()"></div>
-            <div style="flex:1;"><label style="${labelStyle}">예상가동시간(h/일)</label><input id="qmr-estdaily" type="number" step="0.5" min="0" style="${inputStyle}" placeholder="예: 8"></div>
           </div>
           <div><label style="${labelStyle}">반납 예정일 (선택)</label><input id="qmr-returndate" type="date" style="${inputStyle}" onchange="syncQmrReturnDateToUsageDays()"></div>
           <div><label style="${labelStyle}">부자재</label>${suppliesPickerHtml('qmr-supplies', [], '', '')}</div>
@@ -2451,7 +2461,7 @@ async function submitQuickReserve(){
   const arriveTime = document.getElementById('qmr-arrivetime').value.trim() || null;
   const loadDateEl = document.getElementById('qmr-loaddate');
   const loadDate = (loadDateEl && loadDateEl.value) ? loadDateEl.value : outDate;
-  const estDailyRaw = Number(document.getElementById('qmr-estdaily').value||0);
+  const estDailyRaw = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
   const estDaily = estDailyRaw>0 ? estDailyRaw : null;
 
   if(!customer || !address || !phone){
@@ -2530,7 +2540,7 @@ async function submitQuickReserve(){
     if(smsToggleQmr && smsToggleQmr.checked){
       openQmrSmsCompose({customer, address, manager, phone, voltage, outDate, arriveTime, freightBearer, fuelRequested, fuelActual, note});
     }
-    ['qmr-customer','qmr-address','qmr-manager','qmr-phone','qmr-voltage','qmr-usagedays','qmr-estdaily','qmr-returndate','qmr-note','qmr-fuel-req','qmr-fuel-actual','qmr-arrivetime'].forEach(id=>{
+    ['qmr-customer','qmr-address','qmr-manager','qmr-phone','qmr-voltage','qmr-usagedays','qmr-returndate','qmr-note','qmr-fuel-req','qmr-fuel-actual','qmr-arrivetime'].forEach(id=>{
       const el = document.getElementById(id); if(el) el.value = '';
     });
     const arriveSelEl = document.getElementById('qmr-arrivetime-select'); if(arriveSelEl) arriveSelEl.value = '';
@@ -3507,11 +3517,11 @@ function getEstDailyDefault(longTerm){
   const v = Number(longTerm ? ci.estDailyLong : ci.estDailyShort);
   return v>0 ? v : 0;
 }
-// 실제 추정에 쓰는 하루 사용시간: 출고건에 직접 입력한 값이 있으면 그 값, 비어 있으면 기본값(단기/장기)을 씁니다.
+// 실제 추정에 쓰는 하루 사용시간: 발전기별 개별 값은 쓰지 않고, 단기/장기 기본값만 씁니다.
+// (예전에 저장된 rental.estDaily 값은 무시합니다)
 function effEstDaily(g){
   const r = g && g.rental;
   if(!r) return 0;
-  if(Number(r.estDaily)>0) return Number(r.estDaily);
   return getEstDailyDefault(!!r.longTerm);
 }
 function estCurrentHours(g){
@@ -4107,14 +4117,14 @@ function lowStockBannerHtml(){
 }
 function longtermMaintBannerHtml(){
   const ltUrgent = activeGens().filter(g=>{
-    if(!(g.hoursKnown && g.status==='out' && g.rental && g.rental.longTerm && effEstDaily(g)>0)) return false;
+    if(!(g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && g.rental.longTerm && effEstDaily(g)>0)) return false;
     return maintStatus(estRemaining(g))!=='ok';
   });
   if(ltUrgent.length===0) return '';
   const dangerN = ltUrgent.filter(g=>maintStatus(estRemaining(g))==='danger').length;
   return `
     <div class="detail-card" style="background:var(--danger-tint);border-color:var(--danger);margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-      <div style="font-size:13px;color:var(--danger);font-weight:700;">🛠 장기임대 정비 임박 ${ltUrgent.length}대${dangerN>0? ` (정비필요 ${dangerN}대)`:''} — 방문 정비 준비가 필요합니다.</div>
+      <div style="font-size:13px;color:var(--danger);font-weight:700;">🛠 장기임대 정비 임박 ${ltUrgent.length}대${dangerN>0? ` (초과 ${dangerN}대)`:''} — 방문 정비 준비가 필요합니다.</div>
       <button class="btn sm danger" onclick="switchTab('maint');setTimeout(()=>document.getElementById('longterm-prep-anchor')?.scrollIntoView({behavior:'smooth',block:'start'}),50);">정비 준비 리스트 보기</button>
     </div>`;
 }
@@ -4706,21 +4716,34 @@ function clearBulkInSelection(){
   renderContent();
 }
 function longtermPrepListHtml(){
-  const ltList = activeGens().filter(g=>g.hoursKnown && g.status==='out' && g.rental && g.rental.longTerm && effEstDaily(g)>0);
+  // 실측 누적시간이 한 번도 없는 발전기(현재·마지막정비 둘 다 0)는 추정이 의미가 없어 출고중 탭과 같이 제외합니다.
+  const ltList = activeGens().filter(g=>g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && g.rental.longTerm && effEstDaily(g)>0);
   ltList.sort((a,b)=>estRemaining(a)-estRemaining(b));
-  const ltHtml = ltList.map(g=>{
+  const cardHtml = g=>{
     const rem = estRemaining(g);
     const pred = predictedDate(g);
+    const remTxt = rem<=0 ? `<b style="color:var(--danger);">${Math.round(-rem)}h 초과</b>` : `<b>${Math.round(rem)}h 남음</b>`;
     return `<div class="prep-card">
-      <div class="p-head"><span>${g.id} · ${displayModel(g)} · ${escR(g.rental.customer||'거래처 미기재')}</span>${pillHtml(maintStatus(rem))}</div>
-      <div class="muted" style="font-size:12px;margin-bottom:6px;">${[g.rental.manager,g.rental.phone].filter(Boolean).join(' · ')||'담당자 미기재'} · <b>${g.rental.site||'-'}</b> · 예상 정비 도래: ${pred.overdue? '초과됨':`${dow(pred.date)} (약 ${pred.days}일 후)`}</div>
+      <div class="p-head"><span>${g.id} · ${displayModel(g)}</span>${remTxt}</div>
+      <div style="font-size:12.5px;font-weight:700;margin-bottom:2px;">${escR(g.rental.customer||'거래처 미기재')} · ${escR(g.rental.site||'-')}</div>
+      <div class="muted" style="font-size:12px;margin-bottom:6px;">${escR([g.rental.manager,g.rental.phone].filter(Boolean).join(' · ')||'담당자 미기재')} · 예상 정비 도래: ${pred.overdue? '<b style="color:var(--danger);">이미 도래</b>':`${dow(pred.date)} (약 ${pred.days}일 후)`}</div>
       ${materialSummaryHtml(g.model)}
     </div>`;
-  }).join('');
+  };
+  const groups = [
+    {key:'danger', title:'🚨 초과', list: ltList.filter(g=>maintStatus(estRemaining(g))==='danger'), empty:'초과된 발전기가 없습니다'},
+    {key:'warn',   title:'⚠️ 임박', list: ltList.filter(g=>maintStatus(estRemaining(g))==='warn'),   empty:'임박한 발전기가 없습니다'},
+    {key:'ok',     title:'✅ 정상', list: ltList.filter(g=>maintStatus(estRemaining(g))==='ok'),     empty:'정상 발전기가 없습니다'}
+  ];
+  const colsHtml = `<div class="prep-cols">${groups.map(gr=>`
+    <div class="prep-col c-${gr.key}">
+      <div class="prep-col-head"><span>${gr.title}</span><span>${gr.list.length}대</span></div>
+      <div class="prep-col-body">${gr.list.length? gr.list.map(cardHtml).join('') : `<div class="prep-col-empty">${gr.empty}</div>`}</div>
+    </div>`).join('')}</div>`;
   return `
     <div id="longterm-prep-anchor" class="section-title">🔧 장기임대 정비 준비 리스트 <span class="cnt">${ltList.length}대</span>${ltList.length>0? ` <button type="button" class="btn sm" onclick="downloadLongtermPrepFile()">🖨 인쇄</button>`:''}</div>
-    <details class="info-toggle"><summary></summary><p class="muted">현장에서 실사용 시간을 바로 알 수 없는 장기임대 발전기를, 예상 사용시간을 기준으로 정비 임박 순으로 정렬했습니다. 방문 정비시 챙길 자재(엔진오일량·필터 품명/규격/수량)가 함께 표시됩니다.</p></details>
-    ${ltList.length===0? `<div class="empty">장기임대 중인 발전기가 없습니다.</div>` : ltHtml}
+    <details class="info-toggle"><summary></summary><p class="muted">현장에서 실사용 시간을 바로 알 수 없는 장기임대 발전기를, 예상 사용시간을 기준으로 초과·임박·정상으로 나눠 정비가 급한 순으로 보여줍니다. 방문 정비시 챙길 자재(엔진오일량·필터 품명/규격/수량)가 함께 표시됩니다.</p></details>
+    ${ltList.length===0? `<div class="empty">장기임대 중인 발전기가 없습니다.</div>` : colsHtml}
   `;
 }
 function renderOutList(){
@@ -4827,9 +4850,9 @@ function renderOutList(){
       <input type="number" id="default-est-daily-short" value="${escR(defaultEstDailyShort)}" step="0.5" min="0" placeholder="예: 4.5" style="width:56px;padding:4px 6px;font-size:13px;">
       <span style="font-size:11.5px;color:#666;">장기</span>
       <input type="number" id="default-est-daily-long" value="${escR(defaultEstDailyLong)}" step="0.5" min="0" placeholder="예: 6" style="width:56px;padding:4px 6px;font-size:13px;">
-      <button type="button" class="btn sm primary" onclick="applyDefaultEstDailyToAll()">출고중인 발전기에 전체 적용</button>
-      <button type="button" class="btn sm" onclick="clearEstDailyFromAll()" title="기본값과 출고중인 발전기 전체의 예상가동시간을 모두 비웁니다(모르거나 필요 없을 때)">미적용</button>
-      <span style="font-size:11px;color:#888;">※ 예상가동시간을 비워두고 출고하면 이 기본값으로 자동 추정됩니다</span>
+      <button type="button" class="btn sm primary" onclick="applyDefaultEstDailyToAll()">기본값 저장</button>
+      <button type="button" class="btn sm" onclick="clearEstDailyFromAll()" title="단기/장기 기본값을 비웁니다(모르거나 필요 없을 때)">비우기</button>
+      <span style="font-size:11px;color:#888;">※ 출고중 발전기 전체가 이 값으로 정비주기를 추정합니다 (장기로 바꾸면 장기 값 적용)</span>
     </span>`;
   const capacityButtonsHtml = capacityEntries.length===0 ? '' : `
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;">
@@ -4938,86 +4961,36 @@ function toggleLongterm(id){
       flash('단기로 변경되었습니다');
     });
   } else {
-    openLongtermConvertModal(id);
+    openConfirmModal('이 발전기를 "단기"에서 "장기"로 변경할까요?', function(){
+      rt.longTerm = true;
+      saveGens();
+      renderContent();
+      flash('장기로 변경되었습니다');
+    });
   }
 }
-function openLongtermConvertModal(id){
-  const g = findGen(id);
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="text-align:center;">
-      <h3>📅 장기임대로 변경</h3>
-      <div class="modal-sub">${g.id} · ${displayModel(g)}</div>
-      <div class="field"><label>예상 일일 사용시간(h/일)</label><input type="number" id="f-ltdaily" step="0.5" placeholder="예: 8"></div>
-      <div id="f-err" class="err" style="display:none;"></div>
-      <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">취소</button>
-        <button class="btn primary" onclick="submitLongtermConvert('${g.id}')">변경</button>
-      </div>
-    </div>
-  </div>`;
-}
-async function submitLongtermConvert(id){
-  const g = findGen(id);
-  const v = Number(document.getElementById('f-ltdaily').value);
-  const errEl = document.getElementById('f-err');
-  if(!v || v<=0){ errEl.textContent='예상 일일 사용시간을 입력해주세요.'; errEl.style.display='block'; return; }
-  g.rental.longTerm = true;
-  g.rental.estDaily = v;
-  await saveGens();
-  closeModal();
-  renderContent();
-  flash('장기로 변경되었습니다');
-}
 async function applyDefaultEstDailyToAll(){
-  const shortEl = document.getElementById('default-est-daily-short');
-  const longEl = document.getElementById('default-est-daily-long');
-  // 입력칸이 비어있는지(적용 안 함) vs 0을 직접 입력했는지(0으로 적용)를 구분합니다.
-  const shortRaw = shortEl.value.trim();
-  const longRaw = longEl.value.trim();
-  const hasShort = shortRaw!=='' && !isNaN(Number(shortRaw)) && Number(shortRaw)>=0;
-  const hasLong = longRaw!=='' && !isNaN(Number(longRaw)) && Number(longRaw)>=0;
-  const vShort = hasShort ? Number(shortRaw) : null;
-  const vLong = hasLong ? Number(longRaw) : null;
-  if(!hasShort && !hasLong){ flash('단기 또는 장기 시간을 먼저 입력해주세요'); return; }
-  // "비어있는 발전기"가 아니라, 출고중인 발전기 전체(이미 값이 있어도 덮어씀)에 적용합니다.
-  const targetsShort = hasShort ? activeGens().filter(g=>g.status==='out' && g.rental && !g.rental.longTerm) : [];
-  const targetsLong = hasLong ? activeGens().filter(g=>g.status==='out' && g.rental && g.rental.longTerm) : [];
-  const total = targetsShort.length + targetsLong.length;
-  const saveDefaults = ()=>{
-    DB.companyInfo = { ...(DB.companyInfo||{}) };
-    if(hasShort) DB.companyInfo.estDailyShort = vShort;
-    if(hasLong) DB.companyInfo.estDailyLong = vLong;
-    saveWithRetry(saveCompanyInfo);
-  };
-  if(total===0){ saveDefaults(); renderContent(); flash('기본값을 저장했습니다 (이후 출고건에 자동 적용)'); return; }
-  const msgLines = [];
-  if(targetsShort.length) msgLines.push(`단기 ${targetsShort.length}대 → 하루 ${vShort}h`);
-  if(targetsLong.length) msgLines.push(`장기 ${targetsLong.length}대 → 하루 ${vLong}h`);
-  openConfirmModal(`출고중인 발전기 전체에 적용할까요? (이미 입력된 값이 있어도 덮어씁니다)\n\n${msgLines.join('\n')}`, async function(){
-    targetsShort.forEach(g=>{ g.rental.estDaily = vShort; });
-    targetsLong.forEach(g=>{ g.rental.estDaily = vLong; });
-    saveDefaults();
-    saveWithRetry(saveGens);
-    closeModal();
-    renderContent();
-    flash(`총 ${total}대에 적용했습니다`);
-  }, '전체 적용');
+  // 발전기마다 값을 덮어쓰지 않고, 단기/장기 기본값만 저장합니다(팀 전체 공유).
+  const shortRaw = document.getElementById('default-est-daily-short').value.trim();
+  const longRaw = document.getElementById('default-est-daily-long').value.trim();
+  const ok = v => v==='' || (!isNaN(Number(v)) && Number(v)>=0 && Number(v)<=24);
+  if(!ok(shortRaw) || !ok(longRaw)){ flash('0~24 사이 시간으로 입력해주세요'); return; }
+  DB.companyInfo = { ...(DB.companyInfo||{}) };
+  if(shortRaw==='') delete DB.companyInfo.estDailyShort; else DB.companyInfo.estDailyShort = Number(shortRaw);
+  if(longRaw==='') delete DB.companyInfo.estDailyLong; else DB.companyInfo.estDailyLong = Number(longRaw);
+  await saveWithRetry(saveCompanyInfo);
+  renderContent();
+  flash('기본값을 저장했습니다');
 }
 function clearEstDailyFromAll(){
-  const targets = activeGens().filter(g=>g.status==='out' && g.rental && g.rental.estDaily!=null);
-  const hasDefaults = getEstDailyDefault(false)>0 || getEstDailyDefault(true)>0;
-  if(targets.length===0 && !hasDefaults){ flash('비울 예상가동시간이 없습니다'); return; }
-  openConfirmModal(`기본값(단기/장기)과 출고중인 발전기 ${targets.length}대의 예상가동시간을 모두 비울까요?\n\n(비우면 출고중 정비주기 추정이 표시되지 않습니다)`, async function(){
-    targets.forEach(g=>{ g.rental.estDaily = null; });
+  if(!(getEstDailyDefault(false)>0 || getEstDailyDefault(true)>0)){ flash('저장된 기본값이 없습니다'); return; }
+  openConfirmModal('단기/장기 기본값을 비울까요?\n\n(비우면 출고중 정비주기 추정이 표시되지 않습니다)', async function(){
     DB.companyInfo = { ...(DB.companyInfo||{}) };
     delete DB.companyInfo.estDailyShort; delete DB.companyInfo.estDailyLong;
-    saveWithRetry(saveCompanyInfo);
-    saveWithRetry(saveGens);
-    closeModal();
+    await saveWithRetry(saveCompanyInfo);
     renderContent();
-    flash(`${targets.length}대의 예상가동시간을 비웠습니다`);
-  }, '전체 미적용');
+    flash('기본값을 비웠습니다');
+  });
 }
 
 function renderMaintTab(){
@@ -10244,9 +10217,6 @@ function openReserveNoGenModal(resId, draft){
         <div class="field f-xs"><label>사용일수(일)</label>
           <input type="number" id="f-rsv-usagedays" min="0" value="${(pre&&pre.usageDays)||''}" placeholder="예: 7" oninput="syncRsvUsageDaysToReturnDate()" style="${autoStyle('usagedays')}">
         </div>
-        <div class="field f-xs"><label>예상가동시간(h/일)</label>
-          <input type="number" id="f-rsv-estdaily" step="0.5" min="0" value="${(pre&&pre.estDaily)||''}" placeholder="예: 8">
-        </div>
         <div class="field f-sm"><label>반납 예정일 (선택)</label>
           <input type="date" id="f-rsv-returndate" value="${prefillReturnDate}" onchange="syncRsvReturnDateToUsageDays()">
         </div>
@@ -10440,7 +10410,7 @@ function submitReserveNoGen(resId){
   const note = document.getElementById('f-rsv-note').value.trim();
   const outDate = document.getElementById('f-rsv-outdate').value;
   const longTerm = document.getElementById('f-rsv-longterm').checked;
-  const estDailyRaw = Number(document.getElementById('f-rsv-estdaily').value||0);
+  const estDailyRaw = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
   const estDaily = estDailyRaw>0 ? estDailyRaw : null;
   const errEl = document.getElementById('f-rsv-err');
   if(!customer || !address || !manager || !phone){
@@ -10662,9 +10632,6 @@ function openOutInfoEditModal(id){
         <div class="field f-xs"><label>사용일수(일)</label>
           <input type="number" id="f-oie-usagedays" min="0" value="${rt.usageDays||''}" placeholder="예: 7" oninput="syncOieUsageDaysToReturnDate()">
         </div>
-        <div class="field f-xs"><label>예상가동시간(h/일)</label>
-          <input type="number" id="f-oie-estdaily" step="0.5" min="0" value="${rt.estDaily||''}" placeholder="예: 8">
-        </div>
         <div class="field f-sm"><label>반납 예정일 (선택)</label>
           <input type="date" id="f-oie-returndate" value="${oiePrefillReturnDate}" onchange="syncOieReturnDateToUsageDays()">
         </div>
@@ -10767,7 +10734,7 @@ async function submitOutInfoEdit(id){
     errEl.style.display='block'; return;
   }
   const usageDays = Number(document.getElementById('f-oie-usagedays').value)||null;
-  const estDailyOieRaw = Number(document.getElementById('f-oie-estdaily').value||0);
+  const estDailyOieRaw = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
   const estDailyOie = estDailyOieRaw>0 ? estDailyOieRaw : null;
   const oldVoltage = g.voltage||'';
   const newVoltageVal = document.getElementById('f-oie-voltage').value.trim();
@@ -10997,9 +10964,6 @@ function openOutModal(id, reservationId){
         <div class="field f-xs"><label>사용일수(일)</label>
           <input type="number" id="f-usagedays" min="0" value="${(res&&res.usageDays)||''}" placeholder="예: 7" oninput="syncUsageDaysToReturnDate()">
         </div>
-        <div class="field f-xs"><label>예상가동시간(h/일)</label>
-          <input type="number" id="f-estdaily" step="0.5" min="0" value="${(res&&res.estDaily)||''}" placeholder="예: 8">
-        </div>
         <div class="field f-sm"><label>반납 예정일 (선택)</label>
           <input type="date" id="f-returndate" value="${prefillReturnDate}" onchange="syncReturnDateToUsageDays()">
         </div>
@@ -11077,8 +11041,7 @@ function onTargetGenChange(){
   if(hintEl) hintEl.textContent = `현재 누적시간: ${(g.hours||0).toLocaleString()}h`;
 }
 function toggleLongtermField(){
-  // 예상가동시간 입력칸이 "사용일수" 옆으로 이동해 항상 보이므로,
-  // 장기임대 체크박스는 더 이상 이 필드의 표시 여부를 토글하지 않습니다.
+  // 예상가동시간은 개별 입력 없이 단기/장기 기본값을 쓰므로 토글할 필드가 없습니다.
 }
 async function submitOut(idParam, reservationId){
   const targetSelEl = document.getElementById('f-target-gen');
@@ -11151,7 +11114,7 @@ async function submitOut(idParam, reservationId){
   const startHoursEl = document.getElementById('f-starthours');
   const startHours = startHoursEl ? Number(startHoursEl.value) : (g.hours||0);
   const longTerm = document.getElementById('f-longterm').checked;
-  const estDailyRaw = Number(document.getElementById('f-estdaily').value||0);
+  const estDailyRaw = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
   const estDaily = estDailyRaw>0 ? estDailyRaw : null;
   const errEl = document.getElementById('f-err');
   if(!customer || !address || !manager || !phone){
@@ -11278,7 +11241,6 @@ function reopenOutModalWithValues(id, reservationId, vals){
     setVal('f-note', vals.note);
     setVal('f-payment-note', vals.paymentNote);
     const ltEl = document.getElementById('f-longterm'); if(ltEl){ ltEl.checked = vals.longTerm; toggleLongtermField(); }
-    setVal('f-estdaily', vals.estDaily);
     const atSel = document.getElementById('f-arrivetime-select');
     if(atSel && vals.arriveTime){
       const opts = [...atSel.options].map(o=>o.value);
@@ -11350,9 +11312,6 @@ function openBulkOutModal(){
         </div>
         <div class="field f-xs"><label>사용일수(일)</label>
           <input type="number" id="fb-usagedays" min="0" placeholder="예: 7" oninput="syncBulkUsageDaysToReturnDate()">
-        </div>
-        <div class="field f-xs"><label>예상가동시간(h/일, 대당)</label>
-          <input type="number" id="fb-estdaily" step="0.5" min="0" placeholder="예: 8">
         </div>
         <div class="field f-sm"><label>반납 예정일 (선택)</label>
           <input type="date" id="fb-returndate" onchange="syncBulkReturnDateToUsageDays()">
@@ -11482,7 +11441,7 @@ async function submitBulkOut(){
   const note = document.getElementById('fb-note').value.trim();
   const outDate = document.getElementById('fb-outdate').value;
   const longTerm = document.getElementById('fb-longterm').checked;
-  const estDailyRawB = Number(document.getElementById('fb-estdaily').value||0);
+  const estDailyRawB = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
   const estDaily = estDailyRawB>0 ? estDailyRawB : null;
   if(!customer || !address || !manager || !phone){
     errEl.textContent = '거래처명, 현장 주소, 담당자, 연락처를 모두 입력해주세요.';
@@ -11498,10 +11457,6 @@ async function submitBulkOut(){
   }
   if(!outDate){
     errEl.textContent = '도착일을 확인해주세요.';
-    errEl.style.display='block'; return;
-  }
-  if(longTerm && (!estDaily || estDaily<=0)){
-    errEl.textContent = '장기 임대는 예상 일일 사용시간을 입력해주세요.';
     errEl.style.display='block'; return;
   }
   // 발전기별 누적 사용시간 검증 (확인불가 모델은 생략)
