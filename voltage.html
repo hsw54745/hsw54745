@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>전압설정</title>
+<link rel="manifest" href="manifest-voltage.json">
+<meta name="theme-color" content="#16212C">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="전압설정">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<style>
+:root{
+  --bg:#16212C; --panel:#1F2D3A; --panel-2:#26384A; --line:#34495D; --ink:#F1F4F7; --ink-soft:#A9B6C3;
+  --volt:#F2B705; --v220:#4FA3E0; --v380:#F2B705; --v380p:#E8743B; --etc:#8FA3B5; --err:#F07C66;
+  --font:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+}
+*{box-sizing:border-box;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+html,body{margin:0;}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;-webkit-text-size-adjust:100%;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);min-height:100vh;}
+button,input{font:inherit;color:inherit;}
+button{cursor:pointer;}
+:focus-visible{outline:2px solid var(--volt);outline-offset:2px;}
+.wrap{max-width:720px;margin:0 auto;padding:0 14px 40px;}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:14px 0 10px;display:flex;align-items:center;gap:10px;}
+.top h1{font-size:18px;margin:0;font-weight:700;display:flex;align-items:center;gap:8px;}
+.bolt{display:inline-flex;width:28px;height:28px;border-radius:7px;background:var(--volt);color:#16212C;align-items:center;justify-content:center;font-size:16px;}
+.back{border:1px solid var(--line);background:var(--panel);border-radius:8px;width:38px;height:38px;font-size:18px;flex:none;}
+.top .sub{font-size:12px;color:var(--ink-soft);margin-left:auto;}
+.search{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:16px;margin-bottom:12px;}
+.search::placeholder{color:#7F8E9C;}
+
+.list{display:flex;flex-direction:column;gap:8px;}
+.mrow{display:block;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;}
+.mrow .name{font-weight:700;font-size:15.5px;}
+.mrow .ids{font-size:12px;color:var(--ink-soft);margin-top:2px;word-break:keep-all;}
+.mrow .kinds{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;}
+.k{font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 8px;border:1px solid currentColor;}
+.k.v220{color:var(--v220);} .k.v380{color:var(--v380);} .k.v380plus{color:var(--v380p);} .k.etc{color:var(--etc);}
+.k.off{opacity:.3;}
+.empty,.msg{color:var(--ink-soft);text-align:center;padding:28px 10px;}
+.msg.err{color:var(--err);}
+
+.sec{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+.sec h2{margin:0;font-size:15px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-left:6px solid var(--etc);background:var(--panel-2);}
+.sec.v220 h2{border-left-color:var(--v220);} .sec.v380 h2{border-left-color:var(--v380);} .sec.v380plus h2{border-left-color:var(--v380p);}
+.sec h2 small{font-size:12px;color:var(--ink-soft);font-weight:500;}
+.note{padding:10px 14px 0;white-space:pre-wrap;font-size:14.5px;}
+.photos{padding:10px;display:flex;flex-direction:column;gap:10px;}
+.photos button{border:0;padding:0;background:none;display:block;}
+.photos img{width:100%;border-radius:8px;display:block;background:#0E161E;}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:4px 0 2px;scrollbar-width:none;}
+.chips a{flex:none;text-decoration:none;font-size:12.5px;font-weight:700;border-radius:999px;padding:5px 11px;background:var(--panel);border:1px solid var(--line);}
+.chips a.v220{color:var(--v220);} .chips a.v380{color:var(--v380);} .chips a.v380plus{color:var(--v380p);} .chips a.etc{color:var(--etc);}
+
+.viewer{position:fixed;inset:0;background:#000;z-index:20;overflow:auto;touch-action:pinch-zoom pan-x pan-y;}
+.viewer img{width:100%;min-height:100%;object-fit:contain;display:block;}
+.viewer .close{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:12px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:20px;z-index:21;}
+.viewer .hint{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#bbb;font-size:12px;pointer-events:none;}
+.foot{margin-top:18px;font-size:11.5px;color:#7F8E9C;text-align:center;}
+.foot button{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 12px;font-size:12px;margin-top:6px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// 사무실 프로그램과 같은 Firebase에서 "읽기만" 합니다. (모델 정보 ~5KB + 고른 모델의 사진만)
+const DB_URL = 'https://haesung3732-default-rtdb.asia-southeast1.firebasedatabase.app';
+const FB = { apiKey:"AIzaSyBFsyc9pVNruWNOinoiJt-OZlfTHK__aE8", authDomain:"haesung3732.firebaseapp.com", databaseURL: DB_URL };
+let fbOk=false;
+try{ firebase.initializeApp(FB); firebase.auth().signInAnonymously().catch(()=>{}); fbOk=true; }catch(e){}
+function waitUser(ms){
+  return new Promise(res=>{
+    if(!fbOk){ res(null); return; }
+    const u=firebase.auth().currentUser; if(u){ res(u); return; }
+    let done=false; const un=firebase.auth().onAuthStateChanged(x=>{ if(x&&!done){ done=true; un(); res(x); } });
+    setTimeout(()=>{ if(!done){ done=true; un(); res(firebase.auth().currentUser||null); } }, ms);
+  });
+}
+async function getShared(key){
+  const u = await waitUser(15000);
+  const q = u ? '?auth='+encodeURIComponent(await u.getIdToken()) : '';
+  const r = await fetch(`${DB_URL}/shared/${encodeURIComponent(key)}.json${q}`);
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const v = await r.json();
+  return v==null ? null : (typeof v==='string' ? JSON.parse(v) : v);
+}
+
+const KINDS = ['v220','v380','v380plus','etc'];
+const LABEL = {v220:'220V 출력', v380:'380V 출력', v380plus:'380V 이상 출력', etc:'기타참고'};
+const S = { materials:null, gens:[], q:'', model:null, error:'', offline:false };
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+
+// 예전 방식(모델 정보 안에 사진)도 읽을 수 있게
+function legacyPhotos(m,k){
+  const a = m[`voltageGuidePhotos_${k}`];
+  if(Array.isArray(a) && a.filter(Boolean).length) return a.filter(Boolean);
+  const one = m[`voltageGuidePhoto_${k}`] || (k==='v220'? m.voltageGuidePhoto_internal : null);
+  return one ? [one] : [];
+}
+function countOf(m,k){ const l=legacyPhotos(m,k).length; return l || Number(m[`voltageGuideCount_${k}`])||0; }
+function noteOf(m,k){ return m[`voltageGuideNote_${k}`] || (k==='v220'? m.voltageGuideNote_internal : '') || ''; }
+function totalOf(m){ return KINDS.reduce((a,k)=>a+countOf(m,k),0); }
+function kwOf(name){ const x=String(name).match(/(\d+(?:\.\d+)?)\s*kw/i); return x? Number(x[1]) : 9999; }
+// 모델 이름 뒤의 (신형)(노랑)(회색)(구형) 같은 꼬리표는 떼고 비교합니다. (사진이 예전 모델 이름으로 등록된 경우 대비)
+function baseName(md){ return String(md||'').replace(/(kw)\s*(\([^)]*\))+\s*$/i,'$1').trim().toLowerCase(); }
+function idsOf(model){ const b=baseName(model); return S.gens.filter(g=>g && !g.retired && (g.model===model || baseName(g.model)===b)).map(g=>g.id).sort((a,b)=>a.localeCompare(b,'ko',{numeric:true})); }
+
+async function loadBase(){
+  const cached = lsGet('vg-base');
+  if(cached){ S.materials=cached.materials; S.gens=cached.gens||[]; render(); }
+  try{
+    const [mats, gens] = await Promise.all([getShared('gen-materials-v1'), getShared('gen-fleet-v2').catch(()=>null)]);
+    S.materials = mats || {};
+    if(Array.isArray(gens)) S.gens = gens;
+    S.offline=false; S.error='';
+    lsSet('vg-base', {materials:S.materials, gens:S.gens.map(g=>({id:g.id, model:g.model, retired:g.retired}))});
+  }catch(e){
+    if(!S.materials){ S.error='불러오지 못했습니다. 인터넷 연결을 확인하세요.'; }
+    else S.offline=true;
+  }
+  render();
+}
+async function loadPhotos(model){
+  const m = S.materials[model] || {};
+  if(KINDS.some(k=>legacyPhotos(m,k).length)){ const o={}; KINDS.forEach(k=>o[k]=legacyPhotos(m,k)); return o; }
+  if(!totalOf(m)) return {};
+  const key = m.voltagePhotoKey; if(!key) return {};
+  const ver = m.voltagePhotoVer || 0;
+  const c = lsGet('vg-p-'+key);
+  if(c && c.ver===ver) return c.data;                      // 폰에 저장된 사진 사용 (데이터 0)
+  const data = (await getShared(key)) || {};
+  if(!lsSet('vg-p-'+key, {ver, data})){                     // 폰 저장공간이 차면 오래된 사진부터 비움
+    Object.keys(localStorage).filter(k=>k.startsWith('vg-p-')).forEach(k=>localStorage.removeItem(k));
+    lsSet('vg-p-'+key, {ver, data});
+  }
+  return data;
+}
+
+function listHtml(){
+  const q = S.q.trim().toLowerCase();
+  const models = Object.keys(S.materials||{}).filter(md=>totalOf(S.materials[md])>0)
+    .filter(md=>!q || md.toLowerCase().includes(q) || idsOf(md).some(id=>id.toLowerCase().includes(q)))
+    .sort((a,b)=>kwOf(a)-kwOf(b) || a.localeCompare(b,'ko'));
+  if(!models.length) return `<div class="empty">${q? '찾는 모델이 없습니다.' : '등록된 전압 설정 사진이 없습니다.'}</div>`;
+  return `<div class="list">${models.map(md=>{
+    const m=S.materials[md], ids=idsOf(md);
+    return `<button class="mrow" onclick="openModel(${esc(JSON.stringify(md))})">
+      <div class="name">${esc(md)}</div>
+      ${ids.length? `<div class="ids">${esc(ids.join(' · '))}</div>`:''}
+      <div class="kinds">${KINDS.map(k=>`<span class="k ${k}${countOf(m,k)?'':' off'}">${LABEL[k].replace(' 출력','')}${countOf(m,k)? ' '+countOf(m,k):''}</span>`).join('')}</div>
+    </button>`;
+  }).join('')}</div>`;
+}
+function render(){
+  const app = document.getElementById('app');
+  if(S.model) return;  // 상세 화면은 openModel에서 그림
+  if(!S.materials){
+    app.innerHTML = `<div class="wrap"><div class="top"><h1><span class="bolt">⚡</span>전압설정</h1></div><div class="msg${S.error?' err':''}">${esc(S.error||'불러오는 중…')}</div></div>`;
+    return;
+  }
+  const focused = document.activeElement && document.activeElement.id==='q';
+  app.innerHTML = `<div class="wrap">
+    <div class="top"><h1><span class="bolt">⚡</span>전압설정</h1><span class="sub">${S.offline? '오프라인 · 저장본':''}</span></div>
+    <input id="q" class="search" type="search" placeholder="모델 또는 발전기번호 (예: 6BT, S-9)" value="${esc(S.q)}" oninput="S.q=this.value; document.getElementById('lst').innerHTML=listHtml();">
+    <div id="lst">${listHtml()}</div>
+    <div class="foot">사진은 한 번 보면 폰에 저장되어 다음부터는 데이터를 쓰지 않습니다.<br><button onclick="clearCache()">저장된 사진 지우기</button></div>
+  </div>`;
+  if(focused){ const i=document.getElementById('q'); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }
+}
+async function openModel(model, fromPop){
+  S.model = model;
+  if(!fromPop) history.pushState({model}, '', '#'+encodeURIComponent(model));
+  const m = S.materials[model] || {};
+  const ids = idsOf(model);
+  const kinds = KINDS.filter(k=>countOf(m,k)>0);
+  document.getElementById('app').innerHTML = `<div class="wrap">
+    <div class="top"><button class="back" onclick="history.back()" aria-label="목록으로">‹</button>
+      <h1 style="font-size:16px;">${esc(model)}</h1></div>
+    ${ids.length? `<div style="font-size:12.5px;color:var(--ink-soft);margin:-4px 0 6px;">${esc(ids.join(' · '))}</div>`:''}
+    <div class="chips">${kinds.map(k=>`<a class="${k}" href="#sec-${k}" onclick="event.preventDefault();document.getElementById('sec-${k}').scrollIntoView({behavior:'smooth'})">${LABEL[k]}</a>`).join('')}</div>
+    <div id="secs"><div class="msg">사진 불러오는 중…</div></div>
+  </div>`;
+  window.scrollTo(0,0);
+  let o;
+  try{ o = await loadPhotos(model); }
+  catch(e){ if(S.model===model) document.getElementById('secs').innerHTML = `<div class="msg err">사진을 불러오지 못했습니다. 인터넷 연결을 확인하세요.</div>`; return; }
+  if(S.model!==model) return;
+  window._photos = o;
+  document.getElementById('secs').innerHTML = kinds.map(k=>{
+    const ph = (o[k]||[]).filter(Boolean), note = noteOf(m,k);
+    return `<section class="sec ${k}" id="sec-${k}">
+      <h2><span>${LABEL[k]}</span><small>${ph.length}장</small></h2>
+      ${note? `<div class="note">${esc(note)}</div>`:''}
+      <div class="photos">${ph.map((p,i)=>`<button onclick="openViewer('${k}',${i})" aria-label="${LABEL[k]} 사진 ${i+1} 크게 보기"><img src="${p}" alt="${LABEL[k]} ${i+1}" loading="lazy"></button>`).join('') || '<div class="msg">사진 없음</div>'}</div>
+    </section>`;
+  }).join('') || '<div class="msg">등록된 사진이 없습니다.</div>';
+}
+function openViewer(k,i){
+  const src = ((window._photos||{})[k]||[])[i]; if(!src) return;
+  const v = document.createElement('div'); v.className='viewer'; v.id='viewer';
+  v.innerHTML = `<img src="${src}" alt=""><button class="close" aria-label="닫기" onclick="closeViewer()">✕</button><div class="hint">두 손가락으로 확대</div>`;
+  document.body.appendChild(v);
+  history.pushState({viewer:true}, '');
+}
+function closeViewer(fromPop){ const v=document.getElementById('viewer'); if(v){ v.remove(); if(!fromPop) history.back(); } }
+function clearCache(){
+  Object.keys(localStorage).filter(k=>k.startsWith('vg-p-')).forEach(k=>localStorage.removeItem(k));
+  alert('폰에 저장된 사진을 지웠습니다.');
+}
+window.addEventListener('popstate', e=>{
+  if(document.getElementById('viewer')){ closeViewer(true); return; }
+  const st = e.state;
+  if(st && st.model){ openModel(st.model, true); }
+  else { S.model=null; render(); }
+});
+if('serviceWorker' in navigator){ window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
+history.replaceState({}, '', location.pathname);
+render(); loadBase();
+</script>
+</body>
+</html>
