@@ -203,6 +203,27 @@
   .material-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:7px 14px;margin-bottom:10px;}
   .material-card .m-title{font-weight:700;font-size:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
   .tag-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;}
+  /* 자재관리: 모델 카드 안 고정 칸 입력 */
+  .mc .m-title{margin-bottom:4px;}
+  .mc-ids{font-size:11px;color:var(--ink-soft);margin-bottom:8px;line-height:1.7;}
+  .mc-ids .pill{font-size:10.5px;padding:0 6px;margin:0 3px 0 0;}
+  .mc-grid{display:grid;grid-template-columns:74px minmax(0,1fr) 46px 14px 60px;gap:4px 6px;align-items:center;}
+  .mc-grid label,.mc-etc-row .lab{font-size:12px;color:var(--ink-soft);font-weight:600;white-space:nowrap;}
+  .mc-grid input,.mc-etc-row input{font-size:12.5px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:6px;min-width:0;width:100%;font-family:var(--sans);background:#fff;color:var(--ink);}
+  .mc-grid input.q,.mc-etc-row input.q{text-align:center;padding:4px 4px;}
+  .mc-grid .u,.mc-etc-row .u{font-size:11.5px;color:var(--ink-soft);}
+  .mc-etc{margin-top:4px;}
+  .mc-grid .hd{font-size:10.5px;color:var(--ink-soft);text-align:center;margin-bottom:-2px;}
+  .mc-grid .hd.l{text-align:left;}
+  .mc-grid input.stk,.mc-etc-row input.stk{text-align:center;padding:4px 3px;background:var(--surface-2);font-weight:700;}
+  .mc-grid input.stk.neg,.mc-etc-row input.stk.neg{color:var(--danger);border-color:var(--danger);background:var(--danger-tint);}
+  .mc-grid .nostk,.mc-etc-row .nostk{font-size:11px;color:var(--ink-soft);text-align:center;}
+  .mc-etc-row{display:grid;grid-template-columns:74px minmax(0,1fr) 46px 14px 60px 14px;gap:4px 6px;align-items:center;margin-top:4px;}
+  .mc-etc-row .x{border:0;background:none;color:var(--danger);font-size:14px;padding:0;cursor:pointer;line-height:1;}
+  .mc-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:6px;}
+  .mc-foot .btn{font-size:12px;padding:4px 10px;}
+  .mc.dirty{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary) inset;}
+  .mc-dirty-note{font-size:11px;color:var(--primary-dark);font-weight:700;}
   .tag{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:2px 7px;font-size:11px;}
   .prep-card{background:var(--warn-tint);border:1px solid var(--warn);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px;}
   .prep-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start;}
@@ -3153,8 +3174,6 @@ function requireTechnician(actionLabel){
   return false;
 }
 
-// 소모품 편집용 임시 상태 (자재관리 모달)
-let materialsModalState = {model:'', consumables:[]};
 
 function defaultFleet(){
   return [{"id": "S-1", "model": "대우 0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-2", "model": "대우 0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-3", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-4", "model": "위차이(4DX) 50kW", "hours": 1855, "lastMaintHours": 1846, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-5", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-6", "model": "커민스(4BT) 75kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-7", "model": "커민스(4BT) 75kW", "hours": 1735, "lastMaintHours": 1735, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-8", "model": "커민스(4BT) 75kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-9", "model": "커민스(4BT) 120kW", "hours": 5838, "lastMaintHours": 5803, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-10", "model": "커민스(4BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-11", "model": "커민스(4BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-12", "model": "커민스(4BT) 120kW", "hours": 2288, "lastMaintHours": 2159, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-13", "model": "커민스(4BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-14", "model": "커민스(4BT) 120kW(회색)", "hours": 7036, "lastMaintHours": 6741, "hoursKnown": true, "status": "out", "rental": {"customer": "우진루프패널 (박채호이사, 8704-6625)", "site": "용인 · 용인 갈곡초", "outDate": "2026-08-21", "startHours": 7036, "longTerm": false, "estDaily": null}}, {"id": "S-15", "model": "커민스(4BT) 75kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-16", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-17", "model": "위차이(4DX) 50kW", "hours": 1518, "lastMaintHours": 1555, "hoursKnown": true, "status": "out", "rental": {"customer": "가교기업 (강석문상무, 9453-9865)", "site": "음성 · 음성 대소면 내산리 30", "outDate": "2026-08-20", "startHours": 1518, "longTerm": false, "estDaily": null}}, {"id": "S-18", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-19", "model": "보드왕 300kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-20", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-21", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-22", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-23", "model": "커민스(6CT) 200kW", "hours": 387, "lastMaintHours": 230, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-24", "model": "커민스(6BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-25", "model": "볼보 (TAD 1642 GE) 500kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-26", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-27", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-28", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-29", "model": "커민스(6BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "피앤아이종합건설 (신홍규차장, 010-2664-7124)", "site": "세종 · 세종시 어진동 579", "outDate": "2026-08-18", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-30", "model": "커민스(6BT) 120kW", "hours": 1042, "lastMaintHours": 1011, "hoursKnown": true, "status": "out", "rental": {"customer": "용하이엔씨 (황인부장, 010-6204-0504)", "site": "세종 · 세종시 전의역", "outDate": "2026-08-19", "startHours": 1042, "longTerm": false, "estDaily": null}}, {"id": "S-31", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-32", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-33", "model": "커민스(QSX15) 500kW", "hours": 13749, "lastMaintHours": 13619, "hoursKnown": true, "status": "out", "rental": {"customer": "명문산업 (박철신대표, 5329-7153)", "site": "청양 · 청양 학당리 [부자재: 연료60(50)]", "outDate": "2026-08-20", "startHours": 13749, "longTerm": false, "estDaily": null}}, {"id": "S-34", "model": "커민스(QSX15) 500kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-35", "model": "보드왕 30kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-36", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-37", "model": "위차이(4DX) 50kW", "hours": 1319, "lastMaintHours": 1264, "hoursKnown": true, "status": "out", "rental": {"customer": "국방과학연구소 (양한복, 010-5455-3044)", "site": "포천 · 포천시 이동면 장암리 산285-31", "outDate": "2026-08-20", "startHours": 1319, "longTerm": false, "estDaily": null}}, {"id": "S-38", "model": "커민스(6BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "W-1", "model": "커민스(6BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "듀크기술연구소 (김상진 차장, 010-7103-9232)", "site": "인천 · 계양구 서운산단로 8길 11", "outDate": "2026-08-18", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-1", "model": "2366 150kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "in", "rental": null}, {"id": "L-2", "model": "2366 150kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "in", "rental": null}, {"id": "L-3", "model": "2366 150kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-4", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-5", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-6", "model": "2366 150kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-7", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-8", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-9", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-11", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-12", "model": "볼보 TAD1344GE 400kW", "hours": 4661, "lastMaintHours": 4254, "hoursKnown": true, "status": "in", "rental": null}, {"id": "L-13", "model": "볼보 TAD733GE 250kW", "hours": 2254, "lastMaintHours": 2240, "hoursKnown": true, "status": "in", "rental": null}];
@@ -3836,16 +3855,26 @@ function voltagePillHtml(id, voltage){
 }
 
 // 자재정보로 예상 필요 부품 요약 텍스트
+// 엔진오일은 부품 재고에 "엔진오일 15W-40"처럼 규격까지 붙은 이름으로 있으면 그 이름으로 연결합니다.
+function engineOilPartName(m){
+  const spec = (m && m.engineOilSpec||'').trim();
+  if(spec){
+    const k = `엔진오일 ${spec}`;
+    if((DB.partsStock && DB.partsStock[k]!==undefined) || (DB.partsSpecs && DB.partsSpecs[k]!==undefined)) return k;
+  }
+  return '엔진오일';
+}
 function materialSummaryHtml(model){
   const m = DB.materials[model];
   if(!m) return `<div class="muted" style="font-size:12px;">등록된 자재 정보가 없습니다. [자재 관리] 탭에서 등록해주세요.</div>`;
   const rows = [];
   if(m.engineOilLiters) rows.push(`엔진오일${m.engineOilSpec? ` ${m.engineOilSpec}`:''} ${m.engineOilLiters}L`);
+  if(m.batteryName) rows.push(`배터리: ${m.batteryName} × ${m.batteryQty||1}`);
   if(m.oilFilter1Name) rows.push(`오일필터1: ${m.oilFilter1Name} × ${m.oilFilter1Qty||1}`);
   if(m.oilFilter2Name) rows.push(`오일필터2: ${m.oilFilter2Name} × ${m.oilFilter2Qty||1}`);
   if(m.fuelFilterName) rows.push(`연료필터1: ${m.fuelFilterName} × ${m.fuelFilterQty||1}`);
   if(m.fuelFilter2Name) rows.push(`연료필터2: ${m.fuelFilter2Name} × ${m.fuelFilter2Qty||1}`);
-  if(m.airFilterName) rows.push(`에어필터: ${m.airFilterName} × ${m.airFilterQty||1}`);
+  if(m.airFilterName) rows.push(`에어클리너: ${m.airFilterName} × ${m.airFilterQty||1}`);
   if(m.fanBeltName) rows.push(`팬벨트: ${m.fanBeltName} × ${m.fanBeltQty||1}`);
   (m.consumables||[]).forEach(c=>{ if(c.name) rows.push(`${c.category? `[${c.category}] `:''}${c.name}${c.spec? ` (${c.spec})`:''} × ${c.qty||1}${partUnitOf(c.name)||''}`); });
   if(rows.length===0) return `<div class="muted" style="font-size:12px;">등록된 자재 정보가 없습니다.</div>`;
@@ -3855,7 +3884,9 @@ function inferConsumableKind(name, usedKinds){
   if(!name) return null;
   if(/오일필터/.test(name)) return !usedKinds.has('oilFilter1') ? 'oilFilter1' : (!usedKinds.has('oilFilter2') ? 'oilFilter2' : null);
   if(/연료필터/.test(name)) return !usedKinds.has('fuelFilter1') ? 'fuelFilter1' : (!usedKinds.has('fuelFilter2') ? 'fuelFilter2' : null);
-  if(/에어필터/.test(name)) return !usedKinds.has('airFilter') ? 'airFilter' : null;
+  if(/에어필터|에어크리너|에어클리너/.test(name)) return !usedKinds.has('airFilter') ? 'airFilter' : null;
+  if(/배터리/.test(name)) return !usedKinds.has('battery') ? 'battery' : null;
+  if(/벨트/.test(name)) return !usedKinds.has('fanBelt') ? 'fanBelt' : null;
   if(!/필터/.test(name) && /오일/.test(name)) return !usedKinds.has('engineOil') ? 'engineOil' : null;
   return null;
 }
@@ -3864,13 +3895,14 @@ function materialCandidateParts(model){
   if(!m) return [];
   const parts = [];
   const usedKinds = new Set();
-  if(m.engineOilLiters){ parts.push({label:`엔진오일${m.engineOilSpec? ` ${m.engineOilSpec}`:''} ${m.engineOilLiters}L`, partName:`엔진오일`, qty:m.engineOilLiters, kind:'engineOil'}); usedKinds.add('engineOil'); }
+  if(m.engineOilLiters){ parts.push({label:`엔진오일${m.engineOilSpec? ` ${m.engineOilSpec}`:''} ${m.engineOilLiters}L`, partName:engineOilPartName(m), qty:m.engineOilLiters, kind:'engineOil'}); usedKinds.add('engineOil'); }
+  if(m.batteryName){ parts.push({label:`배터리: ${m.batteryName}${m.batteryQty?` ×${m.batteryQty}`:''}`, partName:m.batteryName, qty:m.batteryQty||1, kind:'battery'}); usedKinds.add('battery'); }
   if(m.oilFilter1Name){ parts.push({label:`오일필터1: ${m.oilFilter1Name}${m.oilFilter1Qty?` ×${m.oilFilter1Qty}`:''}`, partName:m.oilFilter1Name, qty:m.oilFilter1Qty||1, kind:'oilFilter1'}); usedKinds.add('oilFilter1'); }
   if(m.oilFilter2Name){ parts.push({label:`오일필터2: ${m.oilFilter2Name}${m.oilFilter2Qty?` ×${m.oilFilter2Qty}`:''}`, partName:m.oilFilter2Name, qty:m.oilFilter2Qty||1, kind:'oilFilter2'}); usedKinds.add('oilFilter2'); }
   if(m.fuelFilterName){ parts.push({label:`연료필터1: ${m.fuelFilterName}${m.fuelFilterQty?` ×${m.fuelFilterQty}`:''}`, partName:m.fuelFilterName, qty:m.fuelFilterQty||1, kind:'fuelFilter1'}); usedKinds.add('fuelFilter1'); }
   if(m.fuelFilter2Name){ parts.push({label:`연료필터2: ${m.fuelFilter2Name}${m.fuelFilter2Qty?` ×${m.fuelFilter2Qty}`:''}`, partName:m.fuelFilter2Name, qty:m.fuelFilter2Qty||1, kind:'fuelFilter2'}); usedKinds.add('fuelFilter2'); }
-  if(m.airFilterName){ parts.push({label:`에어필터: ${m.airFilterName}${m.airFilterQty?` ×${m.airFilterQty}`:''}`, partName:m.airFilterName, qty:m.airFilterQty||1, kind:'airFilter'}); usedKinds.add('airFilter'); }
-  if(m.fanBeltName) parts.push({label:`팬벨트: ${m.fanBeltName}${m.fanBeltQty?` ×${m.fanBeltQty}`:''}`, partName:m.fanBeltName, qty:m.fanBeltQty||1, kind:'fanBelt'});
+  if(m.airFilterName){ parts.push({label:`에어클리너: ${m.airFilterName}${m.airFilterQty?` ×${m.airFilterQty}`:''}`, partName:m.airFilterName, qty:m.airFilterQty||1, kind:'airFilter'}); usedKinds.add('airFilter'); }
+  if(m.fanBeltName){ parts.push({label:`팬벨트: ${m.fanBeltName}${m.fanBeltQty?` ×${m.fanBeltQty}`:''}`, partName:m.fanBeltName, qty:m.fanBeltQty||1, kind:'fanBelt'}); usedKinds.add('fanBelt'); }
   (m.consumables||[]).forEach(c=>{
     if(!c.name) return;
     const kind = inferConsumableKind(c.name, usedKinds);
@@ -3891,7 +3923,8 @@ function allKnownPartNames(){
 function materialCandidatePartsFromMaterial(m){
   if(!m) return [];
   const parts = [];
-  if(m.engineOilLiters) parts.push({partName:'엔진오일'});
+  if(m.engineOilLiters) parts.push({partName:engineOilPartName(m)});
+  if(m.batteryName) parts.push({partName:m.batteryName});
   if(m.oilFilter1Name) parts.push({partName:m.oilFilter1Name});
   if(m.oilFilter2Name) parts.push({partName:m.oilFilter2Name});
   if(m.fuelFilterName) parts.push({partName:m.fuelFilterName});
@@ -4021,7 +4054,6 @@ function renderContent(){
   else if(currentTab==='settings') c.innerHTML = renderSettingsTab();
   if(currentTab==='history'){ if(historyViewMode==='customer') renderCustomerHistoryView(); else initHistorySelect(); }
   if(currentTab==='maint') renderMaintList();
-  if(currentTab==='materials') { renderPartsStockTable(); renderSuppliesCatalogTable(); }
   if(currentTab==='consumable-order') renderConsumableOrderTable();
   if(currentTab==='improvements') renderImprovementsList();
   if(currentTab==='settings'){ renderGenColorOverrideList(); renderCompanyContactSection(); autoBackupFolderStatusHtml(); renderQuickOrderQr(); renderVoiceSelect(); }
@@ -8341,156 +8373,245 @@ async function returnBorrowedGen(id){
 }
 
 // ---------- 자재 관리 ----------
+// ---------- 자재관리: 모델별 고정 칸 ----------
+const MAT_SLOTS = [
+  {key:'battery',     label:'배터리',     nameF:'batteryName',     qtyF:'batteryQty',     prefixes:['배터리'],                       ph:'예: 100A-12V'},
+  {key:'oilFilter1',  label:'오일필터 1', nameF:'oilFilter1Name',  qtyF:'oilFilter1Qty',  prefixes:['오일필터'],                     ph:'품번 (예: LF-3349)'},
+  {key:'oilFilter2',  label:'오일필터 2', nameF:'oilFilter2Name',  qtyF:'oilFilter2Qty',  prefixes:['오일필터'],                     ph:'바이패스 등'},
+  {key:'fuelFilter1', label:'연료필터 1', nameF:'fuelFilterName',  qtyF:'fuelFilterQty',  prefixes:['연료필터'],                     ph:'품번 (1차)'},
+  {key:'fuelFilter2', label:'연료필터 2', nameF:'fuelFilter2Name', qtyF:'fuelFilter2Qty', prefixes:['연료필터'],                     ph:'품번 (2차)'},
+  {key:'airFilter',   label:'에어클리너', nameF:'airFilterName',   qtyF:'airFilterQty',   prefixes:['에어필터','에어크리너','에어클리너'], ph:'품번'},
+  {key:'fanBelt',     label:'팬벨트',     nameF:'fanBeltName',     qtyF:'fanBeltQty',     prefixes:['팬벨트','벨트'],                ph:'품번'}
+];
+let matCardModels = [];
+// 저장된 값 + (예전 방식) 소요자재 목록을 고정 칸으로 풀어서 보여줄 값을 만듭니다.
+function matCardValues(model){
+  const m = DB.materials[model] || {};
+  const v = {oilSpec:m.engineOilSpec||'', oilL:m.engineOilLiters||'', slots:{}, etc:[]};
+  MAT_SLOTS.forEach(sl=>{ v.slots[sl.key] = {name:m[sl.nameF]||'', qty:m[sl.qtyF]||''}; });
+  const used = new Set(MAT_SLOTS.filter(sl=>v.slots[sl.key].name).map(sl=>sl.key));
+  if(v.oilL) used.add('engineOil');
+  (m.consumables||[]).forEach(c=>{
+    if(!c || !c.name) return;
+    const kind = inferConsumableKind(c.name, used);
+    if(kind==='engineOil'){ used.add(kind); v.oilL = c.qty||''; v.oilSpec = (c.spec && c.spec!=='리터')? c.spec : ((c.name.replace(/^엔진오일\s*/,''))||''); return; }
+    const sl = MAT_SLOTS.find(x=>x.key===kind);
+    if(sl){ used.add(kind); v.slots[sl.key] = {name:c.name, qty:c.qty||''}; return; }
+    v.etc.push({name:c.name, qty:c.qty||''});
+  });
+  return v;
+}
+function matPartOptions(prefixes){
+  return allKnownPartNames().filter(n=>prefixes.some(p=>n.startsWith(p))).sort((a,b)=>a.localeCompare(b,'ko'))
+    .map(n=>`<option value="${escR(n)}">`).join('');
+}
+// 모델 카드 안에서 바로 보는·고치는 현재고 칸 (부품 재고와 같은 값)
+function matStockCellHtml(name){
+  const known = name && (DB.partsStock[name]!==undefined || allKnownPartNames().includes(name));
+  if(!known) return `<span class="nostk" title="저장하면 재고와 연결됩니다">-</span>`;
+  const q = Number(DB.partsStock[name]||0);
+  return `<input type="number" class="stk${q<0?' neg':''}" data-part="${escR(name)}" step="${partUnitOf(name)==='L'?'0.5':'1'}" value="${q}" title="현재고 (바로 저장됩니다)" onchange="setPartStockFromCard(this)">`;
+}
+async function setPartStockFromCard(el){
+  const name = el.dataset.part;
+  if(!requireTechnician('부품 재고 수정')){ el.value = Number(DB.partsStock[name]||0); return; }
+  const v = Number(el.value);
+  if(el.value.trim()==='' || isNaN(v)){ el.value = Number(DB.partsStock[name]||0); return; }
+  DB.partsStock[name] = v;
+  // 같은 부품이 다른 모델 카드에도 있으면 함께 바꿔 보여줍니다.
+  document.querySelectorAll('input.stk').forEach(x=>{ if(x.dataset.part===name){ x.value = v; x.classList.toggle('neg', v<0); } });
+  await saveWithRetry(savePartsStock);
+  flash(`${name} 현재고 ${v}${partUnitOf(name)||'개'}로 저장했습니다`);
+}
+function matEtcRowHtml(i, name, qty){
+  return `<div class="mc-etc-row"><span class="lab">기타</span>
+    <input type="text" class="mc-etc-name" value="${escR(name||'')}" placeholder="품명 품번 (예: 부동액)" list="mc-all-parts">
+    <input type="number" class="q mc-etc-qty" min="0" step="0.5" value="${escR(qty||'')}" placeholder="1">
+    <span class="u">${partUnitOf(name||'')||'개'}</span>
+    ${matStockCellHtml(name)}
+    <button type="button" class="x" title="이 줄 삭제" onclick="removeMatEtcRow(this,${i})">✕</button></div>`;
+}
+function materialCardHtml(model, i){
+  const v = matCardValues(model);
+  const genIds = activeGens().filter(g=>g.model===model).sort(sortByIdNatural).map(g=>g.id);
+  const oilSpecs = [...new Set(allKnownPartNames().filter(n=>n.startsWith('엔진오일')).map(n=>(DB.partsSpecs&&DB.partsSpecs[n]) || n.replace(/^엔진오일\s*/,'')).filter(Boolean))];
+  const slotRows = MAT_SLOTS.map(sl=>`
+      <label for="mc-${i}-${sl.key}">${sl.label}</label>
+      <input type="text" id="mc-${i}-${sl.key}" list="mc-dl-${sl.key}" value="${escR(v.slots[sl.key].name)}" placeholder="${sl.ph}">
+      <input type="number" class="q" id="mc-${i}-${sl.key}-q" min="0" step="1" value="${escR(v.slots[sl.key].qty)}" placeholder="1">
+      <span class="u">개</span>
+      ${matStockCellHtml(v.slots[sl.key].name)}`).join('');
+  return `<div class="material-card mc" id="mc-${i}" style="margin-bottom:0;" oninput="if(!event.target.classList.contains('stk')) markMatCardDirty(${i})">
+    <div class="m-title"><span>${escR(model)}</span><span class="mc-dirty-note" id="mc-${i}-dirty"></span></div>
+    ${genIds.length? `<div class="mc-ids">${genIds.map(id=>`<span class="pill gray">${id}</span>`).join('')}</div>`:''}
+    <div class="mc-grid">
+      <span></span><span class="hd l">품번 / 규격</span><span class="hd">필요</span><span></span><span class="hd">현재고</span>
+      <label for="mc-${i}-oil">엔진오일</label>
+      <input type="text" id="mc-${i}-oil" list="mc-dl-oilspec-${i}" value="${escR(v.oilSpec)}" placeholder="규격 (예: 15W-40)">
+      <datalist id="mc-dl-oilspec-${i}">${oilSpecs.map(x=>`<option value="${escR(x)}">`).join('')}</datalist>
+      <input type="number" class="q" id="mc-${i}-oil-l" min="0" step="0.5" value="${escR(v.oilL)}" placeholder="0">
+      <span class="u">L</span>
+      ${matStockCellHtml(v.oilSpec? engineOilPartName({engineOilSpec:v.oilSpec}) : '')}
+      ${slotRows}
+    </div>
+    <div class="mc-etc" id="mc-${i}-etc">${v.etc.map(e=>matEtcRowHtml(i,e.name,e.qty)).join('')}</div>
+    <div class="mc-foot">
+      <button type="button" class="btn sm" onclick="addMatEtcRow(${i})">+ 기타 추가</button>
+      <button type="button" class="btn sm primary" onclick="saveMaterialCard(${i})">저장</button>
+    </div>
+  </div>`;
+}
+function matDatalistsHtml(){
+  return MAT_SLOTS.map(sl=>`<datalist id="mc-dl-${sl.key}">${matPartOptions(sl.prefixes)}</datalist>`).join('')
+    + `<datalist id="mc-all-parts">${allKnownPartNames().sort((a,b)=>a.localeCompare(b,'ko')).map(n=>`<option value="${escR(n)}">`).join('')}</datalist>`;
+}
+function markMatCardDirty(i){
+  const c = document.getElementById(`mc-${i}`); if(c) c.classList.add('dirty');
+  const d = document.getElementById(`mc-${i}-dirty`); if(d) d.textContent = '저장 안 됨';
+}
+function addMatEtcRow(i){
+  const wrap = document.getElementById(`mc-${i}-etc`); if(!wrap) return;
+  wrap.insertAdjacentHTML('beforeend', matEtcRowHtml(i,'',''));
+  markMatCardDirty(i);
+  const inputs = wrap.querySelectorAll('.mc-etc-name'); inputs[inputs.length-1].focus();
+}
+function removeMatEtcRow(btn, i){ btn.closest('.mc-etc-row').remove(); markMatCardDirty(i); }
+// 입력한 품번을 부품 재고 이름에 연결합니다. (정확히 같은 이름 → 품번 일치 → 없으면 "종류 품번"으로 새로 만듦)
+function resolveMatPartName(prefixes, raw){
+  const input = String(raw||'').trim();
+  if(!input) return {name:'', isNew:false, code:''};
+  const known = allKnownPartNames();
+  if(known.includes(input)) return {name:input, isNew:false};
+  const norm = x=>String(x||'').replace(/[\s\-_.]/g,'').toLowerCase();
+  const ni = norm(input);
+  const pool = known.filter(n=>prefixes.some(p=>n.startsWith(p)));
+  const hit = pool.find(n=>norm((DB.partsSpecs||{})[n])===ni) || pool.find(n=>norm(n).endsWith(ni) && ni.length>=3);
+  if(hit) return {name:hit, isNew:false};
+  const hasPrefix = prefixes.some(p=>input.startsWith(p));
+  const code = hasPrefix ? input.replace(new RegExp('^('+prefixes.join('|')+')\\S*\\s*'),'').trim() : input;
+  return {name: hasPrefix? input : `${prefixes[0]} ${input}`, isNew:true, code};
+}
+async function saveMaterialCard(i){
+  if(!requireTechnician('자재 정보 저장')) return;
+  const model = matCardModels[i]; if(!model) return;
+  const val = id=>{ const el=document.getElementById(id); return el? el.value.trim() : ''; };
+  const num = x=>{ const n=Number(x); return n>0? n : null; };
+  if(!DB.materials[model]) DB.materials[model] = {};
+  const m = DB.materials[model];
+  const newParts = [];
+  m.engineOilSpec = val(`mc-${i}-oil`);
+  m.engineOilLiters = num(val(`mc-${i}-oil-l`));
+  if(!m.engineOilSpec) delete m.engineOilSpec;
+  if(!m.engineOilLiters) delete m.engineOilLiters;
+  MAT_SLOTS.forEach(sl=>{
+    const r = resolveMatPartName(sl.prefixes, val(`mc-${i}-${sl.key}`));
+    if(r.name){ m[sl.nameF] = r.name; m[sl.qtyF] = num(val(`mc-${i}-${sl.key}-q`)) || 1; if(r.isNew) newParts.push(r); }
+    else { delete m[sl.nameF]; delete m[sl.qtyF]; }
+  });
+  const etc = [];
+  document.querySelectorAll(`#mc-${i}-etc .mc-etc-row`).forEach(row=>{
+    const name = row.querySelector('.mc-etc-name').value.trim();
+    if(!name) return;
+    etc.push({name, qty: num(row.querySelector('.mc-etc-qty').value) || 1, category: model, spec: (DB.partsSpecs||{})[name] || ''});
+  });
+  m.consumables = etc;
+  // 새 품번은 부품 재고 목록에 품번·구분과 함께 등록(수량 0)해둡니다.
+  if(newParts.length){
+    DB.partsSpecs = DB.partsSpecs || {}; DB.partsCategory = DB.partsCategory || {};
+    newParts.forEach(r=>{
+      if(DB.partsStock[r.name]===undefined) DB.partsStock[r.name] = 0;
+      if(r.code && !DB.partsSpecs[r.name]) DB.partsSpecs[r.name] = r.code;
+      if(!DB.partsCategory[r.name]) DB.partsCategory[r.name] = model;
+    });
+    await saveWithRetry(savePartsStock); await saveWithRetry(savePartsSpecs); await saveWithRetry(savePartsCategory);
+  }
+  await saveWithRetry(saveMaterials);
+  renderContent();
+  flash(newParts.length? `저장했습니다 (새 품번 ${newParts.length}개는 부품 재고에 0개로 추가)` : '저장했습니다');
+}
+// 부품 재고의 "구분"을 모델에 연결해, 모델 카드의 빈 칸을 재고 품번으로 한 번에 채웁니다.
+// (이미 입력된 칸은 덮어쓰지 않습니다. 배터리는 모델마다 달라 채우지 않습니다.)
+const MAT_AUTOFILL_MAP = {
+  '50KW-4DX':    ['위차이(4DX) 50kW(신형)'],
+  '120KW-6BT':   ['커민스(6BT) 120kW(신형)','커민스(6BT) 120kW(신형)(노랑)','커민스(6BT) 120kW(회색)'],
+  '0846용':      ['대우 0846 75kW(구형)'],
+  '30KW-보두앙':  ['보두앙 30kW(신형)'],
+  '300KW-보두앙': ['보두앙 300kW(신형)'],
+  '볼보500K':    ['커민스(QSX15) 500kW']
+};
+function matSlotForPartName(name, v){
+  const empty = k=>!v.slots[k].name;
+  if(/^오일필터-?바이패스/.test(name)) return 'oilFilter2';
+  if(/^오일필터/.test(name)) return empty('oilFilter1')? 'oilFilter1' : (empty('oilFilter2')? 'oilFilter2' : null);
+  if(/^연료필터1차2차/.test(name)) return 'fuelFilter1';
+  if(/^연료필터1차/.test(name)) return 'fuelFilter1';
+  if(/^연료필터2차/.test(name)) return 'fuelFilter2';
+  if(/^연료필터/.test(name)) return empty('fuelFilter1')? 'fuelFilter1' : (empty('fuelFilter2')? 'fuelFilter2' : null);
+  if(/^(에어필터|에어크리너|에어클리너)/.test(name)) return 'airFilter';
+  if(/^(팬벨트|벨트)/.test(name)) return 'fanBelt';
+  return null;
+}
+function writeMatValues(model, v){
+  if(!DB.materials[model]) DB.materials[model] = {};
+  const m = DB.materials[model];
+  if(v.oilSpec) m.engineOilSpec = v.oilSpec; else delete m.engineOilSpec;
+  if(Number(v.oilL)>0) m.engineOilLiters = Number(v.oilL); else delete m.engineOilLiters;
+  MAT_SLOTS.forEach(sl=>{
+    const x = v.slots[sl.key];
+    if(x.name){ m[sl.nameF] = x.name; m[sl.qtyF] = Number(x.qty)||1; } else { delete m[sl.nameF]; delete m[sl.qtyF]; }
+  });
+  m.consumables = v.etc.map(e=>({name:e.name, qty:Number(e.qty)||1, category:model, spec:(DB.partsSpecs||{})[e.name]||''}));
+}
+function autoFillMaterialsFromStock(){
+  if(!requireTechnician('자재 자동 채우기')) return;
+  const cats = DB.partsCategory || {};
+  const models = [...new Set(DB.gens.map(g=>g.model).filter(Boolean))];
+  const oilKey = allKnownPartNames().find(n=>n.startsWith('엔진오일') && cats[n]==='발전기용');
+  const oilSpec = oilKey ? ((DB.partsSpecs||{})[oilKey] || oilKey.replace(/^엔진오일\s*/,'')) : '';
+  const plan = [];  // {model, v, lines}
+  models.forEach(model=>{
+    const v = matCardValues(model);
+    const lines = [];
+    if(oilSpec && !v.oilSpec){ v.oilSpec = oilSpec; lines.push(`엔진오일 규격 ${oilSpec}`); }
+    Object.entries(MAT_AUTOFILL_MAP).forEach(([cat, targets])=>{
+      if(!targets.includes(model)) return;
+      Object.keys(cats).filter(n=>cats[n]===cat).sort((a,b)=>{
+        // "1차2차"를 먼저, "바이패스"를 뒤로 처리해 칸이 자연스럽게 채워지게 합니다.
+        const w = n=>/1차2차/.test(n)?0:/바이패스/.test(n)?2:1; return w(a)-w(b) || a.localeCompare(b,'ko');
+      }).forEach(n=>{
+        const already = MAT_SLOTS.some(sl=>v.slots[sl.key].name===n) || v.etc.some(e=>e.name===n);
+        if(already) return;
+        const k = matSlotForPartName(n, v);
+        if(!k || v.slots[k].name) return;
+        v.slots[k] = {name:n, qty:1};
+        lines.push(`${MAT_SLOTS.find(sl=>sl.key===k).label}: ${n}`);
+      });
+    });
+    if(lines.length) plan.push({model, v, lines});
+  });
+  if(!plan.length){ showInfoModal('채울 빈 칸이 없습니다. (이미 모두 입력되어 있거나, 연결할 재고 품번이 없습니다)'); return; }
+  const msg = `아래 모델의 빈 칸을 부품 재고 품번으로 채울까요? (이미 입력된 칸은 그대로 둡니다)\n\n` +
+    plan.map(p=>`■ ${p.model}\n  - ${p.lines.join('\n  - ')}`).join('\n\n');
+  openConfirmModal(msg, async function(){
+    plan.forEach(p=>writeMatValues(p.model, p.v));
+    await saveWithRetry(saveMaterials);
+    renderContent();
+    flash(`${plan.length}개 모델의 자재 칸을 채웠습니다`);
+  }, '채우기');
+}
 function renderMaterialsTab(){
   const models = sortModelsByCapacity([...new Set(DB.gens.map(g=>g.model).filter(Boolean))]);
   if(models.length===0){
     return `<div class="section-title">🧰 자재 관리</div><div class="empty">먼저 [설정] 탭에서 발전기 모델을 입력해주세요.</div>`;
   }
-  const cards = models.map(model=>{
-    const m = DB.materials[model];
-    const genIds = activeGens().filter(g=>g.model===model).sort(sortByIdNatural).map(g=>g.id);
-    return `<div class="material-card" style="margin-bottom:0;">
-      <div class="m-title"><span>${model}</span><button class="btn sm" onclick="openMaterialsModal('${model.replace(/'/g,"\\'")}')">소요자재입력</button></div>
-      ${genIds.length>0? `<div class="muted" style="font-size:11.5px;margin:-4px 0 8px;">${genIds.map(id=>`<span class="pill gray" style="margin:2px 3px 2px 0;">${id}</span>`).join('')}</div>` : ''}
-      ${materialSummaryHtml(model)}
-    </div>`;
-  }).join('');
+  matCardModels = models;
+  const cards = models.map((model,i)=>materialCardHtml(model,i)).join('');
   return `
-    <div class="section-title">🧰 모델별 정비 자재 <span class="cnt">${models.length}개 모델</span></div>
-    <details class="info-toggle"><summary></summary><p class="muted">모델별로 엔진오일량, 오일필터, 연료필터, 에어필터, 팬벨트, 기타 소모품을 등록해두면 정비 등록시 바로 확인·선택할 수 있습니다.</p></details>
+    <div class="section-title" style="flex-wrap:wrap;">🧰 모델별 정비 자재 <span class="cnt">${models.length}개 모델</span> <button type="button" class="btn sm" onclick="autoFillMaterialsFromStock()" title="부품 재고의 구분(예: 120KW-6BT)에 맞춰 모델 카드의 빈 칸을 채웁니다">🔗 재고 품번으로 빈 칸 채우기</button></div>
+    <details class="info-toggle"><summary></summary><p class="muted">모델별로 엔진오일, 배터리, 오일필터, 연료필터, 에어클리너, 팬벨트의 품번과 필요 수량을 넣고 [저장]을 누르세요. 오른쪽 "현재고"는 부품 재고와 같은 값이며, 숫자를 고치면 바로 저장됩니다. 품번만 적어도 부품 재고에 있는 품목과 자동으로 연결되고, 재고에 없는 새 품번은 부품 재고 목록에 0개로 추가됩니다. 정비 등록·장기임대 준비 리스트·발주에서 이 정보를 그대로 가져다 씁니다.</p></details>
+    ${matDatalistsHtml()}
     <div class="model-cards-grid">${cards}</div>
-    <div class="section-title">🧰 부품 재고 관리</div>
-    <details class="info-toggle"><summary></summary><p class="muted">정비 등록시 사용 부품을 체크하면 아래 재고에서 자동 차감됩니다. 재고가 0 이하이면 빨간색으로 표시됩니다.</p></details>
-    <div class="btn-row" style="margin-bottom:10px;">
-      <button type="button" class="btn sm primary" onclick="openPartsOrderListModal()">📋 발주 리스트 생성</button>
-    </div>
-    <div id="parts-stock-wrap"></div>
-    <div class="material-card" style="margin-top:16px;">
-      <div class="field" style="max-width:600px;">
-        <label>부품(자재) 추가 — 구분 · 품명 · 규격 · 수량</label>
-        <div class="consumable-row" style="flex-wrap:wrap;">
-          <input type="text" id="f-newpart-category" list="parts-category-datalist" placeholder="구분 (예: 발전기전체사용, 120K용)" style="flex:1;min-width:140px;">
-          <datalist id="parts-category-datalist">${[...new Set(Object.values(DB.partsCategory||{}))].map(c=>`<option value="${escR(c)}">`).join('')}</datalist>
-          <input type="text" id="f-newpart-name" placeholder="품명 (예: 엔진오일)" style="flex:1;min-width:100px;">
-          <input type="text" id="f-newpart-spec" placeholder="규격/사이즈 (예: 소형, 중형, 15W-40)" style="flex:1;min-width:100px;">
-          <input type="number" id="f-newpart-qty" class="qty" min="0" step="0.1" placeholder="수량" value="0">
-          <button type="button" class="btn sm primary" onclick="addStockPart()">추가</button>
-        </div>
-        <details class="info-toggle"><summary></summary><p class="muted">품명을 같게 입력하고 규격만 다르게(예: 품명 "오일필터" + 규격 "소형"·"중형") 여러 번 등록하면 서로 다른 항목으로 각각 저장됩니다. 엔진오일·부동액 등 액체류는 단위가 자동으로 "리터"로 설정되고, 필터 등 나머지는 단위 없이 개수로만 관리됩니다. 같은 구분끼리 묶여서 아래 리스트에 나오므로, 발전기별 소요자재 입력시 쉽게 찾을 수 있습니다.</p></details>
-      </div>
-      <div id="parts-purchase-log-wrap" style="margin-top:16px;"></div>
-    </div>
-    <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">📦 부자재 목록 · 재고 관리</div>
-      <details class="info-toggle"><summary></summary><p class="muted">출고 처리시 선택할 수 있는 부자재 목록입니다 (예: 깔판, 전선규격, 분전함 등). 출고(상차완료) 시 선택한 수량만큼 재고에서 자동 차감되고, 입고 처리시 "회수됨"으로 확인하면 재고가 다시 복구됩니다. 품명을 같게 입력하고 규격/사이즈만 다르게(예: 품명 "분전함" + 규격 "대"·"중"·"소") 각각 수량을 등록하면, 같은 품명끼리 묶여서 리스트에 나란히 나옵니다.</p></details>
-      <div id="supplies-catalog-wrap"></div>
-      <div class="field" style="max-width:460px;margin-top:8px;">
-        <div class="consumable-row" style="flex-wrap:wrap;">
-          <input type="text" id="f-newsupply-name" list="supplies-name-datalist" placeholder="품명 (예: 분전함)" style="flex:1;min-width:120px;">
-          <datalist id="supplies-name-datalist">${[...new Set(Object.values(DB.suppliesCategories||{}))].map(c=>`<option value="${escR(c)}">`).join('')}</datalist>
-          <input type="text" id="f-newsupply-spec" placeholder="규격/사이즈 (예: 대, 중, 소)" style="flex:1;min-width:100px;">
-          <input type="number" id="f-newsupply-qty" placeholder="재고수량" min="0" style="width:90px;">
-          <button type="button" class="btn sm primary" onclick="addSuppliesCatalogItem()">추가</button>
-        </div>
-        <div class="hint" style="margin-top:4px;">같은 품명으로 규격만 다르게(대/중/소 등) 여러 번 등록하면 아래 리스트에서 그 품명끼리 묶여 나옵니다.</div>
-      </div>
-    </div>
   `;
-}
-const UNASSIGNED_SUPPLIER = '공급업체 미지정';
-function neededOrderParts(){
-  const names = allKnownPartNames().sort((a,b)=>a.localeCompare(b,'ko'));
-  return names.map(n=>{
-    const stock = DB.partsStock[n]!==undefined ? DB.partsStock[n] : 0;
-    const minQty = (DB.partsMinStock && DB.partsMinStock[n]) || 0;
-    if(!minQty || stock>minQty) return null;
-    const orderQty = Math.max(minQty - stock, 1);
-    const spec = (DB.partsSpecs && DB.partsSpecs[n]) || '';
-    const category = (DB.partsCategory && DB.partsCategory[n]) || '';
-    const unit = partUnitOf(n);
-    const supplier = (DB.partsSupplier && DB.partsSupplier[n]) || UNASSIGNED_SUPPLIER;
-    const mark = (DB.orderMarks && DB.orderMarks[n]) || null;
-    const baseName = (spec && n.endsWith(' '+spec)) ? n.slice(0, n.length - spec.length - 1) : n;
-    return {name:baseName, fullKey:n, stock, minQty, orderQty, spec, category, unit, supplier, mark};
-  }).filter(Boolean);
-}
-function groupBySupplier(needed){
-  const groups = {};
-  needed.forEach(p=>{
-    if(!groups[p.supplier]) groups[p.supplier] = [];
-    groups[p.supplier].push(p);
-  });
-  return groups;
-}
-function openPartsOrderListModal(){
-  const needed = neededOrderParts();
-  const groups = groupBySupplier(needed);
-  const supplierNames = Object.keys(groups).sort((a,b)=>{
-    if(a===UNASSIGNED_SUPPLIER) return 1;
-    if(b===UNASSIGNED_SUPPLIER) return -1;
-    return a.localeCompare(b,'ko');
-  });
-  const dateLabel = dow(todayStr());
-  const pendingCount = needed.filter(p=>!p.mark).length;
-  let text;
-  if(needed.length===0){
-    text = `[부품 발주 리스트] ${dateLabel}\n\n최소재고 미달인 부품이 없습니다.`;
-  } else {
-    const blocks = supplierNames.map(sup=>{
-      const lines = groups[sup].map(p=>`- ${p.name}${p.category? ` (${p.category})`:''}${p.spec? ` [${p.spec}]`:''} : 현재고 ${p.stock}${p.unit||''} / 최소재고 ${p.minQty}${p.unit||''} → 발주 ${p.orderQty}${p.unit||'개'}${p.mark? ` (구매완료 ${dow(p.mark.date)}${p.mark.by? ` · ${p.mark.by}`:''})`:''}`);
-      return `■ ${sup}\n${lines.join('\n')}`;
-    });
-    text = `[부품 발주 리스트] ${dateLabel}\n\n${blocks.join('\n\n')}`;
-  }
-  const previewHtml = needed.length===0
-    ? `<div class="empty">최소재고 미달인 부품이 없습니다.</div>`
-    : supplierNames.map(sup=>`
-      <div class="detail-card" style="margin-bottom:12px;padding:0;overflow:hidden;">
-        <div style="background:var(--surface-2);font-weight:800;font-size:13.5px;padding:8px 12px;border-bottom:1px solid var(--border);">📦 ${escR(sup)} <span class="muted" style="font-weight:400;font-size:11.5px;">(${groups[sup].length}건)</span></div>
-        <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">
-          <thead><tr style="background:var(--surface);">
-            <th style="text-align:left;padding:7px 8px;font-size:11.5px;color:var(--ink-soft);font-weight:700;width:20%;">품명</th>
-            <th style="text-align:left;padding:7px 8px;font-size:11.5px;color:var(--ink-soft);font-weight:700;width:15%;">구분</th>
-            <th style="text-align:left;padding:7px 8px;font-size:11.5px;color:var(--ink-soft);font-weight:700;width:15%;">규격</th>
-            <th style="text-align:right;padding:7px 8px;font-size:11.5px;color:var(--ink-soft);font-weight:700;width:18%;">현재고/최소</th>
-            <th style="text-align:right;padding:7px 8px;font-size:11.5px;color:var(--ink-soft);font-weight:700;width:14%;">발주수량</th>
-            <th style="text-align:right;padding:7px 8px;font-size:11.5px;color:var(--ink-soft);font-weight:700;width:18%;"></th>
-          </tr></thead>
-          <tbody>${groups[sup].map(p=>{
-            const escN = p.fullKey.replace(/'/g,"\\'");
-            const actionCell = p.mark
-              ? `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;">
-                   <span class="pill ok" style="white-space:nowrap;">✅ 구매완료</span>
-                   <span class="muted" style="font-size:10.5px;">${dow(p.mark.date)}${p.mark.by? ` · ${escR(p.mark.by)}`:''}</span>
-                   <button type="button" class="btn sm" style="padding:2px 8px;font-size:11px;" onclick="unmarkOrderPurchased('${escN}')">완료 취소</button>
-                 </div>`
-              : `<button type="button" class="btn sm primary" onclick="markOrderPurchased('${escN}')">구입완료</button>`;
-            return `<tr style="border-top:1px solid var(--border);${p.mark? 'opacity:.6;':''}">
-            <td style="padding:7px 8px;font-weight:600;">${escR(p.name)}</td>
-            <td style="padding:7px 8px;color:var(--ink-soft);">${p.category? escR(p.category):'-'}</td>
-            <td style="padding:7px 8px;color:var(--ink-soft);">${p.spec? escR(p.spec):'-'}</td>
-            <td style="padding:7px 8px;text-align:right;color:var(--ink-soft);font-family:var(--mono);font-size:12px;">${p.stock}${p.unit||''} / ${p.minQty}${p.unit||''}</td>
-            <td style="padding:7px 8px;text-align:right;"><span style="color:var(--danger);font-weight:800;">${p.orderQty}${p.unit||'개'}</span></td>
-            <td style="padding:7px 8px;text-align:right;">${actionCell}</td>
-          </tr>`;
-          }).join('')}</tbody>
-        </table>
-      </div>`).join('');
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="text-align:left;">
-      <h3 style="text-align:center;">📋 부품 발주 리스트</h3>
-      <div class="modal-sub">${dateLabel} · 최소재고 미달 부품 ${needed.length}건 (미구매 ${pendingCount}건) · 공급업체 ${supplierNames.length}곳</div>
-      <div style="max-height:50vh;overflow-y:auto;margin-top:6px;">${previewHtml}</div>
-      <textarea id="f-order-text" readonly style="position:absolute;left:-9999px;top:-9999px;">${text}</textarea>
-      <div id="f-order-msg" class="hint" style="display:none;margin-top:6px;"></div>
-      <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">닫기</button>
-        <button class="btn" onclick="copyTextareaById('f-order-text','f-order-msg')">복사하기</button>
-        ${needed.length>0? `<button class="btn primary" onclick="downloadOrderListFile()">🖨 인쇄</button>`:''}
-      </div>
-    </div>
-  </div>`;
 }
 function inGensPrintCss(){
   return `
@@ -8567,52 +8688,6 @@ function orderListPrintCss(){
     @media print{ .print-hint{display:none;} }
   `;
 }
-function orderListGroupPrintHtml(supplier, items){
-  const rows = items.map(p=>`<tr${p.mark? ` style="color:#888;"`:''}><td class="name">${escR(p.name)}${p.mark? ` <span style="color:#0a7d2c;font-weight:700;font-size:11px;">[구매완료 ${dow(p.mark.date)}]</span>`:''}</td><td>${p.category? escR(p.category):'-'}</td><td>${p.spec? escR(p.spec):'-'}</td><td>${p.orderQty}${p.unit||'개'}</td><td class="muted">현재고 ${p.stock}${p.unit||''} / 최소재고 ${p.minQty}${p.unit||''}</td></tr>`).join('');
-  return `<div class="ol-group">
-    <div class="ol-group-title">■ ${escR(supplier)}</div>
-    <table class="ol-table">
-      <thead><tr><th style="width:28%;">품명</th><th style="width:16%;">구분</th><th style="width:18%;">규격</th><th style="width:14%;">발주수량</th><th>현재고/최소재고</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-  </div>`;
-}
-function downloadOrderListFile(){
-  const needed = neededOrderParts();
-  if(needed.length===0){ showInfoModal('발주가 필요한 부품이 없습니다.'); return; }
-  const groups = groupBySupplier(needed);
-  const supplierNames = Object.keys(groups).sort((a,b)=>{
-    if(a===UNASSIGNED_SUPPLIER) return 1;
-    if(b===UNASSIGNED_SUPPLIER) return -1;
-    return a.localeCompare(b,'ko');
-  });
-  const body = supplierNames.map(sup=>orderListGroupPrintHtml(sup, groups[sup])).join('');
-  const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
-<title>발주리스트 - ${todayStr()}</title>
-<style>${orderListPrintCss()}</style>
-</head><body>
-<div class="ol-wrap">
-  <div class="ol-title">부품 발주 리스트</div>
-  <div class="ol-sub">${dow(todayStr())} 기준 · 공급업체별 정리 · 총 ${needed.length}건</div>
-  ${body}
-</div>
-</body></html>`;
-  const win = window.open('', '_blank', 'width=1000,height=800');
-  if(!win){
-    showInfoModal('팝업이 차단되어 바로 인쇄 창을 열 수 없습니다. 브라우저에서 이 사이트의 팝업을 허용해주세요.');
-    return;
-  }
-  win.document.open();
-  win.document.write(doc);
-  win.document.close();
-  win.onload = function(){
-    setTimeout(function(){
-      win.focus();
-      win.print();
-    }, 300);
-  };
-  win.onafterprint = function(){ win.close(); };
-}
 function outFieldListRowsHtml(list, showMaintCol){
   return list.map(g=>{
     const rt = g.rental||{};
@@ -8639,6 +8714,7 @@ function aggregatePrepParts(gensList){
     const m = DB.materials && DB.materials[g.model];
     if(!m) return;
     if(m.engineOilLiters) push(`oil:${m.engineOilSpec||''}`, `엔진오일${m.engineOilSpec? ' '+m.engineOilSpec:''}`, Number(m.engineOilLiters)||0, 'L');
+    if(m.batteryName) push(`part:${m.batteryName}`, m.batteryName, Number(m.batteryQty)||1, '개');
     if(m.oilFilter1Name) push(`part:${m.oilFilter1Name}`, m.oilFilter1Name, Number(m.oilFilter1Qty)||1, '개');
     if(m.oilFilter2Name) push(`part:${m.oilFilter2Name}`, m.oilFilter2Name, Number(m.oilFilter2Qty)||1, '개');
     if(m.fuelFilterName) push(`part:${m.fuelFilterName}`, m.fuelFilterName, Number(m.fuelFilterQty)||1, '개');
@@ -8706,99 +8782,6 @@ ${body}
   };
   win.onafterprint = function(){ win.close(); };
 }
-function renderSuppliesCatalogTable(){
-  const wrap = document.getElementById('supplies-catalog-wrap');
-  if(!wrap) return;
-  const items = [...(DB.suppliesCatalog||[])];
-  if(items.length===0){ wrap.innerHTML = `<div class="empty">등록된 부자재가 없습니다.</div>`; return; }
-  const catOf = n => (DB.suppliesCategories && DB.suppliesCategories[n]) || n;
-  const groups = {};
-  items.forEach(n=>{ const c = catOf(n); (groups[c]=groups[c]||[]).push(n); });
-  const catNames = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'ko'));
-  const cardHtml = n=>{
-    const qty = (DB.suppliesStock && DB.suppliesStock[n]!==undefined) ? DB.suppliesStock[n] : 0;
-    const escN = n.replace(/'/g,"\\'");
-    const spec = (DB.suppliesSpecs && DB.suppliesSpecs[n]) || '';
-    return `<div style="border:1px solid var(--border);border-radius:8px;padding:8px;${qty<=0? 'background:var(--danger-tint);':''}">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
-        <span style="flex:1;font-weight:700;font-size:13.5px;">${escR(n)}</span>
-        <button class="btn sm danger" style="flex:none;" onclick="removeSuppliesCatalogItem('${escN}')">삭제</button>
-      </div>
-      <div style="display:flex;align-items:center;gap:5px;">
-        <input type="text" value="${escR(spec)}" placeholder="규격/사이즈" style="flex:1;min-width:0;" onchange="updateSuppliesSpec('${escN}', this.value)">
-        <input type="number" value="${qty}" min="0" style="width:64px;flex:none;color:${qty<=0?'var(--danger)':'var(--ink)'};font-weight:${qty<=0?'700':'400'};" onchange="updateSuppliesStock('${escN}', this.value)">
-      </div>
-    </div>`;
-  };
-  const groupsHtml = catNames.map(cat=>`
-    <div style="margin-bottom:12px;">
-      <div style="font-weight:700;font-size:12.5px;color:var(--primary);margin-bottom:6px;">${escR(cat)} <span class="muted" style="font-weight:400;font-size:11px;">(${groups[cat].length}종)</span></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:8px;">
-        ${[...groups[cat]].sort((a,b)=>a.localeCompare(b,'ko')).map(cardHtml).join('')}
-      </div>
-    </div>`).join('');
-  wrap.innerHTML = groupsHtml;
-}
-async function addSuppliesCatalogItem(){
-  const nameEl = document.getElementById('f-newsupply-name');
-  const specEl = document.getElementById('f-newsupply-spec');
-  const qtyEl = document.getElementById('f-newsupply-qty');
-  const baseName = nameEl.value.trim();
-  if(!baseName) return;
-  let spec = specEl ? specEl.value.trim() : '';
-  if(spec && spec.toLowerCase()===baseName.toLowerCase()) spec = ''; // 품명과 규격이 같으면 규격은 무시 (예: "ATS ATS" 같은 중복 표시 방지)
-  const qty = Number(qtyEl.value)||0;
-  const key = spec ? `${baseName} ${spec}` : baseName;
-  DB.suppliesStock = DB.suppliesStock || {};
-  DB.suppliesSpecs = DB.suppliesSpecs || {};
-  DB.suppliesCategories = DB.suppliesCategories || {};
-  if(!(DB.suppliesCatalog||[]).includes(key)){
-    DB.suppliesCatalog = [...(DB.suppliesCatalog||[]), key];
-  }
-  DB.suppliesStock[key] = (DB.suppliesStock[key]||0) + qty;
-  if(spec) DB.suppliesSpecs[key] = spec;
-  DB.suppliesCategories[key] = baseName;
-  await saveSuppliesCatalog();
-  await saveSuppliesStock();
-  if(spec) await saveSuppliesSpecs();
-  await saveSuppliesCategories();
-  nameEl.value = '';
-  if(specEl) specEl.value = '';
-  qtyEl.value = '';
-  renderSuppliesCatalogTable();
-  flash('추가되었습니다');
-}
-async function updateSuppliesStock(name, value){
-  const v = Number(value);
-  DB.suppliesStock = DB.suppliesStock || {};
-  DB.suppliesStock[name] = isNaN(v) ? 0 : v;
-  await saveSuppliesStock();
-  flash('재고가 수정되었습니다');
-}
-async function updateSuppliesSpec(name, value){
-  const v = value.trim();
-  DB.suppliesSpecs = DB.suppliesSpecs || {};
-  if(v) DB.suppliesSpecs[name] = v;
-  else delete DB.suppliesSpecs[name];
-  await saveSuppliesSpecs();
-  flash('규격이 저장되었습니다');
-}
-function removeSuppliesCatalogItem(name){
-  openConfirmModal(`"${name}"을(를) 부자재 목록에서 삭제할까요? 등록된 재고 수량도 함께 삭제됩니다.`, async function(){
-    DB.suppliesCatalog = (DB.suppliesCatalog||[]).filter(n=>n!==name);
-    if(DB.suppliesStock) delete DB.suppliesStock[name];
-    if(DB.suppliesSizes) delete DB.suppliesSizes[name];
-    if(DB.suppliesSpecs) delete DB.suppliesSpecs[name];
-    if(DB.suppliesCategories) delete DB.suppliesCategories[name];
-    await saveSuppliesCatalog();
-    await saveSuppliesStock();
-    await saveSuppliesSizes();
-    await saveSuppliesSpecs();
-    await saveSuppliesCategories();
-    renderSuppliesCatalogTable();
-    flash('삭제되었습니다');
-  }, '삭제');
-}
 function isLiquidPartName(name){
   if(!name) return false;
   if(name.includes('필터')) return false;
@@ -8807,376 +8790,6 @@ function isLiquidPartName(name){
 function partUnitOf(name){
   return isLiquidPartName(name) ? 'L' : '';
 }
-function renderPartsStockTable(){
-  const wrap = document.getElementById('parts-stock-wrap');
-  if(!wrap) return;
-  const names = allKnownPartNames();
-  if(names.length===0){
-    wrap.innerHTML = `<div class="empty">등록된 부품이 없습니다. 모델별 자재정보를 입력하거나 아래에서 직접 추가해주세요.</div>`;
-    const logWrap0 = document.getElementById('parts-purchase-log-wrap');
-    if(logWrap0) logWrap0.innerHTML = '<div class="hint">아직 입고 내역이 없습니다.</div>';
-    return;
-  }
-  const catOf = n => (DB.partsCategory && DB.partsCategory[n]) || n;
-  const groups = {};
-  names.forEach(n=>{ const c = catOf(n); (groups[c]=groups[c]||[]).push(n); });
-  const groupHasLiquid = cat => groups[cat].some(isLiquidPartName);
-  const numOf = cat => { const m = cat.match(/\d+/); return m ? Number(m[0]) : null; };
-  const catNames = Object.keys(groups).sort((a,b)=>{
-    const aLiq = groupHasLiquid(a), bLiq = groupHasLiquid(b);
-    if(aLiq!==bLiq) return aLiq? -1 : 1;
-    const an = numOf(a), bn = numOf(b);
-    if(an!==null && bn!==null && an!==bn) return an-bn;
-    if(an!==null && bn===null) return -1;
-    if(an===null && bn!==null) return 1;
-    return a.localeCompare(b,'ko');
-  });
-  const rowHtml = n=>{
-    const qty = DB.partsStock[n]!==undefined ? DB.partsStock[n] : 0;
-    const unit = partUnitOf(n);
-    const spec = (DB.partsSpecs && DB.partsSpecs[n]) || '';
-    const category = (DB.partsCategory && DB.partsCategory[n]) || '';
-    const supplier = (DB.partsSupplier && DB.partsSupplier[n]) || '';
-    const minQty = (DB.partsMinStock && DB.partsMinStock[n]) || '';
-    const escN = n.replace(/'/g,"\\'");
-    const safeN = safeIdFrag(n);
-    const isLow = minQty && qty<=Number(minQty);
-    const qtyColor = qty<=0 ? 'var(--danger)' : 'var(--primary-dark)';
-    const baseName = (spec && n.endsWith(' '+spec)) ? n.slice(0, n.length - spec.length - 1) : n;
-    return `<tr${isLow? ` style="background:var(--danger-tint);"`:''}>
-      <td class="wrap-ok">
-        ${escR(baseName)}
-        <input type="text" value="${escR(category)}" list="parts-category-datalist" placeholder="구분 이동" style="width:100%;font-size:14px;margin-top:3px;" onchange="updatePartCategory('${escN}', this.value)">
-      </td>
-      <td><input type="text" value="${spec.replace(/"/g,'&quot;')}" placeholder="예: 15W-40" onchange="updatePartSpec('${escN}', this.value)"></td>
-      <td>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-          <span id="curstock-${safeN}" style="font-size:19px;font-weight:800;color:${qtyColor};cursor:pointer;text-decoration:underline dotted;" onclick="editStockQtyInline('${escN}')" title="클릭해서 재고 직접 수정">${qty}</span>
-          <span class="muted" style="font-size:11px;">${unit||'개'}</span>
-        </div>
-      </td>
-      <td>
-        <input type="number" min="0" step="0.1" id="addqty-${safeN}" placeholder="추가${unit? `(${unit})`:''}" class="qty" style="width:100%;" onchange="addStockQty('${escN}', this)">
-      </td>
-      <td><input type="text" value="${supplier.replace(/"/g,'&quot;')}" placeholder="예: 대성상사" onchange="updatePartSupplier('${escN}', this.value)"></td>
-      <td><input type="number" min="0" value="${minQty}" placeholder="예: 3" onchange="updatePartMinStock('${escN}', this.value)"></td>
-      <td><button class="btn sm danger" onclick="removeStockPart('${escN}')">삭제</button></td>
-    </tr>`;
-  };
-  const bodyRows = catNames.map(cat=>`<div class="material-card" style="margin-bottom:0;">
-    <div class="section-title" style="margin-top:0;font-size:14px;">📦 ${escR(cat)} <span class="cnt">${groups[cat].length}종${groupHasLiquid(cat)? ' · 액체':''}</span></div>
-    <div class="table-scroll"><table class="settings-table">
-      <thead><tr><th>품명</th><th style="width:110px;">규격</th><th style="width:80px;">현재고</th><th style="width:100px;">입고 추가</th><th style="width:100px;">공급업체</th><th style="width:80px;">최소재고</th><th style="width:60px;"></th></tr></thead>
-      <tbody>${[...groups[cat]].sort((a,b)=>a.localeCompare(b,'ko')).map(rowHtml).join('')}</tbody>
-    </table></div>
-  </div>`).join('');
-  const tableHtml = `<div class="model-cards-grid">${bodyRows}</div>`;
-  const recentLog = [...(DB.partsPurchaseLog||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,10);
-  const logHtml = recentLog.length>0 ? `
-    <div class="section-title" style="font-size:13px;margin-top:0;">🧾 최근 재고 입고 내역 <span class="muted" style="font-weight:400;font-size:11px;">(최근 10건)</span></div>
-    <details class="info-toggle"><summary></summary><p class="muted">잘못 입력된 항목은 "삭제"를 누르면 내역에서 지워지고 추가된 수량만큼 재고에서도 다시 차감됩니다.</p></details>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-    ${recentLog.map(l=>{
-      const cat = (DB.partsCategory && DB.partsCategory[l.partName]) || '-';
-      const spec = (DB.partsSpecs && DB.partsSpecs[l.partName]) || '-';
-      return `<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px;">
-          <span style="font-weight:700;font-size:13px;">${escR(l.partName)}</span>
-          <span class="muted" style="font-size:11px;white-space:nowrap;">${dow(l.date)}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span class="muted" style="font-size:11.5px;">구분 ${escR(cat)}</span>
-          <span class="muted" style="font-size:11.5px;">규격 ${escR(spec)}</span>
-          <span style="color:var(--primary-dark);font-weight:700;font-size:12.5px;">+${l.qty}</span>
-          ${l.id? `<button class="btn sm danger" style="margin-left:auto;" onclick="deletePartsPurchaseLogEntry('${l.id}')">삭제</button>`:''}
-        </div>
-      </div>`;
-    }).join('')}
-    </div>` : '<div class="hint">아직 입고 내역이 없습니다.</div>';
-  wrap.innerHTML = tableHtml;
-  const logWrap = document.getElementById('parts-purchase-log-wrap');
-  if(logWrap) logWrap.innerHTML = logHtml;
-}
-function safeIdFrag(s){
-  return String(s).replace(/[\s"'<>&]/g, '_');
-}
-async function addStockQty(name, inputEl){
-  if(!requireTechnician('부품 재고 입고')) return;
-  const idFrag = safeIdFrag(name);
-  const input = inputEl || document.getElementById(`addqty-${idFrag}`);
-  if(!input) return;
-  const addQty = Number(input.value);
-  if(!addQty || addQty<=0){ input.value=''; return; }
-  DB.partsStock[name] = (DB.partsStock[name]||0) + addQty;
-  DB.partsPurchaseLog = [...(DB.partsPurchaseLog||[]), {id: uid(), date: todayStr(), partName: name, qty: addQty, by: DB.currentUserName||null}];
-  const hadMark = DB.orderMarks && DB.orderMarks[name];
-  if(hadMark) delete DB.orderMarks[name];
-  await savePartsStock();
-  await savePartsPurchaseLog();
-  if(hadMark) await saveOrderMarks();
-  renderPartsStockTable();
-  flash(`${name} 재고에 ${addQty} 추가되었습니다 (현재 ${DB.partsStock[name]})`);
-}
-function deletePartsPurchaseLogEntry(id){
-  if(!requireTechnician('부품 재고 입고내역 삭제')) return;
-  const entry = (DB.partsPurchaseLog||[]).find(l=>l.id===id);
-  if(!entry) return;
-  openConfirmModal(`"${entry.partName}" +${entry.qty} 입고 내역을 삭제할까요? 삭제하면 재고에서도 ${entry.qty}만큼 다시 차감됩니다.`, async function(){
-    DB.partsPurchaseLog = (DB.partsPurchaseLog||[]).filter(l=>l.id!==id);
-    DB.partsStock[entry.partName] = (DB.partsStock[entry.partName]||0) - entry.qty;
-    await savePartsStock();
-    await savePartsPurchaseLog();
-    closeModal();
-    renderPartsStockTable();
-    flash('삭제되었습니다');
-  }, '삭제');
-}
-async function markOrderPurchased(name){
-  DB.orderMarks = DB.orderMarks || {};
-  DB.orderMarks[name] = {date: todayStr(), by: DB.currentUserName||null};
-  await saveOrderMarks();
-  openPartsOrderListModal();
-  flash('구매완료로 표시되었습니다');
-}
-async function unmarkOrderPurchased(name){
-  if(DB.orderMarks) delete DB.orderMarks[name];
-  await saveOrderMarks();
-  openPartsOrderListModal();
-  flash('구매완료 표시가 취소되었습니다');
-}
-async function updatePartMinStock(name, value){
-  if(!requireTechnician('부품 최소재고 수정')) return;
-  const v = Number(value);
-  if(v && v>0) DB.partsMinStock[name] = v;
-  else delete DB.partsMinStock[name];
-  await savePartsMinStock();
-  renderPartsStockTable();
-  flash('저장되었습니다');
-}
-async function updatePartSpec(name, value){
-  if(!requireTechnician('부품 규격 수정')) return;
-  const spec = value.trim();
-  if(spec) DB.partsSpecs[name] = spec;
-  else delete DB.partsSpecs[name];
-  await savePartsSpecs();
-  flash('저장되었습니다');
-}
-async function updatePartCategory(name, value){
-  if(!requireTechnician('부품 구분 수정')) return;
-  const v = value.trim();
-  DB.partsCategory = DB.partsCategory || {};
-  if(v) DB.partsCategory[name] = v;
-  else delete DB.partsCategory[name];
-  await savePartsCategory();
-  renderPartsStockTable();
-  flash('구분이 저장되었습니다');
-}
-async function updatePartSupplier(name, value){
-  if(!requireTechnician('부품 공급업체 수정')) return;
-  const supplier = value.trim();
-  if(supplier) DB.partsSupplier[name] = supplier;
-  else delete DB.partsSupplier[name];
-  await savePartsSupplier();
-  flash('저장되었습니다');
-}
-async function updateStockQty(name, value){
-  if(!requireTechnician('부품 재고 수정')) return;
-  const v = Number(value);
-  DB.partsStock[name] = isNaN(v) ? 0 : v;
-  await savePartsStock();
-  flash('재고가 저장되었습니다');
-}
-function editStockQtyInline(name){
-  if(!requireTechnician('부품 재고 수정')) return;
-  const current = DB.partsStock[name]!==undefined ? DB.partsStock[name] : 0;
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:340px;">
-      <h3>📦 재고 수정</h3>
-      <div class="modal-sub">${escR(name)}</div>
-      <div class="field"><label>현재고</label><input type="number" id="f-editstock-qty" step="0.1" value="${current}" autofocus></div>
-      <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">취소</button>
-        <button class="btn primary" onclick="submitEditStockQty('${name.replace(/'/g,"\\'")}')">저장</button>
-      </div>
-    </div>
-  </div>`;
-}
-async function submitEditStockQty(name){
-  const v = document.getElementById('f-editstock-qty').value;
-  await updateStockQty(name, v);
-  closeModal();
-  renderPartsStockTable();
-}
-async function addStockPart(){
-  if(!requireTechnician('부품 등록')) return;
-  const baseName = document.getElementById('f-newpart-name').value.trim();
-  const category = document.getElementById('f-newpart-category').value.trim();
-  let spec = document.getElementById('f-newpart-spec').value.trim();
-  if(spec && spec.toLowerCase()===baseName.toLowerCase()) spec = ''; // 품명과 규격이 같으면 규격은 무시 (중복 표시 방지)
-  const qty = Number(document.getElementById('f-newpart-qty').value)||0;
-  if(!baseName) return;
-  const key = spec ? `${baseName} ${spec}` : baseName;
-  DB.partsStock[key] = (DB.partsStock[key]||0) + qty;
-  DB.partsCategory = DB.partsCategory || {};
-  if(category) DB.partsCategory[key] = category;
-  if(spec) DB.partsSpecs[key] = spec;
-  await savePartsStock();
-  if(category) await savePartsCategory();
-  if(spec) await savePartsSpecs();
-  renderPartsStockTable();
-  document.getElementById('f-newpart-name').value='';
-  document.getElementById('f-newpart-category').value='';
-  document.getElementById('f-newpart-spec').value='';
-  document.getElementById('f-newpart-qty').value='0';
-  flash('부품이 추가되었습니다');
-}
-function removeStockPart(name){
-  if(!requireTechnician('부품 삭제')) return;
-  const linkedModels = Object.keys(DB.materials||{}).filter(model=>{
-    return materialCandidatePartsFromMaterial(DB.materials[model]).some(p=>p.partName===name);
-  });
-  let msg = `"${name}" 재고 항목을 삭제할까요?`;
-  if(linkedModels.length>0){
-    msg += `\n\n이 부품명은 아래 모델의 자재 정보에도 등록되어 있어 그냥 재고만 지우면 목록에 다시 나타납니다:\n- ${linkedModels.join(', ')}\n\n확인을 누르면 재고와 함께 위 모델들의 자재 정보에서도 이 부품명을 제거합니다.`;
-  }
-  openConfirmModal(msg, async function(){
-    delete DB.partsStock[name];
-    delete DB.partsSpecs[name];
-    delete DB.partsSupplier[name];
-    if(DB.partsCategory) delete DB.partsCategory[name];
-    if(DB.partsUnit) delete DB.partsUnit[name];
-    if(linkedModels.length>0){
-      linkedModels.forEach(model=>{
-        const m = DB.materials[model];
-        if(!m) return;
-        if(m.oilFilter1Name===name){ m.oilFilter1Name=''; m.oilFilter1Qty=null; }
-        if(m.oilFilter2Name===name){ m.oilFilter2Name=''; m.oilFilter2Qty=null; }
-        if(m.fuelFilterName===name){ m.fuelFilterName=''; m.fuelFilterQty=null; }
-        if(m.fuelFilter2Name===name){ m.fuelFilter2Name=''; m.fuelFilter2Qty=null; }
-        if(m.airFilterName===name){ m.airFilterName=''; m.airFilterQty=null; }
-        if(m.fanBeltName===name){ m.fanBeltName=''; m.fanBeltQty=null; }
-        if(m.consumables){ m.consumables = m.consumables.filter(c=>c.name!==name); }
-      });
-      await saveMaterials();
-    }
-    await savePartsStock();
-    await savePartsSpecs();
-    await savePartsSupplier();
-    renderPartsStockTable();
-    flash('삭제되었습니다');
-  }, '삭제');
-}
-function migrateLegacyConsumables(m){
-  const list = (m.consumables||[]).map(c=>({...c}));
-  const has = name => list.some(c=>c.name===name);
-  const catFor = name => (DB.partsCategory && DB.partsCategory[name]) || '';
-  const specFor = name => (DB.partsSpecs && DB.partsSpecs[name]) || '';
-  if(m.engineOilLiters && !has('엔진오일')) list.push({name:'엔진오일', qty:Number(m.engineOilLiters)||1, category: catFor('엔진오일'), spec: m.engineOilSpec || specFor('엔진오일')});
-  if(m.oilFilter1Name && !has(m.oilFilter1Name)) list.push({name:m.oilFilter1Name, qty:m.oilFilter1Qty||1, category: catFor(m.oilFilter1Name), spec: specFor(m.oilFilter1Name)});
-  if(m.oilFilter2Name && !has(m.oilFilter2Name)) list.push({name:m.oilFilter2Name, qty:m.oilFilter2Qty||1, category: catFor(m.oilFilter2Name), spec: specFor(m.oilFilter2Name)});
-  if(m.fuelFilterName && !has(m.fuelFilterName)) list.push({name:m.fuelFilterName, qty:m.fuelFilterQty||1, category: catFor(m.fuelFilterName), spec: specFor(m.fuelFilterName)});
-  if(m.fuelFilter2Name && !has(m.fuelFilter2Name)) list.push({name:m.fuelFilter2Name, qty:m.fuelFilter2Qty||1, category: catFor(m.fuelFilter2Name), spec: specFor(m.fuelFilter2Name)});
-  if(m.airFilterName && !has(m.airFilterName)) list.push({name:m.airFilterName, qty:m.airFilterQty||1, category: catFor(m.airFilterName), spec: specFor(m.airFilterName)});
-  if(m.fanBeltName && !has(m.fanBeltName)) list.push({name:m.fanBeltName, qty:m.fanBeltQty||1, category: catFor(m.fanBeltName), spec: specFor(m.fanBeltName)});
-  return list;
-}
-function openMaterialsModal(model){
-  const m = DB.materials[model] || {};
-  materialsModalState = {model, consumables: migrateLegacyConsumables(m)};
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:680px;text-align:left;">
-      <h3 style="text-align:center;">🧰 소요자재입력</h3>
-      <div class="modal-sub">${model}</div>
-      <datalist id="mm-category-list">${[...new Set(Object.values(DB.partsCategory||{}))].map(c=>`<option value="${escR(c)}">`).join('')}</datalist>
-      <div class="field">
-        <label>소요자재</label>
-        <div class="hint" style="margin-top:0;margin-bottom:6px;">구분을 먼저 입력하면(예: 120K용) 품명 목록이 그 구분에 해당하는 부품 + "발전기전체사용"으로 등록된 공통 부품만 걸러져서 나옵니다. 구분을 비워두면 전체 부품이 다 나옵니다. 등록된 부품을 고르면 그 부품에 설정된 "구분"·"규격"이 자동으로 채워집니다. 엔진오일 등 액체류는 리터 단위가 자동으로 표시됩니다.</div>
-        <button type="button" class="btn sm" onclick="addConsumableRow()">+ 소모품 직접 추가</button>
-        <div id="mm-consumables-rows" style="margin-top:8px;"></div>
-      </div>
-      <div id="f-err" class="err" style="display:none;"></div>
-      <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">취소</button>
-        <button class="btn primary" onclick="submitMaterials()">저장</button>
-      </div>
-    </div>
-  </div>`;
-  renderConsumableRows();
-}
-function partOptionsForCategory(category){
-  const cat = (category||'').trim();
-  const names = allKnownPartNames();
-  const filtered = cat ? names.filter(n=>{
-    const nc = (DB.partsCategory && DB.partsCategory[n]) || '';
-    return nc===cat || nc==='발전기전체사용';
-  }) : names;
-  return filtered.sort((a,b)=>a.localeCompare(b,'ko')).map(n=>`<option value="${n.replace(/"/g,'&quot;')}">`).join('');
-}
-function updateRowPartOptions(i, category){
-  const dl = document.getElementById(`known-parts-list-${i}`);
-  if(dl) dl.innerHTML = partOptionsForCategory(category);
-}
-function renderConsumableRows(){
-  const wrap = document.getElementById('mm-consumables-rows');
-  if(!wrap) return;
-  wrap.innerHTML = materialsModalState.consumables.map((c,i)=>`
-    <div class="consumable-row" style="flex-wrap:wrap;align-items:center;">
-      <input type="text" value="${(c.category||'').replace(/"/g,'&quot;')}" list="mm-category-list" placeholder="구분" style="width:70px;flex:none;" oninput="updateConsumableField(${i},'category',this.value); updateRowPartOptions(${i}, this.value);">
-      <input type="text" list="known-parts-list-${i}" value="${(c.name||'').replace(/"/g,'&quot;')}" placeholder="품명" style="flex:1;min-width:80px;" oninput="updateConsumableField(${i},'name',this.value)" onchange="autoFillConsumableFields(${i}, this.value)">
-      <datalist id="known-parts-list-${i}">${partOptionsForCategory(c.category)}</datalist>
-      <input type="text" value="${(c.spec||'').replace(/"/g,'&quot;')}" placeholder="규격" style="width:70px;flex:none;" oninput="updateConsumableField(${i},'spec',this.value)">
-      <input type="number" class="qty" min="0" value="${c.qty||1}" style="width:50px;flex:none;" oninput="updateConsumableField(${i},'qty',this.value)">
-      <button type="button" class="btn sm danger" style="flex:none;white-space:nowrap;margin-left:4px;" onclick="removeConsumableRow(${i})">삭제</button>
-    </div>
-  `).join('');
-}
-function autoFillConsumableFields(i, name){
-  if(!materialsModalState.consumables[i]) return;
-  const trimmed = name.trim();
-  const knownCat = DB.partsCategory && DB.partsCategory[trimmed];
-  const knownSpec = DB.partsSpecs && DB.partsSpecs[trimmed];
-  let changed = false;
-  if(knownCat && !materialsModalState.consumables[i].category){ materialsModalState.consumables[i].category = knownCat; changed = true; }
-  if(knownSpec && !materialsModalState.consumables[i].spec){ materialsModalState.consumables[i].spec = knownSpec; changed = true; }
-  if(changed) renderConsumableRows();
-}
-function addConsumableRow(){
-  materialsModalState.consumables.unshift({name:'', qty:1, category:'', spec:''});
-  renderConsumableRows();
-}
-function removeConsumableRow(i){
-  materialsModalState.consumables.splice(i,1);
-  renderConsumableRows();
-}
-function updateConsumableField(i, field, value){
-  if(!materialsModalState.consumables[i]) return;
-  materialsModalState.consumables[i][field] = field==='qty'? Number(value)||0 : value;
-}
-async function submitMaterials(){
-  if(!requireTechnician('소요자재입력 저장')) return;
-  const model = materialsModalState.model;
-  const consumables = materialsModalState.consumables.filter(c=>c.name && c.name.trim());
-  if(!DB.materials[model]) DB.materials[model] = {};
-  const m = DB.materials[model];
-  // 예전 방식(엔진오일/오일필터1·2/연료필터1·2/에어필터/팬벨트 개별 입력칸)은
-  // 위 소요자재 목록으로 이미 옮겨졌으므로 더 이상 쓰지 않습니다. 탱크규격·전압설정 사진 등
-  // 이 모델 객체에 함께 저장된 다른 정보는 그대로 유지하고 소요자재만 갱신합니다.
-  delete m.engineOilSpec; delete m.engineOilLiters;
-  delete m.oilFilter1Name; delete m.oilFilter1Qty;
-  delete m.oilFilter2Name; delete m.oilFilter2Qty;
-  delete m.fuelFilterName; delete m.fuelFilterQty;
-  delete m.fuelFilter2Name; delete m.fuelFilter2Qty;
-  delete m.airFilterName; delete m.airFilterQty;
-  delete m.fanBeltName; delete m.fanBeltQty;
-  m.consumables = consumables;
-  await saveMaterials();
-  closeModal();
-  renderContent();
-  flash('저장되었습니다');
-}
-
 // ---------- 출고 예약 ----------
 function renderReserveTab(){
   const isRawSms = r => !!(r.smsOrder && !r.arriveTime);
@@ -12193,32 +11806,6 @@ function openImageViewModal(url, title){
       <div class="modal-actions"><button class="btn primary" onclick="closeModal()">닫기</button></div>
     </div>
   </div>`;
-}
-async function copyTextareaById(taId, msgId){
-  const ta = document.getElementById(taId);
-  if(!ta) return;
-  const msgEl = msgId ? document.getElementById(msgId) : null;
-  let ok = false;
-  try{
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      await navigator.clipboard.writeText(ta.value);
-      ok = true;
-    }
-  }catch(e){ ok = false; }
-  if(!ok){
-    try{
-      ta.removeAttribute('readonly');
-      ta.focus();
-      ta.select();
-      ok = document.execCommand('copy');
-      ta.setAttribute('readonly','readonly');
-    }catch(e){ ok = false; }
-  }
-  if(msgEl){
-    msgEl.style.display='block';
-    msgEl.textContent = ok ? '복사되었습니다.' : '자동 복사에 실패했습니다. 위 텍스트 상자를 길게 눌러 직접 선택 후 복사해주세요.';
-  }
-  if(ok) flash('복사되었습니다');
 }
 async function copyShareText(){
   const ta = document.getElementById('f-share-text');
