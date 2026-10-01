@@ -203,6 +203,23 @@
   .material-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:7px 14px;margin-bottom:10px;}
   .material-card .m-title{font-weight:700;font-size:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
   .tag-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;}
+  /* 전압 설정 사진 (종류별) */
+  .vpg-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;}
+  @media (max-width:760px){ .vpg-cards{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  .vpg-card{border:1px solid var(--border);border-radius:var(--radius);padding:12px;text-align:center;background:#fff;}
+  .vpg-card.empty{background:var(--warn-tint);}
+  .vpg-card-t{font-weight:800;font-size:14px;}
+  .vpg-card-n{font-size:26px;font-weight:800;line-height:1.2;margin:4px 0 8px;}
+  .vpg-card-n small{font-size:13px;font-weight:600;margin-left:2px;color:var(--ink-soft);}
+  .vpg-card-b{display:flex;gap:4px;justify-content:center;flex-wrap:wrap;}
+  .vpg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-height:62vh;overflow:auto;padding:2px;}
+  .vpg-tile{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff;}
+  .vpg-img{display:block;width:100%;border:0;padding:0;background:#eee;cursor:zoom-in;}
+  .vpg-img img{display:block;width:100%;height:130px;object-fit:cover;}
+  .vpg-cap{font-size:11.5px;padding:5px 6px;white-space:pre-wrap;word-break:break-all;line-height:1.35;}
+  .vpg-mini{border:0;background:none;cursor:pointer;font-size:12px;padding:0 2px;}
+  .vpg-prev{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 10px;}
+  .vpg-prev img{width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--border-strong);}
   /* 설정 맨 아래: 전압 설정 사진 목록 */
   .vp-list{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
   .vp-row{display:grid;grid-template-columns:minmax(180px,1.6fr) repeat(4,minmax(0,1fr));align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);background:#fff;}
@@ -933,55 +950,24 @@ async function qmShowVoltageGuide(model){
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
       <h3>📷 전압 설정방법</h3>
-      <div class="modal-sub">${escR(model)}</div>
       <div id="qmvg-body" style="text-align:center;color:#999;font-size:14px;padding:16px 0;">불러오는 중...</div>
       <div class="modal-actions"><button class="btn primary" onclick="closeModal()">닫기</button></div>
     </div>
   </div>`;
   try{
-    if(!qmMaterialsCache){
-      const cur = await window.storage.get('gen-materials-v1', true);
-      qmMaterialsCache = cur ? JSON.parse(cur.value) : {};
+    // 퀵메뉴는 업체정보를 안 불러올 수 있어 장수 정보만 따로 확인합니다
+    if(!(DB.companyInfo && DB.companyInfo.vpCounts)){
+      const r = await window.storage.get('gen-company-info-v1', true);
+      if(r) DB.companyInfo = { ...(DB.companyInfo||{}), ...JSON.parse(r.value) };
     }
-    const body = document.getElementById('qmvg-body');
-    if(!body) return; // 창이 이미 닫혔으면 무시
-    const m = qmMaterialsCache[model] || {};
-    const escM = model.replace(/'/g,"\\'");
-    const blocks = VOLTAGE_GUIDE_KINDS.map(kind=>{
-      const cnt = voltageGuideCount(m, kind);
-      if(cnt===0) return '';
-      const label = VOLTAGE_GUIDE_LABELS[kind];
-      return `<button type="button" class="btn sm" style="margin:3px 4px 3px 0;color:var(--primary-dark);border-color:var(--primary);" onclick="qmViewVoltageGuidePhoto('${escM}','${kind}',0)">${label} (${cnt}장)</button>`;
-    }).join('');
-    body.innerHTML = blocks ? `<div style="text-align:left;">${blocks}</div>` : '<div class="hint">등록된 전압 설정 방법 사진이 없습니다.</div>';
+    const body = document.getElementById('qmvg-body'); if(!body) return;
+    body.innerHTML = `<div style="text-align:left;">${vpgButtonsHtml('qmViewVoltageGuidePhoto')}</div>`;
   }catch(e){
     const body = document.getElementById('qmvg-body');
     if(body) body.innerHTML = '<div style="color:#B23A34;">불러오지 못했습니다.</div>';
   }
 }
-async function qmViewVoltageGuidePhoto(model, kind, idx){
-  const m = (qmMaterialsCache && qmMaterialsCache[model]) || {};
-  let o;
-  try{ o = await loadVPhotos(model, m); }catch(e){ showInfoModal('사진을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.'); return; }
-  const photos = (o[kind]||[]).filter(Boolean);
-  const note = voltageGuideNote(m, kind);
-  const photo = photos[idx];
-  if(!photo) return;
-  const escM = model.replace(/'/g,"\\'");
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:820px;">
-      <h3>⚡ ${VOLTAGE_GUIDE_LABELS[kind]||'전압 설정'}</h3>
-      <div class="modal-sub">${escR(model)}${photos.length>1? ` (${idx+1}/${photos.length})`:''}</div>
-      <img src="${photo}" alt="" style="width:100%;border-radius:10px;border:1px solid var(--border-strong);margin-bottom:10px;">
-      ${note? `<div style="font-size:14px;white-space:pre-wrap;line-height:1.6;">${escR(note)}</div>` : ''}
-      ${photos.length>1? `<div class="btn-row" style="margin-top:10px;justify-content:center;flex-wrap:wrap;">${photos.map((p,i)=>`<button type="button" class="btn sm ${i===idx?'primary':''}" onclick="qmViewVoltageGuidePhoto('${escM}','${kind}',${i})">${i+1}</button>`).join('')}</div>`:''}
-      <div class="modal-actions">
-        <button class="btn primary" onclick="closeModal()">닫기</button>
-      </div>
-    </div>
-  </div>`;
-}
+function qmViewVoltageGuidePhoto(kind){ vpgOpen(kind, false); }
 let qmOutRegionFilter = null;
 async function renderQuickModeOutList(){
   qmOutRegionFilter = null;
@@ -5930,13 +5916,18 @@ async function buildFullBackupObject(){
     if(voltageGuideTotal(DB.materials[model])===0) continue;
     try{ const o = await loadVPhotos(model); if(o && Object.keys(o).length) voltagePhotos[model] = o; }catch(e){}
   }
+  const voltagePhotosAll = {};
+  for(const k of VOLTAGE_GUIDE_KINDS){
+    if(vpgCount(k)===0) continue;
+    try{ voltagePhotosAll[k] = await vpgLoad(k); }catch(e){}
+  }
   return {
     backupType: 'gen-fleet-full-backup',
     backupVersion: 1,
     backupDate: todayStr(),
     data: {
       gens: DB.gens, rentals: DB.rentals, maint: DB.maint, reservations: DB.reservations,
-      materials: DB.materials, voltagePhotos, technicians: DB.technicians, teamMembers: DB.teamMembers, warnThreshold: DB.warnThreshold,
+      materials: DB.materials, voltagePhotos, voltagePhotosAll, technicians: DB.technicians, teamMembers: DB.teamMembers, warnThreshold: DB.warnThreshold,
       partsStock: DB.partsStock, partsSpecs: DB.partsSpecs, partsUnit: DB.partsUnit, partsCategory: DB.partsCategory, partsSupplier: DB.partsSupplier, partsMinStock: DB.partsMinStock, partsPurchaseLog: DB.partsPurchaseLog, consumableOrders: DB.consumableOrders, orderMarks: DB.orderMarks, improvements: DB.improvements, suppliesCatalog: DB.suppliesCatalog, suppliesStock: DB.suppliesStock, modelColors: DB.modelColors, notices: DB.notices, returnRequests: DB.returnRequests, incomingSmsOrders: DB.incomingSmsOrders, calendarEvents: DB.calendarEvents, genColorOverrides: DB.genColorOverrides, cancelOutHistory: DB.cancelOutHistory, suppliesSizes: DB.suppliesSizes, suppliesSpecs: DB.suppliesSpecs, suppliesCategories: DB.suppliesCategories, customerNotes: DB.customerNotes, readMarkers: DB.readMarkers, companyInfo: DB.companyInfo
     }
   };
@@ -6183,6 +6174,18 @@ function handleRestoreFile(input){
       await saveReturnRequests();
       await saveIncomingSmsOrders();
       await saveCancelOutHistory();
+      // 종류별 전압 사진(220V/380V/380V 이상/기타참고)
+      vpgCache = {};
+      if(d.voltagePhotosAll){
+        const ci = DB.companyInfo || {};
+        const counts = {...(ci.vpCounts||{})}, vers = {...(ci.vpVer||{})};
+        for(const k of Object.keys(d.voltagePhotosAll)){
+          const arr = d.voltagePhotosAll[k] || [];
+          await storageSetChecked(vpgKey(k), JSON.stringify(arr), true);
+          counts[k] = arr.length; vers[k] = Date.now(); vpgCache[k] = arr;
+        }
+        DB.companyInfo = { ...ci, vpCounts:counts, vpVer:vers };
+      }
       await saveCompanyInfo();
       applyCompanyBranding();
       renderTabbar();
@@ -7687,32 +7690,25 @@ function renderSettingsTab(){
 }
 // 설정 맨 아래: 발전기 종류(모델)별 전압 설정 사진 등록·보기·삭제
 function voltagePhotoSettingsHtml(activeList){
-  const models = sortModelsByCapacity([...new Set(activeList.map(g=>g.model).filter(Boolean))]);
-  const rows = models.map(model=>{
-    const m = DB.materials[model] || {};
-    const escM = model.replace(/'/g,"\\'");
-    const ids = activeList.filter(g=>g.model===model).sort(sortByIdNatural).map(g=>g.id);
-    const total = voltageGuideTotal(m);
-    const cells = VOLTAGE_GUIDE_KINDS.map(kind=>{
-      const cnt = voltageGuideCount(m, kind);
-      return `<div class="vp-cell">
-        <div class="vp-kind">${VOLTAGE_GUIDE_LABELS[kind].replace(' 출력 셋팅방법','').replace(' 셋팅방법','')}</div>
-        <div class="vp-btns">
-          ${cnt>0? `<button type="button" class="btn sm vp-view" onclick="viewVoltageGuidePhoto('${escM}','${kind}',0)" title="사진 보기 · 삭제">🖼 ${cnt}장</button>`:''}
-          ${cnt<3? `<button type="button" class="btn sm" onclick="openVoltageGuideUpload('${escM}','${kind}')" title="사진 추가">＋</button>`:''}
-        </div>
-      </div>`;
-    }).join('');
-    return `<div class="vp-row${total? '':' vp-empty'}">
-      <div class="vp-model"><b>${escR(model)}</b><div class="vp-ids">${ids.length}대 · ${escR(ids.join(' '))}</div></div>
-      ${cells}
+  const legacyN = legacyModelPhotoCount();
+  const showImport = legacyN>0 && !(DB.companyInfo||{}).vpImported;
+  const cards = VOLTAGE_GUIDE_KINDS.map(k=>{
+    const n = vpgCount(k);
+    return `<div class="vpg-card${n? '':' empty'}">
+      <div class="vpg-card-t">${VPG_SHORT[k]}</div>
+      <div class="vpg-card-n">${n}<small>장</small></div>
+      <div class="vpg-card-b">
+        ${n? `<button type="button" class="btn sm vp-view" onclick="vpgOpen('${k}',1)">🖼 보기·관리</button>`:''}
+        <button type="button" class="btn sm" onclick="vpgOpenUpload('${k}')">＋ 추가</button>
+      </div>
     </div>`;
   }).join('');
   return `
     <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">⚡ 전압 설정 사진 <span class="cnt">${models.length}종</span></div>
-      <details class="info-toggle"><summary></summary><p class="muted">발전기 종류(모델)별로 220V / 380V / 380V 이상 / 기타참고 셋팅 방법 사진을 종류마다 최대 3장까지 등록합니다. [🖼 n장]을 누르면 크게 보고 삭제할 수 있고, [＋]로 추가합니다. 등록한 사진은 입고 화면·퀵메뉴·⚡전압설정 폰 페이지에서 볼 수 있습니다. 사진은 따로 저장되어 누를 때만 불러옵니다.</p></details>
-      ${rows ? `<div class="vp-list">${rows}</div>` : '<div class="empty">발전기가 없습니다.</div>'}
+      <div class="section-title" style="margin-top:0;">⚡ 전압 설정 사진</div>
+      <details class="info-toggle"><summary></summary><p class="muted">220V / 380V / 380V 이상 / 기타참고 4종류로 사진을 모아둡니다(종류별 최대 ${VPG_MAX}장). 사진마다 설명(예: 모델 이름)을 붙일 수 있고, [보기·관리]에서 크게 보기·설명 수정·삭제를 합니다. 등록한 사진은 입고 화면·퀵메뉴·⚡전압설정 폰 페이지에서 볼 수 있습니다.</p></details>
+      ${showImport? `<div class="hint" style="margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">예전에 모델별로 올린 사진 ${legacyN}장이 있습니다. <button type="button" class="btn sm" onclick="vpgImportLegacy()">📥 종류별로 가져오기</button></div>`:''}
+      <div class="vpg-cards">${cards}</div>
     </div>`;
 }
 async function updateWarnThreshold(value){
@@ -8025,12 +8021,6 @@ async function updateManufactureDate(id, value){
 }
 const VOLTAGE_GUIDE_KINDS = ['v220','v380','v380plus','etc'];
 const VOLTAGE_GUIDE_LABELS = {v220: '220V 출력 셋팅방법', v380: '380V 출력 셋팅방법', v380plus: '380V 이상 출력 셋팅방법', etc: '기타참고'};
-const VOLTAGE_GUIDE_NOTE_PLACEHOLDERS = {
-  v220: '예: 출력을 220V로 맞추는 방법 (단자대 위치, 조작 순서 등)',
-  v380: '예: 출력을 380V로 맞추는 방법 (단자대 위치, 조작 순서 등)',
-  v380plus: '예: 380V보다 높은 전압(고전압)으로 맞추는 방법 (단자대 위치, 조작 순서 등)',
-  etc: '예: 그 외 참고할 사진이나 메모'
-};
 // ---------- 전압 설정 사진: 모델 정보(gen-materials-v1)와 분리해 모델별 키에 따로 저장 ----------
 // 모델 정보에는 사진 장수(voltageGuideCount_*)·설명·사진 키만 남기고, 사진은 볼 때만 불러옵니다.
 // (예전엔 사진 3.5MB가 모델 정보에 섞여 있어, 5분마다 동기화할 때 통째로 다시 받아왔습니다)
@@ -8075,24 +8065,6 @@ async function loadVPhotos(model, mOverride){
   vPhotoCache[model] = r ? (JSON.parse(r.value)||{}) : {};
   return vPhotoCache[model];
 }
-function voltageGuidePhotos(model, kind){
-  const o = vPhotoCache[model];
-  if(o) return (o[kind]||[]).filter(Boolean).slice(0,3);
-  return legacyVoltagePhotos(DB.materials[model], kind);
-}
-// 사진 저장: 사진 키에 저장한 뒤, 모델 정보에는 장수·버전만 갱신
-async function saveVPhotos(model){
-  const o = vPhotoCache[model] || {};
-  const key = vPhotoKeyOf(model);
-  await storageSetChecked(key, JSON.stringify(o), true);
-  if(!DB.materials[model]) DB.materials[model] = {};
-  const m = DB.materials[model];
-  stripLegacyVoltagePhotos(m);
-  VOLTAGE_GUIDE_KINDS.forEach(k=>{ m[`voltageGuideCount_${k}`] = (o[k]||[]).filter(Boolean).length; });
-  m.voltagePhotoKey = key;
-  m.voltagePhotoVer = Date.now();
-  await saveMaterials();
-}
 // 앱을 켤 때 한 번: 모델 정보 안에 남아 있는 예전 사진을 사진 키로 옮기고 모델 정보에서는 뺍니다.
 let vPhotoMigrating = false;
 async function migrateVoltagePhotosIfNeeded(){
@@ -8123,157 +8095,187 @@ function voltageGuideNote(m, kind){
   if(!m) return '';
   return m[`voltageGuideNote_${kind}`] || (kind==='v220' ? m.voltageGuideNote_internal : '') || '';
 }
-function voltageGuideGalleryHtml(model){
-  if(!model) return '';
-  const m = DB.materials[model] || {};
-  const escM = model.replace(/'/g,"\\'");
-  const blocks = VOLTAGE_GUIDE_KINDS.map(kind=>{
-    const cnt = voltageGuideCount(m, kind);
-    if(cnt===0) return '';
-    const label = VOLTAGE_GUIDE_LABELS[kind];
-    return `<button type="button" class="btn sm" style="margin:3px 4px 3px 0;color:var(--primary-dark);border-color:var(--primary);" onclick="viewVoltageGuidePhoto('${escM}','${kind}',0)">${label} (${cnt}장)</button>`;
-  }).join('');
-  if(!blocks) return `<div class="hint" style="margin-top:8px;">등록된 전압 설정 방법 사진이 없습니다. (설정 → ⚡ 전압 설정 사진에서 등록할 수 있습니다)</div>`;
-  return `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
-    <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:4px;">🔧 전압 설정 방법 (모델: ${escR(model)})</div>
-    <div class="hint" style="margin:0 0 6px;">사진을 보시려면 글자 클릭</div>
-    <div>${blocks}</div>
-  </div>`;
+// ---------- 전압 설정 사진: 모델 구분 없이 220V / 380V / 380V 이상 / 기타참고 4종류로만 관리 ----------
+// 종류별로 따로 저장(gen-vphoto-all-v1-<종류>)하고, 장수·버전만 업체정보(companyInfo)에 둡니다. 사진은 볼 때만 불러옵니다.
+const VPG_MAX = 60;
+const VPG_SHORT = {v220:'220V', v380:'380V', v380plus:'380V 이상', etc:'기타참고'};
+function vpgKey(kind){ return 'gen-vphoto-all-v1-' + kind; }
+let vpgCache = {};
+function vpgCount(kind){ return Number((((DB.companyInfo||{}).vpCounts)||{})[kind])||0; }
+async function vpgLoad(kind){
+  if(vpgCache[kind]) return vpgCache[kind];
+  if(vpgCount(kind)===0){ vpgCache[kind] = []; return vpgCache[kind]; }
+  const r = await window.storage.get(vpgKey(kind), true);
+  vpgCache[kind] = r ? (JSON.parse(r.value)||[]) : [];
+  return vpgCache[kind];
 }
-function openVoltageGuidePicker(model){
-  if(!model){ showInfoModal('모델 정보가 없습니다.'); return; }
-  const m = DB.materials[model] || {};
-  const escM = model.replace(/'/g,"\\'");
-  const rows = VOLTAGE_GUIDE_KINDS.map(kind=>{
-    const label = VOLTAGE_GUIDE_LABELS[kind];
-    const cnt = voltageGuideCount(m, kind);
-    return `<div style="padding:8px 0;border-bottom:1px solid var(--border);">
-      ${cnt===0
-        ? `<div style="font-weight:700;font-size:13.5px;">${label}</div><span class="muted" style="font-size:12.5px;">등록된 사진 없음</span>`
-        : `<button type="button" class="btn sm" style="color:var(--primary-dark);border-color:var(--primary);" onclick="viewVoltageGuidePhoto('${escM}','${kind}',0)">${label} (${cnt}장)</button>`}
-    </div>`;
-  }).join('');
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:460px;">
-      <h3>⚡ 전압 설정 방법</h3>
-      <div class="modal-sub">${escR(model)}</div>
-      <div class="hint" style="margin:0 0 6px;">사진을 보시려면 글자 클릭</div>
-      <div>${rows}</div>
-      <div class="hint" style="margin-top:8px;">사진 등록·수정·삭제는 [설정 → 맨 아래 ⚡ 전압 설정 사진]에서 할 수 있습니다.</div>
-      <div class="modal-actions">
-        <button class="btn primary" onclick="closeModal()">닫기</button>
-      </div>
-    </div>
-  </div>`;
+async function vpgSave(kind){
+  const arr = vpgCache[kind] || [];
+  await storageSetChecked(vpgKey(kind), JSON.stringify(arr), true);
+  const ci = DB.companyInfo || {};
+  DB.companyInfo = { ...ci, vpCounts:{...(ci.vpCounts||{}), [kind]:arr.length}, vpVer:{...(ci.vpVer||{}), [kind]:Date.now()} };
+  await saveCompanyInfo();
 }
-async function viewVoltageGuidePhoto(model, kind, idx){
-  const m = DB.materials[model] || {};
-  if(!vPhotoCache[model]){
-    document.getElementById('modal-root').innerHTML = `<div class="overlay"><div class="modal" style="text-align:center;"><h3>⚡ ${VOLTAGE_GUIDE_LABELS[kind]||'전압 설정'}</h3><div class="muted" style="padding:16px 0;">사진 불러오는 중...</div></div></div>`;
-    try{ await loadVPhotos(model); }catch(e){ closeModal(); showInfoModal('사진을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.'); return; }
-  }
-  const photos = voltageGuidePhotos(model, kind);
-  const note = voltageGuideNote(m, kind);
-  const photo = photos[idx];
-  if(!photo){ closeModal(); showInfoModal('등록된 사진이 없습니다.'); return; }
-  const escM = model.replace(/'/g,"\\'");
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:820px;">
-      <h3>⚡ ${VOLTAGE_GUIDE_LABELS[kind]||'전압 설정'}</h3>
-      <div class="modal-sub">${escR(model)}${photos.length>1? ` (${idx+1}/${photos.length})`:''}</div>
-      <img src="${photo}" alt="" style="width:100%;border-radius:10px;border:1px solid var(--border-strong);margin-bottom:10px;">
-      ${note? `<div style="font-size:14px;white-space:pre-wrap;line-height:1.6;">${escR(note)}</div>` : ''}
-      ${photos.length>1? `<div class="btn-row" style="margin-top:10px;justify-content:center;flex-wrap:wrap;">${photos.map((p,i)=>`<button type="button" class="btn sm ${i===idx?'primary':''}" onclick="viewVoltageGuidePhoto('${escM}','${kind}',${i})">${i+1}</button>`).join('')}</div>`:''}
-      <div class="modal-actions">
-        ${currentTab==='settings'? `<button class="btn danger" onclick="deleteVoltageGuidePhoto('${escM}','${kind}',${idx})">이 사진 삭제</button>`:''}
-        <button class="btn primary" onclick="closeModal()">닫기</button>
-      </div>
-    </div>
-  </div>`;
+// 4종류 버튼 (입고 화면·퀵메뉴 등 보기 전용)
+function vpgButtonsHtml(viewFn){
+  const btns = VOLTAGE_GUIDE_KINDS.filter(k=>vpgCount(k)>0).map(k=>
+    `<button type="button" class="btn sm" style="margin:3px 4px 3px 0;color:var(--primary-dark);border-color:var(--primary);" onclick="${viewFn}('${k}')">${VPG_SHORT[k]} (${vpgCount(k)}장)</button>`).join('');
+  return btns || '<div class="hint">등록된 전압 설정 사진이 없습니다. (설정 → ⚡ 전압 설정 사진에서 등록)</div>';
 }
-function openVoltageGuideUpload(model, kind){
-  const m = DB.materials[model] || {};
-  const note = voltageGuideNote(m, kind);
-  const photos = {length: voltageGuideCount(m, kind)};
-  voltageGuidePendingDataUrl = null;
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="max-width:480px;">
-      <h3>📷 ${VOLTAGE_GUIDE_LABELS[kind]||'전압 설정'} 사진 추가</h3>
-      <div class="modal-sub">${escR(model)} · 현재 ${photos.length}/3장</div>
-      <div class="field">
-        <label>사진</label>
-        <input type="file" id="f-vg-photo" accept="image/*" onchange="previewVoltageGuidePhoto()">
-        <div id="f-vg-preview-wrap" style="margin-top:8px;display:none;">
-          <img id="f-vg-preview" src="" style="width:100%;max-width:280px;border-radius:10px;border:1px solid var(--border-strong);">
-        </div>
-      </div>
-      <div class="field"><label>설명 (선택, 이 항목 전체 사진에 공통 적용)</label><textarea id="f-vg-note" placeholder="${VOLTAGE_GUIDE_NOTE_PLACEHOLDERS[kind]||''}">${escR(note||'')}</textarea></div>
-      <div id="f-err" class="err" style="display:none;"></div>
-      <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">취소</button>
-        <button class="btn primary" onclick="submitVoltageGuidePhoto('${model.replace(/'/g,"\\'")}','${kind}')">저장</button>
-      </div>
-    </div>
-  </div>`;
+// 종류별 사진 모아보기 (설정 탭에서는 추가·설명수정·삭제 가능)
+async function vpgOpen(kind, editable){
+  const label = VPG_SHORT[kind];
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `<div class="overlay" onclick="backdropClick(this,event,closeModal)"><div class="modal" style="max-width:860px;"><h3>⚡ ${label}</h3><div class="muted" style="padding:16px 0;text-align:center;">사진 불러오는 중...</div></div></div>`;
+  let arr;
+  try{ arr = await vpgLoad(kind); }catch(e){ closeModal(); showInfoModal('사진을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.'); return; }
+  const tiles = arr.map((p,i)=>`<div class="vpg-tile">
+      <button type="button" class="vpg-img" onclick="vpgView('${kind}',${i},${editable?1:0})"><img src="${p.src}" alt="${escR(p.caption||label)}" loading="lazy"></button>
+      <div class="vpg-cap">${escR(p.caption||'')}${editable? ` <button type="button" class="vpg-mini" onclick="vpgEditCaption('${kind}',${i})" title="설명 수정">✏️</button><button type="button" class="vpg-mini del" onclick="vpgDelete('${kind}',${i})" title="삭제">🗑</button>`:''}</div>
+    </div>`).join('');
+  root.innerHTML = `<div class="overlay" onclick="backdropClick(this,event,closeModal)"><div class="modal" style="max-width:860px;">
+    <h3>⚡ ${label} <span class="muted" style="font-size:13px;font-weight:500;">${arr.length}장</span></h3>
+    ${arr.length? `<div class="vpg-grid">${tiles}</div>` : '<div class="hint" style="padding:12px 0;">아직 등록된 사진이 없습니다.</div>'}
+    <div class="modal-actions">
+      ${editable && arr.length<VPG_MAX? `<button class="btn" onclick="vpgOpenUpload('${kind}')">＋ 사진 추가</button>`:''}
+      <button class="btn primary" onclick="closeModal()">닫기</button>
+    </div></div></div>`;
 }
-let voltageGuidePendingDataUrl = null;
-function previewVoltageGuidePhoto(){
-  const input = document.getElementById('f-vg-photo');
-  const file = input && input.files && input.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e){
-    const img = new Image();
-    img.onload = function(){
-      const maxW = 900;
-      const scale = Math.min(1, maxW/img.width);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width*scale);
-      canvas.height = Math.round(img.height*scale);
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      voltageGuidePendingDataUrl = canvas.toDataURL('image/jpeg', 0.72);
-      const previewWrap = document.getElementById('f-vg-preview-wrap');
-      const preview = document.getElementById('f-vg-preview');
-      if(preview) preview.src = voltageGuidePendingDataUrl;
-      if(previewWrap) previewWrap.style.display = 'block';
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
+function vpgView(kind, idx, editable){
+  const arr = vpgCache[kind] || []; const p = arr[idx]; if(!p) return;
+  const nav = arr.length>1 ? `<div style="display:flex;justify-content:space-between;margin-top:8px;">
+      <button class="btn sm" ${idx<=0?'disabled':''} onclick="vpgView('${kind}',${idx-1},${editable?1:0})">◀ 이전</button>
+      <span class="muted" style="font-size:12.5px;align-self:center;">${idx+1} / ${arr.length}</span>
+      <button class="btn sm" ${idx>=arr.length-1?'disabled':''} onclick="vpgView('${kind}',${idx+1},${editable?1:0})">다음 ▶</button></div>` : '';
+  document.getElementById('modal-root').innerHTML = `<div class="overlay" onclick="backdropClick(this,event,closeModal)"><div class="modal" style="max-width:860px;">
+    <h3>⚡ ${VPG_SHORT[kind]}</h3>
+    ${p.caption? `<div style="font-weight:700;margin-bottom:6px;white-space:pre-wrap;">${escR(p.caption)}</div>`:''}
+    <img src="${p.src}" alt="" style="width:100%;border-radius:10px;border:1px solid var(--border-strong);">
+    ${nav}
+    <div class="modal-actions">
+      <button class="btn" onclick="vpgOpen('${kind}',${editable?1:0})">◀ 목록</button>
+      ${editable? `<button class="btn danger" onclick="vpgDelete('${kind}',${idx})">삭제</button>`:''}
+      <button class="btn primary" onclick="closeModal()">닫기</button>
+    </div></div></div>`;
 }
-async function submitVoltageGuidePhoto(model, kind){
-  const errEl = document.getElementById('f-err');
-  if(!voltageGuidePendingDataUrl){ errEl.textContent = '사진을 선택해주세요.'; errEl.style.display='block'; return; }
-  if(!DB.materials[model]) DB.materials[model] = {};
-  let o;
-  try{ o = await loadVPhotos(model); }catch(e){ errEl.textContent = '기존 사진을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.'; errEl.style.display='block'; return; }
-  const existing = (o[kind]||[]).filter(Boolean);
-  if(existing.length>=3){ errEl.textContent = '사진은 최대 3장까지 등록할 수 있습니다.'; errEl.style.display='block'; return; }
-  existing.push(voltageGuidePendingDataUrl);
-  o[kind] = existing;
-  DB.materials[model][`voltageGuideNote_${kind}`] = document.getElementById('f-vg-note').value.trim();
-  voltageGuidePendingDataUrl = null;
-  await saveVPhotos(model);
-  closeModal();
-  renderContent();
-  flash('사진이 추가되었습니다');
+async function vpgEditCaption(kind, idx){
+  if(!requireTechnician('전압 사진 설명 수정')) return;
+  const arr = vpgCache[kind] || []; const p = arr[idx]; if(!p) return;
+  const v = prompt('사진 설명 (예: 커민스 6BT 120kW)', p.caption||'');
+  if(v===null) return;
+  p.caption = v.trim();
+  await saveWithRetry(()=>vpgSave(kind));
+  vpgOpen(kind, 1);
 }
-function deleteVoltageGuidePhoto(model, kind, idx){
+function vpgDelete(kind, idx){
+  if(!requireTechnician('전압 사진 삭제')) return;
   openConfirmModal('이 사진을 삭제할까요?', async function(){
-    let o;
-    try{ o = await loadVPhotos(model); }catch(e){ showInfoModal('사진을 불러오지 못했습니다.'); return; }
-    const arr = (o[kind]||[]).filter(Boolean);
-    arr.splice(idx,1);
-    o[kind] = arr;
-    await saveVPhotos(model);
-    closeModal();
+    const arr = vpgCache[kind] || []; arr.splice(idx,1);
+    await saveWithRetry(()=>vpgSave(kind));
     renderContent();
-    flash('삭제되었습니다');
+    vpgOpen(kind, 1);
+    flash('사진을 삭제했습니다');
   });
+}
+let vpgPending = [];
+function vpgOpenUpload(kind){
+  if(!requireTechnician('전압 사진 등록')) return;
+  vpgPending = [];
+  document.getElementById('modal-root').innerHTML = `<div class="overlay" onclick="backdropClick(this,event,closeModal)"><div class="modal" style="max-width:520px;">
+    <h3>📷 ${VPG_SHORT[kind]} 사진 추가</h3>
+    <div class="modal-sub">현재 ${vpgCount(kind)}장 · 여러 장을 한 번에 고를 수 있습니다</div>
+    <div class="field"><label>사진</label><input type="file" id="f-vpg-files" accept="image/*" multiple onchange="vpgPreview()"></div>
+    <div id="f-vpg-prev" class="vpg-prev"></div>
+    <div class="field"><label>설명 (선택 · 고른 사진 모두에 붙음)</label><input type="text" id="f-vpg-cap" placeholder="예: 커민스 6BT 120kW / 위차이 4DX"></div>
+    <div id="f-err" class="err" style="display:none;"></div>
+    <div class="modal-actions"><button class="btn" onclick="vpgOpen('${kind}',1)">취소</button><button class="btn primary" id="f-vpg-save" onclick="vpgSubmit('${kind}')">저장</button></div>
+  </div></div>`;
+}
+function vpgShrink(file){
+  return new Promise((res,rej)=>{
+    const rd = new FileReader();
+    rd.onload = e=>{ const img = new Image(); img.onload = ()=>{
+      const scale = Math.min(1, 900/img.width), c = document.createElement('canvas');
+      c.width = Math.round(img.width*scale); c.height = Math.round(img.height*scale);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height); res(c.toDataURL('image/jpeg',0.72)); };
+      img.onerror = rej; img.src = e.target.result; };
+    rd.onerror = rej; rd.readAsDataURL(file);
+  });
+}
+async function vpgPreview(){
+  const files = [...(document.getElementById('f-vpg-files').files||[])];
+  const wrap = document.getElementById('f-vpg-prev');
+  wrap.innerHTML = files.length? '<span class="muted">사진 줄이는 중...</span>' : '';
+  vpgPending = [];
+  for(const f of files){ try{ vpgPending.push(await vpgShrink(f)); }catch(e){} }
+  wrap.innerHTML = vpgPending.map(src=>`<img src="${src}" alt="">`).join('');
+}
+async function vpgSubmit(kind){
+  const errEl = document.getElementById('f-err');
+  if(!vpgPending.length){ errEl.textContent='사진을 골라주세요.'; errEl.style.display='block'; return; }
+  let arr;
+  try{ arr = await vpgLoad(kind); }catch(e){ errEl.textContent='기존 사진을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.'; errEl.style.display='block'; return; }
+  if(arr.length + vpgPending.length > VPG_MAX){ errEl.textContent=`한 종류에 최대 ${VPG_MAX}장까지 등록할 수 있습니다. (지금 ${arr.length}장)`; errEl.style.display='block'; return; }
+  const cap = document.getElementById('f-vpg-cap').value.trim();
+  document.getElementById('f-vpg-save').disabled = true;
+  vpgPending.forEach(src=>arr.push({src, caption:cap, by:DB.currentUserName||'', at:todayStr()}));
+  const n = vpgPending.length; vpgPending = [];
+  await saveWithRetry(()=>vpgSave(kind));
+  renderContent();
+  vpgOpen(kind, 1);
+  flash(`${n}장을 추가했습니다`);
+}
+// 예전에 모델별로 올렸던 사진을 종류별로 한 번에 가져오기 (설명에 모델 이름을 붙임)
+function legacyModelPhotoCount(){
+  return Object.keys(DB.materials||{}).reduce((a,md)=>a+voltageGuideTotal(DB.materials[md]),0);
+}
+async function vpgImportLegacy(){
+  if(!requireTechnician('기존 사진 가져오기')) return;
+  const n = legacyModelPhotoCount();
+  openConfirmModal(`예전에 모델별로 올린 사진(${n}장, 같은 사진은 한 장으로 합침)을 220V / 380V / 380V 이상 / 기타참고로 옮겨올까요?\n\n설명에 모델 이름이 붙고, 필요 없는 사진은 나중에 지우면 됩니다.`, async function(){
+    flash('가져오는 중...');
+    for(const k of VOLTAGE_GUIDE_KINDS) await vpgLoad(k);
+    // 같은 사진을 여러 모델에 올려둔 경우가 많아, 같은 사진은 한 장으로 합치고 설명에 모델 이름을 모두 적습니다.
+    const found = {};   // kind -> Map(src -> {models:[], notes:Set})
+    VOLTAGE_GUIDE_KINDS.forEach(k=>{ found[k] = new Map(); });
+    for(const md of sortModelsByCapacity(Object.keys(DB.materials||{}))){
+      const m = DB.materials[md]; if(voltageGuideTotal(m)===0) continue;
+      let o; try{ o = await loadVPhotos(md); }catch(e){ continue; }
+      VOLTAGE_GUIDE_KINDS.forEach(k=>{
+        const note = voltageGuideNote(m, k);
+        (o[k]||[]).filter(Boolean).forEach(src=>{
+          if(!found[k].has(src)) found[k].set(src, {models:[], notes:new Set()});
+          const f = found[k].get(src); if(!f.models.includes(md)) f.models.push(md); if(note) f.notes.add(note);
+        });
+      });
+    }
+    VOLTAGE_GUIDE_KINDS.forEach(k=>{
+      found[k].forEach((f, src)=>{
+        if(vpgCache[k].some(p=>p.src===src)) return;
+        vpgCache[k].push({src, caption: f.models.join(', ') + (f.notes.size? '\n' + [...f.notes].join('\n') : ''), by:'가져옴', at:todayStr()});
+      });
+    });
+    for(const k of VOLTAGE_GUIDE_KINDS) await saveWithRetry(()=>vpgSave(k));
+    DB.companyInfo = { ...(DB.companyInfo||{}), vpImported:true };
+    await saveWithRetry(saveCompanyInfo);
+    renderContent();
+    flash('기존 사진을 가져왔습니다');
+  }, '가져오기');
+}
+function voltageGuideGalleryHtml(model){
+  return `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+    <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:4px;">🔧 전압 설정 방법</div>
+    <div class="hint" style="margin:0 0 6px;">사진을 보시려면 글자 클릭</div>
+    <div>${vpgButtonsHtml('vpgOpenView')}</div>
+  </div>`;
+}
+function vpgOpenView(kind){ vpgOpen(kind, currentTab==='settings'); }
+function openVoltageGuidePicker(model){
+  document.getElementById('modal-root').innerHTML = `<div class="overlay" onclick="backdropClick(this,event,closeModal)"><div class="modal" style="max-width:480px;">
+    <h3>⚡ 전압 설정 방법</h3>
+    <div style="margin:6px 0 4px;">${vpgButtonsHtml('vpgOpenView')}</div>
+    <div class="modal-actions"><button class="btn primary" onclick="closeModal()">닫기</button></div>
+  </div></div>`;
 }
 async function updateModelTankDim(model, field, value){
   const v = Number(value);

@@ -68,6 +68,13 @@ button{cursor:pointer;}
 .viewer img{width:100%;min-height:100%;object-fit:contain;display:block;}
 .viewer .close{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:12px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:20px;z-index:21;}
 .viewer .hint{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#bbb;font-size:12px;pointer-events:none;}
+.kgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;}
+.kcard{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-height:118px;padding:14px;border-radius:14px;border:1px solid var(--line);background:var(--panel);text-align:left;border-top:6px solid var(--etc);}
+.kcard.v220{border-top-color:var(--v220);} .kcard.v380{border-top-color:var(--v380);} .kcard.v380plus{border-top-color:var(--v380p);}
+.kcard .kl{font-size:20px;font-weight:700;}
+.kcard .kn{font-size:30px;font-weight:700;margin-top:auto;line-height:1;}
+.kcard .kn small{font-size:14px;font-weight:500;color:var(--ink-soft);margin-left:2px;}
+.kcard:disabled{opacity:.45;}
 .foot{margin-top:18px;font-size:11.5px;color:#7F8E9C;text-align:center;}
 .foot button{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 12px;font-size:12px;margin-top:6px;}
 </style>
@@ -97,138 +104,108 @@ async function getShared(key){
   return v==null ? null : (typeof v==='string' ? JSON.parse(v) : v);
 }
 
+// 미리보기(about:srcdoc) 같은 환경에서는 history 기능이 막혀 있어 오류가 나지 않게 감쌉니다.
+function hPush(st, url){ try{ history.pushState(st, '', url); return true; }catch(e){ return false; } }
+function hBack(){ try{ if(history.state && (history.state.kind || history.state.viewer)){ history.back(); return; } }catch(e){} goHome(); }
+function goHome(){ const v=document.getElementById('viewer'); if(v) v.remove(); S.kind=null; render(); }
 const KINDS = ['v220','v380','v380plus','etc'];
-const LABEL = {v220:'220V 출력', v380:'380V 출력', v380plus:'380V 이상 출력', etc:'기타참고'};
-const S = { materials:null, gens:[], q:'', model:null, error:'', offline:false };
+const LABEL = {v220:'220V', v380:'380V', v380plus:'380V 이상', etc:'기타참고'};
+const S = { counts:{}, vers:{}, kind:null, q:'', error:'', offline:false, loaded:false };
 function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)||'null'); }catch(e){ return null; } }
 function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
 
-// 예전 방식(모델 정보 안에 사진)도 읽을 수 있게
-function legacyPhotos(m,k){
-  const a = m[`voltageGuidePhotos_${k}`];
-  if(Array.isArray(a) && a.filter(Boolean).length) return a.filter(Boolean);
-  const one = m[`voltageGuidePhoto_${k}`] || (k==='v220'? m.voltageGuidePhoto_internal : null);
-  return one ? [one] : [];
-}
-function countOf(m,k){ const l=legacyPhotos(m,k).length; return l || Number(m[`voltageGuideCount_${k}`])||0; }
-function noteOf(m,k){ return m[`voltageGuideNote_${k}`] || (k==='v220'? m.voltageGuideNote_internal : '') || ''; }
-function totalOf(m){ return KINDS.reduce((a,k)=>a+countOf(m,k),0); }
-function kwOf(name){ const x=String(name).match(/(\d+(?:\.\d+)?)\s*kw/i); return x? Number(x[1]) : 9999; }
-// 모델 이름 뒤의 (신형)(노랑)(회색)(구형) 같은 꼬리표는 떼고 비교합니다. (사진이 예전 모델 이름으로 등록된 경우 대비)
-function baseName(md){ return String(md||'').replace(/(kw)\s*(\([^)]*\))+\s*$/i,'$1').trim().toLowerCase(); }
-function idsOf(model){ const b=baseName(model); return S.gens.filter(g=>g && !g.retired && (g.model===model || baseName(g.model)===b)).map(g=>g.id).sort((a,b)=>a.localeCompare(b,'ko',{numeric:true})); }
-
+// 장수·버전만 업체정보에서 가져옵니다 (작은 데이터)
 async function loadBase(){
-  const cached = lsGet('vg-base');
-  if(cached){ S.materials=cached.materials; S.gens=cached.gens||[]; render(); }
+  const c = lsGet('vg2-base');
+  if(c){ S.counts=c.counts||{}; S.vers=c.vers||{}; S.loaded=true; render(); }
   try{
-    const [mats, gens] = await Promise.all([getShared('gen-materials-v1'), getShared('gen-fleet-v2').catch(()=>null)]);
-    S.materials = mats || {};
-    if(Array.isArray(gens)) S.gens = gens;
-    S.offline=false; S.error='';
-    lsSet('vg-base', {materials:S.materials, gens:S.gens.map(g=>({id:g.id, model:g.model, retired:g.retired}))});
+    const ci = (await getShared('gen-company-info-v1')) || {};
+    S.counts = ci.vpCounts || {}; S.vers = ci.vpVer || {};
+    S.loaded = true; S.offline=false; S.error='';
+    lsSet('vg2-base', {counts:S.counts, vers:S.vers});
   }catch(e){
-    if(!S.materials){ S.error='불러오지 못했습니다. 인터넷 연결을 확인하세요.'; }
-    else S.offline=true;
+    if(!S.loaded) S.error='불러오지 못했습니다. 인터넷 연결을 확인하세요.'; else S.offline=true;
   }
-  render();
+  if(!S.kind) render();
 }
-async function loadPhotos(model){
-  const m = S.materials[model] || {};
-  if(KINDS.some(k=>legacyPhotos(m,k).length)){ const o={}; KINDS.forEach(k=>o[k]=legacyPhotos(m,k)); return o; }
-  if(!totalOf(m)) return {};
-  const key = m.voltagePhotoKey; if(!key) return {};
-  const ver = m.voltagePhotoVer || 0;
-  const c = lsGet('vg-p-'+key);
-  if(c && c.ver===ver) return c.data;                      // 폰에 저장된 사진 사용 (데이터 0)
-  const data = (await getShared(key)) || {};
-  if(!lsSet('vg-p-'+key, {ver, data})){                     // 폰 저장공간이 차면 오래된 사진부터 비움
-    Object.keys(localStorage).filter(k=>k.startsWith('vg-p-')).forEach(k=>localStorage.removeItem(k));
-    lsSet('vg-p-'+key, {ver, data});
+// 종류별 사진: 한 번 받으면 폰에 저장, 사무실에서 바꿨을 때만 다시 받음
+async function loadKind(kind){
+  const ver = S.vers[kind] || 0;
+  const c = lsGet('vg2-p-'+kind);
+  if(c && c.ver===ver) return c.data;
+  if(!(S.counts[kind]>0)) return [];
+  const data = (await getShared('gen-vphoto-all-v1-'+kind)) || [];
+  if(!lsSet('vg2-p-'+kind, {ver, data})){
+    Object.keys(localStorage).filter(k=>k.startsWith('vg2-p-')).forEach(k=>localStorage.removeItem(k));
+    lsSet('vg2-p-'+kind, {ver, data});
   }
   return data;
 }
-
-function listHtml(){
-  const q = S.q.trim().toLowerCase();
-  const models = Object.keys(S.materials||{}).filter(md=>totalOf(S.materials[md])>0)
-    .filter(md=>!q || md.toLowerCase().includes(q) || idsOf(md).some(id=>id.toLowerCase().includes(q)))
-    .sort((a,b)=>kwOf(a)-kwOf(b) || a.localeCompare(b,'ko'));
-  if(!models.length) return `<div class="empty">${q? '찾는 모델이 없습니다.' : '등록된 전압 설정 사진이 없습니다.'}</div>`;
-  return `<div class="list">${models.map(md=>{
-    const m=S.materials[md], ids=idsOf(md);
-    return `<button class="mrow" onclick="openModel(${esc(JSON.stringify(md))})">
-      <div class="name">${esc(md)}</div>
-      ${ids.length? `<div class="ids">${esc(ids.join(' · '))}</div>`:''}
-      <div class="kinds">${KINDS.map(k=>`<span class="k ${k}${countOf(m,k)?'':' off'}">${LABEL[k].replace(' 출력','')}${countOf(m,k)? ' '+countOf(m,k):''}</span>`).join('')}</div>
-    </button>`;
-  }).join('')}</div>`;
-}
 function render(){
   const app = document.getElementById('app');
-  if(S.model) return;  // 상세 화면은 openModel에서 그림
-  if(!S.materials){
+  if(S.kind) return;
+  if(!S.loaded){
     app.innerHTML = `<div class="wrap"><div class="top"><h1><span class="bolt">⚡</span>전압설정</h1></div><div class="msg${S.error?' err':''}">${esc(S.error||'불러오는 중…')}</div></div>`;
     return;
   }
-  const focused = document.activeElement && document.activeElement.id==='q';
   app.innerHTML = `<div class="wrap">
     <div class="top"><h1><span class="bolt">⚡</span>전압설정</h1><span class="sub">${S.offline? '오프라인 · 저장본':''}</span></div>
-    <input id="q" class="search" type="search" placeholder="모델 또는 발전기번호 (예: 6BT, S-9)" value="${esc(S.q)}" oninput="S.q=this.value; document.getElementById('lst').innerHTML=listHtml();">
-    <div id="lst">${listHtml()}</div>
+    <div class="kgrid">${KINDS.map(k=>`<button class="kcard ${k}" onclick="openKind('${k}')" ${S.counts[k]>0?'':'disabled'}>
+      <span class="kl">${LABEL[k]}</span><span class="kn">${S.counts[k]||0}<small>장</small></span></button>`).join('')}</div>
     <div class="foot">사진은 한 번 보면 폰에 저장되어 다음부터는 데이터를 쓰지 않습니다.<br><button onclick="clearCache()">저장된 사진 지우기</button></div>
   </div>`;
-  if(focused){ const i=document.getElementById('q'); i.focus(); i.setSelectionRange(i.value.length,i.value.length); }
 }
-async function openModel(model, fromPop){
-  S.model = model;
-  if(!fromPop) history.pushState({model}, '', '#'+encodeURIComponent(model));
-  const m = S.materials[model] || {};
-  const ids = idsOf(model);
-  const kinds = KINDS.filter(k=>countOf(m,k)>0);
+function photosHtml(){
+  const q = S.q.trim().toLowerCase();
+  const list = (window._photos||[]).map((p,i)=>({p,i})).filter(x=>!q || String(x.p.caption||'').toLowerCase().includes(q));
+  if(!list.length) return `<div class="msg">${q? '찾는 설명이 없습니다.' : '사진이 없습니다.'}</div>`;
+  return list.map(({p,i})=>`<section class="sec ${S.kind}">
+      ${p.caption? `<div class="note">${esc(p.caption)}</div>`:''}
+      <div class="photos"><button onclick="openViewer(${i})" aria-label="사진 크게 보기"><img src="${p.src}" alt="${esc(p.caption||LABEL[S.kind])}" loading="lazy"></button></div>
+    </section>`).join('');
+}
+async function openKind(kind, fromPop){
+  S.kind = kind; S.q='';
+  if(!fromPop) hPush({kind}, '#'+kind);
   document.getElementById('app').innerHTML = `<div class="wrap">
-    <div class="top"><button class="back" onclick="history.back()" aria-label="목록으로">‹</button>
-      <h1 style="font-size:16px;">${esc(model)}</h1></div>
-    ${ids.length? `<div style="font-size:12.5px;color:var(--ink-soft);margin:-4px 0 6px;">${esc(ids.join(' · '))}</div>`:''}
-    <div class="chips">${kinds.map(k=>`<a class="${k}" href="#sec-${k}" onclick="event.preventDefault();document.getElementById('sec-${k}').scrollIntoView({behavior:'smooth'})">${LABEL[k]}</a>`).join('')}</div>
+    <div class="top"><button class="back" onclick="hBack()" aria-label="처음으로">‹</button><h1>${LABEL[kind]} <span class="sub" style="margin:0 0 0 4px;">${S.counts[kind]||0}장</span></h1></div>
+    <input id="q" class="search" type="search" placeholder="설명으로 찾기 (예: 6BT, 볼보)" oninput="S.q=this.value; document.getElementById('secs').innerHTML=photosHtml();">
     <div id="secs"><div class="msg">사진 불러오는 중…</div></div>
   </div>`;
   window.scrollTo(0,0);
-  let o;
-  try{ o = await loadPhotos(model); }
-  catch(e){ if(S.model===model) document.getElementById('secs').innerHTML = `<div class="msg err">사진을 불러오지 못했습니다. 인터넷 연결을 확인하세요.</div>`; return; }
-  if(S.model!==model) return;
-  window._photos = o;
-  document.getElementById('secs').innerHTML = kinds.map(k=>{
-    const ph = (o[k]||[]).filter(Boolean), note = noteOf(m,k);
-    return `<section class="sec ${k}" id="sec-${k}">
-      <h2><span>${LABEL[k]}</span><small>${ph.length}장</small></h2>
-      ${note? `<div class="note">${esc(note)}</div>`:''}
-      <div class="photos">${ph.map((p,i)=>`<button onclick="openViewer('${k}',${i})" aria-label="${LABEL[k]} 사진 ${i+1} 크게 보기"><img src="${p}" alt="${LABEL[k]} ${i+1}" loading="lazy"></button>`).join('') || '<div class="msg">사진 없음</div>'}</div>
-    </section>`;
-  }).join('') || '<div class="msg">등록된 사진이 없습니다.</div>';
+  let arr;
+  try{ arr = await loadKind(kind); }
+  catch(e){ if(S.kind===kind) document.getElementById('secs').innerHTML = `<div class="msg err">사진을 불러오지 못했습니다. 인터넷 연결을 확인하세요.</div>`; return; }
+  if(S.kind!==kind) return;
+  window._photos = arr;
+  document.getElementById('secs').innerHTML = photosHtml();
 }
-function openViewer(k,i){
-  const src = ((window._photos||{})[k]||[])[i]; if(!src) return;
+function openViewer(i){
+  const p = (window._photos||[])[i]; if(!p) return;
   const v = document.createElement('div'); v.className='viewer'; v.id='viewer';
-  v.innerHTML = `<img src="${src}" alt=""><button class="close" aria-label="닫기" onclick="closeViewer()">✕</button><div class="hint">두 손가락으로 확대</div>`;
+  v.innerHTML = `<img src="${p.src}" alt=""><button class="close" aria-label="닫기" onclick="closeViewer()">✕</button><div class="hint">${p.caption? esc(p.caption.split('\n')[0])+' · ':''}두 손가락으로 확대</div>`;
   document.body.appendChild(v);
-  history.pushState({viewer:true}, '');
+  v.dataset.pushed = hPush({viewer:true, kind:S.kind}) ? '1' : '';
 }
-function closeViewer(fromPop){ const v=document.getElementById('viewer'); if(v){ v.remove(); if(!fromPop) history.back(); } }
+function closeViewer(fromPop){
+  const v=document.getElementById('viewer'); if(!v) return;
+  const pushed = v.dataset.pushed==='1';
+  v.remove();
+  if(!fromPop && pushed){ try{ history.back(); }catch(e){} }
+}
 function clearCache(){
-  Object.keys(localStorage).filter(k=>k.startsWith('vg-p-')).forEach(k=>localStorage.removeItem(k));
+  Object.keys(localStorage).filter(k=>k.startsWith('vg2-p-')).forEach(k=>localStorage.removeItem(k));
   alert('폰에 저장된 사진을 지웠습니다.');
 }
 window.addEventListener('popstate', e=>{
   if(document.getElementById('viewer')){ closeViewer(true); return; }
   const st = e.state;
-  if(st && st.model){ openModel(st.model, true); }
-  else { S.model=null; render(); }
+  if(st && st.kind){ if(S.kind!==st.kind) openKind(st.kind, true); }
+  else { S.kind=null; render(); }
 });
 if('serviceWorker' in navigator){ window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
-history.replaceState({}, '', location.pathname);
+try{ history.replaceState({}, '', location.pathname); }catch(e){}
 render(); loadBase();
 </script>
 </body>
