@@ -6990,7 +6990,17 @@ function getCalendarEventsForDate(dateStr){
   });
   return result;
 }
-const CAL_TAG_STYLE = { deploy:{label:'투입', color:'#1565C0'}, withdraw:{label:'철수', color:'var(--danger)'} };
+const CAL_TAG_STYLE = { deploy:{label:'🚚 투입', color:'#1565C0'}, withdraw:{label:'🔻 철수', color:'var(--danger)'} };
+function calTagLabel(tag, e){
+  const t = CAL_TAG_STYLE[tag]; if(!t) return '';
+  const time = tag==='deploy' ? e.deployTime : e.withdrawTime;
+  return t.label + (time ? ` <span style="font-weight:700;">${escR(time)}</span>` : '');
+}
+// 시간 칸에 자주 쓰는 값 목록
+function calTimeDatalistHtml(){
+  const opts = ['오전','오후','종일','07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00'];
+  return `<datalist id="cal-time-opts">${opts.map(o=>`<option value="${o}">`).join('')}</datalist>`;
+}
 function renderCalendar(){
   const wrap = document.getElementById('calendar-wrap');
   if(!wrap) return;
@@ -7017,7 +7027,7 @@ function renderCalendar(){
     const evHtml = evs.slice(0,6).map(({ev:e,tag})=>{
       const t = CAL_TAG_STYLE[tag];
       const color = t ? t.color : 'var(--primary-dark)';
-      return `<div style="color:${color};font-weight:600;font-size:11.5px;margin-top:3px;word-break:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${t? `<b>${t.label}</b> `:''}${escR(e.text)}</div>`;
+      return `<div style="margin-top:3px;">${t? `<div style="color:${color};font-weight:800;font-size:11.5px;">${calTagLabel(tag,e)}</div>`:''}<div style="color:${color};font-weight:600;font-size:11.5px;word-break:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escR(e.text)}</div></div>`;
     }).join('');
     const moreTxt = evs.length>6? `<div class="muted" style="font-size:10.5px;margin-top:1px;">+${evs.length-6}건 더</div>` : '';
     const numColor = holiday? 'var(--danger)' : (dowIdx===0?'var(--danger)':dowIdx===6?'#1565C0':'var(--ink)');
@@ -7039,9 +7049,13 @@ function openCalendarDayModal(dateStr, editingId){
       return `<div style="padding:8px 0;border-bottom:1px dashed var(--border);">
         <textarea id="f-cal-edit-text" style="min-height:80px;width:100%;box-sizing:border-box;">${escR(e.text)}</textarea>
         ${isSiteEvent(e)? `<div class="field-row" style="margin-top:8px;">
-          <div class="field"><label style="font-size:12px;color:#1565C0;">투입 날짜</label><input type="date" id="f-cal-edit-deploy" value="${e.deployDate||''}"></div>
-          <div class="field"><label style="font-size:12px;color:var(--danger);">철수 날짜</label><input type="date" id="f-cal-edit-withdraw" value="${e.withdrawDate||''}"></div>
-        </div>` : ''}
+          <div class="field"><label style="font-size:12px;color:#1565C0;">🚚 투입 날짜</label><input type="date" id="f-cal-edit-deploy" value="${e.deployDate||''}"></div>
+          <div class="field"><label style="font-size:12px;color:#1565C0;">투입 시간</label><input type="text" id="f-cal-edit-deploy-time" list="cal-time-opts" value="${escR(e.deployTime||'')}" placeholder="예: 09:00"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label style="font-size:12px;color:var(--danger);">🔻 철수 날짜</label><input type="date" id="f-cal-edit-withdraw" value="${e.withdrawDate||''}"></div>
+          <div class="field"><label style="font-size:12px;color:var(--danger);">철수 시간</label><input type="text" id="f-cal-edit-withdraw-time" list="cal-time-opts" value="${escR(e.withdrawTime||'')}" placeholder="예: 14:00"></div>
+        </div>${calTimeDatalistHtml()}` : ''}
         <div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end;">
           <button type="button" class="btn sm" onclick="openCalendarDayModal('${dateStr}')">취소</button>
           <button type="button" class="btn sm primary" onclick="saveCalendarEventEdit('${dateStr}','${e.id}')">저장</button>
@@ -7049,15 +7063,16 @@ function openCalendarDayModal(dateStr, editingId){
       </div>`;
     }
     const tagsHtml = isSiteEvent(e) ? [
-      e.deployDate? `<span class="pill" style="background:#E6EFFA;color:#1565C0;border-color:#1565C0;">투입 ${dow(e.deployDate)}</span>` : '',
-      e.withdrawDate? `<span class="pill danger">철수 ${dow(e.withdrawDate)}</span>` : ''
+      e.deployDate? `<span class="pill" style="background:#E6EFFA;color:#1565C0;border-color:#1565C0;">투입 ${dow(e.deployDate)}${e.deployTime? ' '+escR(e.deployTime):''}</span>` : '',
+      e.withdrawDate? `<span class="pill danger">철수 ${dow(e.withdrawDate)}${e.withdrawTime? ' '+escR(e.withdrawTime):''}</span>` : ''
     ].filter(Boolean).join(' ') : '';
     const t = CAL_TAG_STYLE[tag];
     const crossNote = '';
     return `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px dashed var(--border);">
       <div>
-        <div style="font-size:14px;white-space:pre-wrap;${t? `color:${t.color};`:''}">${t? `<b>${t.label}</b> `:''}${escR(e.text)}</div>
+        ${t? `<div style="font-size:13.5px;font-weight:800;color:${t.color};">${calTagLabel(tag,e)}</div>`:''}
+        <div style="font-size:14px;white-space:pre-wrap;${t? `color:${t.color};`:''}">${escR(e.text)}</div>
         ${tagsHtml? `<div style="margin-top:4px;">${tagsHtml}</div>` : ''}
         ${crossNote}
         <div class="muted" style="font-size:11px;margin-top:4px;">✍ ${escR(e.authorBy||'이름미상')}</div>
@@ -7096,6 +7111,9 @@ async function saveCalendarEventEdit(dateStr, id){
   const withdrawEl = document.getElementById('f-cal-edit-withdraw');
   ev.deployDate = deployEl ? (deployEl.value || null) : (ev.deployDate||null);
   ev.withdrawDate = withdrawEl ? (withdrawEl.value || null) : (ev.withdrawDate||null);
+  const dtEl = document.getElementById('f-cal-edit-deploy-time'), wtEl = document.getElementById('f-cal-edit-withdraw-time');
+  if(dtEl) ev.deployTime = (ev.deployDate && dtEl.value.trim()) || null;
+  if(wtEl) ev.withdrawTime = (ev.withdrawDate && wtEl.value.trim()) || null;
   if(isSiteEvent(ev) && ev.deployDate && ev.withdrawDate && ev.withdrawDate < ev.deployDate){ flash('철수 날짜가 투입 날짜보다 빠릅니다'); return; }
   if(ev.site && (ev.deployDate || ev.withdrawDate)) ev.date = ev.deployDate || ev.withdrawDate;
   await saveCalendarEvents();
@@ -7122,12 +7140,17 @@ function openSiteEventModal(){
     <div class="modal" style="max-width:520px;">
       <h3>🗓️ 새 일정 등록</h3>
       <div class="modal-sub">작성자: ${escR(DB.currentUserName||'이름 미선택')}</div>
+      ${calTimeDatalistHtml()}
       <div class="field-row">
-        <div class="field"><label style="color:#1565C0;font-weight:700;">투입 날짜</label><input type="date" id="f-site-deploy"></div>
-        <div class="field"><label style="color:var(--danger);font-weight:700;">철수 날짜</label><input type="date" id="f-site-withdraw"></div>
+        <div class="field"><label style="color:#1565C0;font-weight:700;">🚚 투입 날짜</label><input type="date" id="f-site-deploy"></div>
+        <div class="field"><label style="color:#1565C0;font-weight:700;">투입 시간</label><input type="text" id="f-site-deploy-time" list="cal-time-opts" placeholder="예: 09:00, 오전"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label style="color:var(--danger);font-weight:700;">🔻 철수 날짜</label><input type="date" id="f-site-withdraw"></div>
+        <div class="field"><label style="color:var(--danger);font-weight:700;">철수 시간</label><input type="text" id="f-site-withdraw-time" list="cal-time-opts" placeholder="예: 14:00, 오후"></div>
       </div>
       <div class="field"><label>내용</label><textarea id="f-site-text" placeholder="예: 씨앤오 100KW 3대, ATS 2대, 케이블" style="min-height:120px;"></textarea></div>
-      <div class="hint">투입 날짜에는 <b style="color:#1565C0;">투입</b>, 철수 날짜에는 <b style="color:var(--danger);">철수</b>가 붙어 같은 내용이 표시됩니다. 둘 중 하나만 넣어도 됩니다.</div>
+      <div class="hint">투입 날짜에는 <b style="color:#1565C0;">🚚 투입</b>, 철수 날짜에는 <b style="color:var(--danger);">🔻 철수</b>가 붙어 같은 내용이 표시됩니다. 둘 중 하나만 넣어도 됩니다.</div>
       <div id="f-site-err" class="err" style="display:none;"></div>
       <div class="modal-actions">
         <button class="btn" onclick="closeModal()">취소</button>
@@ -7140,13 +7163,15 @@ async function submitSiteEvent(){
   const deploy = document.getElementById('f-site-deploy').value || null;
   const withdraw = document.getElementById('f-site-withdraw').value || null;
   const text = document.getElementById('f-site-text').value.trim();
+  const deployTime = document.getElementById('f-site-deploy-time').value.trim() || null;
+  const withdrawTime = document.getElementById('f-site-withdraw-time').value.trim() || null;
   const errEl = document.getElementById('f-site-err');
   const err = m=>{ errEl.textContent = m; errEl.style.display='block'; };
   if(!deploy && !withdraw) return err('투입 날짜나 철수 날짜 중 하나는 입력해주세요.');
   if(!text) return err('내용을 입력해주세요.');
   if(deploy && withdraw && withdraw < deploy) return err('철수 날짜가 투입 날짜보다 빠릅니다.');
   const newId = uid();
-  DB.calendarEvents = [...(DB.calendarEvents||[]), {id:newId, date: deploy||withdraw, text, deployDate:deploy, withdrawDate:withdraw, site:true, authorBy: DB.currentUserName||'이름미상', createdDate: todayStr()}];
+  DB.calendarEvents = [...(DB.calendarEvents||[]), {id:newId, date: deploy||withdraw, text, deployDate:deploy, withdrawDate:withdraw, deployTime: deploy? deployTime : null, withdrawTime: withdraw? withdrawTime : null, site:true, authorBy: DB.currentUserName||'이름미상', createdDate: todayStr()}];
   seenEventIds.add(newId);
   await saveCalendarEvents();
   closeModal();
