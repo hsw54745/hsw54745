@@ -883,7 +883,6 @@ async function openQmVoltageEdit(id){
       </div>
       <input id="qmv-input" type="text" style="width:100%;font-size:20px;padding:14px;border-radius:14px;border:3px solid #ccc;box-sizing:border-box;" placeholder="예: 380V">
       ${voltageButtonsHtml('qmv-input', {vertical:true, big:true})}
-      <div id="qmv-guide-wrap" style="margin-top:12px;"></div>
       <div id="qmv-status" style="display:none;margin-top:14px;padding:14px;border-radius:12px;font-size:15px;font-weight:700;text-align:center;"></div>
       <button id="qmv-save-btn" onclick="submitQmVoltageEdit('${id}')" style="width:100%;margin-top:16px;padding:18px;font-size:20px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">저장</button>
     </div>
@@ -901,11 +900,6 @@ async function openQmVoltageEdit(id){
     }
     document.getElementById('qmv-sub').textContent = `${g.id} · ${g.model||'모델 미등록'} (현재: ${g.voltage||'미설정'})`;
     document.getElementById('qmv-input').value = g.voltage || '';
-    const guideWrap = document.getElementById('qmv-guide-wrap');
-    if(guideWrap && g.model){
-      const escM = g.model.replace(/'/g,"\\'");
-      guideWrap.innerHTML = `<button type="button" onclick="qmShowVoltageGuide('${escM}')" style="width:100%;background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-weight:800;font-size:14px;padding:10px;border-radius:12px;cursor:pointer;">📷 이 모델 전압 설정방법 사진 보기</button>`;
-    }
   }catch(e){
     if(document.getElementById('qmv-sub')) document.getElementById('qmv-sub').textContent = '불러오지 못했습니다.';
   }
@@ -943,31 +937,6 @@ async function submitQmVoltageEdit(id){
     if(btn){ btn.disabled = false; btn.textContent = '저장'; }
   }
 }
-// 전압 설정방법 사진(모델별)은 용량이 커서, 필요할 때(눌렀을 때)만 불러와 캐시해둡니다.
-let qmMaterialsCache = null;
-async function qmShowVoltageGuide(model){
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal">
-      <h3>📷 전압 설정방법</h3>
-      <div id="qmvg-body" style="text-align:center;color:#999;font-size:14px;padding:16px 0;">불러오는 중...</div>
-      <div class="modal-actions"><button class="btn primary" onclick="closeModal()">닫기</button></div>
-    </div>
-  </div>`;
-  try{
-    // 퀵메뉴는 업체정보를 안 불러올 수 있어 장수 정보만 따로 확인합니다
-    if(!(DB.companyInfo && DB.companyInfo.vpCounts)){
-      const r = await window.storage.get('gen-company-info-v1', true);
-      if(r) DB.companyInfo = { ...(DB.companyInfo||{}), ...JSON.parse(r.value) };
-    }
-    const body = document.getElementById('qmvg-body'); if(!body) return;
-    body.innerHTML = `<div style="text-align:left;">${vpgButtonsHtml('qmViewVoltageGuidePhoto')}</div>`;
-  }catch(e){
-    const body = document.getElementById('qmvg-body');
-    if(body) body.innerHTML = '<div style="color:#B23A34;">불러오지 못했습니다.</div>';
-  }
-}
-function qmViewVoltageGuidePhoto(kind){ vpgOpen(kind, false); }
 let qmOutRegionFilter = null;
 async function renderQuickModeOutList(){
   qmOutRegionFilter = null;
@@ -1260,7 +1229,6 @@ async function openQmInProcess(id){
         <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:6px;">전압</label>
         <input type="text" id="qmin-voltage" value="${escR(r.voltage||g.voltage||'')}" placeholder="예: 380V" style="width:100%;font-size:16px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;">
         ${voltageButtonsHtml('qmin-voltage')}
-        ${g.model? `<button type="button" onclick="qmShowVoltageGuide('${g.model.replace(/'/g,"\\'")}')" style="width:100%;margin-top:8px;background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-weight:800;font-size:13px;padding:8px;border-radius:10px;cursor:pointer;">📷 이 모델 전압 설정방법 사진 보기</button>` : ''}
       </div>
       <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px;margin-bottom:10px;">
         ${g.hoursKnown ? `
@@ -6606,7 +6574,7 @@ function renderManualTab(){
       ['출고하기', '상차대기가 아닌 일반 예약 건을 실제 출고 처리합니다.'],
       ['출고 취소 / 예약 취소', '해당 건을 취소하고 목록에서 제거합니다.'],
       ['입금 확인', '🚨 미입금 출고로 등록된 건에서, 입금이 확인되면 눌러서 표시를 해제합니다.'],
-      ['전압변경 표시', '출고 전압이 발전기 기존 셋팅전압과 다르면 빨간 글씨로 뜹니다. 글씨를 클릭하면 그 모델의 전압 설정 방법 사진을 볼 수 있고, 그 아래 "✓ 설정완료" 버튼을 누르면 발전기에서 실제로 전압을 바꾸셨는지 확인한 뒤 셋팅전압이 업데이트되고 정비이력에도 자동으로 기록됩니다.'],
+      ['전압변경 표시', '출고 전압이 발전기 기존 셋팅전압과 다르면 빨간 글씨로 뜹니다. 그 아래 "✓ 설정완료" 버튼을 누르면 발전기에서 실제로 전압을 바꾸셨는지 확인한 뒤 셋팅전압이 업데이트되고 정비이력에도 자동으로 기록됩니다.'],
       ['부자재확인', '출고시 선택한 부자재 목록만 간단히 팝업으로 보여줍니다 (비고확인과 같은 형식 — 내용만 표시, 닫기 버튼만 있음). 부자재가 없으면 "부자재없음"으로 표시됩니다.'],
       ['비고확인', '출고하기에서 비고란에 내용을 적어두면 부자재확인 버튼 바로 아래에 파란색 버튼으로 "비고확인"이 뜹니다 (부자재확인과 같은 크기·모양). 클릭하면 비고 내용만 바로 보여줍니다. 비고가 없으면 표시되지 않습니다.'],
       ['📩 문자오더 원문 확인', '이영숙님 등이 퀵메뉴(문자 간편등록)로 붙여넣어 등록한 출고 문자 원문이 노란 카드로 맨 위에 따로 표시됩니다. 카드 안 거래처명은 진하게 강조되어 보이고, 문자 내용을 다 확인해서 발전기 배정 등 처리를 마쳤으면 "✅ 확인완료"를 눌러 숨김 목록으로 넘길 수 있습니다("▸ 숨김 목록 보기"에서 다시 볼 수 있고 "↩️ 다시 표시"로 되돌릴 수 있습니다). 필요 없는 건은 "🗑 삭제"로 바로 지울 수 있습니다. 아직 거래처 정보를 입력 안 한 문자오더 건을 "내용보기/수정"으로 열면, 문자 원문에서 업체명·주소·담당자·연락처·전압·도착일시(오늘/내일/며칠 표현 인식)·부자재(비고)를 자동으로 추출해 미리 채워줍니다(상차일자는 도착예정일 하루 전으로 자동 계산됩니다). 100% 정확하진 않으니 빨간 안내문구가 뜨면 채워진 내용을 꼭 확인 후 저장해주세요 — 이미 값이 입력되어 있는 칸은 자동으로 덮어쓰지 않습니다.'],
@@ -6700,7 +6668,7 @@ function renderManualTab(){
       ['모델별 색상 설정', '모델마다 색상을 지정하면 발전기 목록(입고/출고중/출고대기 등)에서 모델명 옆에 색상 점으로 표시되어 구분하기 쉽습니다. 용량대별로 묶어서 모델명과 함께 보여줍니다.'],
       ['발전기별 색상 고정', '특정 발전기 번호에 색을 고정하면, 모델명이 바뀌거나 그 모델의 색상이 바뀌어도 그 발전기만은 항상 지정한 색으로 표시됩니다. 모델별 색상보다 우선 적용됩니다. 번호·색상을 등록하는 카드와, 지금 색상이 지정된 발전기 목록을 보여주는 카드가 나란히 있습니다.'],
       ['모델별 제원 (탱크 · 총중량 · 연료소모량)', '모델별 탱크 크기(자동 연료환산용), 총중량, 시간당 연료소모량(L/h)을 등록합니다.'],
-      ['⚡ 전압 설정 사진', '설정 맨 아래에서 발전기 종류(모델)별로 220V/380V/380V 이상/기타참고 셋팅법 사진(종류별 최대 3장)을 등록·삭제합니다. 입고 목록의 전압 클릭·입고 처리 화면·퀵메뉴·전압설정 폰 페이지에는 보기 전용으로 나타납니다.'],
+      ['⚡ 전압 설정 사진', '설정 맨 아래에서 220V/380V/380V 이상/기타참고 4종류로 셋팅법 사진을 등록·삭제합니다. 사진은 ⚡전압설정 폰 페이지에서만 보기 전용으로 나타나고, 다른 탭에서는 전압 값만 바꿉니다.'],
       ['발전기별 탱크 규격 · 기준높이 (개별 설정)', '같은 모델이라도 실제 탱크 크기가 다른 발전기가 있으면, 왼쪽 카드에서 번호로 찾아 그 발전기만 가로×세로×높이와 바닥 기준높이(모델 기본값과 다른 경우)를 한 번에 입력할 수 있습니다. 비워두면 위 "모델별 제원 (탱크 · 총중량 · 연료소모량)"에서 등록한 모델 기본값이 그대로 적용됩니다. 계산되는 "남은 연료량"은 이 기준높이만큼(항상 남아있어 실제로 쓸 수 없는 양)을 자동으로 빼고 계산됩니다. 개별 설정된 발전기는 오른쪽 카드 목록에 바로 표시되고, "삭제" 버튼으로 지울 수 있습니다. 높이가 세로(깊이)에 비해 유난히 낮게 입력된 경우(세로·높이를 바꿔 입력하는 실수가 흔함) 그 항목이 빨간색으로 표시되어 바로 눈에 띕니다.'],
       ['폐기된/매각된 발전기', '처리된 발전기 목록입니다. "복원" 버튼으로 다시 살릴 수 있습니다.']
     ])}
@@ -7706,7 +7674,7 @@ function voltagePhotoSettingsHtml(activeList){
   return `
     <div class="material-card" style="margin-top:20px;">
       <div class="section-title" style="margin-top:0;">⚡ 전압 설정 사진</div>
-      <details class="info-toggle"><summary></summary><p class="muted">220V / 380V / 380V 이상 / 기타참고 4종류로 사진을 모아둡니다(종류별 최대 ${VPG_MAX}장). 사진마다 설명(예: 모델 이름)을 붙일 수 있고, [보기·관리]에서 크게 보기·설명 수정·삭제를 합니다. 등록한 사진은 입고 화면·퀵메뉴·⚡전압설정 폰 페이지에서 볼 수 있습니다.</p></details>
+      <details class="info-toggle"><summary></summary><p class="muted">220V / 380V / 380V 이상 / 기타참고 4종류로 사진을 모아둡니다(종류별 최대 ${VPG_MAX}장). 사진마다 설명(예: 모델 이름)을 붙일 수 있고, [보기·관리]에서 크게 보기·설명 수정·삭제를 합니다. 등록한 사진은 ⚡전압설정 폰 페이지(설정의 QR로 설치)에서 볼 수 있습니다.</p></details>
       ${showImport? `<div class="hint" style="margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">예전에 모델별로 올린 사진 ${legacyN}장이 있습니다. <button type="button" class="btn sm" onclick="vpgImportLegacy()">📥 종류별로 가져오기</button></div>`:''}
       <div class="vpg-cards">${cards}</div>
     </div>`;
@@ -8116,12 +8084,6 @@ async function vpgSave(kind){
   DB.companyInfo = { ...ci, vpCounts:{...(ci.vpCounts||{}), [kind]:arr.length}, vpVer:{...(ci.vpVer||{}), [kind]:Date.now()} };
   await saveCompanyInfo();
 }
-// 4종류 버튼 (입고 화면·퀵메뉴 등 보기 전용)
-function vpgButtonsHtml(viewFn){
-  const btns = VOLTAGE_GUIDE_KINDS.filter(k=>vpgCount(k)>0).map(k=>
-    `<button type="button" class="btn sm" style="margin:3px 4px 3px 0;color:var(--primary-dark);border-color:var(--primary);" onclick="${viewFn}('${k}')">${VPG_SHORT[k]} (${vpgCount(k)}장)</button>`).join('');
-  return btns || '<div class="hint">등록된 전압 설정 사진이 없습니다. (설정 → ⚡ 전압 설정 사진에서 등록)</div>';
-}
 // 종류별 사진 모아보기 (설정 탭에서는 추가·설명수정·삭제 가능)
 async function vpgOpen(kind, editable){
   const label = VPG_SHORT[kind];
@@ -8262,21 +8224,6 @@ async function vpgImportLegacy(){
     flash('기존 사진을 가져왔습니다');
   }, '가져오기');
 }
-function voltageGuideGalleryHtml(model){
-  return `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
-    <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:4px;">🔧 전압 설정 방법</div>
-    <div class="hint" style="margin:0 0 6px;">사진을 보시려면 글자 클릭</div>
-    <div>${vpgButtonsHtml('vpgOpenView')}</div>
-  </div>`;
-}
-function vpgOpenView(kind){ vpgOpen(kind, currentTab==='settings'); }
-function openVoltageGuidePicker(model){
-  document.getElementById('modal-root').innerHTML = `<div class="overlay" onclick="backdropClick(this,event,closeModal)"><div class="modal" style="max-width:480px;">
-    <h3>⚡ 전압 설정 방법</h3>
-    <div style="margin:6px 0 4px;">${vpgButtonsHtml('vpgOpenView')}</div>
-    <div class="modal-actions"><button class="btn primary" onclick="closeModal()">닫기</button></div>
-  </div></div>`;
-}
 async function updateModelTankDim(model, field, value){
   const v = Number(value);
   if(!DB.materials[model]) DB.materials[model] = {};
@@ -8341,7 +8288,6 @@ function openVoltageModal(id){
         <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><span>셋팅 전압</span>${lastInfo}</label>
         <input type="text" id="f-volt-edit" value="${(g.voltage||'').replace(/"/g,'&quot;')}" placeholder="예: 380V">
         ${voltageButtonsHtml('f-volt-edit', {vertical:true, big:true})}
-        ${voltageGuideGalleryHtml(g.model)}
       </div>
       <div class="modal-actions">
         <button class="btn" onclick="closeModal()">취소</button>
@@ -9049,7 +8995,7 @@ function renderReserveTab(){
     const voltageChanged = g && g.voltage && r.voltage && g.voltage!==r.voltage;
     const vColor = voltageColor(r.voltage);
     const voltageCell = voltageChanged
-      ? `<span style="color:var(--danger);font-weight:700;cursor:pointer;text-decoration:underline;" onclick="openVoltageGuidePicker('${(g.model||'').replace(/'/g,"\\'")}')" title="클릭하면 전압 설정 방법을 볼 수 있습니다">전압변경<br>${escR(g.voltage)}→${escR(r.voltage)}</span>
+      ? `<span style="color:var(--danger);font-weight:700;">전압변경<br>${escR(g.voltage)}→${escR(r.voltage)}</span>
          <button class="btn sm" style="margin-top:3px;padding:2px 6px;font-size:10.5px;" onclick="confirmReservationVoltageChange('${r.id}')">✓ 설정완료</button>`
       : (r.voltage? `<span style="${vColor?`color:${vColor};font-weight:700;`:''}">${escR(r.voltage)}</span>` : '-');
     const suppliesCell = r.supplies
