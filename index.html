@@ -1137,7 +1137,7 @@ async function openQmOutDetail(id){
       ['연락처', r.phone],
       ['주소', r.address || r.site],
       ['출고일', r.outDate? `${fmtDateKR(r.outDate)}${r.arriveTime? ` (${r.arriveTime})` : ''}` : null],
-      ['임대구분', r.longTerm? '장기임대' : '단기임대'],
+      
       ['출고시 누적사용시간', hoursDisplay],
             ['연료 요청/실제(L)', (r.fuelRequested!=null || r.fuelActual!=null) ? `요청 ${r.fuelRequested!=null?r.fuelRequested:'-'} / 실제 ${r.fuelActual!=null?r.fuelActual:'-'}` : null],
       ['부자재', r.supplies],
@@ -3503,18 +3503,19 @@ function buildReturnReqNumMap(){
   items.forEach((it,i)=>{ map[it.id] = i+1; });
   return map;
 }
-// 하루평균 사용예상시간 기본값(단기/장기) - 팀 전체 공유를 위해 Firebase(companyInfo)에 저장합니다.
-function getEstDailyDefault(longTerm){
+// 하루평균 사용예상시간 기본값 - 팀 전체 공유를 위해 Firebase(companyInfo)에 저장합니다.
+// (예전 단기/장기 값이 남아 있으면 그 값을 이어서 씁니다)
+function getEstDailyDefault(){
   const ci = DB.companyInfo || {};
-  const v = Number(longTerm ? ci.estDailyLong : ci.estDailyShort);
-  return v>0 ? v : 0;
+  for(const x of [ci.estDaily, ci.estDailyShort, ci.estDailyLong]){ const v = Number(x); if(v>0) return v; }
+  return 0;
 }
-// 실제 추정에 쓰는 하루 사용시간: 발전기별 개별 값은 쓰지 않고, 단기/장기 기본값만 씁니다.
+// 실제 추정에 쓰는 하루 사용시간: 발전기별 개별 값은 쓰지 않고, 기본값 하나만 씁니다.
 // (예전에 저장된 rental.estDaily 값은 무시합니다)
 function effEstDaily(g){
   const r = g && g.rental;
   if(!r) return 0;
-  return getEstDailyDefault(!!r.longTerm);
+  return getEstDailyDefault();
 }
 function estCurrentHours(g){
   const ed = effEstDaily(g);
@@ -4747,7 +4748,7 @@ function longtermPrepListHtml(){
     const pred = predictedDate(g);
     const remTxt = rem<=0 ? `<b style="color:var(--danger);">${Math.round(-rem)}h 초과</b>` : `<b>${Math.round(rem)}h 남음</b>`;
     return `<div class="prep-card">
-      <div class="p-head"><span>${g.id} · ${displayModel(g)} <span class="pill ${g.rental.longTerm?'gray':''}" style="font-size:10.5px;padding:0 6px;">${g.rental.longTerm?'장기':'단기'}</span></span>${remTxt}</div>
+      <div class="p-head"><span>${g.id} · ${displayModel(g)}</span>${remTxt}</div>
       <div style="font-size:12.5px;font-weight:700;margin-bottom:2px;">${escR(g.rental.customer||'거래처 미기재')} · ${escR(g.rental.site||'-')}</div>
       <div class="muted" style="font-size:12px;margin-bottom:6px;">${escR([g.rental.manager,g.rental.phone].filter(Boolean).join(' · ')||'담당자 미기재')} · 예상 정비 도래: ${pred.overdue? '<b style="color:var(--danger);">이미 도래</b>':`${dow(pred.date)} (약 ${pred.days}일 후)`}</div>
       ${materialSummaryHtml(g.model)}
@@ -4764,7 +4765,7 @@ function longtermPrepListHtml(){
     </div>`).join('')}</div>`;
   return `
     <div id="longterm-prep-anchor" class="section-title">🔧 출고중 정비 준비 리스트 <span class="cnt">${prepList.length}대</span>${prepList.length>0? ` <button type="button" class="btn sm" onclick="downloadLongtermPrepFile()">🖨 인쇄</button>`:''}</div>
-    <details class="info-toggle"><summary></summary><p class="muted">출고중인 발전기(단기·장기 모두)를 하루 예상 사용시간을 기준으로 정비가 필요한(초과) 것과 곧 필요한(임박) 것만 나눠 급한 순으로 보여줍니다. 방문 정비시 챙길 자재(엔진오일량·필터 품명/규격/수량)가 함께 표시됩니다.</p></details>
+    <details class="info-toggle"><summary></summary><p class="muted">출고중인 발전기를 하루 예상 사용시간을 기준으로 정비가 필요한(초과) 것과 곧 필요한(임박) 것만 나눠 급한 순으로 보여줍니다. 방문 정비시 챙길 자재(엔진오일량·필터 품명/규격/수량)가 함께 표시됩니다.</p></details>
     ${ltList.length===0? `<div class="empty">정비주기를 추정할 출고중 발전기가 없습니다.</div>` : prepList.length===0? `<div class="empty">정비가 임박하거나 초과된 출고중 발전기가 없습니다. (${ltList.length}대 모두 정상)</div>` : colsHtml}
   `;
 }
@@ -4844,15 +4845,11 @@ function renderOutList(){
         <div class="btn-row" style="flex-wrap:wrap;row-gap:4px;margin-top:4px;">
           <button class="btn sm" onclick="quickForceInPrompt('${g.id}')" style="white-space:nowrap;" title="발전기를 새로 등록해 시스템을 처음 시작할 때, 아직 임대 정보가 없는 발전기를 거래처 입력 없이 한 번에 [입고] 상태로 정리하는 용도입니다. 누적 사용시간은 여기서 입력되지 않으니, 실제 값은 [설정 → 발전기 모델 설정 → 관리]에서 직접 입력해주세요. 평소 운영 중에는 거의 쓸 일이 없습니다.">⚡ 강제입고</button>
           <button class="btn sm" onclick="cancelOutPrompt('${g.id}')" style="white-space:nowrap;color:var(--danger);border-color:var(--danger);" title="이번 출고를 취소하고 바로 창고 재고로 되돌립니다. 이번 출고 이력은 기록되지 않습니다.">🚫 출고취소</button>
-          <button class="btn sm" onclick="toggleLongterm('${g.id}')" style="white-space:nowrap;" title="단기/장기 구분 전환">${rt.longTerm? '장기→단기':'단기→장기'}</button>
         </div>
       </td>
     </tr>`;
   };
-  const shortList = list.filter(g=>!g.rental.longTerm);
-  const longList = list.filter(g=>g.rental.longTerm);
-  const shortRows = shortList.map(rowHtml).join('');
-  const longRows = longList.map(rowHtml).join('');
+  const allRows = list.map(rowHtml).join('');
   const theadHtml = `<thead><tr><th style="width:30px;"><input type="checkbox" onchange="toggleSelectAllBulkIn(this)" title="전체 선택"></th><th>번호</th><th>모델</th><th>출고완료</th><th>전압</th><th>거래처/현장</th><th>출고일</th><th>사용일수</th><th>정비 주기(추정)</th><th>정비 예상시점</th><th>입고예정일</th><th></th></tr></thead>`;
 
   // 용량(kW)별 버튼 목록
@@ -4863,18 +4860,14 @@ function renderOutList(){
     capacityCounts[cap] = (capacityCounts[cap]||0) + 1;
   });
   const capacityEntries = Object.entries(capacityCounts).map(([k,v])=>[parseFloat(k),v]).sort((a,b)=>a[0]-b[0]);
-  const defaultEstDailyShort = getEstDailyDefault(false) || '';
-  const defaultEstDailyLong = getEstDailyDefault(true) || '';
+  const defaultEstDaily = getEstDailyDefault() || '';
   const estDailyDefaultHtml = `
     <span style="display:inline-flex;align-items:center;gap:6px;margin-left:8px;padding-left:10px;border-left:1px solid var(--border);flex-wrap:wrap;">
       <label style="font-weight:700;font-size:12.5px;white-space:nowrap;">📊 발전기 하루평균 사용예상시간(h/일)</label>
-      <span style="font-size:11.5px;color:#666;">단기</span>
-      <input type="number" id="default-est-daily-short" value="${escR(defaultEstDailyShort)}" step="0.5" min="0" placeholder="예: 4.5" style="width:56px;padding:4px 6px;font-size:13px;">
-      <span style="font-size:11.5px;color:#666;">장기</span>
-      <input type="number" id="default-est-daily-long" value="${escR(defaultEstDailyLong)}" step="0.5" min="0" placeholder="예: 6" style="width:56px;padding:4px 6px;font-size:13px;">
+      <input type="number" id="default-est-daily" value="${escR(defaultEstDaily)}" step="0.5" min="0" placeholder="예: 4" style="width:60px;padding:4px 6px;font-size:13px;">
       <button type="button" class="btn sm primary" onclick="applyDefaultEstDailyToAll()">기본값 저장</button>
-      <button type="button" class="btn sm" onclick="clearEstDailyFromAll()" title="단기/장기 기본값을 비웁니다(모르거나 필요 없을 때)">비우기</button>
-      <span style="font-size:11px;color:#888;">※ 출고중 발전기 전체가 이 값으로 정비주기를 추정합니다 (장기로 바꾸면 장기 값 적용)</span>
+      <button type="button" class="btn sm" onclick="clearEstDailyFromAll()" title="기본값을 비웁니다(모르거나 필요 없을 때)">비우기</button>
+      <span style="font-size:11px;color:#888;">※ 출고중 발전기 전체가 이 값으로 정비주기를 추정합니다</span>
     </span>`;
   const capacityButtonsHtml = capacityEntries.length===0 ? '' : `
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;">
@@ -4935,21 +4928,13 @@ function renderOutList(){
     ${embeddedSoonHtml}
     <div class="section-title" style="flex-wrap:wrap;">📤 출고중 발전기 <span class="cnt">${list.length}대</span>${outRegionFilter? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">지역: ${escR(outRegionFilter)} <button onclick="clearOutRegionFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}${outCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${outCapacityFilter}kW <button onclick="clearOutCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''} <button type="button" class="btn sm" onclick="downloadOutFieldListFile()">🖨 출고 리스트 인쇄(단기/장기)</button>${estDailyDefaultHtml}</div>
     ${capacityButtonsHtml}
-    <details class="info-toggle"><summary></summary><p class="muted">같은 거래처에서 여러 대를 한 번에 반납받을 때는 왼쪽 체크박스로 여러 대를 선택한 뒤 "한번에 입고" 버튼을 눌러주세요. 현장 정기 점검 출장 전에는 위 "출고 리스트 인쇄" 버튼으로 단기 1장·장기 1장짜리 리스트를 뽑을 수 있습니다.</p></details>
+    <details class="info-toggle"><summary></summary><p class="muted">같은 거래처에서 여러 대를 한 번에 반납받을 때는 왼쪽 체크박스로 여러 대를 선택한 뒤 "한번에 입고" 버튼을 눌러주세요. 현장 정기 점검 출장 전에는 위 "출고 리스트 인쇄" 버튼으로 출고 리스트를 뽑을 수 있습니다.</p></details>
     <div id="bulk-in-bar">${bulkInBarHtml()}</div>
     ${list.length===0? `<div class="empty">${outRegionFilter||outCapacityFilter!=null? `조건에 맞는 출고중인 발전기가 없습니다.`:'출고중인 발전기가 없습니다.'}</div>` : `
-    <div class="section-title" style="font-size:14px;margin-top:14px;">📅 단기임대 <span class="cnt">${shortList.length}대</span></div>
-    ${shortList.length===0? `<div class="empty">단기임대 중인 발전기가 없습니다.</div>` : `
-    <div class="table-scroll"><table>
+    <div class="table-scroll" style="margin-top:10px;"><table>
       ${theadHtml}
-      <tbody>${shortRows}</tbody>
-    </table></div>`}
-    <div class="section-title" style="font-size:14px;margin-top:20px;">📅 장기임대 <span class="cnt">${longList.length}대</span></div>
-    ${longList.length===0? `<div class="empty">장기임대 중인 발전기가 없습니다.</div>` : `
-    <div class="table-scroll"><table>
-      ${theadHtml}
-      <tbody>${longRows}</tbody>
-    </table></div>`}
+      <tbody>${allRows}</tbody>
+    </table></div>
     `}
   `;
 }
@@ -4970,45 +4955,22 @@ function deleteReturnRequestCard(id){
     flash('삭제되었습니다');
   });
 }
-
-function toggleLongterm(id){
-  const g = findGen(id);
-  const rt = g.rental;
-  if(!rt) return;
-  if(rt.longTerm){
-    openConfirmModal('이 발전기를 "장기"에서 "단기"로 변경할까요?', function(){
-      rt.longTerm = false;
-      saveGens();
-      renderContent();
-      flash('단기로 변경되었습니다');
-    });
-  } else {
-    openConfirmModal('이 발전기를 "단기"에서 "장기"로 변경할까요?', function(){
-      rt.longTerm = true;
-      saveGens();
-      renderContent();
-      flash('장기로 변경되었습니다');
-    });
-  }
-}
 async function applyDefaultEstDailyToAll(){
-  // 발전기마다 값을 덮어쓰지 않고, 단기/장기 기본값만 저장합니다(팀 전체 공유).
-  const shortRaw = document.getElementById('default-est-daily-short').value.trim();
-  const longRaw = document.getElementById('default-est-daily-long').value.trim();
-  const ok = v => v==='' || (!isNaN(Number(v)) && Number(v)>=0 && Number(v)<=24);
-  if(!ok(shortRaw) || !ok(longRaw)){ flash('0~24 사이 시간으로 입력해주세요'); return; }
+  // 발전기마다 값을 덮어쓰지 않고, 기본값 하나만 저장합니다(팀 전체 공유).
+  const raw = document.getElementById('default-est-daily').value.trim();
+  if(raw!=='' && (isNaN(Number(raw)) || Number(raw)<0 || Number(raw)>24)){ flash('0~24 사이 시간으로 입력해주세요'); return; }
   DB.companyInfo = { ...(DB.companyInfo||{}) };
-  if(shortRaw==='') delete DB.companyInfo.estDailyShort; else DB.companyInfo.estDailyShort = Number(shortRaw);
-  if(longRaw==='') delete DB.companyInfo.estDailyLong; else DB.companyInfo.estDailyLong = Number(longRaw);
+  delete DB.companyInfo.estDailyShort; delete DB.companyInfo.estDailyLong;
+  if(raw==='') delete DB.companyInfo.estDaily; else DB.companyInfo.estDaily = Number(raw);
   await saveWithRetry(saveCompanyInfo);
   renderContent();
   flash('기본값을 저장했습니다');
 }
 function clearEstDailyFromAll(){
-  if(!(getEstDailyDefault(false)>0 || getEstDailyDefault(true)>0)){ flash('저장된 기본값이 없습니다'); return; }
-  openConfirmModal('단기/장기 기본값을 비울까요?\n\n(비우면 출고중 정비주기 추정이 표시되지 않습니다)', async function(){
+  if(!(getEstDailyDefault()>0)){ flash('저장된 기본값이 없습니다'); return; }
+  openConfirmModal('하루평균 사용예상시간 기본값을 비울까요?\n\n(비우면 출고중 정비주기 추정이 표시되지 않습니다)', async function(){
     DB.companyInfo = { ...(DB.companyInfo||{}) };
-    delete DB.companyInfo.estDailyShort; delete DB.companyInfo.estDailyLong;
+    delete DB.companyInfo.estDaily; delete DB.companyInfo.estDailyShort; delete DB.companyInfo.estDailyLong;
     await saveWithRetry(saveCompanyInfo);
     renderContent();
     flash('기본값을 비웠습니다');
@@ -5130,7 +5092,7 @@ function renderMaintList(){
         <button class="btn sm" onclick="openMaintHistoryModal('${g.id}')">정비이력조회</button>
         <button class="btn sm" onclick="openAdjustModal('${g.id}')">직접수정</button>
         <button class="btn sm" onclick="openCycleModal('${g.id}')" style="${getCycle(g)!==DEFAULT_CYCLE? 'color:var(--danger);font-weight:700;border-color:var(--danger);':''}">정비주기(${getCycle(g)}h)</button>
-        <label style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--danger);white-space:nowrap;cursor:pointer;margin-left:4px;" title="체크하면 이 발전기는 목록·정비관리·장기임대 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;확인불가&quot;로 고정 표시됩니다. 강제입고 없이 이 화면에서 바로 켜고 끌 수 있습니다.">
+        <label style="display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--danger);white-space:nowrap;cursor:pointer;margin-left:4px;" title="체크하면 이 발전기는 목록·정비관리·출고중 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;확인불가&quot;로 고정 표시됩니다. 강제입고 없이 이 화면에서 바로 켜고 끌 수 있습니다.">
           <input type="checkbox" ${!g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', !this.checked)"> 누적시간 확인불가
         </label>
       </div></td>
@@ -6182,8 +6144,8 @@ function handleRestoreFile(input){
 }
 function exportRentalsCsv(id){
   const rentals = DB.rentals.filter(r=>r.genId===id).sort((a,b)=>(a.outDate||'').localeCompare(b.outDate||''));
-  const rows = [['도착일','입고일','거래처','담당자','연락처','현장','주소','임대사용시간(h)','구분']];
-  rentals.forEach(r=>rows.push([r.outDate,r.inDate,r.customer,r.manager,r.phone,r.site,r.address,r.usedHours||0,r.longTerm?'장기':'단기']));
+  const rows = [['도착일','입고일','거래처','담당자','연락처','현장','주소','임대사용시간(h)']];
+  rentals.forEach(r=>rows.push([r.outDate,r.inDate,r.customer,r.manager,r.phone,r.site,r.address,r.usedHours||0]));
   downloadCsv(`${id}_임대이력.csv`, rows);
 }
 function exportMaintCsv(id){
@@ -6232,7 +6194,7 @@ function renderGenHistory(){
     <div class="section-title">📜 누적 임대 이력 <span class="cnt">${rentals.length}건</span>${rentals.length>0?` <button class="btn sm" onclick="exportRentalsCsv('${id}')">CSV 내보내기</button>`:''}</div>
     ${rentals.length===0? `<div class="empty">임대 이력이 없습니다.</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>도착일</th><th>입고일</th><th>거래처</th><th>현장</th><th>출고시 누적</th><th>입고시 누적</th><th>발전기 사용시간</th><th>구분</th><th></th></tr></thead>
+      <thead><tr><th>도착일</th><th>입고일</th><th>거래처</th><th>현장</th><th>출고시 누적</th><th>입고시 누적</th><th>발전기 사용시간</th><th></th></tr></thead>
       <tbody>${rentals.map(r=>`<tr>
         <td>${dow(r.outDate)||'-'}</td>
         <td>${dow(r.inDate)||'-'}</td>
@@ -6241,7 +6203,6 @@ function renderGenHistory(){
         <td class="muted">${r.startHours!=null? r.startHours.toLocaleString()+'h' : '-'}</td>
         <td class="muted">${r.endHours!=null? r.endHours.toLocaleString()+'h' : '-'}</td>
         <td class="muted" style="font-weight:700;">${(r.usedHours||0).toLocaleString()}h</td>
-        <td>${r.longTerm?'<span class="pill gray">장기</span>':'<span class="pill gray">단기</span>'}</td>
         <td><button class="btn sm danger" onclick="deleteRental('${r.id}','${id}')">삭제</button></td>
       </tr>`).join('')}</tbody>
     </table></div>`}
@@ -6609,17 +6570,16 @@ function renderManualTab(){
     ])}
 
     ${manualSection('📤','출고중', false,
-      '현재 현장에 나가있는(출고중) 발전기 목록입니다. 단기임대/장기임대로 나뉘어 표시됩니다.', [
+      '현재 현장에 나가있는(출고중) 발전기 목록입니다.', [
       ['정보 수정', '이미 출고중인 발전기의 거래처·현장·날짜·사용기간 등을 입고 처리 없이 바로 고칩니다. 맨 위에서 출고시 누적 사용시간을 먼저 확인·수정합니다.'],
       ['인수증 미리보기', '실제 출고 처리 없이 인수증만 미리 보기 · 🖨 인쇄하기로 바로 인쇄 · 파일 다운로드 · 공유'],
       ['입고 처리', '반납받을 때 눌러서 입고 처리합니다(누적시간, 연료 측정 등 입력). 연료를 넣어드린 발전기인데 실제로 손도 안 대고 그대로 반납된 경우는 "⛽ 연료사용안함" 버튼을 누르면 높이 측정 없이 그렇게 기록되고, [입고] 목록의 "남은연료" 칸에도 "연료사용안함"으로 표시됩니다(다른 측정값처럼 "초기화" 버튼으로 지울 수 있습니다).'],
       ['⚡ 강제입고', '발전기를 새로 등록해서 시스템을 처음 시작할 때 쓰는 기능입니다. 거래처 등 정보 입력 없이 바로 [입고] 상태로 전환되고, 이번 출고 이력은 남기지 않습니다. 누적 사용시간은 여기서 입력되지 않으므로, 실제 값은 [설정 → 발전기 모델 설정 → 관리]에서 직접 입력해야 합니다. 평소 운영 중 실수로 출고 처리한 걸 되돌리는 용도가 아니라, 초기 세팅 때 주로 사용합니다.'],
       ['🚫 출고취소', '실제로 출고 나갔다가 취소된 건에 사용합니다. 거래처 등 정보 입력 없이 바로 [입고] 상태로 전환되지만, 취소 사유와 "비용발생"/"비용발생 안함"을 반드시 선택해야 하며 이 내용은 기록으로 남습니다.'],
       ['한번에 입고', '왼쪽 체크박스로 여러 대를 선택하면 뜨는 "한번에 입고" 버튼으로, 여러 대를 한 번에 정상입고 처리합니다. 발전기별 입고시 누적 사용시간을 대별로 각각 입력합니다. (고장 등록이 필요하거나 연료 높이 측정이 필요한 경우는 개별 "입고 처리"를 이용해주세요)'],
-      ['장기→단기 / 단기→장기', '임대 구분을 전환합니다. 장기임대는 예상 사용시간을 입력해 정비 시점을 추정합니다.'],
       ['입금 확인', '🚨 미입금 출고 건의 입금 확인 처리.'],
       ['🔻 철수(회수) 요청', '퀵메뉴에서 등록된 철수 요청 문자가 [출고중] 화면 맨 위에 빨간 카드로 표시됩니다. 새로 등록되면 문자오더와 마찬가지로 30초 이내에 음성 알림("철수요청이 등록되었습니다")이 울립니다(음성 알림 사용 시간대 안일 때만). 다 처리했으면 "🗑 삭제"로 지우면 됩니다. 철수 문자의 연락처·주소가 지금 출고중인 발전기 중 하나와 일치하면, [출고중] 목록에서 그 발전기 줄이 주황색 배경으로 강조되고 "🔻 철수오더확인" 버튼이 자동으로 뜹니다 — 누르면 문자 원문과 함께, 문자에서 인식한 회수예정일(오늘/내일/"OO일 후"/특정 날짜 "18일" 등)을 보여주고, "이 날짜로 반납예정일에 적용" 버튼으로 바로 그 발전기의 반납예정일(사용일수)에 반영할 수 있습니다. 배경 강조는 해당 철수요청을 삭제하거나(위 카드에서), 그 발전기가 실제로 입고 처리되면 자동으로 사라집니다.'],
-      ['🖨 출고 리스트 인쇄(단기/장기)', '현재 출고중인 발전기 전체를 단기임대 1장·장기임대 1장으로 나눠 인쇄합니다. 번호·모델·거래처·현장·담당자연락처·출고일이 함께 나오고, 장기임대 페이지 맨 아래에는 준비할 부품 합계(같은 품명은 수량을 합산)가 자동으로 표시됩니다. 현장 정기 점검 출장 전에 쓰기 좋습니다.']
+      ['🖨 출고 리스트 인쇄', '현재 출고중인 발전기 전체를 한 장으로 인쇄합니다. 번호·모델·거래처·현장·담당자연락처·출고일이 함께 나오고, 맨 아래에는 정비 임박·초과 발전기의 준비할 부품 합계(같은 품명은 수량을 합산)가 자동으로 표시됩니다. 현장 정기 점검 출장 전에 쓰기 좋습니다.']
     ])}
 
     ${manualSection('🔧','정비 관리', false,
@@ -6697,7 +6657,7 @@ function renderManualTab(){
       ['🎨 발전기별 색상 고정', '[설정 → 발전기별 색상 고정]에 번호를 등록해두면, 그 발전기는 모델이 바뀌든 모델 색상이 바뀌든 항상 지정한 색으로만 표시됩니다. 특정 발전기를 한눈에 구분하고 싶을 때 씁니다.'],
       ['👤 거래처 자동완성', '출고하기에서 거래처명을 입력할 때 이전에 거래했던 곳을 선택하면 담당자·연락처·주소가 자동으로 채워집니다.'],
       ['🔧 정비 부품 자동 선택', '정비 등록에서 "필터 교체" 같은 정비 내용을 체크하면, 그 모델에 등록해둔 해당 부품이 자동으로 같이 선택되고 재고가 차감됩니다.'],
-      ['🖨 출고 리스트는 자동으로 가로 인쇄', '[출고중 → 🖨 출고 리스트 인쇄]는 세로가 아니라 가로(landscape)로 자동 인쇄됩니다. 장기임대 페이지 맨 아래에는 준비할 부품 수량이 자동으로 합산되어 나옵니다.'],
+      ['🖨 출고 리스트는 자동으로 가로 인쇄', '[출고중 → 🖨 출고 리스트 인쇄]는 세로가 아니라 가로(landscape)로 자동 인쇄됩니다. 맨 아래에는 정비 임박·초과 발전기의 준비할 부품 수량이 자동으로 합산되어 나옵니다.'],
       ['🔄 데이터는 2분마다 자동으로 새로고침', '다른 팀원이 입력한 내용은 화면을 새로고침하지 않아도 2분 안에 자동으로 반영됩니다. 급하게 최신 내용을 봐야 하면 우측 상단 "🔄 새로고침" 버튼을 눌러 바로 받아올 수 있습니다.'],
       ['❓ 마우스를 올리면 나오는 설명', '[설정 → 관리자 모드 → 위험 구역]의 각 초기화 버튼에 마우스를 올리면(모바일은 길게 누르면) 정확히 무엇이 지워지는지 설명이 뜹니다. 누르기 전에 꼭 한 번 읽어보세요.'],
       ['📊 전체현황 숫자 카드는 버튼입니다', '[전체현황] 맨 위의 "전체 발전기·입고·출고중·정비 필요·고장/수리중·미입금 출고·출고 대기" 숫자 카드를 누르면, 그냥 숫자가 아니라 해당 목록 탭으로 바로 이동합니다.'],
@@ -7439,7 +7399,7 @@ function renderSettingsTab(){
         const modelRowHtml = g=>{
           const cap = capacityOf(g);
           const ratioOptions = [100,90,80,70,60,50,40,30].map(r=>`<option value="${r}" ${(g.usageRatio||100)===r?'selected':''}>${r}%</option>`).join('');
-          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·장기임대 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
+          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·출고중 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
         };
         const half = Math.ceil(activeList.length/2);
         const thead = `<thead><tr><th style="width:42px;">번호</th><th style="width:112px;">모델/용량</th><th style="width:56px;">년식</th><th style="width:78px;">정격대비사용</th><th style="width:64px;">가동시간<br>확인가능</th><th style="width:74px;"></th></tr></thead>`;
@@ -8756,7 +8716,7 @@ function renderMaterialsTab(){
   const cards = models.map((model,i)=>materialCardHtml(model,i)).join('');
   return `
     <div class="section-title" style="flex-wrap:wrap;">🧰 모델별 정비 자재 <span class="cnt">${models.length}개 모델</span></div>
-    <details class="info-toggle"><summary></summary><p class="muted">모델별로 엔진오일, 배터리, 오일필터, 연료필터, 에어클리너, 팬벨트의 품번과 필요 수량을 넣고 [저장]을 누르세요. 오른쪽 "현재고"는 부품 재고와 같은 값이며, 숫자를 고치면 바로 저장됩니다. 품번만 적어도 부품 재고에 있는 품목과 자동으로 연결되고, 재고에 없는 새 품번은 부품 재고 목록에 0개로 추가됩니다. 정비 등록·장기임대 준비 리스트·발주에서 이 정보를 그대로 가져다 씁니다.</p></details>
+    <details class="info-toggle"><summary></summary><p class="muted">모델별로 엔진오일, 배터리, 오일필터, 연료필터, 에어클리너, 팬벨트의 품번과 필요 수량을 넣고 [저장]을 누르세요. 오른쪽 "현재고"는 부품 재고와 같은 값이며, 숫자를 고치면 바로 저장됩니다. 품번만 적어도 부품 재고에 있는 품목과 자동으로 연결되고, 재고에 없는 새 품번은 부품 재고 목록에 0개로 추가됩니다. 정비 등록·출고중 정비 준비 리스트에서 이 정보를 그대로 가져다 씁니다.</p></details>
     ${matDatalistsHtml()}
     <div class="model-cards-grid">${cards}</div>
   `;
@@ -8878,7 +8838,7 @@ function prepPartsSummaryHtml(gensList){
   if(totals.length===0) return '';
   const rows = totals.map(t=>`<tr><td class="name">${escR(t.label)}</td><td style="text-align:right;">${t.unit==='L'? t.qty : t.qty}${escR(t.unit)}</td></tr>`).join('');
   return `<div style="margin-top:14px;page-break-inside:avoid;">
-    <div style="font-size:14px;font-weight:800;margin-bottom:4px;">✅ 준비할 부품 합계 (장기임대 ${gensList.length}대 기준)</div>
+    <div style="font-size:14px;font-weight:800;margin-bottom:4px;">✅ 준비할 부품 합계 (정비 임박·초과 ${gensList.length}대 기준)</div>
     <table class="ol-table">
       <thead><tr><th>품명</th><th style="width:80px;">합계 수량</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -8901,9 +8861,9 @@ function outFieldListSectionHtml(title, list, pageBreak, showMaintCol, extraHtml
 function downloadOutFieldListFile(){
   const list = activeGens().filter(g=>g.status==='out');
   if(list.length===0){ showInfoModal('출고중인 발전기가 없습니다.'); return; }
-  const shortList = list.filter(g=>!(g.rental&&g.rental.longTerm)).sort(sortByIdNatural);
-  const longList = list.filter(g=>g.rental&&g.rental.longTerm).sort(sortByIdNatural);
-  const body = outFieldListSectionHtml('단기임대 출고 리스트', shortList, longList.length>0, false) + outFieldListSectionHtml('장기임대 출고 리스트', longList, false, true, prepPartsSummaryHtml(longList));
+  const sorted = list.slice().sort(sortByIdNatural);
+  const urgent = sorted.filter(g=>g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && effEstDaily(g)>0 && maintStatus(estRemaining(g))!=='ok');
+  const body = outFieldListSectionHtml('출고 리스트', sorted, false, true, prepPartsSummaryHtml(urgent));
   const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <title>출고 리스트 - ${todayStr()}</title>
 <style>${orderListPrintCss()}</style>
@@ -10015,11 +9975,6 @@ function openReserveNoGenModal(resId, draft){
           </div>
         </div>
         <div class="field f-eq">
-          <div class="field chk" style="background:var(--ok-tint);border:1px solid var(--ok);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
-            <input type="checkbox" id="f-rsv-longterm" ${pre&&pre.longTerm?'checked':''}><label for="f-rsv-longterm">장기 임대 출고</label>
-          </div>
-        </div>
-        <div class="field f-eq">
           <input type="text" id="f-rsv-payment-note" value="${escR((pre&&pre.paymentNote)||'')}" placeholder="입금관련 메모">
         </div>
       </div>
@@ -10169,7 +10124,7 @@ function submitReserveNoGen(resId){
   const paymentNote = document.getElementById('f-rsv-payment-note').value.trim();
   const note = document.getElementById('f-rsv-note').value.trim();
   const outDate = document.getElementById('f-rsv-outdate').value;
-  const longTerm = document.getElementById('f-rsv-longterm').checked;
+  const longTerm = false; // 장기/단기 구분 없앰
   const estDailyRaw = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
   const estDaily = estDailyRaw>0 ? estDailyRaw : null;
   const errEl = document.getElementById('f-rsv-err');
@@ -10762,11 +10717,6 @@ function openOutModal(id, reservationId){
           </div>
         </div>
         <div class="field f-eq">
-          <div class="field chk" style="background:var(--ok-tint);border:1px solid var(--ok);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
-            <input type="checkbox" id="f-longterm"><label for="f-longterm">장기 임대 출고</label>
-          </div>
-        </div>
-        <div class="field f-eq">
           <input type="text" id="f-payment-note" value="${escR(res&&res.paymentNote||'')}" placeholder="입금관련 메모">
         </div>
       </div>
@@ -10799,9 +10749,6 @@ function onTargetGenChange(){
   if(hoursEl){ hoursEl.value = g.hours||0; hoursEl.min = g.hours||0; }
   const hintEl = document.getElementById('starthours-hint');
   if(hintEl) hintEl.textContent = `현재 누적시간: ${(g.hours||0).toLocaleString()}h`;
-}
-function toggleLongtermField(){
-  // 예상가동시간은 개별 입력 없이 단기/장기 기본값을 쓰므로 토글할 필드가 없습니다.
 }
 async function submitOut(idParam, reservationId){
   const targetSelEl = document.getElementById('f-target-gen');
@@ -10873,7 +10820,7 @@ async function submitOut(idParam, reservationId){
   const outDate = document.getElementById('f-outdate').value;
   const startHoursEl = document.getElementById('f-starthours');
   const startHours = startHoursEl ? Number(startHoursEl.value) : (g.hours||0);
-  const longTerm = document.getElementById('f-longterm').checked;
+  const longTerm = false; // 장기/단기 구분 없앰
   const estDailyRaw = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
   const estDaily = estDailyRaw>0 ? estDailyRaw : null;
   const errEl = document.getElementById('f-err');
@@ -11000,7 +10947,6 @@ function reopenOutModalWithValues(id, reservationId, vals){
     }
     setVal('f-note', vals.note);
     setVal('f-payment-note', vals.paymentNote);
-    const ltEl = document.getElementById('f-longterm'); if(ltEl){ ltEl.checked = vals.longTerm; toggleLongtermField(); }
     const atSel = document.getElementById('f-arrivetime-select');
     if(atSel && vals.arriveTime){
       const opts = [...atSel.options].map(o=>o.value);
@@ -11102,11 +11048,6 @@ function openBulkOutModal(){
           </div>
         </div>
         <div class="field f-eq">
-          <div class="field chk" style="background:var(--ok-tint);border:1px solid var(--ok);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
-            <input type="checkbox" id="fb-longterm"><label for="fb-longterm">장기 임대 출고 (목록 구분·방문정비 준비 리스트용)</label>
-          </div>
-        </div>
-        <div class="field f-eq">
           <div class="field chk" style="background:var(--warn-tint);border:1px solid var(--warn);border-radius:8px;padding:10px 12px;">
             <input type="checkbox" id="fb-payment-confirmed" onchange="toggleBulkForceOutField()">
             <label for="fb-payment-confirmed">입금을 확인했습니다</label>
@@ -11200,7 +11141,7 @@ async function submitBulkOut(){
   const forceReason = forcedOut ? document.getElementById('fb-force-reason').value.trim() : '';
   const note = document.getElementById('fb-note').value.trim();
   const outDate = document.getElementById('fb-outdate').value;
-  const longTerm = document.getElementById('fb-longterm').checked;
+  const longTerm = false; // 장기/단기 구분 없앰
   const estDailyRawB = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
   const estDaily = estDailyRawB>0 ? estDailyRawB : null;
   if(!customer || !address || !manager || !phone){
