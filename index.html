@@ -207,7 +207,7 @@
   .mc .m-title{margin-bottom:4px;}
   .mc-ids{font-size:11px;color:var(--ink-soft);margin-bottom:8px;line-height:1.7;}
   .mc-ids .pill{font-size:10.5px;padding:0 6px;margin:0 3px 0 0;}
-  .mc-grid{display:grid;grid-template-columns:74px minmax(0,1fr) 46px 14px 60px;gap:4px 6px;align-items:center;}
+  .mc-grid{display:grid;grid-template-columns:74px minmax(0,1fr) 46px 14px 68px;gap:4px 6px;align-items:center;}
   .mc-grid label,.mc-etc-row .lab{font-size:12px;color:var(--ink-soft);font-weight:600;white-space:nowrap;}
   .mc-grid input,.mc-etc-row input{font-size:12.5px;padding:4px 7px;border:1px solid var(--border-strong);border-radius:6px;min-width:0;width:100%;font-family:var(--sans);background:#fff;color:var(--ink);}
   .mc-grid input.q,.mc-etc-row input.q{text-align:center;padding:4px 4px;}
@@ -220,7 +220,11 @@
   .mc-grid input.stk.saved,.mc-etc-row input.stk.saved{background:var(--ok-tint);border-color:var(--ok);}
   .mc-grid input.stk.neg,.mc-etc-row input.stk.neg{color:var(--danger);border-color:var(--danger);background:var(--danger-tint);}
   .mc-grid .nostk,.mc-etc-row .nostk{font-size:11px;color:var(--ink-soft);text-align:center;}
-  .mc-etc-row{display:grid;grid-template-columns:74px minmax(0,1fr) 46px 14px 60px 14px;gap:4px 6px;align-items:center;margin-top:4px;}
+  .stk-cell{display:flex;align-items:center;gap:2px;min-width:0;}
+  .stk-cell input.stk{flex:1;min-width:0;}
+  .stk-inf-btn{flex:none;border:1px solid var(--border-strong);background:#fff;border-radius:5px;font-size:12px;line-height:1;padding:3px 3px;color:var(--ink-soft);cursor:pointer;}
+  .stk-inf-on{width:100%;border:1.5px solid var(--ok);background:var(--ok-tint);color:var(--ok);border-radius:6px;font-size:16px;font-weight:800;line-height:1;padding:3px 0;cursor:pointer;}
+  .mc-etc-row{display:grid;grid-template-columns:74px minmax(0,1fr) 46px 14px 68px 14px;gap:4px 6px;align-items:center;margin-top:4px;}
   .mc-etc-row .x{border:0;background:none;color:var(--danger);font-size:14px;padding:0;cursor:pointer;line-height:1;}
   .mc-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:6px;}
   .mc-foot .btn{font-size:12px;padding:4px 10px;}
@@ -6295,7 +6299,7 @@ function deleteMaint(mid, genId){
       let changed = false;
       if(rec.partsUsed){
         rec.partsUsed.forEach(p=>{
-          if(typeof p==='object' && p.partName){
+          if(typeof p==='object' && p.partName && !isUnlimitedPart(p.partName)){
             DB.partsStock[p.partName] = (DB.partsStock[p.partName]||0) + (p.qty||1);
             changed = true;
           }
@@ -7356,16 +7360,19 @@ function renderSettingsTab(){
       </div>
 
       <div class="material-card" style="margin-top:0;">
-        <div class="section-title" style="margin-top:0;text-align:center;">📱 문자 간편등록 QR코드</div>
-        <details class="info-toggle"><summary></summary><p class="muted">문자로 오더를 주시는 분(예: 이영숙님)이 카메라로 QR을 찍으면 문자 붙여넣기 전용 간편등록 화면이 바로 열립니다. 아래 주소는 메인 앱 주소 뒤에 <code>?quick=1</code>을 붙인 형태여야 합니다.</p></details>
-        <div class="field" style="margin-top:8px;"><label>간편등록 페이지 주소</label>
-          <input type="text" id="f-quickorder-url" value="${escR(getQuickOrderUrl())}" oninput="setQuickOrderUrl(this.value);renderQuickOrderQr();">
-        </div>
-        <div style="text-align:center;margin-top:6px;">
-          <img id="quick-order-qr" src="" alt="QR" width="130" height="130" style="border:4px solid #fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.15);">
-        </div>
-        <div class="btn-row" style="margin-top:6px;justify-content:center;">
-          <button class="btn primary" onclick="printQuickOrderQr()">🖨 QR코드 인쇄</button>
+        <div class="section-title" style="margin-top:0;text-align:center;">📱 QR코드</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;text-align:center;">
+          <div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:6px;">💬 문자 간편등록</div>
+            <img id="quick-order-qr" src="" alt="문자 간편등록 QR" width="130" height="130" style="border:4px solid #fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.15);max-width:100%;height:auto;">
+            <div class="muted" style="font-size:11px;margin-top:4px;">문자로 오더 주시는 분용</div>
+            <button class="btn sm" style="margin-top:6px;" onclick="printQuickOrderQr()">🖨 인쇄</button>
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:13px;margin-bottom:6px;">⚡ 전압설정</div>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(getVoltageAppUrl())}" alt="전압설정 QR" width="130" height="130" style="border:4px solid #fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.15);max-width:100%;height:auto;">
+            <div class="muted" style="font-size:11px;margin-top:4px;">찍고 → 홈 화면에 추가</div>
+          </div>
         </div>
       </div>
 
@@ -7388,21 +7395,12 @@ function renderSettingsTab(){
     <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:20px;align-items:stretch;margin-top:20px;">
       <div class="material-card" style="margin-top:0;">
         <div class="section-title" style="margin-top:0;text-align:center;">🔐 관리자 모드</div>
-        <div style="display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;">
-          <div style="flex:1;min-width:200px;">
         <details class="info-toggle"><summary></summary><p class="muted">업체 정보 수정, 위험 구역(초기화) 작업은 관리자 모드에서만 할 수 있습니다. 사이트 접속 비밀번호와는 별개인 전용 관리자 비밀번호를 입력하면 ${Math.round(ADMIN_MODE_DURATION_MS/60000)}분 동안 열리고, 시간이 지나면 자동으로 다시 잠깁니다.</p></details>
         <div class="field" style="max-width:220px;">
           <input type="password" id="f-admin-pw" placeholder="관리자 비밀번호" onkeydown="if(event.key==='Enter')submitAdminModeUnlock()">
           <div id="f-admin-pw-err" class="err" style="display:none;"></div>
         </div>
         <button class="btn primary" onclick="submitAdminModeUnlock()">관리자 모드 열기</button>
-          </div>
-          <div style="text-align:center;flex:none;" title="휴대폰 카메라로 찍으면 전압설정 보기 페이지가 열립니다. 열린 뒤 브라우저 메뉴의 '홈 화면에 추가'로 설치하세요.">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(getVoltageAppUrl())}" alt="전압설정 QR" width="96" height="96" style="border:3px solid #fff;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.15);display:block;">
-            <div style="font-size:11px;font-weight:700;margin-top:4px;">⚡ 전압설정 보기</div>
-            <div class="muted" style="font-size:10px;">찍고 → 홈 화면에 추가</div>
-          </div>
-        </div>
       </div>
       <div class="material-card" style="margin-top:0;">
         <div class="section-title" style="margin-top:0;text-align:center;">👥 사용자(팀원) 목록 (최대 3명)</div>
@@ -8520,12 +8518,28 @@ function matPartOptions(prefixes){
   return allKnownPartNames().filter(n=>prefixes.some(p=>n.startsWith(p))).sort((a,b)=>a.localeCompare(b,'ko'))
     .map(n=>`<option value="${escR(n)}">`).join('');
 }
-// 모델 카드 안에서 바로 보는·고치는 현재고 칸 (부품 재고와 같은 값)
-function matStockCellHtml(name){
+// 재고를 세지 않는(무한대) 부품: 드럼으로 들여놓는 엔진오일 등. 정비 등록 때 차감하지 않습니다.
+function isUnlimitedPart(name){ return !!name && ((DB.companyInfo||{}).unlimitedParts||[]).includes(name); }
+async function toggleUnlimitedPart(name){
+  if(!requireTechnician('재고 무한대 설정')) return;
+  DB.companyInfo = { ...(DB.companyInfo||{}) };
+  const list = new Set(DB.companyInfo.unlimitedParts||[]);
+  const on = !list.has(name);
+  if(on) list.add(name); else list.delete(name);
+  DB.companyInfo.unlimitedParts = [...list];
+  await saveWithRetry(saveCompanyInfo);
+  // 화면 안 같은 부품 칸만 바꿔 그립니다 (입력 중인 카드 내용 유지)
+  document.querySelectorAll('.stk-cell').forEach(c=>{ if(c.dataset.part===name) c.outerHTML = matStockCellHtml(name, c.dataset.inf==='1'); });
+  flash(on? `${name} 재고를 무한대(∞)로 설정했습니다 (정비 때 차감 안 함)` : `${name} 무한대 설정을 해제했습니다`);
+}
+// 모델 카드 안에서 바로 보는·고치는 현재고 칸 (부품 재고와 같은 값). allowInf=true면 ∞ 전환 버튼을 붙입니다.
+function matStockCellHtml(name, allowInf){
   const known = name && (DB.partsStock[name]!==undefined || allKnownPartNames().includes(name));
   if(!known) return `<span class="nostk" title="저장하면 재고와 연결됩니다">-</span>`;
+  const infBtn = allowInf ? `<button type="button" class="stk-inf-btn" title="재고 무한대(∞) 켜기/끄기" onclick="toggleUnlimitedPart(this.closest('.stk-cell').dataset.part)">∞</button>` : '';
+  if(isUnlimitedPart(name)) return `<span class="stk-cell" data-part="${escR(name)}" data-inf="${allowInf?1:0}"><button type="button" class="stk-inf-on" title="무한대 해제" onclick="toggleUnlimitedPart(this.closest('.stk-cell').dataset.part)">∞</button></span>`;
   const q = Number(DB.partsStock[name]||0);
-  return `<input type="number" class="stk${q<0?' neg':''}" data-part="${escR(name)}" step="${partUnitOf(name)==='L'?'0.5':'1'}" value="${q}" title="현재고 — 숫자를 고치면 바로 저장됩니다" inputmode="decimal" oninput="queueStockSave(this)" onchange="setPartStockFromCard(this)" onkeydown="if(event.key==='Enter'){this.blur();}">`;
+  return `<span class="stk-cell" data-part="${escR(name)}" data-inf="${allowInf?1:0}"><input type="number" class="stk${q<0?' neg':''}" data-part="${escR(name)}" step="${partUnitOf(name)==='L'?'0.5':'1'}" value="${q}" title="현재고 — 숫자를 고치면 바로 저장됩니다" inputmode="decimal" oninput="queueStockSave(this)" onchange="setPartStockFromCard(this)" onkeydown="if(event.key==='Enter'){this.blur();}">${infBtn}</span>`;
 }
 const stockSaveTimers = {};
 function queueStockSave(el){
@@ -8575,7 +8589,7 @@ function materialCardHtml(model, i){
       <datalist id="mc-dl-oilspec-${i}">${oilSpecs.map(x=>`<option value="${escR(x)}">`).join('')}</datalist>
       <input type="number" class="q" id="mc-${i}-oil-l" min="0" step="0.5" value="${escR(v.oilL)}" placeholder="0">
       <span class="u">L</span>
-      ${matStockCellHtml(v.oilSpec? engineOilPartName({engineOilSpec:v.oilSpec}) : '')}
+      ${matStockCellHtml(v.oilSpec? engineOilPartName({engineOilSpec:v.oilSpec}) : '', true)}
       ${slotRows}
     </div>
     <div class="mc-etc" id="mc-${i}-etc">${v.etc.map(e=>matEtcRowHtml(i,e.name,e.qty)).join('')}</div>
@@ -8606,18 +8620,82 @@ function resolveMatPartName(prefixes, raw){
   if(!input) return {name:'', isNew:false, code:''};
   const known = allKnownPartNames();
   if(known.includes(input)) return {name:input, isNew:false};
-  const norm = x=>String(x||'').replace(/[\s\-_.]/g,'').toLowerCase();
-  const ni = norm(input);
-  const pool = known.filter(n=>prefixes.some(p=>n.startsWith(p)));
-  const hit = pool.find(n=>norm((DB.partsSpecs||{})[n])===ni) || pool.find(n=>norm(n).endsWith(ni) && ni.length>=3);
-  if(hit) return {name:hit, isNew:false};
   const hasPrefix = prefixes.some(p=>input.startsWith(p));
+  if(!hasPrefix){
+    // 품번만 적었을 때만 재고 품목과 맞춰 봅니다 (품번이 정확히 같을 때만)
+    const norm = x=>String(x||'').replace(/[\s\-_.]/g,'').toLowerCase();
+    const ni = norm(input);
+    const pool = known.filter(n=>prefixes.some(p=>n.startsWith(p)));
+    const codeOf = n=>((DB.partsSpecs||{})[n]) || n.replace(/^\S+\s*/,'');
+    const hit = pool.find(n=>norm(codeOf(n))===ni);
+    if(hit) return {name:hit, isNew:false};
+  }
   const code = hasPrefix ? input.replace(new RegExp('^('+prefixes.join('|')+')\\S*\\s*'),'').trim() : input;
   return {name: hasPrefix? input : `${prefixes[0]} ${input}`, isNew:true, code};
+}
+// 품번 이름 바꾸기: 재고 수량·품번·구분과, 같은 품번을 쓰는 다른 모델 칸까지 새 이름으로 옮깁니다.
+function renamePartEverywhere(oldName, newName){
+  const maps = ['partsStock','partsSpecs','partsCategory','partsUnit','partsSupplier','partsMinStock'];
+  maps.forEach(k=>{
+    const mp = DB[k]; if(!mp || mp[oldName]===undefined) return;
+    if(mp[newName]===undefined) mp[newName] = mp[oldName];
+    delete mp[oldName];
+  });
+  if(DB.partsSpecs && DB.partsSpecs[newName]!==undefined){
+    const code = newName.replace(/^\S+\s*/,'');
+    if(code) DB.partsSpecs[newName] = code;
+  }
+  Object.values(DB.materials||{}).forEach(m=>{
+    if(!m) return;
+    MAT_SLOTS.forEach(sl=>{ if(m[sl.nameF]===oldName) m[sl.nameF] = newName; });
+    (m.consumables||[]).forEach(c=>{ if(c && c.name===oldName) c.name = newName; });
+  });
+  const ul = (DB.companyInfo||{}).unlimitedParts;
+  if(ul && ul.includes(oldName)) DB.companyInfo.unlimitedParts = ul.map(x=>x===oldName? newName : x);
+}
+function askRenameScope(renames){
+  return new Promise(resolve=>{
+    const list = renames.map(r=>`• ${escR(r.from)}  →  <b>${escR(r.to)}</b>`).join('<br>');
+    document.getElementById('modal-root').innerHTML = `
+    <div class="overlay"><div class="modal" style="max-width:520px;">
+      <h3>✏️ 품번 수정</h3>
+      <div style="font-size:13.5px;line-height:1.8;margin:6px 0 10px;">${list}</div>
+      <div class="hint" style="margin-bottom:10px;">"모두 바꾸기"는 현재고 수량을 그대로 가져가고, 같은 품번을 쓰는 다른 모델 칸도 함께 바꿉니다. "이 모델만"은 이 모델에만 새 품번을 넣고, 새 품번은 재고 0개로 시작합니다.</div>
+      <div class="modal-actions" style="flex-wrap:wrap;">
+        <button class="btn" id="rn-cancel">취소</button>
+        <button class="btn" id="rn-one">이 모델만</button>
+        <button class="btn primary" id="rn-all">모두 바꾸기</button>
+      </div>
+    </div></div>`;
+    document.getElementById('rn-cancel').onclick = ()=>{ closeModal(); resolve(null); };
+    document.getElementById('rn-one').onclick = ()=>{ closeModal(); resolve('one'); };
+    document.getElementById('rn-all').onclick = ()=>{ closeModal(); resolve('all'); };
+  });
 }
 async function saveMaterialCard(i){
   if(!requireTechnician('자재 정보 저장')) return;
   const model = matCardModels[i]; if(!model) return;
+  {
+    // 기존 품번을 다른 이름으로 고친 칸이 있는지 먼저 확인
+    const m0 = DB.materials[model] || {};
+    const valOf = id=>{ const el=document.getElementById(id); return el? el.value.trim() : ''; };
+    const renames = [];
+    MAT_SLOTS.forEach(sl=>{
+      const from = m0[sl.nameF]; if(!from) return;
+      const r = resolveMatPartName(sl.prefixes, valOf(`mc-${i}-${sl.key}`));
+      if(r.name && r.name!==from && r.isNew && !renames.some(x=>x.from===from)) renames.push({from, to:r.name});
+    });
+    if(renames.length){
+      const scope = await askRenameScope(renames);
+      if(!scope) return;
+      if(scope==='all'){
+        renames.forEach(r=>renamePartEverywhere(r.from, r.to));
+        await saveWithRetry(savePartsStock); await saveWithRetry(savePartsSpecs); await saveWithRetry(savePartsCategory);
+        await saveWithRetry(savePartsUnit); await saveWithRetry(savePartsSupplier); await saveWithRetry(savePartsMinStock);
+        if(((DB.companyInfo||{}).unlimitedParts||[]).length) await saveWithRetry(saveCompanyInfo);
+      }
+    }
+  }
   const val = id=>{ const el=document.getElementById(id); return el? el.value.trim() : ''; };
   const num = x=>{ const n=Number(x); return n>0? n : null; };
   if(!DB.materials[model]) DB.materials[model] = {};
@@ -12618,7 +12696,7 @@ async function submitMaint(id, editId, completeRepair){
   const prevParts = editId ? ((DB.maint.find(m=>m.id===editId)||{}).partsUsed || []) : [];
   // 수정인 경우, 기존 차감분을 먼저 재고에 복원 후 다시 차감(중복 차감 방지)
   prevParts.forEach(p=>{
-    if(typeof p==='object' && p.partName){
+    if(typeof p==='object' && p.partName && !isUnlimitedPart(p.partName)){
       DB.partsStock[p.partName] = (DB.partsStock[p.partName]||0) + (p.qty||1);
     }
   });
@@ -12626,7 +12704,7 @@ async function submitMaint(id, editId, completeRepair){
     const el = document.getElementById(`f-part-${i}`);
     if(el && el.checked){
       partsUsed.push({label:p.label, partName:p.partName, qty:p.qty});
-      DB.partsStock[p.partName] = (DB.partsStock[p.partName]!==undefined ? DB.partsStock[p.partName] : 0) - (p.qty||1);
+      if(!isUnlimitedPart(p.partName)) DB.partsStock[p.partName] = (DB.partsStock[p.partName]!==undefined ? DB.partsStock[p.partName] : 0) - (p.qty||1);
     }
   });
   if(editId){
@@ -13020,7 +13098,6 @@ function getVoltageAppUrl(){
   try{ if(/^https?:$/.test(location.protocol)) return new URL('voltage.html', location.origin + location.pathname).href; }catch(e){}
   return getQuickOrderUrl().split('?')[0].replace(/[^/]*$/,'') + 'voltage.html';
 }
-function setQuickOrderUrl(v){ localStorage.setItem('quickOrderUrl', (v||'').trim()); }
 function renderQuickOrderQr(){
   const img = document.getElementById('quick-order-qr');
   if(!img) return;
