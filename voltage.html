@@ -6,8 +6,8 @@
 <title>전압설정</title>
 <link rel="manifest" href="manifest-voltage.json">
 <meta name="theme-color" content="#16212C">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="voltage-icon-192.png">
+<link rel="apple-touch-icon" href="voltage-icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -68,8 +68,8 @@ button{cursor:pointer;}
 .viewer img{width:100%;min-height:100%;object-fit:contain;display:block;}
 .viewer .close{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:12px;width:44px;height:44px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:20px;z-index:21;}
 .viewer .hint{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#bbb;font-size:12px;pointer-events:none;}
-.kgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;}
-.kcard{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-height:118px;padding:14px;border-radius:14px;border:1px solid var(--line);background:var(--panel);text-align:left;border-top:6px solid var(--etc);}
+.kgrid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:4px;max-width:420px;margin-left:auto;margin-right:auto;}
+.kcard{display:flex;flex-direction:column;align-items:center;gap:6px;min-height:118px;padding:14px;border-radius:14px;border:1px solid var(--line);background:var(--panel);text-align:center;border-top:6px solid var(--etc);}
 .kcard.v220{border-top-color:var(--v220);} .kcard.v380{border-top-color:var(--v380);} .kcard.v380plus{border-top-color:var(--v380p);}
 .kcard .kl{font-size:20px;font-weight:700;}
 .kcard .kn{font-size:30px;font-weight:700;margin-top:auto;line-height:1;}
@@ -153,7 +153,7 @@ function render(){
     <div class="top"><h1><span class="bolt">⚡</span>전압설정</h1><span class="sub">${S.offline? '오프라인 · 저장본':''}</span></div>
     <div class="kgrid">${KINDS.map(k=>`<button class="kcard ${k}" onclick="openKind('${k}')" ${S.counts[k]>0?'':'disabled'}>
       <span class="kl">${LABEL[k]}</span><span class="kn">${S.counts[k]||0}<small>장</small></span></button>`).join('')}</div>
-    <div class="foot">사진은 한 번 보면 폰에 저장되어 다음부터는 데이터를 쓰지 않습니다.<br><button onclick="clearCache()">저장된 사진 지우기</button></div>
+    <div class="foot">사진은 한 번 보면 폰에 저장되어 다음부터는 데이터를 쓰지 않습니다.</div>
   </div>`;
 }
 function photosHtml(){
@@ -193,10 +193,6 @@ function closeViewer(fromPop){
   const pushed = v.dataset.pushed==='1';
   v.remove();
   if(!fromPop && pushed){ try{ history.back(); }catch(e){} }
-}
-function clearCache(){
-  Object.keys(localStorage).filter(k=>k.startsWith('vg2-p-')).forEach(k=>localStorage.removeItem(k));
-  alert('폰에 저장된 사진을 지웠습니다.');
 }
 window.addEventListener('popstate', e=>{
   if(document.getElementById('viewer')){ closeViewer(true); return; }
