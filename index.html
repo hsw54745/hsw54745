@@ -218,13 +218,6 @@
   .vpg-img img{display:block;width:100%;height:130px;object-fit:cover;}
   .vpg-cap{font-size:11.5px;padding:5px 6px;white-space:pre-wrap;word-break:break-all;line-height:1.35;}
   .vpg-mini{border:0;background:none;cursor:pointer;font-size:12px;padding:0 2px;}
-  /* 스마트폰: 사진을 한 줄에 하나씩, 가운데 정렬 */
-  @media (max-width:760px){
-    .vpg-cards{grid-template-columns:1fr;max-width:420px;margin:0 auto;}
-    .vpg-grid{grid-template-columns:1fr;justify-items:center;}
-    .vpg-tile{width:100%;max-width:480px;text-align:center;}
-    .vpg-img img{height:auto;max-height:60vh;object-fit:contain;margin:0 auto;}
-  }
   .vpg-prev{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 10px;}
   .vpg-prev img{width:72px;height:72px;object-fit:cover;border-radius:6px;border:1px solid var(--border-strong);}
   /* 설정 맨 아래: 전압 설정 사진 목록 */
@@ -4129,14 +4122,14 @@ function lowStockBannerHtml(){
 }
 function longtermMaintBannerHtml(){
   const ltUrgent = activeGens().filter(g=>{
-    if(!(g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && g.rental.longTerm && effEstDaily(g)>0)) return false;
+    if(!(g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && effEstDaily(g)>0)) return false;
     return maintStatus(estRemaining(g))!=='ok';
   });
   if(ltUrgent.length===0) return '';
   const dangerN = ltUrgent.filter(g=>maintStatus(estRemaining(g))==='danger').length;
   return `
     <div class="detail-card" style="background:var(--danger-tint);border-color:var(--danger);margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-      <div style="font-size:13px;color:var(--danger);font-weight:700;">🛠 장기임대 정비 임박 ${ltUrgent.length}대${dangerN>0? ` (초과 ${dangerN}대)`:''} — 방문 정비 준비가 필요합니다.</div>
+      <div style="font-size:13px;color:var(--danger);font-weight:700;">🛠 출고중 정비 임박 ${ltUrgent.length}대${dangerN>0? ` (초과 ${dangerN}대)`:''} — 방문 정비 준비가 필요합니다.</div>
       <button class="btn sm danger" onclick="switchTab('maint');setTimeout(()=>document.getElementById('longterm-prep-anchor')?.scrollIntoView({behavior:'smooth',block:'start'}),50);">정비 준비 리스트 보기</button>
     </div>`;
 }
@@ -4729,7 +4722,7 @@ function clearBulkInSelection(){
 }
 function longtermPrepListHtml(){
   // 실측 누적시간이 한 번도 없는 발전기(현재·마지막정비 둘 다 0)는 추정이 의미가 없어 출고중 탭과 같이 제외합니다.
-  const ltList = activeGens().filter(g=>g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && g.rental.longTerm && effEstDaily(g)>0);
+  const ltList = activeGens().filter(g=>g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && effEstDaily(g)>0);
   // 정상(여유 있음)은 보여주지 않고, 초과·임박만 모읍니다.
   const prepList = ltList.filter(g=>maintStatus(estRemaining(g))!=='ok');
   prepList.sort((a,b)=>estRemaining(a)-estRemaining(b));
@@ -4738,7 +4731,7 @@ function longtermPrepListHtml(){
     const pred = predictedDate(g);
     const remTxt = rem<=0 ? `<b style="color:var(--danger);">${Math.round(-rem)}h 초과</b>` : `<b>${Math.round(rem)}h 남음</b>`;
     return `<div class="prep-card">
-      <div class="p-head"><span>${g.id} · ${displayModel(g)}</span>${remTxt}</div>
+      <div class="p-head"><span>${g.id} · ${displayModel(g)} <span class="pill ${g.rental.longTerm?'gray':''}" style="font-size:10.5px;padding:0 6px;">${g.rental.longTerm?'장기':'단기'}</span></span>${remTxt}</div>
       <div style="font-size:12.5px;font-weight:700;margin-bottom:2px;">${escR(g.rental.customer||'거래처 미기재')} · ${escR(g.rental.site||'-')}</div>
       <div class="muted" style="font-size:12px;margin-bottom:6px;">${escR([g.rental.manager,g.rental.phone].filter(Boolean).join(' · ')||'담당자 미기재')} · 예상 정비 도래: ${pred.overdue? '<b style="color:var(--danger);">이미 도래</b>':`${dow(pred.date)} (약 ${pred.days}일 후)`}</div>
       ${materialSummaryHtml(g.model)}
@@ -4754,9 +4747,9 @@ function longtermPrepListHtml(){
       <div class="prep-col-body">${gr.list.length? gr.list.map(cardHtml).join('') : `<div class="prep-col-empty">${gr.empty}</div>`}</div>
     </div>`).join('')}</div>`;
   return `
-    <div id="longterm-prep-anchor" class="section-title">🔧 장기임대 정비 준비 리스트 <span class="cnt">${prepList.length}대</span>${prepList.length>0? ` <button type="button" class="btn sm" onclick="downloadLongtermPrepFile()">🖨 인쇄</button>`:''}</div>
-    <details class="info-toggle"><summary></summary><p class="muted">현장에서 실사용 시간을 바로 알 수 없는 장기임대 발전기를, 예상 사용시간을 기준으로 정비가 필요한(초과) 것과 곧 필요한(임박) 것만 나눠 급한 순으로 보여줍니다. 방문 정비시 챙길 자재(엔진오일량·필터 품명/규격/수량)가 함께 표시됩니다.</p></details>
-    ${ltList.length===0? `<div class="empty">장기임대 중인 발전기가 없습니다.</div>` : prepList.length===0? `<div class="empty">정비가 임박하거나 초과된 장기임대 발전기가 없습니다. (장기임대 ${ltList.length}대 모두 정상)</div>` : colsHtml}
+    <div id="longterm-prep-anchor" class="section-title">🔧 출고중 정비 준비 리스트 <span class="cnt">${prepList.length}대</span>${prepList.length>0? ` <button type="button" class="btn sm" onclick="downloadLongtermPrepFile()">🖨 인쇄</button>`:''}</div>
+    <details class="info-toggle"><summary></summary><p class="muted">출고중인 발전기(단기·장기 모두)를 하루 예상 사용시간을 기준으로 정비가 필요한(초과) 것과 곧 필요한(임박) 것만 나눠 급한 순으로 보여줍니다. 방문 정비시 챙길 자재(엔진오일량·필터 품명/규격/수량)가 함께 표시됩니다.</p></details>
+    ${ltList.length===0? `<div class="empty">정비주기를 추정할 출고중 발전기가 없습니다.</div>` : prepList.length===0? `<div class="empty">정비가 임박하거나 초과된 출고중 발전기가 없습니다. (${ltList.length}대 모두 정상)</div>` : colsHtml}
   `;
 }
 function renderOutList(){
@@ -6545,7 +6538,7 @@ function renderManualTab(){
     ${manualSection('🏠','전체현황', false,
       '접속하면 처음 보이는 화면으로, 전체 발전기 상태를 한눈에 요약해서 보여줍니다.', [
       ['상단 카드', '전체/입고/출고중·출고율/정비 필요/고장·수리중/미입금 출고/출고 대기 숫자. 카드를 누르면 해당 메뉴로 바로 이동합니다.'],
-      ['알림 배너', '백업 안내, 부품 재고 부족, 장기임대 정비 임박이 있으면 빨간 배너로 뜹니다. 배너의 버튼을 누르면 관련 화면으로 이동합니다.'],
+      ['알림 배너', '백업 안내, 부품 재고 부족, 출고중 정비 임박이 있으면 빨간 배너로 뜹니다. 배너의 버튼을 누르면 관련 화면으로 이동합니다.'],
       ['지역별 출고 현황', '출고중인 발전기를 지역(경기북부/남부 등)별로 몇 대씩 나가있는지 보여줍니다. 카드를 누르면 그 지역만 걸러서 [출고중] 목록을 봅니다.'],
       ['용량별 보기 (출고중)', '[출고중] 목록 위에도 자동으로 용량(kW) 버튼이 생겨서, 그 용량의 발전기만 걸러서 볼 수 있습니다. 지역 필터와 같이 켜두면 두 조건이 동시에 적용됩니다. "전체" 버튼으로 용량 필터만 해제할 수 있습니다.'],
       ['정비 임박/필요', '정비 시점이 다가오거나 지난 발전기를 최대 15대까지 보여줍니다.'],
@@ -6623,7 +6616,7 @@ function renderManualTab(){
       ['발전기별 정비 이력', '발전기 번호를 선택하면 그 발전기 한 대의 정비 기록만 모아서 봅니다. "모델별 정비 이력" 바로 왼쪽에 같은 크기의 카드로 나란히 있습니다.'],
       ['모델별 정비 이력', '모델을 선택하면 그 모델을 쓴 발전기들의 정비 기록만 모아서 봅니다. 바로 아래에 "정비 임박 경고 기준"을 숫자로 직접 설정하는 칸이 있습니다(기본값 50h). 잔여시간이 그 값 이하면 "임박"으로 표시됩니다.'],
       ['용량별 보기 (정비 주기 현황)', '정비 주기 현황 목록 위에 자동으로 생기는 용량(kW) 버튼을 누르면 그 용량의 발전기만 걸러서 봅니다. "전체" 버튼으로 다시 전체 목록으로 돌아갑니다. [입고] 탭의 용량별 보기와 같은 방식입니다.'],
-      ['장기임대 정비 준비 리스트', '장기임대 발전기를 정비 임박 순으로 모아, 거래처·현장과 함께 방문시 챙길 자재(엔진오일량·필터 품명/규격)까지 보여줍니다. 🖨 인쇄 버튼으로 체크리스트를 뽑을 수 있습니다.']
+      ['출고중 정비 준비 리스트', '출고중인 발전기(단기·장기)를 정비 임박 순으로 모아, 거래처·현장과 함께 방문시 챙길 자재(엔진오일량·필터 품명/규격)까지 보여줍니다. 🖨 인쇄 버튼으로 체크리스트를 뽑을 수 있습니다.']
     ])}
 
     ${manualSection('🧰','자재 관리', false,
@@ -11683,17 +11676,17 @@ function longtermPrepCardPrintHtml(g){
   </div>`;
 }
 function downloadLongtermPrepFile(){
-  // 화면과 같게: 실측값 있는 장기임대 중 초과·임박만 인쇄합니다.
-  const ltList = activeGens().filter(g=>g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && g.rental.longTerm && effEstDaily(g)>0 && maintStatus(estRemaining(g))!=='ok');
+  // 화면과 같게: 실측값 있는 출고중 발전기(단기·장기) 중 초과·임박만 인쇄합니다.
+  const ltList = activeGens().filter(g=>g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && effEstDaily(g)>0 && maintStatus(estRemaining(g))!=='ok');
   ltList.sort((a,b)=>estRemaining(a)-estRemaining(b));
-  if(ltList.length===0){ showInfoModal('정비가 임박하거나 초과된 장기임대 발전기가 없습니다.'); return; }
+  if(ltList.length===0){ showInfoModal('정비가 임박하거나 초과된 출고중 발전기가 없습니다.'); return; }
   const cards = ltList.map(longtermPrepCardPrintHtml).join('');
   const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
-<title>장기임대 정비 준비 리스트</title>
+<title>출고중 정비 준비 리스트</title>
 <style>${longtermPrepPrintCss()}</style>
 </head><body>
 <div class="lp-wrap">
-  <div class="lp-title">장기임대 정비 준비 리스트</div>
+  <div class="lp-title">출고중 정비 준비 리스트</div>
   <div class="lp-sub">${dow(todayStr())} 기준 · 정비 임박 순 · 총 ${ltList.length}대</div>
   ${cards}
 </div>
