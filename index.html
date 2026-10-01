@@ -203,6 +203,19 @@
   .material-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:7px 14px;margin-bottom:10px;}
   .material-card .m-title{font-weight:700;font-size:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
   .tag-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px;}
+  /* 설정 맨 아래: 전압 설정 사진 목록 */
+  .vp-list{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .vp-row{display:grid;grid-template-columns:minmax(180px,1.6fr) repeat(4,minmax(0,1fr));align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border);background:#fff;}
+  .vp-row:last-child{border-bottom:0;}
+  .vp-row.vp-empty{background:var(--warn-tint);}
+  .vp-model b{font-size:13px;}
+  .vp-ids{font-size:10.5px;color:var(--ink-soft);line-height:1.4;margin-top:1px;}
+  .vp-cell{text-align:center;}
+  .vp-kind{font-size:10.5px;color:var(--ink-soft);margin-bottom:2px;}
+  .vp-btns{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;}
+  .vp-btns .btn{font-size:11.5px;padding:3px 7px;}
+  .vp-view{color:var(--primary-dark);border-color:var(--primary);}
+  @media (max-width:760px){ .vp-row{grid-template-columns:repeat(4,minmax(0,1fr));} .vp-model{grid-column:1/-1;} }
   /* 자재관리: 모델 카드 안 고정 칸 입력 */
   .mc .m-title{margin-bottom:4px;}
   .mc-ids{font-size:11px;color:var(--ink-soft);margin-bottom:8px;line-height:1.7;}
@@ -6683,8 +6696,9 @@ function renderManualTab(){
       ['발전기 모델 설정', '번호별 모델(용량), 년식, 정격대비사용을 입력합니다. "관리" 버튼으로 번호(ID) 수정, 매각/폐기 처리, 완전 삭제(등록을 잘못했을 때만)까지 한 곳에서 할 수 있습니다. 폐기 처리시 폐기일자·폐기업체명·전화번호·처리방법·폐기사유·폐차수익을 함께 기록할 수 있습니다.'],
       ['모델별 색상 설정', '모델마다 색상을 지정하면 발전기 목록(입고/출고중/출고대기 등)에서 모델명 옆에 색상 점으로 표시되어 구분하기 쉽습니다. 용량대별로 묶어서 모델명과 함께 보여줍니다.'],
       ['발전기별 색상 고정', '특정 발전기 번호에 색을 고정하면, 모델명이 바뀌거나 그 모델의 색상이 바뀌어도 그 발전기만은 항상 지정한 색으로 표시됩니다. 모델별 색상보다 우선 적용됩니다. 번호·색상을 등록하는 카드와, 지금 색상이 지정된 발전기 목록을 보여주는 카드가 나란히 있습니다.'],
-      ['모델별 제원 (탱크 · 총중량 · 연료소모량) · 전압 설정', '모델별 탱크 크기(자동 연료환산용), 총중량, 시간당 연료소모량(L/h), 220V/380V/380V 이상/기타참고 셋팅법 사진(종류별 최대 3장)을 등록합니다. 사진 등록·수정·삭제는 이 화면(설정)에서만 가능하며, 입고 목록의 전압 클릭·입고 처리 화면에는 등록된 사진이 보기 전용(클릭하면 크게 보기)으로만 나타납니다.'],
-      ['발전기별 탱크 규격 · 기준높이 (개별 설정)', '같은 모델이라도 실제 탱크 크기가 다른 발전기가 있으면, 왼쪽 카드에서 번호로 찾아 그 발전기만 가로×세로×높이와 바닥 기준높이(모델 기본값과 다른 경우)를 한 번에 입력할 수 있습니다. 비워두면 위 "모델별 제원 (탱크 · 총중량 · 연료소모량) · 전압 설정"에서 등록한 모델 기본값이 그대로 적용됩니다. 계산되는 "남은 연료량"은 이 기준높이만큼(항상 남아있어 실제로 쓸 수 없는 양)을 자동으로 빼고 계산됩니다. 개별 설정된 발전기는 오른쪽 카드 목록에 바로 표시되고, "삭제" 버튼으로 지울 수 있습니다. 높이가 세로(깊이)에 비해 유난히 낮게 입력된 경우(세로·높이를 바꿔 입력하는 실수가 흔함) 그 항목이 빨간색으로 표시되어 바로 눈에 띕니다.'],
+      ['모델별 제원 (탱크 · 총중량 · 연료소모량)', '모델별 탱크 크기(자동 연료환산용), 총중량, 시간당 연료소모량(L/h)을 등록합니다.'],
+      ['⚡ 전압 설정 사진', '설정 맨 아래에서 발전기 종류(모델)별로 220V/380V/380V 이상/기타참고 셋팅법 사진(종류별 최대 3장)을 등록·삭제합니다. 입고 목록의 전압 클릭·입고 처리 화면·퀵메뉴·전압설정 폰 페이지에는 보기 전용으로 나타납니다.'],
+      ['발전기별 탱크 규격 · 기준높이 (개별 설정)', '같은 모델이라도 실제 탱크 크기가 다른 발전기가 있으면, 왼쪽 카드에서 번호로 찾아 그 발전기만 가로×세로×높이와 바닥 기준높이(모델 기본값과 다른 경우)를 한 번에 입력할 수 있습니다. 비워두면 위 "모델별 제원 (탱크 · 총중량 · 연료소모량)"에서 등록한 모델 기본값이 그대로 적용됩니다. 계산되는 "남은 연료량"은 이 기준높이만큼(항상 남아있어 실제로 쓸 수 없는 양)을 자동으로 빼고 계산됩니다. 개별 설정된 발전기는 오른쪽 카드 목록에 바로 표시되고, "삭제" 버튼으로 지울 수 있습니다. 높이가 세로(깊이)에 비해 유난히 낮게 입력된 경우(세로·높이를 바꿔 입력하는 실수가 흔함) 그 항목이 빨간색으로 표시되어 바로 눈에 띕니다.'],
       ['폐기된/매각된 발전기', '처리된 발전기 목록입니다. "복원" 버튼으로 다시 살릴 수 있습니다.']
     ])}
 
@@ -7535,20 +7549,10 @@ function renderSettingsTab(){
     </div>
 
     <div class="material-card" style="margin-top:20px;">
-      <div class="section-title" style="margin-top:0;">⛽ 모델별 제원 (탱크 · 총중량 · 연료소모량) · 전압 설정 <span class="cnt">${[...new Set(activeList.map(g=>g.model).filter(Boolean))].length}종</span></div>
-      <details class="info-toggle"><summary></summary><p class="muted">모델별로 한 번만 입력하면, 그 모델을 쓰는 모든 발전기에 동일하게 적용됩니다. 탱크 내부 가로·세로(cm)를 입력해두면 입고 처리시 기름 높이만 재서 남은 연료량(L)을 자동으로 계산합니다. (직육면체 탱크 기준) 220V/380V/380V 이상 출력 셋팅방법을 각각 사진으로 등록해두면 입고/출고 처리 화면에서 누구나 클릭해서 볼 수 있습니다.</p></details>
+      <div class="section-title" style="margin-top:0;">⛽ 모델별 제원 (탱크 · 총중량 · 연료소모량) <span class="cnt">${[...new Set(activeList.map(g=>g.model).filter(Boolean))].length}종</span></div>
+      <details class="info-toggle"><summary></summary><p class="muted">모델별로 한 번만 입력하면, 그 모델을 쓰는 모든 발전기에 동일하게 적용됩니다. 탱크 내부 가로·세로(cm)를 입력해두면 입고 처리시 기름 높이만 재서 남은 연료량(L)을 자동으로 계산합니다. (직육면체 탱크 기준)</p></details>
       ${(()=>{
         const models = sortModelsByCapacity([...new Set(activeList.map(g=>g.model).filter(Boolean))]);
-        const guideBtn = (model, escM, m, kind)=>{
-          const label = VOLTAGE_GUIDE_LABELS[kind];
-          const cnt = voltageGuideCount(m, kind);
-          const thumbs = cnt>0 ? `<button type="button" class="btn sm" style="margin-right:4px;color:var(--primary-dark);border-color:var(--primary);" onclick="viewVoltageGuidePhoto('${escM}','${kind}',0)" title="사진 보기 · 삭제">🖼 ${cnt}장 보기</button>` : '';
-          const addBtn = cnt<3 ? `<button type="button" class="btn sm" onclick="openVoltageGuideUpload('${escM}','${kind}')">+ 등록 (${cnt}/3)</button>` : '';
-          return `<div style="margin-right:12px;margin-bottom:8px;">
-            <div class="muted" style="font-size:10.5px;margin-bottom:2px;">${label}</div>
-            <div style="display:flex;align-items:center;flex-wrap:wrap;">${thumbs}${addBtn}</div>
-          </div>`;
-        };
         const cards = models.map(model=>{
           const genIds = activeList.filter(g=>g.model===model).sort(sortByIdNatural).map(g=>g.id);
           const m = DB.materials[model] || {};
@@ -7585,7 +7589,6 @@ function renderSettingsTab(){
               <input type="number" min="0" step="0.1" value="${m.fuelPerHour||''}" placeholder="예: 12" style="width:64px;padding:6px 6px;text-align:center;flex:none;border:1px solid ${!(m.fuelPerHour>0)?'var(--warn)':'var(--border-strong)'};border-radius:6px;font-size:14px;font-family:var(--sans);background:${!(m.fuelPerHour>0)?'var(--warn-tint)':'#fff'};color:var(--ink);" onchange="updateModelTankDim('${escM}','fuelPerHour', this.value)">
               <span class="muted">L/h (시간당)</span>
             </div>`;
-          const guideRow = `<div style="display:flex;align-items:flex-start;flex-wrap:wrap;gap:4px;margin-top:8px;">${VOLTAGE_GUIDE_KINDS.map(k=>guideBtn(model,escM,m,k)).join('')}</div>`;
           return `<div class="material-card" style="background:var(--surface-2);">
             <div class="m-title"><span>${model} <span class="muted" style="font-size:11px;font-weight:400;">(${genIds.length}대)</span></span></div>
             ${genIds.length>0? `<div class="muted" style="font-size:11.5px;margin:-4px 0 8px;">${genIds.map(id=>`<span class="pill gray" style="margin:2px 3px 2px 0;">${id}</span>`).join('')}</div>` : ''}
@@ -7594,7 +7597,6 @@ function renderSettingsTab(){
             </div>
             ${baselineRow}
             ${weightRow}
-            ${guideRow}
           </div>`;
         }).join('');
         return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;">${cards}</div>`;
@@ -7680,7 +7682,38 @@ function renderSettingsTab(){
       </div>
     </div>
     </div>
+    ${voltagePhotoSettingsHtml(activeList)}
   `;
+}
+// 설정 맨 아래: 발전기 종류(모델)별 전압 설정 사진 등록·보기·삭제
+function voltagePhotoSettingsHtml(activeList){
+  const models = sortModelsByCapacity([...new Set(activeList.map(g=>g.model).filter(Boolean))]);
+  const rows = models.map(model=>{
+    const m = DB.materials[model] || {};
+    const escM = model.replace(/'/g,"\\'");
+    const ids = activeList.filter(g=>g.model===model).sort(sortByIdNatural).map(g=>g.id);
+    const total = voltageGuideTotal(m);
+    const cells = VOLTAGE_GUIDE_KINDS.map(kind=>{
+      const cnt = voltageGuideCount(m, kind);
+      return `<div class="vp-cell">
+        <div class="vp-kind">${VOLTAGE_GUIDE_LABELS[kind].replace(' 출력 셋팅방법','').replace(' 셋팅방법','')}</div>
+        <div class="vp-btns">
+          ${cnt>0? `<button type="button" class="btn sm vp-view" onclick="viewVoltageGuidePhoto('${escM}','${kind}',0)" title="사진 보기 · 삭제">🖼 ${cnt}장</button>`:''}
+          ${cnt<3? `<button type="button" class="btn sm" onclick="openVoltageGuideUpload('${escM}','${kind}')" title="사진 추가">＋</button>`:''}
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="vp-row${total? '':' vp-empty'}">
+      <div class="vp-model"><b>${escR(model)}</b><div class="vp-ids">${ids.length}대 · ${escR(ids.join(' '))}</div></div>
+      ${cells}
+    </div>`;
+  }).join('');
+  return `
+    <div class="material-card" style="margin-top:20px;">
+      <div class="section-title" style="margin-top:0;">⚡ 전압 설정 사진 <span class="cnt">${models.length}종</span></div>
+      <details class="info-toggle"><summary></summary><p class="muted">발전기 종류(모델)별로 220V / 380V / 380V 이상 / 기타참고 셋팅 방법 사진을 종류마다 최대 3장까지 등록합니다. [🖼 n장]을 누르면 크게 보고 삭제할 수 있고, [＋]로 추가합니다. 등록한 사진은 입고 화면·퀵메뉴·⚡전압설정 폰 페이지에서 볼 수 있습니다. 사진은 따로 저장되어 누를 때만 불러옵니다.</p></details>
+      ${rows ? `<div class="vp-list">${rows}</div>` : '<div class="empty">발전기가 없습니다.</div>'}
+    </div>`;
 }
 async function updateWarnThreshold(value){
   const v = Number(value);
@@ -8100,7 +8133,7 @@ function voltageGuideGalleryHtml(model){
     const label = VOLTAGE_GUIDE_LABELS[kind];
     return `<button type="button" class="btn sm" style="margin:3px 4px 3px 0;color:var(--primary-dark);border-color:var(--primary);" onclick="viewVoltageGuidePhoto('${escM}','${kind}',0)">${label} (${cnt}장)</button>`;
   }).join('');
-  if(!blocks) return `<div class="hint" style="margin-top:8px;">등록된 전압 설정 방법 사진이 없습니다. (설정 → 모델별 제원 (탱크 · 총중량 · 연료소모량) · 전압 설정에서 등록할 수 있습니다)</div>`;
+  if(!blocks) return `<div class="hint" style="margin-top:8px;">등록된 전압 설정 방법 사진이 없습니다. (설정 → ⚡ 전압 설정 사진에서 등록할 수 있습니다)</div>`;
   return `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
     <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:4px;">🔧 전압 설정 방법 (모델: ${escR(model)})</div>
     <div class="hint" style="margin:0 0 6px;">사진을 보시려면 글자 클릭</div>
@@ -8127,7 +8160,7 @@ function openVoltageGuidePicker(model){
       <div class="modal-sub">${escR(model)}</div>
       <div class="hint" style="margin:0 0 6px;">사진을 보시려면 글자 클릭</div>
       <div>${rows}</div>
-      <div class="hint" style="margin-top:8px;">사진 등록·수정·삭제는 [설정 → 모델별 제원 (탱크 · 총중량 · 연료소모량) · 전압 설정]에서 할 수 있습니다.</div>
+      <div class="hint" style="margin-top:8px;">사진 등록·수정·삭제는 [설정 → 맨 아래 ⚡ 전압 설정 사진]에서 할 수 있습니다.</div>
       <div class="modal-actions">
         <button class="btn primary" onclick="closeModal()">닫기</button>
       </div>
