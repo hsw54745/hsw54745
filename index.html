@@ -8487,14 +8487,14 @@ async function returnBorrowedGen(id){
 
 // ---------- 자재 관리 ----------
 // ---------- 자재관리: 모델별 고정 칸 ----------
-const MAT_SLOTS = [
-  {key:'battery',     label:'배터리',     nameF:'batteryName',     qtyF:'batteryQty',     prefixes:['배터리'],                       ph:'예: 100A-12V'},
-  {key:'oilFilter1',  label:'오일필터 1', nameF:'oilFilter1Name',  qtyF:'oilFilter1Qty',  prefixes:['오일필터'],                     ph:'품번 (예: LF-3349)'},
-  {key:'oilFilter2',  label:'오일필터 2', nameF:'oilFilter2Name',  qtyF:'oilFilter2Qty',  prefixes:['오일필터'],                     ph:'바이패스 등'},
-  {key:'fuelFilter1', label:'연료필터 1', nameF:'fuelFilterName',  qtyF:'fuelFilterQty',  prefixes:['연료필터'],                     ph:'품번 (1차)'},
-  {key:'fuelFilter2', label:'연료필터 2', nameF:'fuelFilter2Name', qtyF:'fuelFilter2Qty', prefixes:['연료필터'],                     ph:'품번 (2차)'},
-  {key:'airFilter',   label:'에어클리너', nameF:'airFilterName',   qtyF:'airFilterQty',   prefixes:['에어필터','에어크리너','에어클리너'], ph:'품번'},
-  {key:'fanBelt',     label:'팬벨트',     nameF:'fanBeltName',     qtyF:'fanBeltQty',     prefixes:['팬벨트','벨트'],                ph:'품번'}
+const MAT_SLOTS = [  // newPrefix: 재고에 없는 새 품번을 등록할 때 앞에 붙이는 종류 이름
+  {key:'battery',     label:'배터리',     nameF:'batteryName',     qtyF:'batteryQty',     prefixes:['배터리'], newPrefix:'배터리',                       ph:'예: 100A-12V'},
+  {key:'oilFilter1',  label:'오일필터 1', nameF:'oilFilter1Name',  qtyF:'oilFilter1Qty',  prefixes:['오일필터'], newPrefix:'오일필터',                     ph:'품번 (예: LF-3349)'},
+  {key:'oilFilter2',  label:'오일필터 2', nameF:'oilFilter2Name',  qtyF:'oilFilter2Qty',  prefixes:['오일필터'], newPrefix:'오일필터',                     ph:'바이패스 등'},
+  {key:'fuelFilter1', label:'연료필터 1', nameF:'fuelFilterName',  qtyF:'fuelFilterQty',  prefixes:['연료필터'], newPrefix:'연료필터1차',                     ph:'품번 (1차)'},
+  {key:'fuelFilter2', label:'연료필터 2', nameF:'fuelFilter2Name', qtyF:'fuelFilter2Qty', prefixes:['연료필터'], newPrefix:'연료필터2차',                     ph:'품번 (2차)'},
+  {key:'airFilter',   label:'에어클리너', nameF:'airFilterName',   qtyF:'airFilterQty',   prefixes:['에어필터','에어크리너','에어클리너'], newPrefix:'에어필터', ph:'품번'},
+  {key:'fanBelt',     label:'팬벨트',     nameF:'fanBeltName',     qtyF:'fanBeltQty',     prefixes:['팬벨트','벨트'], newPrefix:'팬벨트',                ph:'품번'}
 ];
 let matCardModels = [];
 // 저장된 값 + (예전 방식) 소요자재 목록을 고정 칸으로 풀어서 보여줄 값을 만듭니다.
@@ -8516,7 +8516,7 @@ function matCardValues(model){
 }
 function matPartOptions(prefixes){
   return allKnownPartNames().filter(n=>prefixes.some(p=>n.startsWith(p))).sort((a,b)=>a.localeCompare(b,'ko'))
-    .map(n=>`<option value="${escR(n)}">`).join('');
+    .map(n=>`<option value="${escR(matCodeOf(n, prefixes))}">${escR(n)}</option>`).join('');
 }
 // 재고를 세지 않는(무한대) 부품: 드럼으로 들여놓는 엔진오일 등. 정비 등록 때 차감하지 않습니다.
 function isUnlimitedPart(name){ return !!name && ((DB.companyInfo||{}).unlimitedParts||[]).includes(name); }
@@ -8575,7 +8575,7 @@ function materialCardHtml(model, i){
   const oilSpecs = [...new Set(allKnownPartNames().filter(n=>n.startsWith('엔진오일')).map(n=>(DB.partsSpecs&&DB.partsSpecs[n]) || n.replace(/^엔진오일\s*/,'')).filter(Boolean))];
   const slotRows = MAT_SLOTS.map(sl=>`
       <label for="mc-${i}-${sl.key}">${sl.label}</label>
-      <input type="text" id="mc-${i}-${sl.key}" list="mc-dl-${sl.key}" value="${escR(v.slots[sl.key].name)}" placeholder="${sl.ph}">
+      <input type="text" id="mc-${i}-${sl.key}" list="mc-dl-${sl.key}" value="${escR(matCodeOf(v.slots[sl.key].name, sl.prefixes))}" placeholder="${sl.ph}" title="${escR(v.slots[sl.key].name)}">
       <input type="number" class="q" id="mc-${i}-${sl.key}-q" min="0" step="1" value="${escR(v.slots[sl.key].qty)}" placeholder="1">
       <span class="u">개</span>
       ${matStockCellHtml(v.slots[sl.key].name)}`).join('');
@@ -8614,24 +8614,43 @@ function addMatEtcRow(i){
   const inputs = wrap.querySelectorAll('.mc-etc-name'); inputs[inputs.length-1].focus();
 }
 function removeMatEtcRow(btn, i){ btn.closest('.mc-etc-row').remove(); markMatCardDirty(i); }
-// 입력한 품번을 부품 재고 이름에 연결합니다. (정확히 같은 이름 → 품번 일치 → 없으면 "종류 품번"으로 새로 만듦)
-function resolveMatPartName(prefixes, raw){
+// 카드 칸에는 "오일필터 LF-3349"에서 종류 이름을 뗀 품번(LF-3349)만 보여줍니다. (재고 이름은 그대로 유지)
+function matCodeOf(name, prefixes){
+  if(!name) return '';
+  const first = String(name).split(/\s+/)[0];
+  if(prefixes && prefixes.some(p=>first.startsWith(p))){
+    const rest = String(name).replace(/^\S+\s*/,'').trim();
+    return rest || name;
+  }
+  return name;
+}
+// 입력한 품번을 부품 재고 이름에 연결합니다.
+// 1) 재고 이름과 정확히 같으면 그대로  2) 지금 칸에 있던 품번과 같으면 그대로(종류 이름만 뗀 경우)
+// 3) 품번만 적었으면 같은 종류 재고 중 품번이 같은 것  4) 없으면 "종류 품번"으로 새로 만듦
+function resolveMatPartName(prefixes, raw, currentName, newPrefix){
   const input = String(raw||'').trim();
   if(!input) return {name:'', isNew:false, code:''};
   const known = allKnownPartNames();
   if(known.includes(input)) return {name:input, isNew:false};
+  const norm = x=>String(x||'').replace(/[\s\-_.]/g,'').toLowerCase();
+  const ni = norm(input);
+  if(currentName){
+    const curCode = matCodeOf(currentName, prefixes);
+    if(input===curCode) return {name:currentName, isNew:false};                       // 그대로
+    if(norm(curCode)===ni){                                                            // 띄어쓰기·하이픈만 고친 경우 → 같은 종류 이름으로 이름 바꾸기
+      const kind = String(currentName).split(/\s+/)[0];
+      const renamed = (kind && kind!==currentName) ? `${kind} ${input}` : input;
+      return known.includes(renamed) ? {name:renamed, isNew:false} : {name:renamed, isNew:true, code:input};
+    }
+  }
   const hasPrefix = prefixes.some(p=>input.startsWith(p));
   if(!hasPrefix){
-    // 품번만 적었을 때만 재고 품목과 맞춰 봅니다 (품번이 정확히 같을 때만)
-    const norm = x=>String(x||'').replace(/[\s\-_.]/g,'').toLowerCase();
-    const ni = norm(input);
     const pool = known.filter(n=>prefixes.some(p=>n.startsWith(p)));
-    const codeOf = n=>((DB.partsSpecs||{})[n]) || n.replace(/^\S+\s*/,'');
-    const hit = pool.find(n=>norm(codeOf(n))===ni);
+    const hit = pool.find(n=>norm(matCodeOf(n, prefixes))===ni) || pool.find(n=>norm((DB.partsSpecs||{})[n])===ni);
     if(hit) return {name:hit, isNew:false};
   }
-  const code = hasPrefix ? input.replace(new RegExp('^('+prefixes.join('|')+')\\S*\\s*'),'').trim() : input;
-  return {name: hasPrefix? input : `${prefixes[0]} ${input}`, isNew:true, code};
+  const code = hasPrefix ? matCodeOf(input, prefixes) : input;
+  return {name: hasPrefix? input : `${newPrefix||prefixes[0]} ${input}`, isNew:true, code};
 }
 // 품번 이름 바꾸기: 재고 수량·품번·구분과, 같은 품번을 쓰는 다른 모델 칸까지 새 이름으로 옮깁니다.
 function renamePartEverywhere(oldName, newName){
@@ -8682,7 +8701,7 @@ async function saveMaterialCard(i){
     const renames = [];
     MAT_SLOTS.forEach(sl=>{
       const from = m0[sl.nameF]; if(!from) return;
-      const r = resolveMatPartName(sl.prefixes, valOf(`mc-${i}-${sl.key}`));
+      const r = resolveMatPartName(sl.prefixes, valOf(`mc-${i}-${sl.key}`), from, sl.newPrefix);
       if(r.name && r.name!==from && r.isNew && !renames.some(x=>x.from===from)) renames.push({from, to:r.name});
     });
     if(renames.length){
@@ -8706,7 +8725,7 @@ async function saveMaterialCard(i){
   if(!m.engineOilSpec) delete m.engineOilSpec;
   if(!m.engineOilLiters) delete m.engineOilLiters;
   MAT_SLOTS.forEach(sl=>{
-    const r = resolveMatPartName(sl.prefixes, val(`mc-${i}-${sl.key}`));
+    const r = resolveMatPartName(sl.prefixes, val(`mc-${i}-${sl.key}`), (DB.materials[model]||{})[sl.nameF], sl.newPrefix);
     if(r.name){ m[sl.nameF] = r.name; m[sl.qtyF] = num(val(`mc-${i}-${sl.key}-q`)) || 1; if(r.isNew) newParts.push(r); }
     else { delete m[sl.nameF]; delete m[sl.qtyF]; }
   });
