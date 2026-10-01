@@ -176,8 +176,16 @@
   .save-flash.show{opacity:1;}
   .util-two-col{display:flex;gap:16px;}
   .loadpop-row:last-child{border-bottom:none;}
-  .model-cards-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+  .model-cards-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px;}
+  @media(max-width:1500px){.model-cards-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}
+  @media(max-width:1100px){.model-cards-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
   @media(max-width:760px){.model-cards-grid{grid-template-columns:1fr;}}
+  .model-cards-grid .material-card{padding:10px 11px;}
+  .model-cards-grid .mc-grid,.model-cards-grid .mc-etc-row{grid-template-columns:62px minmax(0,1fr) 38px 12px 62px;gap:3px 4px;}
+  .model-cards-grid .mc-etc-row{grid-template-columns:62px minmax(0,1fr) 38px 12px 62px 12px;}
+  .model-cards-grid .mc-grid label,.model-cards-grid .mc-etc-row .lab{font-size:11.5px;}
+  .model-cards-grid .mc-grid input,.model-cards-grid .mc-etc-row input{font-size:12px;padding:3px 5px;}
+  .model-cards-grid .m-title{font-size:13px;}
   .util-two-col .table-scroll{flex:1;min-width:0;}
   .util-two-col .util-table{flex:1;min-width:0;overflow-x:visible;}
   .util-table table{width:100%;min-width:0;table-layout:fixed;}
@@ -1370,7 +1378,7 @@ async function submitQmInProcess(id){
       site: r.site, address: r.address, supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', suppliesRecovered, suppliesNote,
       fuelRequested: r.fuelRequested, fuelActual: r.fuelActual, usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, note: combinedNote,
       outDate: r.outDate, inDate, startHours: r.startHours, endHours,
-      usedHours: endHours!=null ? endHours - (r.startHours||0) : null, longTerm: r.longTerm, estDaily: r.estDaily,
+      usedHours: endHours!=null ? endHours - (r.startHours||0) : null,
       voltage, outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: r.loadConfirmedBy||null, inProcessedBy: qmLabel(), inProcessedAt: nowDateTimeStr(),
       measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
       paymentConfirmed: r.paymentConfirmed||false, forcedOut: r.forcedOut||false, forceReason: r.forceReason||'', forcedBy: r.forcedBy||null
@@ -1786,7 +1794,7 @@ async function submitQmConfirmLoad(resId, needFuel){
       supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', voltage: r.voltage, qty: r.qty,
       fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
       usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
-      outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
+      outDate: r.outDate, startHours: r.startHours,
       outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: qmLabel(), genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now()
     };
     if(r.suppliesItems && r.suppliesItems.length){
@@ -1934,8 +1942,7 @@ async function submitQmEditReservation(resId){
   const loadDateEl = document.getElementById('qmre-loaddate');
   const loadDate = (loadDateEl && loadDateEl.value) ? loadDateEl.value : outDate;
   const usageDays = Number(document.getElementById('qmre-usagedays').value)||null;
-  const estDailyRaw = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
-  const estDaily = estDailyRaw>0 ? estDailyRaw : null;
+
 
   if(!customer || !address || !phone){
     box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
@@ -1962,7 +1969,7 @@ async function submitQmEditReservation(resId){
     Object.assign(r, {
       customer, site: customer, address, manager, phone, voltage, outDate, arriveTime,
       freightBearer, note, supplies, suppliesItems, suppliesCustom,
-      fuelRequested, fuelActual, loadDate, usageDays, estDaily
+      fuelRequested, fuelActual, loadDate, usageDays
     });
     await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
     box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
@@ -2455,8 +2462,7 @@ async function submitQuickReserve(){
   const arriveTime = document.getElementById('qmr-arrivetime').value.trim() || null;
   const loadDateEl = document.getElementById('qmr-loaddate');
   const loadDate = (loadDateEl && loadDateEl.value) ? loadDateEl.value : outDate;
-  const estDailyRaw = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
-  const estDaily = estDailyRaw>0 ? estDailyRaw : null;
+
 
   if(!customer || !address || !phone){
     box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
@@ -2504,7 +2510,7 @@ async function submitQuickReserve(){
         usageDays, loadDate, arriveTime,
         freightBearer, paymentNote: '',
         note,
-        outDate, startHours, longTerm: false, estDaily,
+        outDate, startHours, 
         smsOrder: null,
         outProcessedBy: qmLabel(), createdAt: today, createdAtTs: Date.now()
       };
@@ -2521,7 +2527,7 @@ async function submitQuickReserve(){
         freightBearer, paymentNote: '',
         note,
         smsOrder: null,
-        longTerm: false, estDaily,
+        
         outProcessedBy: qmLabel(), createdAt: today, createdAtTs: Date.now()
       };
     }
@@ -2764,8 +2770,7 @@ async function proceedSubmitQuickOrder(text){
       note: '',
       smsOrder: text,
       smsQtyIndex: qty>1 ? i+1 : null, smsQtyTotal: qty>1 ? qty : null,
-      longTerm: false, estDaily: null,
-      outProcessedBy: qmLabel(), createdAt: today, createdAtTs: Date.now()
+            outProcessedBy: qmLabel(), createdAt: today, createdAtTs: Date.now()
     });
     const newItems = Array.from({length: qty}, (_,i)=>makeItem(i));
     const newItem = newItems[0];
@@ -3151,7 +3156,7 @@ function requireTechnician(actionLabel){
 
 
 function defaultFleet(){
-  return [{"id": "S-1", "model": "대우 0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-2", "model": "대우 0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-3", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-4", "model": "위차이(4DX) 50kW", "hours": 1855, "lastMaintHours": 1846, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-5", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-6", "model": "커민스(4BT) 75kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-7", "model": "커민스(4BT) 75kW", "hours": 1735, "lastMaintHours": 1735, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-8", "model": "커민스(4BT) 75kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-9", "model": "커민스(4BT) 120kW", "hours": 5838, "lastMaintHours": 5803, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-10", "model": "커민스(4BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-11", "model": "커민스(4BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-12", "model": "커민스(4BT) 120kW", "hours": 2288, "lastMaintHours": 2159, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-13", "model": "커민스(4BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-14", "model": "커민스(4BT) 120kW(회색)", "hours": 7036, "lastMaintHours": 6741, "hoursKnown": true, "status": "out", "rental": {"customer": "우진루프패널 (박채호이사, 8704-6625)", "site": "용인 · 용인 갈곡초", "outDate": "2026-08-21", "startHours": 7036, "longTerm": false, "estDaily": null}}, {"id": "S-15", "model": "커민스(4BT) 75kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-16", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-17", "model": "위차이(4DX) 50kW", "hours": 1518, "lastMaintHours": 1555, "hoursKnown": true, "status": "out", "rental": {"customer": "가교기업 (강석문상무, 9453-9865)", "site": "음성 · 음성 대소면 내산리 30", "outDate": "2026-08-20", "startHours": 1518, "longTerm": false, "estDaily": null}}, {"id": "S-18", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-19", "model": "보드왕 300kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-20", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-21", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-22", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-23", "model": "커민스(6CT) 200kW", "hours": 387, "lastMaintHours": 230, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-24", "model": "커민스(6BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-25", "model": "볼보 (TAD 1642 GE) 500kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-26", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-27", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-28", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-29", "model": "커민스(6BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "피앤아이종합건설 (신홍규차장, 010-2664-7124)", "site": "세종 · 세종시 어진동 579", "outDate": "2026-08-18", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-30", "model": "커민스(6BT) 120kW", "hours": 1042, "lastMaintHours": 1011, "hoursKnown": true, "status": "out", "rental": {"customer": "용하이엔씨 (황인부장, 010-6204-0504)", "site": "세종 · 세종시 전의역", "outDate": "2026-08-19", "startHours": 1042, "longTerm": false, "estDaily": null}}, {"id": "S-31", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-32", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-33", "model": "커민스(QSX15) 500kW", "hours": 13749, "lastMaintHours": 13619, "hoursKnown": true, "status": "out", "rental": {"customer": "명문산업 (박철신대표, 5329-7153)", "site": "청양 · 청양 학당리 [부자재: 연료60(50)]", "outDate": "2026-08-20", "startHours": 13749, "longTerm": false, "estDaily": null}}, {"id": "S-34", "model": "커민스(QSX15) 500kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-35", "model": "보드왕 30kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-36", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "S-37", "model": "위차이(4DX) 50kW", "hours": 1319, "lastMaintHours": 1264, "hoursKnown": true, "status": "out", "rental": {"customer": "국방과학연구소 (양한복, 010-5455-3044)", "site": "포천 · 포천시 이동면 장암리 산285-31", "outDate": "2026-08-20", "startHours": 1319, "longTerm": false, "estDaily": null}}, {"id": "S-38", "model": "커민스(6BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "W-1", "model": "커민스(6BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "듀크기술연구소 (김상진 차장, 010-7103-9232)", "site": "인천 · 계양구 서운산단로 8길 11", "outDate": "2026-08-18", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-1", "model": "2366 150kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "in", "rental": null}, {"id": "L-2", "model": "2366 150kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "in", "rental": null}, {"id": "L-3", "model": "2366 150kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-4", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-5", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-6", "model": "2366 150kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-7", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-8", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-9", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-11", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0, "longTerm": false, "estDaily": null}}, {"id": "L-12", "model": "볼보 TAD1344GE 400kW", "hours": 4661, "lastMaintHours": 4254, "hoursKnown": true, "status": "in", "rental": null}, {"id": "L-13", "model": "볼보 TAD733GE 250kW", "hours": 2254, "lastMaintHours": 2240, "hoursKnown": true, "status": "in", "rental": null}];
+  return [{"id": "S-1", "model": "대우 0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-2", "model": "대우 0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-3", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-4", "model": "위차이(4DX) 50kW", "hours": 1855, "lastMaintHours": 1846, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-5", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-6", "model": "커민스(4BT) 75kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-7", "model": "커민스(4BT) 75kW", "hours": 1735, "lastMaintHours": 1735, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-8", "model": "커민스(4BT) 75kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-9", "model": "커민스(4BT) 120kW", "hours": 5838, "lastMaintHours": 5803, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-10", "model": "커민스(4BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-11", "model": "커민스(4BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-12", "model": "커민스(4BT) 120kW", "hours": 2288, "lastMaintHours": 2159, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-13", "model": "커민스(4BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-14", "model": "커민스(4BT) 120kW(회색)", "hours": 7036, "lastMaintHours": 6741, "hoursKnown": true, "status": "out", "rental": {"customer": "우진루프패널 (박채호이사, 8704-6625)", "site": "용인 · 용인 갈곡초", "outDate": "2026-08-21", "startHours": 7036}}, {"id": "S-15", "model": "커민스(4BT) 75kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-16", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-17", "model": "위차이(4DX) 50kW", "hours": 1518, "lastMaintHours": 1555, "hoursKnown": true, "status": "out", "rental": {"customer": "가교기업 (강석문상무, 9453-9865)", "site": "음성 · 음성 대소면 내산리 30", "outDate": "2026-08-20", "startHours": 1518}}, {"id": "S-18", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-19", "model": "보드왕 300kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-20", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-21", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-22", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-23", "model": "커민스(6CT) 200kW", "hours": 387, "lastMaintHours": 230, "hoursKnown": true, "status": "in", "rental": null}, {"id": "S-24", "model": "커민스(6BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-25", "model": "볼보 (TAD 1642 GE) 500kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-26", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-27", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-28", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-29", "model": "커민스(6BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "피앤아이종합건설 (신홍규차장, 010-2664-7124)", "site": "세종 · 세종시 어진동 579", "outDate": "2026-08-18", "startHours": 0}}, {"id": "S-30", "model": "커민스(6BT) 120kW", "hours": 1042, "lastMaintHours": 1011, "hoursKnown": true, "status": "out", "rental": {"customer": "용하이엔씨 (황인부장, 010-6204-0504)", "site": "세종 · 세종시 전의역", "outDate": "2026-08-19", "startHours": 1042}}, {"id": "S-31", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-32", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-33", "model": "커민스(QSX15) 500kW", "hours": 13749, "lastMaintHours": 13619, "hoursKnown": true, "status": "out", "rental": {"customer": "명문산업 (박철신대표, 5329-7153)", "site": "청양 · 청양 학당리 [부자재: 연료60(50)]", "outDate": "2026-08-20", "startHours": 13749}}, {"id": "S-34", "model": "커민스(QSX15) 500kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-35", "model": "보드왕 30kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-36", "model": "위차이(4DX) 50kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "S-37", "model": "위차이(4DX) 50kW", "hours": 1319, "lastMaintHours": 1264, "hoursKnown": true, "status": "out", "rental": {"customer": "국방과학연구소 (양한복, 010-5455-3044)", "site": "포천 · 포천시 이동면 장암리 산285-31", "outDate": "2026-08-20", "startHours": 1319}}, {"id": "S-38", "model": "커민스(6BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "W-1", "model": "커민스(6BT) 120kW", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "듀크기술연구소 (김상진 차장, 010-7103-9232)", "site": "인천 · 계양구 서운산단로 8길 11", "outDate": "2026-08-18", "startHours": 0}}, {"id": "L-1", "model": "2366 150kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "in", "rental": null}, {"id": "L-2", "model": "2366 150kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "in", "rental": null}, {"id": "L-3", "model": "2366 150kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "L-4", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "L-5", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "L-6", "model": "2366 150kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "L-7", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "L-8", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "L-9", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "L-11", "model": "0846 75kW(구형)", "hours": 0, "lastMaintHours": 0, "hoursKnown": false, "status": "out", "rental": {"customer": "", "site": "", "outDate": "", "startHours": 0}}, {"id": "L-12", "model": "볼보 TAD1344GE 400kW", "hours": 4661, "lastMaintHours": 4254, "hoursKnown": true, "status": "in", "rental": null}, {"id": "L-13", "model": "볼보 TAD733GE 250kW", "hours": 2254, "lastMaintHours": 2240, "hoursKnown": true, "status": "in", "rental": null}];
 }
 
 async function getOrInit(key, defVal){
@@ -3504,11 +3509,19 @@ function buildReturnReqNumMap(){
   return map;
 }
 // 하루평균 사용예상시간 기본값 - 팀 전체 공유를 위해 Firebase(companyInfo)에 저장합니다.
-// (예전 단기/장기 값이 남아 있으면 그 값을 이어서 씁니다)
 function getEstDailyDefault(){
+  const v = Number((DB.companyInfo||{}).estDaily);
+  return v>0 ? v : 0;
+}
+// 예전 단기/장기 기본값(estDailyShort/Long)이 남아 있으면 하나(estDaily)로 옮깁니다. (앱 켤 때 한 번)
+async function migrateEstDailyDefault(){
   const ci = DB.companyInfo || {};
-  for(const x of [ci.estDaily, ci.estDailyShort, ci.estDailyLong]){ const v = Number(x); if(v>0) return v; }
-  return 0;
+  if(ci.estDailyShort===undefined && ci.estDailyLong===undefined) return;
+  const next = { ...ci };
+  if(!(Number(next.estDaily)>0)){ const v = Number(ci.estDailyShort)>0 ? Number(ci.estDailyShort) : Number(ci.estDailyLong); if(v>0) next.estDaily = v; }
+  delete next.estDailyShort; delete next.estDailyLong;
+  DB.companyInfo = next;
+  await saveWithRetry(saveCompanyInfo);
 }
 // 실제 추정에 쓰는 하루 사용시간: 발전기별 개별 값은 쓰지 않고, 기본값 하나만 씁니다.
 // (예전에 저장된 rental.estDaily 값은 무시합니다)
@@ -4137,17 +4150,17 @@ function lowStockBannerHtml(){
       <button class="btn sm danger" onclick="switchTab('materials')">자재관리로 이동</button>
     </div>`;
 }
-function longtermMaintBannerHtml(){
-  const ltUrgent = activeGens().filter(g=>{
+function outMaintBannerHtml(){
+  const urgentList = activeGens().filter(g=>{
     if(!(g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && effEstDaily(g)>0)) return false;
     return maintStatus(estRemaining(g))!=='ok';
   });
-  if(ltUrgent.length===0) return '';
-  const dangerN = ltUrgent.filter(g=>maintStatus(estRemaining(g))==='danger').length;
+  if(urgentList.length===0) return '';
+  const dangerN = urgentList.filter(g=>maintStatus(estRemaining(g))==='danger').length;
   return `
     <div class="detail-card" style="background:var(--danger-tint);border-color:var(--danger);margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-      <div style="font-size:13px;color:var(--danger);font-weight:700;">🛠 출고중 정비 임박 ${ltUrgent.length}대${dangerN>0? ` (초과 ${dangerN}대)`:''} — 방문 정비 준비가 필요합니다.</div>
-      <button class="btn sm danger" onclick="switchTab('maint');setTimeout(()=>document.getElementById('longterm-prep-anchor')?.scrollIntoView({behavior:'smooth',block:'start'}),50);">정비 준비 리스트 보기</button>
+      <div style="font-size:13px;color:var(--danger);font-weight:700;">🛠 출고중 정비 임박 ${urgentList.length}대${dangerN>0? ` (초과 ${dangerN}대)`:''} — 방문 정비 준비가 필요합니다.</div>
+      <button class="btn sm danger" onclick="switchTab('maint');setTimeout(()=>document.getElementById('out-prep-anchor')?.scrollIntoView({behavior:'smooth',block:'start'}),50);">정비 준비 리스트 보기</button>
     </div>`;
 }
 function renderDashboard(){
@@ -4336,7 +4349,7 @@ function renderDashboard(){
   return `
     ${backupReminderBannerHtml()}
     ${lowStockBannerHtml()}
-    ${longtermMaintBannerHtml()}
+    ${outMaintBannerHtml()}
     <div class="cards">
       <div class="card" style="cursor:pointer;" onclick="switchTab('history')"><div class="num">${total}</div><div class="lbl">전체 발전기</div></div>
       <div class="card ok" style="cursor:pointer;" onclick="switchTab('in')"><div class="num">${inCount}</div><div class="lbl">입고</div></div>
@@ -4737,11 +4750,11 @@ function clearBulkInSelection(){
   bulkInSelection.clear();
   renderContent();
 }
-function longtermPrepListHtml(){
+function outPrepListHtml(){
   // 실측 누적시간이 한 번도 없는 발전기(현재·마지막정비 둘 다 0)는 추정이 의미가 없어 출고중 탭과 같이 제외합니다.
-  const ltList = activeGens().filter(g=>g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && effEstDaily(g)>0);
+  const candList = activeGens().filter(g=>g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && effEstDaily(g)>0);
   // 정상(여유 있음)은 보여주지 않고, 초과·임박만 모읍니다.
-  const prepList = ltList.filter(g=>maintStatus(estRemaining(g))!=='ok');
+  const prepList = candList.filter(g=>maintStatus(estRemaining(g))!=='ok');
   prepList.sort((a,b)=>estRemaining(a)-estRemaining(b));
   const cardHtml = g=>{
     const rem = estRemaining(g);
@@ -4764,9 +4777,9 @@ function longtermPrepListHtml(){
       <div class="prep-col-body">${gr.list.length? gr.list.map(cardHtml).join('') : `<div class="prep-col-empty">${gr.empty}</div>`}</div>
     </div>`).join('')}</div>`;
   return `
-    <div id="longterm-prep-anchor" class="section-title">🔧 출고중 정비 준비 리스트 <span class="cnt">${prepList.length}대</span>${prepList.length>0? ` <button type="button" class="btn sm" onclick="downloadLongtermPrepFile()">🖨 인쇄</button>`:''}</div>
+    <div id="out-prep-anchor" class="section-title">🔧 출고중 정비 준비 리스트 <span class="cnt">${prepList.length}대</span>${prepList.length>0? ` <button type="button" class="btn sm" onclick="downloadOutPrepFile()">🖨 인쇄</button>`:''}</div>
     <details class="info-toggle"><summary></summary><p class="muted">출고중인 발전기를 하루 예상 사용시간을 기준으로 정비가 필요한(초과) 것과 곧 필요한(임박) 것만 나눠 급한 순으로 보여줍니다. 방문 정비시 챙길 자재(엔진오일량·필터 품명/규격/수량)가 함께 표시됩니다.</p></details>
-    ${ltList.length===0? `<div class="empty">정비주기를 추정할 출고중 발전기가 없습니다.</div>` : prepList.length===0? `<div class="empty">정비가 임박하거나 초과된 출고중 발전기가 없습니다. (${ltList.length}대 모두 정상)</div>` : colsHtml}
+    ${candList.length===0? `<div class="empty">정비주기를 추정할 출고중 발전기가 없습니다.</div>` : prepList.length===0? `<div class="empty">정비가 임박하거나 초과된 출고중 발전기가 없습니다. (${candList.length}대 모두 정상)</div>` : colsHtml}
   `;
 }
 function renderOutList(){
@@ -4926,7 +4939,7 @@ function renderOutList(){
   return `
     ${returnReqHtml}
     ${embeddedSoonHtml}
-    <div class="section-title" style="flex-wrap:wrap;">📤 출고중 발전기 <span class="cnt">${list.length}대</span>${outRegionFilter? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">지역: ${escR(outRegionFilter)} <button onclick="clearOutRegionFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}${outCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${outCapacityFilter}kW <button onclick="clearOutCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''} <button type="button" class="btn sm" onclick="downloadOutFieldListFile()">🖨 출고 리스트 인쇄(단기/장기)</button>${estDailyDefaultHtml}</div>
+    <div class="section-title" style="flex-wrap:wrap;">📤 출고중 발전기 <span class="cnt">${list.length}대</span>${outRegionFilter? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">지역: ${escR(outRegionFilter)} <button onclick="clearOutRegionFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''}${outCapacityFilter!=null? ` <span class="cnt" style="background:var(--warn-tint);color:var(--warn);border-color:var(--warn);">용량: ${outCapacityFilter}kW <button onclick="clearOutCapacityFilter()" style="border:none;background:none;cursor:pointer;font-weight:700;margin-left:4px;">✕</button></span>`:''} <button type="button" class="btn sm" onclick="downloadOutFieldListFile()">🖨 출고 리스트 인쇄</button>${estDailyDefaultHtml}</div>
     ${capacityButtonsHtml}
     <details class="info-toggle"><summary></summary><p class="muted">같은 거래처에서 여러 대를 한 번에 반납받을 때는 왼쪽 체크박스로 여러 대를 선택한 뒤 "한번에 입고" 버튼을 눌러주세요. 현장 정기 점검 출장 전에는 위 "출고 리스트 인쇄" 버튼으로 출고 리스트를 뽑을 수 있습니다.</p></details>
     <div id="bulk-in-bar">${bulkInBarHtml()}</div>
@@ -4960,7 +4973,6 @@ async function applyDefaultEstDailyToAll(){
   const raw = document.getElementById('default-est-daily').value.trim();
   if(raw!=='' && (isNaN(Number(raw)) || Number(raw)<0 || Number(raw)>24)){ flash('0~24 사이 시간으로 입력해주세요'); return; }
   DB.companyInfo = { ...(DB.companyInfo||{}) };
-  delete DB.companyInfo.estDailyShort; delete DB.companyInfo.estDailyLong;
   if(raw==='') delete DB.companyInfo.estDaily; else DB.companyInfo.estDaily = Number(raw);
   await saveWithRetry(saveCompanyInfo);
   renderContent();
@@ -4970,7 +4982,7 @@ function clearEstDailyFromAll(){
   if(!(getEstDailyDefault()>0)){ flash('저장된 기본값이 없습니다'); return; }
   openConfirmModal('하루평균 사용예상시간 기본값을 비울까요?\n\n(비우면 출고중 정비주기 추정이 표시되지 않습니다)', async function(){
     DB.companyInfo = { ...(DB.companyInfo||{}) };
-    delete DB.companyInfo.estDaily; delete DB.companyInfo.estDailyShort; delete DB.companyInfo.estDailyLong;
+    delete DB.companyInfo.estDaily;
     await saveWithRetry(saveCompanyInfo);
     renderContent();
     flash('기본값을 비웠습니다');
@@ -5018,7 +5030,7 @@ function renderMaintTab(){
     </div>
     <div id="maint-gen-result"></div>
     <div id="maint-model-result"></div>
-    ${longtermPrepListHtml()}
+    ${outPrepListHtml()}
     <div class="section-title">🔧 정비 주기 현황 <span class="cnt" id="maint-list-cnt"></span></div>
     <div id="maint-list-wrap"></div>
   `;
@@ -5721,7 +5733,7 @@ function resetAllToOut(){
             supplies: '', voltage: g.voltage||'', qty: 1,
             fuelRequested: null, fuelActual: null, usageDays: null,
             loadDate: null, arriveTime: null, freightBearer: null, note: '',
-            outDate: todayStr(), startHours: g.hours||0, longTerm: false, estDaily: null, outConfirmedAt: Date.now()
+            outDate: todayStr(), startHours: g.hours||0, outConfirmedAt: Date.now()
           };
         }
       });
@@ -6592,7 +6604,7 @@ function renderManualTab(){
       ['발전기별 정비 이력', '발전기 번호를 선택하면 그 발전기 한 대의 정비 기록만 모아서 봅니다. "모델별 정비 이력" 바로 왼쪽에 같은 크기의 카드로 나란히 있습니다.'],
       ['모델별 정비 이력', '모델을 선택하면 그 모델을 쓴 발전기들의 정비 기록만 모아서 봅니다. 바로 아래에 "정비 임박 경고 기준"을 숫자로 직접 설정하는 칸이 있습니다(기본값 50h). 잔여시간이 그 값 이하면 "임박"으로 표시됩니다.'],
       ['용량별 보기 (정비 주기 현황)', '정비 주기 현황 목록 위에 자동으로 생기는 용량(kW) 버튼을 누르면 그 용량의 발전기만 걸러서 봅니다. "전체" 버튼으로 다시 전체 목록으로 돌아갑니다. [입고] 탭의 용량별 보기와 같은 방식입니다.'],
-      ['출고중 정비 준비 리스트', '출고중인 발전기(단기·장기)를 정비 임박 순으로 모아, 거래처·현장과 함께 방문시 챙길 자재(엔진오일량·필터 품명/규격)까지 보여줍니다. 🖨 인쇄 버튼으로 체크리스트를 뽑을 수 있습니다.']
+      ['출고중 정비 준비 리스트', '출고중인 발전기를 정비 임박 순으로 모아, 거래처·현장과 함께 방문시 챙길 자재(엔진오일량·필터 품명/규격)까지 보여줍니다. 🖨 인쇄 버튼으로 체크리스트를 뽑을 수 있습니다.']
     ])}
 
     ${manualSection('🧰','자재 관리', false,
@@ -9384,7 +9396,7 @@ async function confirmLoad(resId, isTransfer){
     fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
     usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'',
     note: [r.note, transferFuelNote].filter(Boolean).join(' / '), smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
-    outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily,
+    outDate: r.outDate, startHours: r.startHours,
     outProcessedBy: r.outProcessedBy || null, loadConfirmedBy: DB.currentUserName || null, genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now()
   };
   if(r.suppliesItems && r.suppliesItems.length){
@@ -10124,9 +10136,7 @@ function submitReserveNoGen(resId){
   const paymentNote = document.getElementById('f-rsv-payment-note').value.trim();
   const note = document.getElementById('f-rsv-note').value.trim();
   const outDate = document.getElementById('f-rsv-outdate').value;
-  const longTerm = false; // 장기/단기 구분 없앰
-  const estDailyRaw = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
-  const estDaily = estDailyRaw>0 ? estDailyRaw : null;
+
   const errEl = document.getElementById('f-rsv-err');
   if(!customer || !address || !manager || !phone){
     errEl.textContent = '거래처명, 현장 주소, 담당자, 연락처를 모두 입력해주세요.';
@@ -10153,7 +10163,7 @@ function submitReserveNoGen(resId){
       id: uid(), genId: selEl.value, pendingLoad: true, batchId: null,
       customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
       fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
-      outDate: outDate||todayStr(), startHours: extraStartHours, longTerm, estDaily, smsOrder: null, smsOrderAt: null,
+      outDate: outDate||todayStr(), startHours: extraStartHours, smsOrder: null, smsOrderAt: null,
       outProcessedBy: DB.currentUserName || null, createdAt: todayStr(),
       genAssignedBy: DB.currentUserName||null, genAssignedAt: nowDateTimeStr()
     });
@@ -10172,7 +10182,7 @@ function submitReserveNoGen(resId){
       id: existing? existing.id : uid(), genId: genSel, pendingLoad: true, batchId: (existing&&existing.batchId)||null,
       customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
       fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
-      outDate, startHours, longTerm, estDaily, smsOrder: (existing&&existing.smsOrder)||null, smsOrderAt: (existing&&(existing.smsOrderAt||existing.createdAtTs))||null,
+      outDate, startHours, smsOrder: (existing&&existing.smsOrder)||null, smsOrderAt: (existing&&(existing.smsOrderAt||existing.createdAtTs))||null,
       outProcessedBy: existing ? (existing.outProcessedBy || '미상') : (DB.currentUserName || null), createdAt: (existing&&existing.createdAt) || todayStr(),
       lastEditedBy: existing ? (DB.currentUserName||null) : null, lastEditedAt: existing ? nowDateTimeStr() : null,
       genAssignedBy: (existing && existing.genId===genSel && existing.genAssignedBy) ? existing.genAssignedBy : (DB.currentUserName||null),
@@ -10192,7 +10202,7 @@ function submitReserveNoGen(resId){
         if(x.id!==pendingData.id && x.batchId===existing.batchId){
           x.customer = customer; x.site = site; x.manager = manager; x.phone = phone; x.address = address;
           x.arriveTime = arriveTime; x.loadDate = loadDate; x.freightBearer = freightBearer;
-          x.usageDays = usageDays; x.estDaily = estDaily;
+          x.usageDays = usageDays;
           if(x.genId===UNASSIGNED_GEN_ID) x.plannedOutDate = outDate; else x.outDate = outDate;
           batchSiblingCount++;
         }
@@ -10208,7 +10218,7 @@ function submitReserveNoGen(resId){
     id: existing? existing.id : uid(), genId: UNASSIGNED_GEN_ID, pendingLoad: false, plannedOutDate: outDate, batchId: (existing&&existing.batchId)||null,
     customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty:1,
     fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
-    longTerm, estDaily, smsOrder: (existing&&existing.smsOrder)||null, smsOrderAt: (existing&&(existing.smsOrderAt||existing.createdAtTs))||null,
+    smsOrder: (existing&&existing.smsOrder)||null, smsOrderAt: (existing&&(existing.smsOrderAt||existing.createdAtTs))||null,
     outProcessedBy: existing ? (existing.outProcessedBy || '미상') : (DB.currentUserName || null), createdAt: (existing&&existing.createdAt) || todayStr(),
     lastEditedBy: existing ? (DB.currentUserName||null) : null, lastEditedAt: existing ? nowDateTimeStr() : null
   };
@@ -10226,7 +10236,7 @@ function submitReserveNoGen(resId){
       if(x.id!==pendingData.id && x.batchId===existing.batchId){
         x.customer = customer; x.site = site; x.manager = manager; x.phone = phone; x.address = address;
         x.arriveTime = arriveTime; x.loadDate = loadDate; x.freightBearer = freightBearer;
-        x.usageDays = usageDays; x.estDaily = estDaily;
+        x.usageDays = usageDays;
         if(x.genId===UNASSIGNED_GEN_ID) x.plannedOutDate = outDate; else x.outDate = outDate;
         batchSiblingCount2++;
       }
@@ -10449,8 +10459,7 @@ async function submitOutInfoEdit(id){
     errEl.style.display='block'; return;
   }
   const usageDays = Number(document.getElementById('f-oie-usagedays').value)||null;
-  const estDailyOieRaw = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
-  const estDailyOie = estDailyOieRaw>0 ? estDailyOieRaw : null;
+
   const oldVoltage = g.voltage||'';
   const newVoltageVal = document.getElementById('f-oie-voltage').value.trim();
   const newOutDate = document.getElementById('f-oie-outdate').value || todayStr();
@@ -10474,7 +10483,6 @@ async function submitOutInfoEdit(id){
     fuelRequested: (document.getElementById('f-oie-fuel-toggle') && document.getElementById('f-oie-fuel-toggle').checked) ? (Number(document.getElementById('f-oie-fuel-req').value)||null) : null,
     fuelActual: (document.getElementById('f-oie-fuel-toggle') && document.getElementById('f-oie-fuel-toggle').checked) ? (Number(document.getElementById('f-oie-fuel-actual').value)||null) : null,
     usageDays,
-    estDaily: estDailyOie,
     outDate: newOutDate,
     loadDate: document.getElementById('f-oie-loaddate').value || null,
     arriveTime: document.getElementById('f-oie-arrivetime').value.trim() || null,
@@ -10499,7 +10507,6 @@ async function submitOutInfoEdit(id){
     og.rental.loadDate = document.getElementById('f-oie-loaddate').value || null;
     og.rental.freightBearer = document.getElementById('f-oie-freight').value;
     og.rental.usageDays = usageDays;
-    og.rental.estDaily = estDailyOie;
   });
   closeModal();
   renderContent();
@@ -10526,7 +10533,7 @@ async function quickForceOut(id){
     fuelRequested:null, fuelActual:null, usageDays:null, loadDate: todayStr(), arriveTime:null,
     freightBearer:'우리배차', paymentConfirmed:false, forcedOut:false, forceReason:'', forcedBy:null,
     note:'(정보없이 강제출고됨 - 오입고 수정용)',
-    outDate: todayStr(), startHours: g.hours||0, longTerm:false, estDaily:null,
+    outDate: todayStr(), startHours: g.hours||0,
     outProcessedBy: DB.currentUserName||null, loadConfirmedBy: DB.currentUserName||null, outConfirmedAt: Date.now()
   };
   closeModal();
@@ -10820,9 +10827,7 @@ async function submitOut(idParam, reservationId){
   const outDate = document.getElementById('f-outdate').value;
   const startHoursEl = document.getElementById('f-starthours');
   const startHours = startHoursEl ? Number(startHoursEl.value) : (g.hours||0);
-  const longTerm = false; // 장기/단기 구분 없앰
-  const estDailyRaw = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
-  const estDaily = estDailyRaw>0 ? estDailyRaw : null;
+
   const errEl = document.getElementById('f-err');
   if(!customer || !address || !manager || !phone){
     errEl.textContent = '거래처명, 현장 주소, 담당자, 연락처를 모두 입력해주세요.';
@@ -10837,7 +10842,7 @@ async function submitOut(idParam, reservationId){
     id: reservationId || uid(), genId: id, pendingLoad: true, batchId: (existing && existing.batchId) || null,
     customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty,
     fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note,
-    outDate, startHours, longTerm, estDaily, smsOrder: (existing&&existing.smsOrder)||null, smsOrderAt: (existing&&(existing.smsOrderAt||existing.createdAtTs))||null,
+    outDate, startHours, smsOrder: (existing&&existing.smsOrder)||null, smsOrderAt: (existing&&(existing.smsOrderAt||existing.createdAtTs))||null,
     outProcessedBy: DB.currentUserName || (existing&&existing.outProcessedBy) || null,
     genAssignedBy: (existing&&existing.genAssignedBy)||null, genAssignedAt: (existing&&existing.genAssignedAt)||null,
     createdAt: (existing && existing.createdAt) || todayStr()
@@ -10846,7 +10851,7 @@ async function submitOut(idParam, reservationId){
   const wasPending = idx>=0 && DB.reservations[idx].pendingLoad;
   pendingOutSubmitCtx = {
     id, reservationId, pendingData, existing, idx, wasPending,
-    vals: {customer, manager, phone, address, supplies, voltage, qty, fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note, outDate, startHours, longTerm, estDaily}
+    vals: {customer, manager, phone, address, supplies, voltage, qty, fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note, outDate, startHours}
   };
   showOutSubmitPreview(g, pendingData);
 }
@@ -10899,7 +10904,7 @@ async function confirmOutSubmit(){
         r.fuelRequested = pendingData.fuelRequested; r.fuelActual = pendingData.fuelActual;
         r.usageDays = pendingData.usageDays; r.loadDate = pendingData.loadDate; r.arriveTime = pendingData.arriveTime;
         r.freightBearer = pendingData.freightBearer; r.paymentNote = pendingData.paymentNote;
-        r.note = pendingData.note; r.outDate = pendingData.outDate; r.longTerm = pendingData.longTerm; r.estDaily = pendingData.estDaily;
+        r.note = pendingData.note; r.outDate = pendingData.outDate;
       });
     }
     const siblingCount = siblings.length;
@@ -11141,9 +11146,6 @@ async function submitBulkOut(){
   const forceReason = forcedOut ? document.getElementById('fb-force-reason').value.trim() : '';
   const note = document.getElementById('fb-note').value.trim();
   const outDate = document.getElementById('fb-outdate').value;
-  const longTerm = false; // 장기/단기 구분 없앰
-  const estDailyRawB = 0 /* 예상가동시간 개별 입력 폐지: 단기/장기 기본값 사용 */;
-  const estDaily = estDailyRawB>0 ? estDailyRawB : null;
   if(!customer || !address || !manager || !phone){
     errEl.textContent = '거래처명, 현장 주소, 담당자, 연락처를 모두 입력해주세요.';
     errEl.style.display='block'; return;
@@ -11187,7 +11189,7 @@ async function submitBulkOut(){
       id: uid(), genId: id, pendingLoad: true, batchId,
       customer, manager, phone, site, address, supplies, voltage, qty:1,
       fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentConfirmed, forcedOut, forceReason, forcedBy: forcedOut ? (DB.currentUserName||null) : null, note,
-      outDate, startHours: hoursMap[id], longTerm, estDaily: longTerm? estDaily: null,
+      outDate, startHours: hoursMap[id],
       outProcessedBy: DB.currentUserName || null,
       genAssignedBy: DB.currentUserName || null, genAssignedAt: nowDateTimeStr(),
       createdAt: todayStr()
@@ -11315,7 +11317,7 @@ async function submitBulkIn(){
       id: uid(), genId: g.id, customer: rt.customer, manager: rt.manager, phone: rt.phone,
       site: rt.site, address: rt.address, supplies: rt.supplies, suppliesRecovered: !!rt.supplies, suppliesNote: '', fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: rt.note, smsOrder: rt.smsOrder||null,
       outDate: rt.outDate, inDate, startHours: rt.startHours, endHours,
-      usedHours: endHours!=null ? endHours - (rt.startHours||0) : null, longTerm: rt.longTerm, estDaily: rt.estDaily,
+      usedHours: endHours!=null ? endHours - (rt.startHours||0) : null,
       voltage: g.voltage||rt.voltage||'', outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null,
       measuredFuelHeightCm: null, remainingFuelLiters: null,
       paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null
@@ -11362,7 +11364,7 @@ function rentalFromReservation(r){
     customer: r.customer, manager: r.manager, phone: r.phone, site: r.site, address: r.address,
     supplies: r.supplies, voltage: r.voltage, qty: r.qty, fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
     usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, note: r.note,
-    outDate: r.outDate, startHours: r.startHours, longTerm: r.longTerm, estDaily: r.estDaily
+    outDate: r.outDate, startHours: r.startHours
   };
 }
 function printReceiptForReservation(resId){
@@ -11584,7 +11586,7 @@ ${body}
   URL.revokeObjectURL(a.href);
   flash('인쇄용 파일이 다운로드되었습니다. 다운로드된 파일을 열면 인쇄창이 뜹니다.');
 }
-function longtermPrepPrintCss(){
+function outPrepPrintCss(){
   return `
     @page{ size:A4 portrait; margin:14mm 12mm; }
     *{box-sizing:border-box;}
@@ -11609,7 +11611,7 @@ function longtermPrepPrintCss(){
     @media print{ .print-hint{display:none;} }
   `;
 }
-function longtermPrepCardPrintHtml(g){
+function outPrepCardPrintHtml(g){
   const rt = g.rental;
   const rem = estRemaining(g);
   const pred = predictedDate(g);
@@ -11632,19 +11634,19 @@ function longtermPrepCardPrintHtml(g){
     ${partsHtml}
   </div>`;
 }
-function downloadLongtermPrepFile(){
-  // 화면과 같게: 실측값 있는 출고중 발전기(단기·장기) 중 초과·임박만 인쇄합니다.
-  const ltList = activeGens().filter(g=>g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && effEstDaily(g)>0 && maintStatus(estRemaining(g))!=='ok');
-  ltList.sort((a,b)=>estRemaining(a)-estRemaining(b));
-  if(ltList.length===0){ showInfoModal('정비가 임박하거나 초과된 출고중 발전기가 없습니다.'); return; }
-  const cards = ltList.map(longtermPrepCardPrintHtml).join('');
+function downloadOutPrepFile(){
+  // 화면과 같게: 실측값 있는 출고중 발전기 중 초과·임박만 인쇄합니다.
+  const candList = activeGens().filter(g=>g.hoursKnown && (g.hours>0 || g.lastMaintHours>0) && g.status==='out' && g.rental && effEstDaily(g)>0 && maintStatus(estRemaining(g))!=='ok');
+  candList.sort((a,b)=>estRemaining(a)-estRemaining(b));
+  if(candList.length===0){ showInfoModal('정비가 임박하거나 초과된 출고중 발전기가 없습니다.'); return; }
+  const cards = candList.map(outPrepCardPrintHtml).join('');
   const doc = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
 <title>출고중 정비 준비 리스트</title>
-<style>${longtermPrepPrintCss()}</style>
+<style>${outPrepPrintCss()}</style>
 </head><body>
 <div class="lp-wrap">
   <div class="lp-title">출고중 정비 준비 리스트</div>
-  <div class="lp-sub">${dow(todayStr())} 기준 · 정비 임박 순 · 총 ${ltList.length}대</div>
+  <div class="lp-sub">${dow(todayStr())} 기준 · 정비 임박 순 · 총 ${candList.length}대</div>
   ${cards}
 </div>
 </body></html>`;
@@ -12290,7 +12292,7 @@ async function submitInFinish(id, isTransfer, vals){
     id: newRentalId, genId: g.id, customer: rt.customer, manager: rt.manager, phone: rt.phone,
     site: rt.site, address: rt.address, supplies: rt.supplies, suppliesItems: rt.suppliesItems||[], suppliesCustom: rt.suppliesCustom||'', suppliesRecovered, suppliesNote, fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: combinedNote,
     outDate: rt.outDate, inDate, startHours: rt.startHours, endHours,
-    usedHours: endHours!=null ? endHours - rt.startHours : null, longTerm: rt.longTerm, estDaily: rt.estDaily,
+    usedHours: endHours!=null ? endHours - rt.startHours : null,
     voltage, outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null, inProcessedAt: nowDateTimeStr(),
     measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
     paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null
@@ -12822,7 +12824,7 @@ async function init(){
   }
   if(outConfirmedAtMigrated) saveWithRetry(saveGens);
   // 전압 사진을 모델 정보에서 분리 (예전 데이터가 남아 있을 때만, 한 번)
-  if(!isQuickMode()) setTimeout(()=>{ migrateVoltagePhotosIfNeeded(); }, 4000);
+  if(!isQuickMode()) setTimeout(()=>{ migrateVoltagePhotosIfNeeded(); migrateEstDailyDefault(); }, 4000);
 }
 async function saveAllNow(){
   const btn = document.getElementById('save-all-btn');
