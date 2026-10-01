@@ -1,12 +1,13 @@
 {
-  "name": "해성발전기 전압설정",
+  "name": "해성 전압설정",
   "short_name": "전압설정",
   "start_url": "voltage.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#16212C",
-  "theme_color": "#16212C",
+  "background_color": "#1565C0",
+  "theme_color": "#1565C0",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" }
+    { "src": "voltage-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "voltage-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
