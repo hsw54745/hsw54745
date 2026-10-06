@@ -1966,14 +1966,18 @@ async function submitQmEditReservation(resId){
       if(btn){ btn.disabled = false; btn.textContent = '저장'; }
       return;
     }
+    const qmGroupSibs = findResGroupSiblings(r, list);
     Object.assign(r, {
       customer, site: customer, address, manager, phone, voltage, outDate, arriveTime,
       freightBearer, note, supplies, suppliesItems, suppliesCustom,
       fuelRequested, fuelActual, loadDate, usageDays
     });
+    if(r.genId===UNASSIGNED_GEN_ID) r.plannedOutDate = outDate;
+    // 같은 현장 묶음(같은 문자로 나뉜 N대, 같이 등록한 발전기)에도 거래처·주소·담당자·연락처·비고를 똑같이 반영합니다.
+    const qmSyncCount = syncResGroupSharedFields(r, list, qmGroupSibs);
     await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
     box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
-    box.textContent = '✅ 저장되었습니다!';
+    box.textContent = '✅ 저장되었습니다!' + (qmSyncCount>0? `\n같은 현장 ${qmSyncCount}건에도 같이 반영됐어요.` : '');
     if(btn) btn.textContent = '저장';
     setTimeout(()=>{ if(document.getElementById('qmre-status')) renderQmReservationList(); }, 700);
   }catch(e){
@@ -2730,8 +2734,14 @@ async function submitQuickOrder(){
   // "철수/회수" 단어가 있는데 출고 화면에 등록하려는 경우, 그냥 넘어가지 않고 한 번 더 확인을 받습니다.
   proceedWithDupCheck(text);
 }
-function proceedWithDupCheck(text){
-  const box = document.getElementById('qm-status');
+let qmSubmitInFlight = false;
+let qmDupChecking = false;
+async function proceedWithDupCheck(text){
+  if(qmSubmitInFlight || qmDupChecking) return; // 버튼을 두 번 눌러도 한 번만 등록되게 막습니다
+  qmDupChecking = true;
+  try{ await proceedWithDupCheckInner(text); } finally { qmDupChecking = false; }
+}
+async function proceedWithDupCheckInner(text){
   try{
     const lastRaw = localStorage.getItem('qmLastSmsSubmit');
     if(lastRaw){
@@ -2744,10 +2754,41 @@ function proceedWithDupCheck(text){
       }
     }
   }catch(e0){}
+  // 같은 문자를 여러 사람이 받아서 각자 등록하면 출고대기에 똑같은 건이 2번씩 생깁니다.
+  // 등록하기 전에 출고대기 목록을 확인해서, 같은 문자이거나 같은 연락처로 이미 들어와 있는 건이 있으면 먼저 물어봅니다.
+  try{
+    const cur = await window.storage.get('gen-reservations-v1', true);
+    let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    const norm = t=>String(t||'').replace(/\s+/g,'');
+    const myText = norm(text);
+    const myPhone = (parseSmsOrderText(text).phone)||'';
+    const hits = list.filter(r=>{
+      if(!r) return false;
+      if(r.smsOrder && norm(r.smsOrder)===myText) return true;
+      const ph = String(r.phone||'').replace(/[^0-9]/g,'') || (r.smsOrder ? (parseSmsOrderText(r.smsOrder).phone||'') : '');
+      return !!(myPhone && ph && ph===myPhone);
+    });
+    if(hits.length){
+      const sameText = hits.some(r=>r.smsOrder && norm(r.smsOrder)===myText);
+      const who = [...new Set(hits.map(r=>String(r.outProcessedBy||'').replace(/\(.*\)$/,'')).filter(Boolean))].join(', ');
+      const desc = hits.slice(0,4).map(r=>{
+        const nm = r.customer || (r.smsOrder ? (parseSmsOrderText(r.smsOrder).customer||'') : '') || '거래처 미기재';
+        return `· ${nm} (${r.genId && r.genId!==UNASSIGNED_GEN_ID ? r.genId : '미지정'})`;
+      }).join('\n');
+      const msg = (sameText ? '⚠️ 똑같은 문자가 이미 출고대기에 등록되어 있습니다.' : '⚠️ 같은 연락처로 등록된 출고대기 건이 이미 있습니다.')
+        + `\n${who? `(등록: ${who})\n`:''}\n${desc}${hits.length>4? `\n외 ${hits.length-4}건`:''}`
+        + `\n\n${sameText ? '중복 등록이면 "취소"를 눌러주세요.' : '변경·추가 문자가 아니라 같은 주문이면 "취소"를 눌러주세요.'}`;
+      openConfirmModal(msg, function(){ proceedSubmitQuickOrder(text); }, '그래도 등록', '취소');
+      return;
+    }
+  }catch(e1){ /* 목록 확인이 실패해도 등록은 진행합니다 */ }
   proceedSubmitQuickOrder(text);
 }
 async function proceedSubmitQuickOrder(text){
   if(!qmCurrentUserName){ openQmUserGate(); return; } // 이름을 안 고르면 등록되지 않게 막습니다
+  if(qmSubmitInFlight) return;
+  qmSubmitInFlight = true;
   const textEl = document.getElementById('qm-text');
   const btn = document.getElementById('qm-btn');
   const box = document.getElementById('qm-status');
@@ -2810,6 +2851,7 @@ async function proceedSubmitQuickOrder(text){
     box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
     box.textContent = '등록에 실패했습니다. 인터넷 연결을 확인하고 다시 눌러주세요.';
   }finally{
+    qmSubmitInFlight = false;
     btn.disabled=false; btn.textContent='등록하기';
   }
 }
@@ -3485,6 +3527,56 @@ function maintStatus(remaining){
   return 'ok';
 }
 function activeGens(){ return DB.gens.filter(g=>!g.retired); }
+// ===== 같은 현장 묶음 =====
+// "2대"처럼 한 문자로 여러 건이 나뉘어 등록된 건(같은 문자·같은 등록시각)이나, "+ 추가"/일괄출고로 같은 batchId를 가진 건들을
+// 하나의 현장 묶음으로 봅니다. 묶음 안의 한 건에서 거래처·주소·담당자·연락처·비고 등을 고치면 나머지 건에도 똑같이 반영됩니다.
+function resSmsGroupKey(r){
+  return (r && r.smsQtyTotal>1 && r.smsOrder && r.smsOrder.trim()) ? (String(r.createdAtTs||r.smsOrderAt||'')+'|'+r.smsOrder.trim()) : null;
+}
+function findResSmsGroup(r, list){
+  const k = resSmsGroupKey(r);
+  if(!k) return [r];
+  return (list||[]).filter(x=>x && resSmsGroupKey(x)===k);
+}
+function findResGroupSiblings(r, list){
+  if(!r) return [];
+  const out = []; const seen = new Set([r.id]); const queue = [r];
+  while(queue.length){
+    const cur = queue.shift();
+    const bk = cur.batchId; const sk = resSmsGroupKey(cur);
+    (list||[]).forEach(x=>{
+      if(!x || seen.has(x.id)) return;
+      if((bk && x.batchId===bk) || (sk && resSmsGroupKey(x)===sk)){ seen.add(x.id); out.push(x); queue.push(x); }
+    });
+  }
+  return out;
+}
+// 수정 저장할 때 새 객체로 갈아끼우면서 문자 N대 정보(smsQtyIndex/Total)와 최초 등록시각이 빠지던 것을 보존합니다.
+function keepResSmsMeta(target, existing){
+  if(!target || !existing) return;
+  if(existing.createdAtTs && !target.createdAtTs) target.createdAtTs = existing.createdAtTs;
+  if(existing.smsQtyTotal && !target.smsQtyTotal){ target.smsQtyTotal = existing.smsQtyTotal; target.smsQtyIndex = existing.smsQtyIndex||null; }
+  if(existing.smsOrderChecked && target.smsOrderChecked===undefined) target.smsOrderChecked = existing.smsOrderChecked;
+}
+// src(방금 저장한 건)의 현장 공통 정보를 묶음의 다른 건들에 복사합니다. 묶음이 batchId 없이 문자로만 이어져 있으면
+// 이후 수정에도 계속 묶여 있도록 같은 batchId를 붙여줍니다. 반영된 건수를 돌려줍니다.
+function syncResGroupSharedFields(src, list, siblingsOverride){
+  const sibs = siblingsOverride || findResGroupSiblings(src, list);
+  if(!sibs.length) return 0;
+  const bid = src.batchId || sibs.map(x=>x.batchId).find(Boolean) || uid();
+  src.batchId = bid;
+  sibs.forEach(x=>{
+    x.batchId = bid;
+    x.customer = src.customer; x.site = src.site || src.customer;
+    x.address = src.address; x.manager = src.manager; x.phone = src.phone;
+    x.note = src.note;
+    x.arriveTime = src.arriveTime; x.loadDate = src.loadDate; x.freightBearer = src.freightBearer;
+    x.usageDays = src.usageDays;
+    const d = src.genId===UNASSIGNED_GEN_ID ? (src.plannedOutDate||src.outDate) : (src.outDate||src.plannedOutDate);
+    if(d){ if(x.genId===UNASSIGNED_GEN_ID) x.plannedOutDate = d; else x.outDate = d; }
+  });
+  return sibs.length;
+}
 // 문자오더가 있는 건(출고대기의 예약 건 + 이미 출고된 발전기)을 모두 모아, 접수된 순서대로(오래된게 1번)
 // 일련번호를 매깁니다. 출고 전후로도 같은 번호가 유지되어 위 문자카드와 아래 목록을 서로 대조할 수 있습니다.
 function buildSmsOrderNumMap(){
@@ -9017,8 +9109,11 @@ function renderReserveTab(){
   const delayedCount = list.filter(r=>!isRawSms(r) && dateOf(r) && daysFromToday(dateOf(r))<0).length;
   const pendingCount = list.filter(r=>r.pendingLoad).length;
   const smsOrderAll = list.filter(r=>r.smsOrder && r.smsOrder.trim());
-  const smsOrderCards = smsOrderAll.filter(r=>!r.smsOrderChecked).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
-  const smsOrderHidden = smsOrderAll.filter(r=>r.smsOrderChecked).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
+  // "2대"처럼 한 문자가 여러 건으로 나뉘어 등록돼도, 위 문자오더 원문 카드는 문자 1통당 1장만 보여줍니다.
+  const smsCardSeen = new Set();
+  const smsOrderUnique = smsOrderAll.filter(r=>{ const k = resSmsGroupKey(r); if(!k) return true; if(smsCardSeen.has(k)) return false; smsCardSeen.add(k); return true; });
+  const smsOrderCards = smsOrderUnique.filter(r=>!r.smsOrderChecked).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
+  const smsOrderHidden = smsOrderUnique.filter(r=>r.smsOrderChecked).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
   const smsOrderNumMapFull = buildSmsOrderNumMap();
   const smsOrderNumMap = {};
   Object.keys(smsOrderNumMapFull).forEach(k=>{ if(k.startsWith('r:')) smsOrderNumMap[k.slice(2)] = smsOrderNumMapFull[k]; });
@@ -9113,7 +9208,7 @@ function renderReserveTab(){
           return `
         <div style="width:195px;height:260px;flex-shrink:0;background:#fff;${cardStyle}border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
           ${change? `<div style="background:var(--danger);color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;line-height:1.3;">⚠️ ${change.diffs.join('·')} 변경됨!<br>(${fmtCardDateTime(change.priorAt)} 문자와 다름)</div>` : ''}
-          ${r.smsQtyTotal>1? `<div style="background:#1565C0;color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;">📦 ${r.smsQtyTotal}대 중 ${r.smsQtyIndex}번째</div>` : ''}
+          ${r.smsQtyTotal>1? `<div style="background:#1565C0;color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;">📦 ${r.smsQtyTotal}대 주문 (아래 표에 ${findResSmsGroup(r, DB.reservations).length}건)</div>` : ''}
           <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}${r.outProcessedBy? ` · ${escR(r.outProcessedBy)}` : ''}</div>
           ${smsOrderNumMap[r.id]? `<div style="font-size:10px;color:#8A6D00;font-weight:800;margin-bottom:2px;">#${smsOrderNumMap[r.id]}</div>`:''}
           <div style="font-size:14px;font-weight:700;color:var(--primary-dark);margin-bottom:4px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
@@ -9189,7 +9284,7 @@ function showNoteModal(resId){
 function markSmsOrderChecked(resId){
   const r = DB.reservations.find(x=>x.id===resId);
   if(!r) return;
-  r.smsOrderChecked = true;
+  findResSmsGroup(r, DB.reservations).forEach(x=>{ x.smsOrderChecked = true; });
   saveReservations();
   renderContent();
   flash('✅ 확인완료');
@@ -9197,15 +9292,19 @@ function markSmsOrderChecked(resId){
 function unmarkSmsOrderChecked(resId){
   const r = DB.reservations.find(x=>x.id===resId);
   if(!r) return;
-  r.smsOrderChecked = false;
+  findResSmsGroup(r, DB.reservations).forEach(x=>{ x.smsOrderChecked = false; });
   saveReservations();
   renderContent();
 }
 function deleteSmsOrderCard(resId){
   const r = DB.reservations.find(x=>x.id===resId);
-  openConfirmModal('이 문자오더 건을 완전히 삭제할까요? 출고대기 목록에서도 함께 삭제되며, 되돌릴 수 없습니다.', async function(){
-    const summary = r ? `문자오더: ${(r.smsOrder||'').slice(0,40)}${(r.smsOrder||'').length>40?'…':''}` : '문자오더 삭제';
-    DB.reservations = DB.reservations.filter(r=>r.id!==resId);
+  const delIds = new Set(r ? findResSmsGroup(r, DB.reservations).map(x=>x.id) : [resId]);
+  const delMsg = delIds.size>1
+    ? `이 문자오더는 ${delIds.size}대 주문이라 출고대기에 ${delIds.size}건으로 나뉘어 있습니다.\n${delIds.size}건을 모두 삭제할까요? 되돌릴 수 없습니다.\n(1대만 빼려면 아래 표에서 해당 건만 "예약 취소"하세요)`
+    : '이 문자오더 건을 완전히 삭제할까요? 출고대기 목록에서도 함께 삭제되며, 되돌릴 수 없습니다.';
+  openConfirmModal(delMsg, async function(){
+    const summary = r ? `문자오더${delIds.size>1? `(${delIds.size}건)`:''}: ${(r.smsOrder||'').slice(0,40)}${(r.smsOrder||'').length>40?'…':''}` : '문자오더 삭제';
+    DB.reservations = DB.reservations.filter(x=>!delIds.has(x.id));
     await saveWithRetry(saveReservations);
     await logDeletion('문자오더 삭제', summary);
     closeModal();
@@ -10267,26 +10366,23 @@ function submitReserveNoGen(resId){
       genAssignedBy: (existing && existing.genId===genSel && existing.genAssignedBy) ? existing.genAssignedBy : (DB.currentUserName||null),
       genAssignedAt: (existing && existing.genId===genSel && existing.genAssignedAt) ? existing.genAssignedAt : nowDateTimeStr()
     };
+    const groupSibs = existing ? findResGroupSiblings(existing, DB.reservations) : [];
+    keepResSmsMeta(pendingData, existing);
     if(existing){
       const idx = DB.reservations.findIndex(x=>x.id===existing.id);
       if(idx>=0) DB.reservations[idx] = pendingData;
     } else {
       DB.reservations.push(pendingData);
     }
-    DB.reservations.push(...extraPendingList);
-    // 같은 묶음(batchId)으로 같이 출고 대기중인 다른 건에도 거래처 관련 정보만 똑같이 반영합니다.
-    let batchSiblingCount = 0;
-    if(existing && existing.batchId){
-      DB.reservations.forEach(x=>{
-        if(x.id!==pendingData.id && x.batchId===existing.batchId){
-          x.customer = customer; x.site = site; x.manager = manager; x.phone = phone; x.address = address;
-          x.arriveTime = arriveTime; x.loadDate = loadDate; x.freightBearer = freightBearer;
-          x.usageDays = usageDays;
-          if(x.genId===UNASSIGNED_GEN_ID) x.plannedOutDate = outDate; else x.outDate = outDate;
-          batchSiblingCount++;
-        }
-      });
+    // "+ 추가"로 같이 등록한 발전기들은 같은 묶음(batchId)으로 이어둡니다. (나중에 한 곳만 고쳐도 같이 바뀌게)
+    if(extraPendingList.length){
+      const bid = pendingData.batchId || groupSibs.map(x=>x.batchId).find(Boolean) || uid();
+      pendingData.batchId = bid;
+      extraPendingList.forEach(x=>{ x.batchId = bid; });
     }
+    DB.reservations.push(...extraPendingList);
+    // 같은 묶음(batchId 또는 같은 문자로 나뉜 N대)으로 출고 대기중인 다른 건에도 거래처·주소·담당자·연락처·비고를 똑같이 반영합니다.
+    const batchSiblingCount = syncResGroupSharedFields(pendingData, DB.reservations, groupSibs);
     saveWithRetry(saveReservations);
     closeModal();
     currentTab = 'reserve'; renderTabbar(); renderContent();
@@ -10301,26 +10397,22 @@ function submitReserveNoGen(resId){
     outProcessedBy: existing ? (existing.outProcessedBy || '미상') : (DB.currentUserName || null), createdAt: (existing&&existing.createdAt) || todayStr(),
     lastEditedBy: existing ? (DB.currentUserName||null) : null, lastEditedAt: existing ? nowDateTimeStr() : null
   };
+  const groupSibs2 = existing ? findResGroupSiblings(existing, DB.reservations) : [];
+  keepResSmsMeta(pendingData, existing);
   if(existing){
     const idx = DB.reservations.findIndex(x=>x.id===existing.id);
     if(idx>=0) DB.reservations[idx] = pendingData;
   } else {
     DB.reservations.push(pendingData);
   }
-  DB.reservations.push(...extraPendingList);
-  // 같은 묶음(batchId)으로 같이 출고 대기중인 다른 건에도 거래처 관련 정보만 똑같이 반영합니다.
-  let batchSiblingCount2 = 0;
-  if(existing && existing.batchId){
-    DB.reservations.forEach(x=>{
-      if(x.id!==pendingData.id && x.batchId===existing.batchId){
-        x.customer = customer; x.site = site; x.manager = manager; x.phone = phone; x.address = address;
-        x.arriveTime = arriveTime; x.loadDate = loadDate; x.freightBearer = freightBearer;
-        x.usageDays = usageDays;
-        if(x.genId===UNASSIGNED_GEN_ID) x.plannedOutDate = outDate; else x.outDate = outDate;
-        batchSiblingCount2++;
-      }
-    });
+  if(extraPendingList.length){
+    const bid = pendingData.batchId || groupSibs2.map(x=>x.batchId).find(Boolean) || uid();
+    pendingData.batchId = bid;
+    extraPendingList.forEach(x=>{ x.batchId = bid; });
   }
+  DB.reservations.push(...extraPendingList);
+  // 같은 묶음(batchId 또는 같은 문자로 나뉜 N대)으로 출고 대기중인 다른 건에도 거래처·주소·담당자·연락처·비고를 똑같이 반영합니다.
+  const batchSiblingCount2 = syncResGroupSharedFields(pendingData, DB.reservations, groupSibs2);
   saveWithRetry(saveReservations);
   closeModal();
   currentTab = 'reserve'; renderTabbar(); renderContent();
@@ -10962,8 +11054,12 @@ async function confirmOutSubmit(){
   if(!ctx) return;
   const {reservationId, pendingData, existing, idx, wasPending} = ctx;
   try{
+    const groupSibs3 = existing ? findResGroupSiblings(existing, DB.reservations) : [];
+    keepResSmsMeta(pendingData, existing);
     if(idx>=0) DB.reservations[idx] = pendingData;
     else DB.reservations.push(pendingData);
+    // 같은 문자로 나뉜 N대·같은 묶음의 다른 건(미지정 포함)에도 거래처·주소·담당자·연락처·비고를 먼저 반영합니다.
+    syncResGroupSharedFields(pendingData, DB.reservations, groupSibs3);
     // 배치 판별: 명시적으로 batchId가 같으면 그걸로 묶고, batchId가 없는 건들끼리는
     // 거래처명+현장주소가 같으면 "같이 나가는 묶음"으로 보고 같은 batchId를 새로 붙여줍니다.
     const siblings = DB.reservations.filter(r=>{
