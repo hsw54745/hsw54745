@@ -1242,7 +1242,8 @@ async function openQmInProcess(id){
         ${g.hoursKnown ? `
         <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:6px;">입고시(반납) 누적 사용시간(h)</label>
         <input type="number" id="qmin-endhours" placeholder="예: ${Math.round((g.hours||0))}" min="${r.startHours||0}" style="width:100%;font-size:16px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;">
-        <div style="font-size:12.5px;color:#C23B3B;font-weight:700;margin-top:6px;">출고시 누적시간: ${(r.startHours||0).toLocaleString()}h</div>
+        <div style="font-size:12.5px;color:#C23B3B;font-weight:700;margin-top:6px;">출고시 누적시간: ${(r.startHours||0).toLocaleString()}h${g.hoursUnconfirmed? ' (⚠️ 실제와 다를 수 있음)':''}</div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:15px;font-weight:800;color:#333;cursor:pointer;"><input type="checkbox" id="qmin-endhours-unknown" onchange="toggleEndHoursUnknown('qmin-endhours', this.checked)" style="width:20px;height:20px;"> 누적시간 모름 (계기판 확인 못함)</label>
         ` : `
         <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:4px;">누적 사용시간</label>
         <div style="font-size:14px;color:#C23B3B;font-weight:700;">확인불가</div>
@@ -1341,13 +1342,16 @@ async function submitQmInProcess(id){
     const inDate = document.getElementById('qmin-date').value;
     const voltage = (document.getElementById('qmin-voltage').value||'').trim();
     const endHoursEl = document.getElementById('qmin-endhours');
-    const endHours = endHoursEl ? (endHoursEl.value==='' ? null : Number(endHoursEl.value)) : null;
+    const qmHoursUnknownEl = document.getElementById('qmin-endhours-unknown');
+    const qmHoursUnknown = !!(qmHoursUnknownEl && qmHoursUnknownEl.checked);
+    const endHours = (endHoursEl && !qmHoursUnknown) ? (endHoursEl.value==='' ? null : Number(endHoursEl.value)) : null;
 
-    if(!inDate || (g.hoursKnown && (endHours===null || isNaN(endHours) || endHours < (r.startHours||0)))){
-      showErr('입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다)');
+    if(!inDate || (g.hoursKnown && !qmHoursUnknown && (endHours===null || isNaN(endHours) || (endHours < (r.startHours||0) && !g.hoursUnconfirmed)))){
+      showErr('입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다. 계기판을 못 봤으면 "누적시간 모름"을 체크하세요)');
       return;
     }
-    if(r.outDate && inDate && g.hoursKnown && endHours!==null){
+    // 이전에 누적시간을 확인 못한 발전기는 그동안 쓴 시간이 이번에 몰아서 잡히는 게 정상이라 하루 24시간 검사를 건너뜁니다.
+    if(r.outDate && inDate && g.hoursKnown && endHours!==null && !g.hoursUnconfirmed){
       const usedH = endHours - (r.startHours||0);
       const outD = new Date(r.outDate+'T00:00:00');
       const inD = new Date(inDate+'T00:00:00');
@@ -1369,7 +1373,8 @@ async function submitQmInProcess(id){
     let remainingFuelLiters = null;
     if(measuredFuelHeightCm!=null) remainingFuelLiters = qmComputeFuelLiters(g, measuredFuelHeightCm, materials);
     const fuelExhaustNote = (remainingFuelLiters===0) ? '출고시 연료 모두 소진되어 입고' : '';
-    const combinedNote = [r.note, fuelExhaustNote].filter(Boolean).join(' / ');
+    const qmHoursNote = (g.hoursKnown && endHours===null) ? '입고시 누적시간 미확인' : '';
+    const combinedNote = [r.note, fuelExhaustNote, qmHoursNote].filter(Boolean).join(' / ');
 
     if(btn){ btn.disabled = true; btn.textContent = '처리 중...'; }
 
@@ -1378,14 +1383,15 @@ async function submitQmInProcess(id){
       site: r.site, address: r.address, supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', suppliesRecovered, suppliesNote,
       fuelRequested: r.fuelRequested, fuelActual: r.fuelActual, usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, note: combinedNote,
       outDate: r.outDate, inDate, startHours: r.startHours, endHours,
-      usedHours: endHours!=null ? endHours - (r.startHours||0) : null,
+      usedHours: (endHours!=null && endHours >= (r.startHours||0)) ? endHours - (r.startHours||0) : null,
       voltage, outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: r.loadConfirmedBy||null, inProcessedBy: qmLabel(), inProcessedAt: nowDateTimeStr(),
       measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
       paymentConfirmed: r.paymentConfirmed||false, forcedOut: r.forcedOut||false, forceReason: r.forceReason||'', forcedBy: r.forcedBy||null
     });
 
     g.status = 'in';
-    if(g.hoursKnown && endHours!==null) g.hours = endHours;
+    if(g.hoursKnown && endHours!==null){ g.hours = endHours; g.hoursUnconfirmed = false; }
+    else if(g.hoursKnown) g.hoursUnconfirmed = true;
     const oldVoltageForMaintLog = g.voltage||'';
     g.voltage = voltage;
     g.voltageUpdatedAt = nowDateTimeStr();
@@ -1461,6 +1467,7 @@ async function renderQmReservationList(){
 }
 async function qmRefreshReservationList(){
   const wrap = document.getElementById('qm-res-list');
+  await qmLoadSmsLearnCache();
   try{
     const [cur, curFleet] = await Promise.all([
       window.storage.get('gen-reservations-v1', true),
@@ -1495,7 +1502,7 @@ async function qmRefreshReservationList(){
       ].filter(([k,v])=>v);
       return `
       <div style="background:${assigned?'#EAF5EC':'#fff'};border:1px solid ${assigned?'#2C6E49':'#ddd'};border-radius:10px;padding:12px 14px;margin-bottom:8px;">
-        ${auto? `<div style="font-size:11px;font-weight:800;color:#8A6D00;background:#FFF8E1;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;">🤖 문자 자동인식 (사무실 확인 전)</div>` : ''}
+        ${auto? `<div style="font-size:11px;font-weight:800;color:#8A6D00;background:#FFF8E1;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;">🤖 문자 자동인식${auto.learned&&auto.learned.length? ' + 지난 거래기록 참고':''} (사무실 확인 전)</div>` : ''}
         ${r.smsQtyTotal>1? `<div style="font-size:11px;font-weight:800;color:#1565C0;background:#E8F0FE;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;margin-left:4px;">📦 ${r.smsQtyTotal}대 중 ${r.smsQtyIndex}번째</div>` : ''}
         <div style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(dCustomer)}</div>
         <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${(r.outDate||r.plannedOutDate)? fmtDateKR(r.outDate||r.plannedOutDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
@@ -1827,6 +1834,7 @@ async function openQmEditReservation(resId){
       <div id="qmre-body"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
     </div>
   `);
+  await qmLoadSmsLearnCache();
   try{
     const cur = await window.storage.get('gen-reservations-v1', true);
     let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
@@ -4701,7 +4709,7 @@ function renderInList(){
     return `<tr${isBroken? ` style="background:var(--danger-tint);"`:''}>
       <td>${selectable? `<input type="checkbox" class="bulk-out-chk" data-gid="${g.id}" ${bulkOutSelection.has(g.id)?'checked':''} onchange="toggleBulkOutSelect('${g.id}', this.checked)">` : ''}</td>
       <td class="gid">${g.id}</td>
-      <td class="wrap-ok">${displayModel(g)}${g.borrowed? ` <span class="pill" style="background:var(--primary-tint);color:var(--primary-dark);border:1px solid var(--primary);">🤝 임대</span>`:''}${isPendingOut? ` <span class="pill warn">출고대기</span>`:''}${isBroken? `<div class="muted" style="font-size:11px;color:var(--danger);font-weight:700;">⚠ 고장: ${escR(g.repairNote||'-')}${g.repairPhoto? ` <img src="${g.repairPhoto}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;cursor:pointer;" onclick="openImageViewModal('${g.repairPhoto}','고장 사진')">`:''}</div>`:''}</td>
+      <td class="wrap-ok">${displayModel(g)}${g.borrowed? ` <span class="pill" style="background:var(--primary-tint);color:var(--primary-dark);border:1px solid var(--primary);">🤝 임대</span>`:''}${isPendingOut? ` <span class="pill warn">출고대기</span>`:''}${(g.hoursKnown && g.hoursUnconfirmed)? ` <span class="pill danger" title="지난 입고 때 계기판을 못 봐서 누적시간이 실제와 다를 수 있습니다. 확인되면 [누적시간 수정]으로 넣어주세요.">⏱ 누적시간 미확인</span>`:''}${isBroken? `<div class="muted" style="font-size:11px;color:var(--danger);font-weight:700;">⚠ 고장: ${escR(g.repairNote||'-')}${g.repairPhoto? ` <img src="${g.repairPhoto}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;cursor:pointer;" onclick="openImageViewModal('${g.repairPhoto}','고장 사진')">`:''}</div>`:''}</td>
       <td>${voltagePillHtml(g.id, g.voltage)}</td>
       <td>${usableCapacityCell(g)}</td>
       <td class="muted">${hoursStatus(g)==='known'? `${(g.hours||0).toLocaleString()}h <span style="font-size:11px;">(정비: ${(g.lastMaintHours||0).toLocaleString()}h)</span>` : '<span style="color:var(--danger);font-weight:700;">확인불가</span>'}</td>
@@ -5323,6 +5331,7 @@ async function submitAdjust(id){
   }
   g.hoursUpdatedAt = nowDateTimeStr();
   g.hoursUpdatedBy = DB.currentUserName || null;
+  g.hoursUnconfirmed = false;
   if(voltage !== oldVoltage.trim()){
     g.voltageUpdatedAt = nowDateTimeStr();
     g.voltageUpdatedAtMs = Date.now();
@@ -5457,6 +5466,7 @@ function recomputeLastMaint(genId){
       g.lastMaintDate = null;
       g.hoursUpdatedAt = nowDateTimeStr();
       g.hoursUpdatedBy = DB.currentUserName || null;
+      g.hoursUnconfirmed = false;
     } else {
       g.lastOilChangeDate = null;
     }
@@ -5477,6 +5487,7 @@ function recomputeLastMaint(genId){
   if((g.hours||0) < maxHours) g.hours = maxHours;
   g.hoursUpdatedAt = nowDateTimeStr();
   g.hoursUpdatedBy = DB.currentUserName || null;
+  g.hoursUnconfirmed = false;
   const atMax = recs.filter(r=>(r.hours||0)===maxHours).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   if(atMax.length>0 && atMax[0].date) g.lastMaintDate = atMax[0].date;
 }
@@ -8136,6 +8147,7 @@ async function toggleHoursKnownSetting(id, checked){
   }
   g.hoursUpdatedAt = nowDateTimeStr();
   g.hoursUpdatedBy = DB.currentUserName || null;
+  g.hoursUnconfirmed = false;
   await saveGens();
   renderContent();
   flash(checked? `${g.id} 가동시간 확인가능으로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 실제 값을 입력해주세요.` : `${g.id} 누적시간 확인불가로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 마지막 엔진오일교체일을 입력해주세요.`);
@@ -9633,7 +9645,68 @@ function showInfoModal(message){
 // 문자오더 원문에서 업체명·현장·주소·담당자·연락처·전압·도착일시·비고(부자재)를 최대한 뽑아냅니다.
 // 100% 정확하진 않으니, 이미 값이 있는 칸은 절대 덮어쓰지 않고 "비어있는 칸만" 채우는 용도로 씁니다.
 // baseTs: 문자가 들어온 시각. "내일/오늘/27일"은 사무실에서 여는 날이 아니라 문자가 온 날 기준으로 계산해야 합니다.
-function parseSmsOrderText(text, baseTs){
+// ===== 문자 자동인식 학습 =====
+// 사무실에서 고쳐서 저장해둔 거래 기록(출고중·출고대기·지난 임대이력)을 기준으로, 새 문자의 연락처나 거래처명이
+// 예전에 고쳐둔 건과 같으면 그때 확정한 거래처명·담당자·전압을 그대로 가져다 씁니다.
+// (문자를 고칠 때마다 규칙을 새로 짤 필요 없이, 사무실에서 한 번 고쳐두면 다음부터는 그대로 인식됩니다)
+let smsLearnQmCache = null, smsLearnQmCacheAt = 0;
+async function qmLoadSmsLearnCache(force){
+  if(!force && smsLearnQmCache && Date.now()-smsLearnQmCacheAt < 60000) return;
+  try{
+    const [cg, cr, ch] = await Promise.all([
+      window.storage.get('gen-fleet-v2', true).catch(()=>null),
+      window.storage.get('gen-reservations-v1', true).catch(()=>null),
+      window.storage.get('gen-rentals-v2', true).catch(()=>null)
+    ]);
+    const pj = c=>{ try{ const v = c ? JSON.parse(c.value) : []; return Array.isArray(v) ? v : []; }catch(e){ return []; } };
+    smsLearnQmCache = { gens: pj(cg), reservations: pj(cr), rentals: pj(ch) };
+    smsLearnQmCacheAt = Date.now();
+  }catch(e){ /* 못 불러오면 학습 없이 기본 인식만 합니다 */ }
+}
+function getSmsLearnRecords(){
+  let src = null;
+  try{ if(typeof DB!=='undefined' && DB && ((DB.rentals||[]).length || (DB.gens||[]).length)) src = {gens: DB.gens||[], reservations: DB.reservations||[], rentals: DB.rentals||[]}; }catch(e){}
+  if(!src) src = smsLearnQmCache;
+  if(!src) return [];
+  const recs = [];
+  const add = (r, ts)=>{ if(r && (r.customer||r.manager) && (r.phone||r.customer)) recs.push({customer:r.customer||'', manager:r.manager||'', phone:String(r.phone||'').replace(/[^0-9]/g,''), voltage:r.voltage||'', smsOrder:r.smsOrder||'', ts}); };
+  (src.rentals||[]).forEach(r=>add(r, Date.parse(r.outDate||r.inDate||'')||0));
+  (src.gens||[]).forEach(g=>{ if(g && g.rental) add(g.rental, g.rental.smsOrderAt || Date.parse(g.rental.outDate||'') || 0); });
+  (src.reservations||[]).forEach(r=>add(r, r.smsOrderAt || r.createdAtTs || Date.parse(r.outDate||r.plannedOutDate||'') || 0));
+  recs.sort((a,b)=>b.ts-a.ts); // 최근에 고친 기록이 우선
+  return recs;
+}
+function applySmsLearning(result, text, recs){
+  recs = recs || getSmsLearnRecords();
+  result.learned = [];
+  if(!recs.length) return result;
+  const norm = s=>String(s||'').replace(/\s+|\(주\)|㈜|주식회사|님$/g,'').toLowerCase();
+  const similar = (a,b)=>{ a=norm(a); b=norm(b); return !!(a && b && (a.includes(b) || b.includes(a))); };
+  const titleOnly = /^(담당자?|대표|사장|소장|팀장|과장|부장|차장|이사|반장|실장|매니저|매니져|주임|대리|기사|협회장|회장)님?$/;
+  const myText = norm(text);
+  // 원문이 똑같은 문자를 예전에 고쳐둔 적이 있으면 그 결과를 가장 먼저 씁니다.
+  let rec = recs.find(r=>r.smsOrder && norm(r.smsOrder)===myText);
+  let by = rec ? 'text' : '';
+  if(!rec && result.phone){ rec = recs.find(r=>r.phone && r.phone===result.phone); if(rec) by = 'phone'; }
+  if(!rec && result.customer && norm(result.customer).length>=2){ rec = recs.find(r=>r.customer && norm(r.customer)===norm(result.customer)) || recs.find(r=>r.customer && norm(result.customer).length>=3 && similar(r.customer, result.customer)); if(rec) by = 'customer'; }
+  if(!rec) return result;
+  const set = (k,v)=>{ if(v && result[k]!==v){ result[k] = v; result.learned.push(k); } };
+  if(by==='text' || by==='phone'){
+    // 같은 연락처면 같은 사람·같은 회사입니다. 문자에 다른 회사명이 분명히 적혀 있으면 문자를 따릅니다.
+    if(by==='text' || !result.customer || similar(result.customer, rec.customer) || (typeof siteReForLearn!=='undefined' && siteReForLearn.test(result.customer))) set('customer', rec.customer);
+    if(by==='text' || !result.manager || titleOnly.test(result.manager) || similar(result.manager, rec.manager)) set('manager', rec.manager);
+  } else {
+    set('customer', rec.customer); // 거래처명은 사무실에서 확정한 표기로 맞춥니다
+    if(!result.phone && rec.phone){ set('phone', rec.phone); if(!result.manager || titleOnly.test(result.manager)) set('manager', rec.manager); }
+  }
+  if(!result.voltage && rec.voltage) set('voltage', rec.voltage);
+  return result;
+}
+const siteReForLearn = /(학교|대학교|운동장|공원|부대|정수장|센터|병원|아파트|현장|공장|체육관|야영장|캠핑장|행사장|주차장|청사|구청|시청|군청|교회|성당|축제|광장)/;
+function parseSmsOrderText(text, baseTs, learnRecs){
+  return applySmsLearning(parseSmsOrderTextRaw(text, baseTs), text, learnRecs);
+}
+function parseSmsOrderTextRaw(text, baseTs){
   const result = {customer:'', address:'', manager:'', phone:'', voltage:'', arriveTime:'', outDate:'', loadDate:'', note:'', usageDays:'', fuelRequested:null, fuelActual:null};
   if(!text) return result;
   const base = baseTs ? new Date(baseTs) : new Date();
@@ -9641,6 +9714,34 @@ function parseSmsOrderText(text, baseTs){
   // 소수점(1.4톤, 2.5T)과 괄호 안의 마침표·쉼표("분전반(메인250.분기150A.4P,3P 100)")는 보호해두고,
   // 그 외 줄바꿈/쉼표/마침표를 전부 구분자로 써서 잘게 쪼갭니다.
   // (문자가 "구형(L9)380볼트.분전반,내일8시도착.OO리820-1번지.다온스틸텍.김신경이사"처럼 마침표/쉼표로만 구분되는 경우가 많습니다)
+  // "행사명 : 한성백제문화제", "담당자: 홍길동"처럼 "항목 : 내용" 형식으로 온 줄은 줄 단위로 먼저 처리합니다.
+  // (쉼표로 잘게 쪼개면 "필요인력 : 발전기 온/오프 진행, 중간 기름체크" 뒷부분이 업체명·주소로 잘못 들어가던 문제)
+  const labeledNotes = [];
+  const labeled = {customer:'', site:'', address:'', manager:'', phone:'', arrival:''};
+  text = String(text).split(/\n/).filter(line=>{
+    const lm = line.match(/^\s*[*•\-]?\s*([가-힣A-Za-z ]{2,8}?)\s*[:：]\s*(.+)$/);
+    if(!lm) return true;
+    const key = lm[1].replace(/\s+/g,''); const val = lm[2].trim();
+    if(/^(업체명?|업체|거래처명?|회사명?|상호|발주처|고객사?)$/.test(key)){ labeled.customer = val; return false; }
+    if(/^(행사명|현장명?|공사명|행사|현장위치)$/.test(key)){ labeled.site = val; return false; }
+    if(/^(주소|위치|장소|현장주소|설치장소|설치위치)$/.test(key)){ labeled.address = val; return false; }
+    if(/^(담당자?|담당자명|성함|이름|현장담당자?)$/.test(key)){
+      const ph = val.match(/01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/);
+      if(ph){ labeled.phone = ph[0].replace(/[^0-9]/g,''); labeled.manager = val.replace(ph[0],'').trim(); }
+      else labeled.manager = val;
+      return false;
+    }
+    if(/^(연락처|전화|전화번호|휴대폰|핸드폰|번호)$/.test(key)){ const ph = val.match(/01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/); if(ph){ labeled.phone = ph[0].replace(/[^0-9]/g,''); return false; } return true; }
+    if(/^(도착|도착일시?|도착시간|투입|투입일시?|일시|날짜|날자|행사날짜|행사날자|행사일시?|기간|행사기간|사용기간|출고일)$/.test(key)){
+      labeled.arrival = labeled.arrival ? labeled.arrival+' '+val : val;
+      if(/~|부터|까지/.test(val)) labeledNotes.push(`${lm[1].trim()}: ${val}`);
+      return false;
+    }
+    if(/^(전압|용량|발전기|필요발전기|규격)$/.test(key)) return true; // 아래 일반 처리(전압·용량 인식)로 넘깁니다
+    // 운영시간·필요인력·비고 등 나머지 항목은 통째로 비고로 남깁니다.
+    labeledNotes.push(`${lm[1].trim()}: ${val}`);
+    return false;
+  }).join('\n');
   const DOT='\u2027', COMMA='\u201A';
   let protectedText = text.replace(/(\d)\.(\d)/g, '$1'+DOT+'$2');
   protectedText = protectedText.replace(/\([^)\n]*\)/g, m=>m.replace(/\./g,DOT).replace(/,/g,COMMA));
@@ -9663,15 +9764,25 @@ function parseSmsOrderText(text, baseTs){
   const requestRe = /(주세요|바랍니다|부탁|해서|같이|요$)/;
   // 날짜/시간이 들어있는 조각 ("27일", "10월 1일(목)", "오후5시투입", "내일 9시 도착")
   const arrivalRe = /도착|상차|투입|오늘|내일|모레|\d{1,2}\s*월\s*\d{1,2}\s*일|^\d{1,2}\s*일\s*(\([^)]*\))?$|^(오전|오후|아침|저녁)?\s*\d{1,2}\s*시/;
-  const titleAlt = '지점장|본부장|소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저|매니져|제작팀|팀';
+  const titleAlt = '협회장|부회장|회장|대표이사|현장소장|공장장|지점장|본부장|소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|담당자|담당|계장|국장|원장|매니저|매니져|제작팀|총무|감독|주무관|선생님|교수|상무|전무|위원장|사무장|조장|선임|책임|팀';
   // "정현산업종봉섭대표" → 업체 "정현산업" + 담당자 "종봉섭대표", "씨앤오 정윤석부장님" → "씨앤오" + "정윤석부장님"
   const personRe = new RegExp(`^(.*?)([가-힣]{2,3})?\\s*(${titleAlt})\\s*(님)?$`);
   const splitCompanyPerson = s=>{
     const m = s.match(personRe);
     if(!m) return null;
-    return {company: m[1].trim(), person: `${m[2]||''}${m[3]}${m[4]||''}`};
+    let company = m[1].trim(), person = `${m[2]||''}${m[3]}${m[4]||''}`;
+    if(company.length===1){ person = company+person; company=''; } // "협회장"이 "협"+"회장"으로 쪼개지지 않게
+    else if(!m[2]){ const sm = company.match(/^(.*\S)\s+([가-힣])$/); if(sm){ company = sm[1].trim(); person = sm[2]+person; } } // "세원산업 정대리" → 정대리
+    return {company, person};
   };
 
+  // 띄어쓰기 없이 "대전유성한밭대학교", "대전자운대"처럼 지역명으로 시작하는 조각은 번지가 없어도 주소로 봅니다.
+  const regionRe = /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|충청|전라|경상|수원|성남|용인|고양|화성|평택|안산|안양|김포|파주|시흥|광명|하남|이천|오산|의정부|남양주|구리|포천|양주|동두천|연천|천안|아산|청주|충주|제천|전주|군산|익산|포항|구미|경주|창원|김해|진주|원주|춘천|강릉|당진|서산|논산|공주|보령|여주|양평|가평|안성|과천|군포|의왕|부천|인제|홍천|평창|정선|영월|태안|예산|홍성|음성|진천|괴산|부안|김제|정읍|목포|여수|순천|광양|거제|통영|양산|울주|기장|청라|송도|영종|판교|동탄|위례)/;
+  const companyRe = /(산업|전기|전력|건설|엔지니어링|ENC|E&C|이엔씨|엔씨|㈜|\(주\)|기업|상사|테크|개발|종합|공사|기술|시스템|에너지|이벤트|기획|컴퍼니|코리아|글로벌|통신|설비|중공업|스틸|철강|플랜트)/i;
+  const siteRe = /(학교|대학교|운동장|공원|부대|정수장|센터|병원|아파트|현장|공장|체육관|야영장|캠핑장|행사장|주차장|청사|구청|시청|군청|교회|성당|축제|광장|터미널|역사|물류|단지|본부|부지|휴게소|해수욕장|경기장)/;
+  // 상차·차량·연락 관련 안내("차량인적사항오늘통보", "인적사항통보", "지게차는 해성에서")는 비고로 보냅니다.
+  // ("오늘"이 들어있어서 도착일이 오늘로 잘못 잡히던 문제)
+  const memoRe = /(통보|인적사항|연락\s*(바람|주세요|요망|부탁)|사전연락|출입|신분증|차량번호|요망|필수|주의|지게차|하차|크레인)/;
   const leftover = []; // {text, pos}
   const noteParts = [];
   const arrivalParts = [];
@@ -9679,6 +9790,7 @@ function parseSmsOrderText(text, baseTs){
   let isLoadDateHint = false; // "상차"라고만 되어 있으면(도착 언급 없이) 그 날짜 자체가 상차일이라 -1일 계산을 안 합니다.
 
   const fillerRe = /\s*(입니다|이에요|예요|이요|요)\s*$/;
+  let lastAddrPos = -99, instPiece = '';
   // 한 조각 처리. 날짜·주소·전화번호가 띄어쓰기 없이 붙은 조각("30일10시도착천안동남구…입니다01096861959")은
   // 알아본 부분을 떼어내고 남은 부분을 다시 이 함수로 처리합니다.
   const processPiece = (piece, pos)=>{
@@ -9696,10 +9808,12 @@ function parseSmsOrderText(text, baseTs){
     if(capacityRe.test(l)){
       const um0 = l.match(usageDaysRe);
       if(um0) result.usageDays = um0[1] || um0[2];
+      // "150키로 380볼트 오늘 지금 바로 출고"처럼 용량 줄에 날짜·도착 정보가 같이 있으면 그 부분도 읽습니다.
+      if(/(오늘|내일|모레|지금|도착|투입|\d{1,2}\s*월\s*\d{1,2}\s*일)/.test(l)) arrivalParts.push(l.replace(/\d+(\.\d+)?\s*(키로|kw)/ig,' '));
       return;
     }
     if(l.startsWith('*')){ noteParts.push(l.slice(1).trim()); return; }
-    if(l.includes('철수') || l.includes('회수')){ noteParts.push(l); return; } // "10월 11일(일) 철수"는 출고일이 아니라 참고사항
+    if((l.includes('철수') || l.includes('회수')) && !splitCompanyPerson(l.replace(phoneRe,'').trim())){ noteParts.push(l); return; } // "10월 11일(일) 철수"는 출고일이 아니라 참고사항 (단, "김철수소장님" 같은 이름은 제외)
     const um = l.match(usageDaysRe);
     if(um){ result.usageDays = um[1] || um[2]; return; }
     const mm = l.match(usageMonthRe);
@@ -9712,10 +9826,14 @@ function parseSmsOrderText(text, baseTs){
       if(rest){
         const sp = splitCompanyPerson(rest);
         if(sp){ result.manager = sp.person; if(sp.company) customerFromManager = sp.company; }
+        else if(/^[가-힣]{2,4}$/.test(rest) && !companyRe.test(rest) && !regionRe.test(rest) && !siteRe.test(rest) && !/(도착|투입|상차|오늘|내일|모레|입니다)/.test(rest)){
+          result.manager = rest; // 직급 없이 이름만 붙은 경우("이승민01083288104")
+        }
         else { managerPos = -1; processPiece(rest, pos); } // 담당자가 아니면(날짜·주소 등) 다시 처리
       }
       return;
     }
+    if(memoRe.test(l) && !/도착|투입/.test(l)){ noteParts.push(l); return; }
     // "30일10시도착천안동남구…"처럼 도착/투입/상차 뒤에 다른 내용이 붙어 있으면 잘라서 따로 처리합니다.
     const am = l.match(/^(.*?(도착|투입|상차))\s*(\S.*)$/);
     if(am && !/^(예정|요망|바랍니다|해주세요|부탁)/.test(am[3])){
@@ -9723,7 +9841,12 @@ function parseSmsOrderText(text, baseTs){
       processPiece(am[3], pos);
       return;
     }
-    if(arrivalRe.test(l)){
+    // "7일오전중"처럼 도착·투입이라는 말 없이 날짜+시간대만 있는 조각은, 다른 곳에 도착 날짜가 따로 있으면
+    // 상차(출발) 안내로 보고 비고에 남깁니다. (예: "11톤.7일오전중.…8일10시도착")
+    if(/^\d{1,2}\s*일\s*(\([^)]*\))?\s*(오전|오후|아침|저녁)\s*(중|\d{1,2}\s*시)?$/.test(l) && /\d\s*일[^\n]{0,12}(도착|투입)/.test(text)){
+      noteParts.push('상차 '+l); return;
+    }
+    if(arrivalRe.test(l) || /^\d{1,2}\s*\/\s*\d{1,2}(\s*\/|\s|$)/.test(l)){
       arrivalParts.push(l);
       if(l.includes('상차') && !l.includes('도착')) isLoadDateHint = true;
       if(l.includes('~')) noteParts.push(l); // "10월 5일(월)~ 10월24일" 같은 기간은 비고에도 남겨둡니다
@@ -9733,7 +9856,16 @@ function parseSmsOrderText(text, baseTs){
     if(qtyOnlyRe.test(l) || (supplyRe.test(l) && l.length<40)){ noteParts.push(l); return; }
     // "2시간대기후철수"처럼 대기시간을 설명하는 조각은 거래처명이 아니라 비고로 보내야 합니다.
     if(/\d+\s*시간.*(대기|후|뒤)/.test(l)){ noteParts.push(l); return; }
-    if(addressRe.test(l)){ result.address = result.address ? result.address+' '+l : l; return; }
+    // 앞 조각이 "…고음달로"처럼 도로명으로 끝나고 이번 조각이 번지로 시작하면("152담현스틸") 번지는 주소에 붙이고 나머지는 현장명으로 봅니다.
+    if(result.address && lastAddrPos===pos-1 && /(로|길|리|동)$/.test(result.address)){
+      const bm = l.match(/^(\d+(?:-\d+)?)(\s*번지)?\s*(.*)$/);
+      if(bm){ result.address += ' '+bm[1]+(bm[2]||''); lastAddrPos = pos; if(bm[3]) processPiece(bm[3], pos); return; }
+    }
+    { const spx = splitCompanyPerson(l); if(spx && spx.person.length>=3 && !/\d/.test(l) && l.length<=20){ leftover.push({text:l.replace(fillerRe,'').trim(), pos}); return; } }
+    if(addressRe.test(l) || (regionRe.test(l) && l.length>=3 && !companyRe.test(l))){
+      if(!addressRe.test(l) && siteRe.test(l) && !instPiece) instPiece = l; // "대전유성한밭대학교"처럼 기관 자체가 현장(=거래처)인 경우
+      result.address = result.address ? result.address+' '+l : l; lastAddrPos = pos; return;
+    }
     if(vm) return; // 전압만 있고 다른 정보가 없는 조각(예: "380볼트")은 업체명 후보에서 제외합니다.
     if(requestRe.test(l) && l.length>=8){ noteParts.push(l); return; } // "군산거하고 같이 한차로 해주세요"
     l = l.replace(fillerRe,'').trim();
@@ -9761,18 +9893,31 @@ function parseSmsOrderText(text, baseTs){
   if(customerFromManager){
     result.customer = customerFromManager;
   } else if(leftover.length){
+    const notSite = x=> !siteRe.test(x.text) || companyRe.test(x.text);
     if(managerPos>=0){
-      for(let i=leftover.length-1;i>=0;i--){ if(leftover[i].pos < managerPos){ custIdx = i; break; } }
+      for(let i=leftover.length-1;i>=0;i--){ if(leftover[i].pos < managerPos && notSite(leftover[i])){ custIdx = i; break; } }
+      if(custIdx<0) for(let i=leftover.length-1;i>=0;i--){ if(leftover[i].pos < managerPos){ custIdx = i; break; } }
     }
-    if(custIdx<0) custIdx = 0;
+    if(custIdx<0){ custIdx = leftover.findIndex(notSite); if(custIdx<0) custIdx = 0; }
     result.customer = leftover[custIdx].text;
+  }
+  // 업체명 후보가 "대운동장"처럼 현장 이름뿐이고, 주소가 "대전유성한밭대학교"처럼 기관이면 기관을 거래처로, 현장 이름은 주소 뒤로 보냅니다.
+  if(!customerFromManager && instPiece && result.customer && siteRe.test(result.customer) && !companyRe.test(result.customer)){
+    result.address = result.address + ' ' + result.customer;
+    result.customer = instPiece;
   }
   // 나머지 조각(현장명 등)은 주소 뒤에 괄호로 붙여둡니다.
   const siteParts = leftover.filter((x,i)=>i!==custIdx).map(x=>x.text);
   if(siteParts.length){
     result.address = result.address ? `${result.address} (${siteParts.join(' ')})` : siteParts.join(' ');
   }
-  result.note = noteParts.join(', ');
+  if(labeled.customer) result.customer = labeled.customer;
+  if(labeled.manager) result.manager = labeled.manager;
+  if(labeled.phone) result.phone = labeled.phone;
+  if(labeled.address) result.address = labeled.address + (result.address && !result.address.includes(labeled.address) ? ` (${result.address})` : '');
+  if(labeled.site) result.address = result.address ? `${result.address} (${labeled.site})` : labeled.site;
+  if(labeled.arrival) arrivalParts.unshift(labeled.arrival);
+  result.note = [...noteParts, ...labeledNotes].join(', ');
 
   // 도착 시간/날짜 파싱 (여러 조각에 나뉘어 있어도 합쳐서 봅니다. 예: "27일" + "오후5시투입")
   const arrivalLine = arrivalParts.join(' ');
@@ -9782,14 +9927,20 @@ function parseSmsOrderText(text, baseTs){
       const tm = arrivalLine.match(/(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시\s*(반|(\d{1,2})\s*분)?/);
       if(tm){
         let ampm = tm[1]==='아침' ? '오전' : ((tm[1]==='저녁'||tm[1]==='밤') ? '오후' : tm[1]);
-        const hour = Number(tm[2]);
+        let hour = Number(tm[2]);
+        if(hour>12 && hour<=24){ ampm = '오후'; hour -= 12; } // "14시" → "오후 2시"
         if(!ampm) ampm = (hour>=7 && hour<=12) ? '오전' : '오후';
         const minute = tm[3]==='반' ? 30 : (tm[4]? Number(tm[4]) : 0);
         result.arriveTime = minute>0 ? `${ampm} ${hour}시 ${minute}분` : `${ampm} ${hour}시`;
+        const after = arrivalLine.slice(tm.index + tm[0].length);
+        if(/^\s*(전|이전|까지)/.test(after)) result.arriveTime += ' 전'; // "오후4시전도착"
+        else if(/^\s*(이후|후|부터)/.test(after)) result.arriveTime += ' 이후';
       } else if(/오전\s*중/.test(arrivalLine)) result.arriveTime = '오전중';
       else if(/오후\s*중/.test(arrivalLine)) result.arriveTime = '오후중';
     }
-    const md = arrivalLine.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    let md = arrivalLine.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+    // "9/11", "10/8(목)" 형식 날짜도 월/일로 읽습니다.
+    if(!md){ const sm = arrivalLine.match(/(?:^|[^\d])(\d{1,2})\s*\/\s*(\d{1,2})(?!\d)/); if(sm && Number(sm[1])>=1 && Number(sm[1])<=12 && Number(sm[2])>=1 && Number(sm[2])<=31) md = sm; }
     if(arrivalLine.includes('오늘') || arrivalLine.includes('지금')) result.outDate = toLocalDateStr(baseDay);
     else if(arrivalLine.includes('모레')){ const d = new Date(baseDay); d.setDate(d.getDate()+2); result.outDate = toLocalDateStr(d); }
     else if(arrivalLine.includes('내일')){ const d = new Date(baseDay); d.setDate(d.getDate()+1); result.outDate = toLocalDateStr(d); }
@@ -10820,7 +10971,7 @@ function openOutModal(id, reservationId){
             ${g.hoursKnown? `<input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;background:var(--surface-2);color:var(--ink-soft);">` : ''}
           </div>
           <details class="info-toggle" style="margin-top:4px;"><summary></summary><p class="muted" style="font-size:12px;">다른 발전기로 바꾸면 옆 누적 사용시간이 그 발전기의 현재 누적시간으로 자동으로 바뀝니다. 이미 입고중이고 다른 곳에 예약되지 않은 발전기만 고를 수 있습니다. 누적시간은 이미 등록된 값이라 여기서 수정할 수 없고, 틀렸으면 [정비관리 → 직접수정]에서 먼저 바로잡아야 합니다.</p></details>
-        </div></div>` : (g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="background:var(--surface-2);color:var(--ink-soft);"></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</div></div></div>`)}
+        </div></div>` : (g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="background:var(--surface-2);color:var(--ink-soft);">${g.hoursUnconfirmed? `<div class="hint" style="color:var(--danger);font-weight:700;font-size:11.5px;">⚠️ 지난 입고 때 누적시간 미확인 - 실제와 다를 수 있음</div>`:''}</div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</div></div></div>`)}
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="f-outdate" value="${(res&&(res.outDate||res.plannedOutDate))||todayStr()}" onchange="syncReturnDateToUsageDays()">
         </div></div>
@@ -11402,7 +11553,7 @@ function openBulkInModal(){
     return `
     <div class="field-row" style="align-items:flex-end;">
       <div style="flex:0 0 auto;min-width:110px;font-size:13px;font-weight:700;padding-bottom:8px;">${g.id}${g.model? ` <span class="muted" style="font-weight:400;font-size:11.5px;">· ${escR(g.model)}</span>`:''}<div class="muted" style="font-size:11px;font-weight:400;">${escR(rt.customer||'-')}</div></div>
-      <div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">입고시 누적 사용시간(h)</label><input type="number" id="fbi-hours-${g.id}" value="${suggested}" min="${rt.startHours||0}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(rt.startHours||0).toLocaleString()}h</div></div>
+      <div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">입고시 누적 사용시간(h)</label><input type="number" id="fbi-hours-${g.id}" value="${suggested}" min="${rt.startHours||0}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(rt.startHours||0).toLocaleString()}h${g.hoursUnconfirmed? ' (⚠️ 실제와 다를 수 있음)':''}</div><label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;margin-top:4px;cursor:pointer;"><input type="checkbox" id="fbi-hours-unknown-${g.id}" onchange="toggleEndHoursUnknown('fbi-hours-${g.id}', this.checked)"> 누적시간 모름</label></div>
     </div>`;
   }).join('');
   document.getElementById('modal-root').innerHTML = `
@@ -11465,14 +11616,16 @@ async function submitBulkIn(){
   for(const g of gens){
     if(!g.hoursKnown) continue;
     const el = document.getElementById(`fbi-hours-${g.id}`);
-    const v = el ? Number(el.value) : NaN;
-    if(isNaN(v) || v < (g.rental.startHours||0)){
+    const unkEl = document.getElementById(`fbi-hours-unknown-${g.id}`);
+    if(unkEl && unkEl.checked){ hoursMap[g.id] = null; continue; } // 계기판 확인 못함
+    const v = (el && el.value!=='') ? Number(el.value) : NaN;
+    if(isNaN(v) || (v < (g.rental.startHours||0) && !g.hoursUnconfirmed)){
       errEl.textContent = `${g.id}의 누적 사용시간을 확인해주세요. (출고시 누적시간 ${(g.rental.startHours||0).toLocaleString()}h보다 작을 수 없습니다)`;
       errEl.style.display='block'; return;
     }
     // 하루 24시간을 초과하는 물리적으로 불가능한 사용시간 감지 (데이터 입력 실수 방지)
     const rt = g.rental;
-    if(rt.outDate && inDate){
+    if(rt.outDate && inDate && !g.hoursUnconfirmed){
       const usedH = v - (rt.startHours||0);
       const outD = new Date(rt.outDate+'T00:00:00');
       const inD = new Date(inDate+'T00:00:00');
@@ -11490,16 +11643,17 @@ async function submitBulkIn(){
     const endHours = hoursMap[g.id]!=null ? hoursMap[g.id] : null;
     DB.rentals.push({
       id: uid(), genId: g.id, customer: rt.customer, manager: rt.manager, phone: rt.phone,
-      site: rt.site, address: rt.address, supplies: rt.supplies, suppliesRecovered: !!rt.supplies, suppliesNote: '', fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: rt.note, smsOrder: rt.smsOrder||null,
+      site: rt.site, address: rt.address, supplies: rt.supplies, suppliesRecovered: !!rt.supplies, suppliesNote: '', fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: [rt.note, (g.hoursKnown && endHours==null) ? '입고시 누적시간 미확인' : ''].filter(Boolean).join(' / '), smsOrder: rt.smsOrder||null,
       outDate: rt.outDate, inDate, startHours: rt.startHours, endHours,
-      usedHours: endHours!=null ? endHours - (rt.startHours||0) : null,
+      usedHours: (endHours!=null && endHours >= (rt.startHours||0)) ? endHours - (rt.startHours||0) : null,
       voltage: g.voltage||rt.voltage||'', outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null,
       measuredFuelHeightCm: null, remainingFuelLiters: null,
       paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null
     });
     if(g.hoursKnown && endHours!=null){
       g.hours = endHours;
-    }
+      g.hoursUnconfirmed = false;
+    } else if(g.hoursKnown) g.hoursUnconfirmed = true;
     // 부자재 재고 복원 (개별 입고 처리와 동일하게, 회수 확인된 건은 재고를 다시 채워줍니다)
     if(g.rental && g.rental.suppliesItems && g.rental.suppliesItems.length){
       DB.suppliesStock = DB.suppliesStock || {};
@@ -12221,7 +12375,8 @@ function openInModal(id, isTransfer){
         ${g.hoursKnown? `<div class="field f-md"><div class="out-card">
           <label>입고시(반납) 누적 사용시간(h)</label>
           <input type="number" id="f-endhours" placeholder="${isTransfer? '모르면 비워두세요' : `예: ${suggested}`}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
-          <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
+          <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h${g.hoursUnconfirmed? ' (⚠️ 실제와 다를 수 있음 - 이전 누적시간 미확인)':''}</div>
+          ${isTransfer? '' : `<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;font-weight:700;cursor:pointer;"><input type="checkbox" id="f-endhours-unknown" onchange="toggleEndHoursUnknown('f-endhours', this.checked)" style="width:18px;height:18px;"> 누적시간 모름 (계기판 확인 못함)</label>`}
         </div></div>` : `<div class="field f-md"><div class="out-card">
           <label>누적 사용시간</label>
           <div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</div>
@@ -12376,11 +12531,20 @@ function setSuppliesRecovered(recovered){
     applySuppliesNo();
   }
 }
+// "누적시간 모름"을 체크하면 누적시간 칸을 비우고 잠급니다.
+function toggleEndHoursUnknown(inputId, checked){
+  const el = document.getElementById(inputId);
+  if(!el) return;
+  if(checked){ el.value = ''; el.disabled = true; el.placeholder = '미확인 (다음 확인 때 입력)'; }
+  else { el.disabled = false; el.placeholder = ''; }
+}
 async function submitIn(id, isTransfer){
   const g = findGen(id);
   const inDate = document.getElementById('f-indate').value;
   const endHoursEl = document.getElementById('f-endhours');
-  const endHours = endHoursEl ? (endHoursEl.value==='' ? null : Number(endHoursEl.value)) : null;
+  const hoursUnknownEl = document.getElementById('f-endhours-unknown');
+  const hoursUnknown = !!(hoursUnknownEl && hoursUnknownEl.checked);
+  const endHours = (endHoursEl && !hoursUnknown) ? (endHoursEl.value==='' ? null : Number(endHoursEl.value)) : null;
   const voltage = document.getElementById('f-in-voltage').value.trim();
   const oldVoltageForLog = g ? (g.voltage||'') : '';
   const supRecoveredEl = document.getElementById('f-sup-recovered');
@@ -12402,15 +12566,15 @@ async function submitIn(id, isTransfer){
   }
   // 누적시간 확인불가은 입력을 생략할 수 있습니다. (설정 → 발전기 모델 설정에서 지정)
   // 현장이동(공장 미경유)은 계기판을 직접 볼 수 없는 경우가 많아, 누적시간 입력을 필수로 강제하지 않습니다.
-  if(!inDate || (g.hoursKnown && !isTransfer && (endHours===null || isNaN(endHours) || endHours < g.rental.startHours))){
-    errEl.textContent = '입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다)';
+  if(!inDate || (g.hoursKnown && !isTransfer && !hoursUnknown && (endHours===null || isNaN(endHours) || (endHours < g.rental.startHours && !g.hoursUnconfirmed)))){
+    errEl.textContent = '입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다. 계기판을 못 봤으면 "누적시간 모름"을 체크하세요)';
     errEl.style.display='block';
     if(g.hoursKnown && !isTransfer && (endHours===null || isNaN(endHours)) && isWithinVoiceAlertHours()){
       speakText('누적 사용시간을 입력하지 않으면 입고 처리가 안 됩니다. 확인해주세요.');
     }
     return;
   }
-  if(isTransfer && endHours!==null && !isNaN(endHours) && endHours < g.rental.startHours){
+  if(isTransfer && endHours!==null && !isNaN(endHours) && endHours < g.rental.startHours && !g.hoursUnconfirmed){
     errEl.textContent = '입력한 누적시간이 출고시 누적시간보다 작습니다. 확인 후 다시 입력해주세요.';
     errEl.style.display='block'; return;
   }
@@ -12437,7 +12601,7 @@ async function submitIn(id, isTransfer){
     const days = Math.max(1, Math.round((inD-outD)/86400000));
     const avgDaily = usedH/days;
     if(avgDaily > 24){
-      const recentTransferNote = (g.rental.note && g.rental.note.includes('현장이동')) || (g.rental.note && g.rental.note.includes('누적시간 미확인'));
+      const recentTransferNote = g.hoursUnconfirmed || (g.rental.note && g.rental.note.includes('현장이동')) || (g.rental.note && g.rental.note.includes('누적시간 미확인'));
       openConfirmModal(
         `입력하신 누적시간 차이(${usedH.toLocaleString()}h)를 임대일수(${days}일)로 나누면 하루 평균 ${avgDaily.toFixed(1)}시간이 됩니다. 하루는 24시간을 넘을 수 없습니다.\n\n${recentTransferNote? '이 발전기는 최근 현장이동으로 누적시간을 한동안 확인 못한 이력이 있어서, 그 구간 사용량이 이번에 한꺼번에 잡혀 정상적으로 큰 값이 나올 수 있습니다.\n\n' : ''}오타가 아니라 실제로 확인하신 숫자가 맞다면 계속 진행하세요.`,
         function(){ submitInFinish(id, isTransfer, {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm}); },
@@ -12460,14 +12624,14 @@ async function submitInFinish(id, isTransfer, vals){
   }
   const fuelExhaustNote = (remainingFuelLiters===0) ? '출고시 연료 모두 소진되어 입고' : '';
   const rt = g.rental;
-  const transferNote = (isTransfer && g.hoursKnown && endHours===null) ? '현장이동(공장 미경유)으로 종료 - 반납시 누적시간 미확인' : (isTransfer ? '현장이동(공장 미경유)으로 종료' : '');
+  const transferNote = (isTransfer && g.hoursKnown && endHours===null) ? '현장이동(공장 미경유)으로 종료 - 반납시 누적시간 미확인' : (isTransfer ? '현장이동(공장 미경유)으로 종료' : ((g.hoursKnown && endHours===null) ? '입고시 누적시간 미확인' : ''));
   const combinedNote = [rt.note, fuelExhaustNote, transferNote].filter(Boolean).join(' / ');
   const newRentalId = uid();
   DB.rentals.push({
     id: newRentalId, genId: g.id, customer: rt.customer, manager: rt.manager, phone: rt.phone,
     site: rt.site, address: rt.address, supplies: rt.supplies, suppliesItems: rt.suppliesItems||[], suppliesCustom: rt.suppliesCustom||'', suppliesRecovered, suppliesNote, fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: combinedNote,
     outDate: rt.outDate, inDate, startHours: rt.startHours, endHours,
-    usedHours: endHours!=null ? endHours - rt.startHours : null,
+    usedHours: (endHours!=null && endHours >= (rt.startHours||0)) ? endHours - rt.startHours : null,
     voltage, outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null, inProcessedAt: nowDateTimeStr(),
     measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
     paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null
@@ -12475,6 +12639,10 @@ async function submitInFinish(id, isTransfer, vals){
   // 누적시간 확인불가(설정에서 지정)은 여기서 hoursKnown을 절대 자동으로 켜지 않습니다.
   if(g.hoursKnown && endHours!==null){
     g.hours = endHours;
+    g.hoursUnconfirmed = false;
+  } else if(g.hoursKnown){
+    // 계기판을 못 보고 입고했으면, 다음에 실제 숫자를 확인할 때까지 "누적시간 미확인" 상태로 표시해둡니다.
+    g.hoursUnconfirmed = true;
   }
   g.status = 'in';
   g.voltage = voltage;
