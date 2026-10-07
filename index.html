@@ -1432,11 +1432,8 @@ async function submitQmInProcess(id){
       if(Array.isArray(rrList2) && rrList2.length>0){
         const autoMatched2 = rrList2.filter(rr=>{
           if(!rr) return false;
-          const parsed = parseReturnRequestText(rr.text);
-          if(parsed.phone && r.phone && parsed.phone===r.phone.replace(/[^0-9]/g,'')) return true;
-          if(parsed.address && r.address && (r.address.includes(parsed.address) || parsed.address.includes(r.address))) return true;
-          if(parsed.customer && r.customer && (r.customer.includes(parsed.customer) || parsed.customer.includes(r.customer))) return true;
-          return false;
+          const parsed = parseReturnRequestText(rr.text, rr.createdAtTs);
+          return returnReqMatchesRental(parsed, r, g.id);
         });
         if(autoMatched2.length>0){
           const autoMatchedIds2 = new Set(autoMatched2.map(rr=>rr.id));
@@ -1628,8 +1625,13 @@ async function qmRefreshReservationList(){
         ${auto? `<div style="font-size:11px;font-weight:800;color:#8A6D00;background:#FFF8E1;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;">🤖 문자 자동인식${auto.learned&&auto.learned.length? ' + 지난 거래기록 참고':''} (사무실 확인 전)</div>` : ''}
         ${r.smsQtyTotal>1? `<div style="font-size:11px;font-weight:800;color:#1565C0;background:#E8F0FE;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;margin-left:4px;">📦 ${r.smsQtyTotal}대 중 ${r.smsQtyIndex}번째</div>` : ''}
         <div style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(dCustomer)}</div>
-        <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${(r.outDate||r.plannedOutDate)? fmtDateKR(r.outDate||r.plannedOutDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
-        ${(r.outDate||r.plannedOutDate)? arriveCountdownHtml(r.outDate||r.plannedOutDate) : ''}
+        ${(()=>{
+          // 사무실 확인 전 문자오더는 예약일이 "문자 붙여넣은 날"로 임시로 들어가 있어서, 문자에서 읽은 도착일을 대신 보여줍니다.
+          const unconfirmed = !!(auto && !r.arriveTime);
+          const dDate = unconfirmed ? (auto.outDate||'') : (r.outDate||r.plannedOutDate||'');
+          const dTime = unconfirmed ? (auto.arriveTime||'') : (r.arriveTime||'');
+          return `<div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${dDate? fmtDateKR(dDate) : '미정'}${dTime? ` (${escR(dTime)})`:''}${unconfirmed? ' <span style="color:#8A6D00;">(문자에서 읽음)</span>':''}</div>${dDate? arriveCountdownHtml(dDate) : ''}`;
+        })()}
         <div style="font-size:13px;color:#333;margin-top:6px;">
           ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
@@ -1687,11 +1689,12 @@ async function qmRefreshReturnRequestList(){
     // 사무실 화면과 똑같은 기준(연락처 → 주소 → 거래처명 순)으로 어느 발전기인지 추정해봅니다.
     const outGens = gens.filter(g=>g && g.status==='out' && g.rental);
     wrap.innerHTML = list.map((r,i)=>{
-      const parsed = parseReturnRequestText(r.text);
+      const parsed = parseReturnRequestText(r.text, r.createdAtTs);
       let matched = null;
-      if(parsed.phone) matched = outGens.find(g=>g.rental.phone && g.rental.phone.replace(/[^0-9]/g,'')===parsed.phone);
-      if(!matched && parsed.address) matched = outGens.find(g=>g.rental.address && (g.rental.address.includes(parsed.address) || parsed.address.includes(g.rental.address)));
-      if(!matched && parsed.customer) matched = outGens.find(g=>g.rental.customer && (g.rental.customer.includes(parsed.customer) || parsed.customer.includes(g.rental.customer)));
+      if(parsed.genId) matched = outGens.find(g=>g.id===parsed.genId) || null;
+      if(!matched && parsed.phone) matched = outGens.find(g=>rrPhoneMatch(parsed.phone, g.rental.phone));
+      if(!matched && parsed.address) matched = outGens.find(g=>rrAddrMatch(parsed.address, g.rental.address));
+      if(!matched && parsed.customer) matched = outGens.find(g=>rrCustMatch(parsed.customer, g.rental.customer));
       const matchHtml = matched
         ? `<div style="font-size:13px;font-weight:800;color:#1E7B45;background:#E7F5EC;display:inline-block;padding:3px 10px;border-radius:8px;margin-top:6px;">✅ [${escR(matched.id)}] ${escR(matched.model||'')} 로 추정됨</div>`
         : `<div style="font-size:13px;font-weight:800;color:#B23A34;background:#FBEAEA;display:inline-block;padding:3px 10px;border-radius:8px;margin-top:6px;">🅾 어느 발전기인지 자동으로 못 찾았어요, 문자 내용 보고 직접 확인해주세요</div>`;
@@ -3913,6 +3916,34 @@ function historyUsageDaysText(r){
   if(r.status==='진행중' && r.outDate){ const d = daysSinceDate(r.outDate)+1; return `${d}일째 사용중${plan? ` / ${plan}`:''}`; }
   return plan || '미정';
 }
+// ===== 누적시간 미확인 임대 표시 =====
+// 현장이동(공장 미경유)이나 "누적시간 모름"으로 끝난 임대는 사용시간을 알 수 없으므로 0h 대신 "미확인"으로 보여주고,
+// 그 바로 다음 임대의 사용시간에는 앞 현장에서 쓴 시간이 합쳐져 있다는 것을 표시합니다.
+function prevRentalOf(r){
+  if(!r) return null;
+  const key = x=> (x.inDate||'') + ' ' + (x.inProcessedAt||'');
+  return (DB.rentals||[]).filter(x=>x && x.genId===r.genId && x.id!==r.id && x.inDate && (x.inDate||'') <= (r.outDate||'') && (x.outDate||'') <= (r.outDate||''))
+    .sort((a,b)=>key(b).localeCompare(key(a)))[0] || null;
+}
+function rentalHoursUnknown(r){ return !!(r && (r.endHours==null || r.usedHours==null)); }
+function rentalHoursUnknownLabel(r){ return /현장이동/.test((r&&r.note)||'') ? '미확인(현장이동)' : '미확인'; }
+function rentalIncludesPrevUsage(r){
+  if(!r || rentalHoursUnknown(r)) return null;
+  const p = prevRentalOf(r);
+  return (p && rentalHoursUnknown(p)) ? p : null;
+}
+function rentalUsedHoursHtml(r){
+  const g = findGen(r.genId);
+  if(g && !g.hoursKnown && rentalHoursUnknown(r)) return '<span class="muted">-</span>';
+  if(rentalHoursUnknown(r)) return `<span style="color:var(--warn);font-weight:700;white-space:nowrap;">⏱ ${rentalHoursUnknownLabel(r)}</span>`;
+  const p = rentalIncludesPrevUsage(r);
+  return `${(r.usedHours||0).toLocaleString()}h${p? `<div style="font-size:10.5px;color:var(--warn);font-weight:700;line-height:1.3;">⚠️ 이전 현장(${escR(p.customer||'거래처 미기재')}) 사용분 포함</div>`:''}`;
+}
+function rentalUsedHoursText(r){
+  if(rentalHoursUnknown(r)) return rentalHoursUnknownLabel(r);
+  const p = rentalIncludesPrevUsage(r);
+  return `${(r.usedHours||0).toLocaleString()}h${p? ` (이전 현장 ${p.customer||''} 사용분 포함)`:''}`;
+}
 function rentalDays(r){
   if(!r || !r.outDate || !r.inDate) return null;
   const out = new Date(r.outDate+'T00:00:00');
@@ -4466,8 +4497,8 @@ function renderDashboard(){
       <td class="muted" style="font-size:12px;">${daysUsed1? `${daysUsed1}일` : '-'}</td>
       <td class="muted" style="font-size:12px;">${r.startHours!=null? r.startHours.toLocaleString()+'h':'-'}</td>
       <td class="muted" style="font-size:12px;">${r.endHours!=null? r.endHours.toLocaleString()+'h':'-'}</td>
-      <td style="font-size:12px;font-weight:700;">${(r.usedHours||0).toLocaleString()}h</td>
-      <td style="font-size:12px;">${daysUsed1? `${Math.round((r.usedHours||0)/daysUsed1*10)/10}h/일` : '-'}</td>
+      <td style="font-size:12px;font-weight:700;">${rentalUsedHoursHtml(r)}</td>
+      <td style="font-size:12px;">${(daysUsed1 && !rentalHoursUnknown(r) && !rentalIncludesPrevUsage(r))? `${Math.round((r.usedHours||0)/daysUsed1*10)/10}h/일` : '-'}</td>
       <td style="font-size:12px;">${fuelCell}</td>
     </tr>`;
   }).join('');
@@ -5058,7 +5089,7 @@ function renderOutList(){
     if(isLT){ predTxt = pred.overdue ? '<span class="pill danger">정비 도래</span>' : `${dow(pred.date)} (약 ${pred.days}일 후)`; }
     const expIn = expectedInDate(rt);
     const matchedReq = (DB.returnRequests||[]).find(r=>{
-      const m = findMatchedGenForReturnRequest(r.text);
+      const m = findMatchedGenForReturnRequest(r.text, r.createdAtTs);
       return m && m.id===g.id;
     });
     const rowBg = rt.forcedOut ? 'var(--danger-tint)' : (matchedReq ? '#FFF3E0' : null);
@@ -5742,7 +5773,7 @@ function openCustomerNotesModal(customer){
       ? `${dow(r.outDate)||'-'} ~ ${dow(r.inDate)||'-'} (${rentalDays(r)||'-'}일)`
       : `${dow(r.outDate||r.plannedOutDate)||'-'} 출고`;
     const hoursLine = r.status==='완료'
-      ? `출고시 누적: ${r.startHours!=null? r.startHours.toLocaleString()+'h':'-'} · 입고시 누적: ${r.endHours!=null? r.endHours.toLocaleString()+'h':'-'} · <b style="color:var(--primary-dark);">사용 ${(r.usedHours||0).toLocaleString()}h</b><br>`
+      ? `출고시 누적: ${r.startHours!=null? r.startHours.toLocaleString()+'h':'-'} · 입고시 누적: ${r.endHours!=null? r.endHours.toLocaleString()+'h':'-'} · <b style="color:var(--primary-dark);">사용 ${rentalUsedHoursHtml(r)}</b><br>`
       : '';
     return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
@@ -5839,7 +5870,7 @@ function downloadCustomerHistoryPrintFile(customer){
     const g = findGen(r.genId);
     const fuel = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     const period = r.status==='완료'
-      ? `${dow(r.outDate)||'-'} ~ ${dow(r.inDate)||'-'} (${rentalDays(r)||'-'}일, 사용 ${(r.usedHours||0).toLocaleString()}h)`
+      ? `${dow(r.outDate)||'-'} ~ ${dow(r.inDate)||'-'} (${rentalDays(r)||'-'}일, 사용 ${escR(rentalUsedHoursText(r))})`
       : `${dow(r.outDate||r.plannedOutDate)||'-'} 출고`;
     return `<div class="ch-card">
       <div class="ch-head"><span>${escR(r.genId||'-')}</span><span>${escR(g? (g.model||'모델 미등록') : (r.model||'-'))}</span><span class="ch-status">${escR(r.status)}</span></div>
@@ -6411,7 +6442,7 @@ function handleRestoreFile(input){
 function exportRentalsCsv(id){
   const rentals = DB.rentals.filter(r=>r.genId===id).sort((a,b)=>(a.outDate||'').localeCompare(b.outDate||''));
   const rows = [['도착일','입고일','사용일수','거래처','담당자','연락처','현장','주소','임대사용시간(h)']];
-  rentals.forEach(r=>rows.push([r.outDate,r.inDate,rentalUsedDaysInclusive(r)||'',r.customer,r.manager,r.phone,r.site,r.address,r.usedHours||0]));
+  rentals.forEach(r=>rows.push([r.outDate,r.inDate,rentalUsedDaysInclusive(r)||'',r.customer,r.manager,r.phone,r.site,r.address,rentalUsedHoursText(r)]));
   downloadCsv(`${id}_임대이력.csv`, rows);
 }
 function exportMaintCsv(id){
@@ -6471,8 +6502,8 @@ function renderGenHistory(){
         <td class="wrap-ok">${r.customer||'-'}${(r.manager||r.phone)? `<div class="muted" style="font-size:11px;">${[r.manager,r.phone].filter(Boolean).join(' · ')}</div>`:''}</td>
         <td class="wrap-ok">${[r.site,r.address].filter(Boolean).join(' · ')||'-'}${r.supplies? `<div class="muted" style="font-size:11px;">부자재(출고): ${r.supplies}</div>`:''}${r.supplies? `<div class="muted" style="font-size:11px;">부자재 회수: ${r.suppliesRecovered? '<span class="pill ok">회수됨</span>' : `<span class="pill danger">회수안됨</span>${r.suppliesNote? ` - ${r.suppliesNote}`:''}`}</div>`:''}${r.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${r.fuelRequested}L${r.fuelActual && r.fuelActual!==r.fuelRequested? ` (실제주입 ${r.fuelActual}L)`:''}</div>`:''}${r.fuelNotUsed? `<div class="muted" style="font-size:11px;">반납시 연료: <span class="pill gray">연료사용안함</span></div>`:''}${(!r.fuelNotUsed && r.measuredFuelHeightCm!=null)? `<div class="muted" style="font-size:11px;">반납시 연료: ${(()=>{ const L=computeFuelLiters(g, r.measuredFuelHeightCm); return L!=null? `약 ${L}L ` : ''; })()}(측정높이 ${r.measuredFuelHeightCm}cm)</div>`:''}${(()=>{ const given = r.fuelRequested!=null? r.fuelRequested : r.fuelActual; const remain = r.measuredFuelHeightCm!=null? computeFuelLiters(g, r.measuredFuelHeightCm) : null; if(given==null || remain==null) return ''; const used = Math.round((given-remain)*10)/10; return `<div class="muted" style="font-size:11px;font-weight:700;color:var(--primary-dark);">⛽ ${given}L 중 ${remain}L 남아서 반납 → 사용량 약 ${used}L</div>`; })()}${(r.loadDate||r.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(r.loadDate),r.arriveTime].filter(Boolean).join(' · ')}</div>`:''}${r.freightBearer? `<div class="muted" style="font-size:11px;">배차: ${r.freightBearer}</div>`:''}${r.note? `<div class="muted" style="font-size:11px;">비고: ${r.note}</div>`:''}${(r.loadConfirmedBy||r.outProcessedBy||r.inProcessedBy)? `<div class="muted" style="font-size:11px;">${[(r.loadConfirmedBy||r.outProcessedBy)? `출고: ${escR(r.loadConfirmedBy||r.outProcessedBy)}`:null, r.inProcessedBy? `입고: ${escR(r.inProcessedBy)}`:null].filter(Boolean).join(' · ')}</div>`:''}</td>
         <td class="muted">${r.startHours!=null? r.startHours.toLocaleString()+'h' : '-'}</td>
-        <td class="muted">${r.endHours!=null? r.endHours.toLocaleString()+'h' : '-'}</td>
-        <td class="muted" style="font-weight:700;">${(r.usedHours||0).toLocaleString()}h</td>
+        <td class="muted">${r.endHours!=null? r.endHours.toLocaleString()+'h' : (rentalHoursUnknown(r) && (findGen(r.genId)||{}).hoursKnown!==false ? `<span style="color:var(--warn);font-weight:700;">${rentalHoursUnknownLabel(r)}</span>` : '-')}</td>
+        <td class="muted" style="font-weight:700;">${rentalUsedHoursHtml(r)}</td>
         <td><button class="btn sm danger" onclick="deleteRental('${r.id}','${id}')">삭제</button></td>
       </tr>`).join('')}</tbody>
     </table></div>`}
@@ -9892,7 +9923,7 @@ function parseSmsOrderTextRaw(text, baseTs){
   let protectedText = text.replace(/(\d)\.(\d)/g, '$1'+DOT+'$2');
   protectedText = protectedText.replace(/\([^)\n]*\)/g, m=>m.replace(/\./g,DOT).replace(/,/g,COMMA));
   const restore = s=>s.split(DOT).join('.').split(COMMA).join(',');
-  const pieces = protectedText.split(/[\n,]+|\.+/).map(l=>restore(l).trim()).filter(Boolean);
+  const pieces = protectedText.split(/[\n,]+|\.+|(?<=[가-힣A-Za-z)])\s*-\s+/).map(l=>restore(l).trim()).filter(Boolean);
 
   const phoneRe = /01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/;
   const capacityRe = /\d+(\.\d+)?\s*(키로|kw)/i;
@@ -9924,7 +9955,7 @@ function parseSmsOrderTextRaw(text, baseTs){
 
   // 띄어쓰기 없이 "대전유성한밭대학교", "대전자운대"처럼 지역명으로 시작하는 조각은 번지가 없어도 주소로 봅니다.
   const regionRe = /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|충청|전라|경상|수원|성남|용인|고양|화성|평택|안산|안양|김포|파주|시흥|광명|하남|이천|오산|의정부|남양주|구리|포천|양주|동두천|연천|천안|아산|청주|충주|제천|전주|군산|익산|포항|구미|경주|창원|김해|진주|원주|춘천|강릉|당진|서산|논산|공주|보령|여주|양평|가평|안성|과천|군포|의왕|부천|인제|홍천|평창|정선|영월|태안|예산|홍성|음성|진천|괴산|부안|김제|정읍|목포|여수|순천|광양|거제|통영|양산|울주|기장|청라|송도|영종|판교|동탄|위례)/;
-  const companyRe = /(산업|전기|전력|건설|엔지니어링|ENC|E&C|이엔씨|엔씨|㈜|\(주\)|기업|상사|테크|개발|종합|공사|기술|시스템|에너지|이벤트|기획|컴퍼니|코리아|글로벌|통신|설비|중공업|스틸|철강|플랜트)/i;
+  const companyRe = /(산업|전기|전력|건설|엔지니어링|이엔지|엔지$|ENC|E&C|이엔씨|엔씨|㈜|\(주\)|기업|상사|테크|개발|종합|공사|기술|시스템|에너지|이벤트|기획|컴퍼니|코리아|글로벌|통신|설비|중공업|스틸|철강|플랜트)/i;
   const siteRe = /(학교|대학교|운동장|공원|부대|정수장|센터|병원|아파트|현장|공장|체육관|야영장|캠핑장|행사장|주차장|청사|구청|시청|군청|교회|성당|축제|광장|터미널|역사|물류|단지|본부|부지|휴게소|해수욕장|경기장)/;
   // 상차·차량·연락 관련 안내("차량인적사항오늘통보", "인적사항통보", "지게차는 해성에서")는 비고로 보냅니다.
   // ("오늘"이 들어있어서 도착일이 오늘로 잘못 잡히던 문제)
@@ -9949,15 +9980,20 @@ function parseSmsOrderTextRaw(text, baseTs){
     const fpm0 = l.match(fuelParenRe);
     if(fpm0){ result.fuelRequested = Number(fpm0[1]); result.fuelActual = Number(fpm0[2]); return; }
     const fsm0 = l.match(fuelSimpleRe);
-    if(fsm0){ result.fuelRequested = Number(fsm0[1]); result.fuelActual = Number(fsm0[1]); return; }
+    if(fsm0 && !/^\s*연료\s*\d+\s*만/.test(l)){ result.fuelRequested = Number(fsm0[1]); result.fuelActual = Number(fsm0[1]); return; }
+    if(/^(연료|연로|기름|경유)/.test(l)){ noteParts.push(l.replace(/^연로/,'연료')); return; } // "연로7만"(연료 7만원어치)처럼 금액이거나 오타인 경우는 비고로
     if(/구형|신형/.test(l) && !noteParts.some(n=>/구형|신형/.test(n))) noteParts.push((l.match(/구형|신형/)||[''])[0]);
     if(capacityRe.test(l)){
       const um0 = l.match(usageDaysRe);
       if(um0) result.usageDays = um0[1] || um0[2];
       // "150키로 380볼트 오늘 지금 바로 출고"처럼 용량 줄에 날짜·도착 정보가 같이 있으면 그 부분도 읽습니다.
       if(/(오늘|내일|모레|지금|도착|투입|\d{1,2}\s*월\s*\d{1,2}\s*일)/.test(l)) arrivalParts.push(l.replace(/\d+(\.\d+)?\s*(키로|kw)/ig,' '));
+      // 용량·전압·대수를 떼고도 주소처럼 보이는 내용이 남으면("50키로 당진송악면가곡로185") 그 부분은 따로 읽습니다.
+      const restCap = l.replace(/\d+(\.\d+)?\s*(키로|kw)(\s*\([^)]*\))?/ig,' ').replace(voltageRe,' ').replace(/\d{1,2}\s*대/g,' ').replace(/(오늘|내일|모레|지금|즉시|바로)\s*(출고|도착)?/g,' ').replace(/\s+/g,' ').trim();
+      if(restCap && !restCap.startsWith('(') && addressRe.test(restCap) && !supplyRe.test(restCap)) processPiece(restCap, pos);
       return;
     }
+    if(/^\*?\s*[A-Za-z]{1,2}-\d{1,3}$/.test(l)){ noteParts.push('지정 발전기 '+l.replace(/^\*\s*/,'').toUpperCase()); return; }
     if(l.startsWith('*')){ noteParts.push(l.slice(1).trim()); return; }
     if((l.includes('철수') || l.includes('회수')) && !splitCompanyPerson(l.replace(phoneRe,'').trim())){ noteParts.push(l); return; } // "10월 11일(일) 철수"는 출고일이 아니라 참고사항 (단, "김철수소장님" 같은 이름은 제외)
     const um = l.match(usageDaysRe);
@@ -9967,6 +10003,15 @@ function parseSmsOrderTextRaw(text, baseTs){
     const pm = l.match(phoneRe);
     if(pm){
       result.phone = pm[0].replace(/[^0-9]/g,'');
+      const preP = l.slice(0, pm.index).replace(fillerRe,'').trim(), postP = l.slice(pm.index + pm[0].length).trim();
+      if(preP && postP && splitCompanyPerson(preP)){
+        // 번호 앞이 담당자, 뒤는 다른 내용(메모 등)인 경우 따로 처리합니다.
+        const sp1 = splitCompanyPerson(preP);
+        result.manager = sp1.person; if(sp1.company) customerFromManager = sp1.company;
+        if(managerPos<0) managerPos = pos;
+        processPiece(postP, pos);
+        return;
+      }
       const rest = l.replace(phoneRe,' ').replace(fillerRe,'').replace(/\s+/g,' ').trim();
       if(managerPos<0) managerPos = pos;
       if(rest){
@@ -10039,8 +10084,12 @@ function parseSmsOrderTextRaw(text, baseTs){
   if(customerFromManager){
     result.customer = customerFromManager;
   } else if(leftover.length){
-    const notSite = x=> !siteRe.test(x.text) || companyRe.test(x.text);
+    const bareRegion = x=> regionRe.test(x.text) && x.text.length<=4 && !companyRe.test(x.text); // "평택" 같은 지역명 한 단어
+    const notSite = x=> (!siteRe.test(x.text) || companyRe.test(x.text)) && !bareRegion(x);
     if(managerPos>=0){
+      for(let i=leftover.length-1;i>=0;i--){ if(leftover[i].pos <= managerPos && companyRe.test(leftover[i].text) && !siteRe.test(leftover[i].text)){ custIdx = i; break; } }
+    }
+    if(custIdx<0 && managerPos>=0){
       for(let i=leftover.length-1;i>=0;i--){ if(leftover[i].pos < managerPos && notSite(leftover[i])){ custIdx = i; break; } }
       if(custIdx<0) for(let i=leftover.length-1;i>=0;i--){ if(leftover[i].pos < managerPos){ custIdx = i; break; } }
     }
@@ -10053,7 +10102,7 @@ function parseSmsOrderTextRaw(text, baseTs){
     result.customer = instPiece;
   }
   // 나머지 조각(현장명 등)은 주소 뒤에 괄호로 붙여둡니다.
-  const siteParts = leftover.filter((x,i)=>i!==custIdx).map(x=>x.text);
+  const siteParts = leftover.filter((x,i)=>i!==custIdx).map(x=>x.text).filter(t=> !(regionRe.test(t) && t.length<=4 && result.address && result.address.includes(t))); // 주소에 이미 있는 지역명은 빼기
   if(siteParts.length){
     result.address = result.address ? `${result.address} (${siteParts.join(' ')})` : siteParts.join(' ');
   }
@@ -10121,67 +10170,57 @@ function parseSmsOrderTextRaw(text, baseTs){
 }
 // 철수(회수) 요청 문자에서 주소·연락처·담당자·회수예정일을 뽑아냅니다.
 // 오늘/내일/"OO일 후"/특정 날짜("18일") 표현을 인식합니다. 시간은 철수 요청에서는 안 쓰므로 뽑지 않습니다.
-function parseReturnRequestText(text){
-  const result = {address:'', phone:'', manager:'', customer:'', recallDate:''};
+// 철수(회수) 요청 문자 인식. 거래처·담당자·연락처·주소는 출고 문자와 같은 인식 규칙(parseSmsOrderTextRaw)을 그대로 씁니다.
+// (예전엔 줄바꿈으로만 나눠서, "50키로 지금철수당진…태산엔지니어링.이문기팀장010…"처럼 한 줄로 온 문자를 통째로 버렸습니다)
+function parseReturnRequestText(text, baseTs){
+  const result = {address:'', phone:'', manager:'', customer:'', recallDate:'', genId:''};
   if(!text) return result;
-  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
-  const phoneRe = /01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/;
-  const addressRe = /(시|도|군|구|읍|면|동|리|로|길)[\s]*\d|산\s*\d|(^|\s)[가-힣]{2,}(시|도|군|구|읍|면|동|리)(\s|$)/;
-  const today = new Date();
-  const leftover = [];
-
-  // 날짜는 더 구체적인 표현(특정 날짜 > N일 후 > 내일 > 오늘) 순으로 찾습니다.
+  // 발전기 번호가 적혀 있으면("S-33 자운대 철수") 그 번호로 바로 찾습니다.
+  const gm = String(text).match(/(?:^|[^A-Za-z0-9])([A-Za-z]{1,2})\s*-\s*(\d{1,3})(?![\d-])/);
+  if(gm) result.genId = `${gm[1].toUpperCase()}-${gm[2]}`;
+  text = gm ? String(text).replace(gm[0], gm[0].charAt(0).match(/[A-Za-z0-9]/)? ' ' : gm[0].charAt(0)+' ') : text;
+  const base = baseTs ? new Date(baseTs) : new Date();
+  const baseDay = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+  // 회수일: 더 구체적인 표현(월/일 > N일 후 > N일 > 모레 > 내일 > 오늘·지금) 순으로 찾습니다. 문자 받은 날 기준입니다.
+  const md = text.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
   const relMatch = text.match(/(\d{1,2})\s*일\s*(후|뒤)/);
-  const dayMatch = text.match(/(\d{1,2})\s*일(?!\s*(후|뒤))/);
-  if(relMatch){
-    const d = new Date(today); d.setDate(d.getDate()+Number(relMatch[1]));
+  const dayMatch = text.match(/(?:^|[^\d\-])(\d{1,2})\s*일(?!\s*(후|뒤|간|동안))/);
+  if(md){
+    let d = new Date(baseDay.getFullYear(), Number(md[1])-1, Number(md[2]));
+    if(d < new Date(baseDay.getFullYear(), baseDay.getMonth()-2, baseDay.getDate())) d = new Date(baseDay.getFullYear()+1, Number(md[1])-1, Number(md[2]));
+    result.recallDate = toLocalDateStr(d);
+  } else if(relMatch){
+    const d = new Date(baseDay); d.setDate(d.getDate()+Number(relMatch[1]));
     result.recallDate = toLocalDateStr(d);
   } else if(dayMatch){
     const day = Number(dayMatch[1]);
-    let d = new Date(today.getFullYear(), today.getMonth(), day);
-    if(d < new Date(today.getFullYear(), today.getMonth(), today.getDate())) d = new Date(today.getFullYear(), today.getMonth()+1, day);
+    let d = new Date(baseDay.getFullYear(), baseDay.getMonth(), day);
+    if(d < baseDay) d = new Date(baseDay.getFullYear(), baseDay.getMonth()+1, day);
     result.recallDate = toLocalDateStr(d);
+  } else if(/모레/.test(text)){
+    const d = new Date(baseDay); d.setDate(d.getDate()+2); result.recallDate = toLocalDateStr(d);
   } else if(/내일/.test(text)){
-    const d = new Date(today); d.setDate(d.getDate()+1);
-    result.recallDate = toLocalDateStr(d);
-  } else if(/오늘|지금/.test(text)){
-    result.recallDate = toLocalDateStr(today);
+    const d = new Date(baseDay); d.setDate(d.getDate()+1); result.recallDate = toLocalDateStr(d);
+  } else if(/오늘|지금|즉시|바로/.test(text)){
+    result.recallDate = toLocalDateStr(baseDay);
   }
-
-  lines.forEach(line=>{
-    let l = line.replace(/[★☆]+\s*해성발전기\s*(출고|철수)?\s*요청\s*[★☆]+/g, '').trim();
-    if(!l) return;
-    if(/\d+(\.\d+)?\s*(키로|kw)/i.test(l)) return; // 용량 줄은 "키로"의 "로"가 주소 패턴과 헷갈릴 수 있어 건너뜁니다.
-    if(l.startsWith('*')) return; // "*지금철수" 같은 메모 줄
-    const pm = l.match(phoneRe);
-    if(pm){
-      result.phone = pm[0].replace(/[^0-9]/g,'');
-      const rest = l.replace(phoneRe,'').trim();
-      if(rest) result.manager = rest;
-      return;
-    }
-    if(addressRe.test(l)){ result.address = result.address ? result.address+' '+l : l; return; }
-    leftover.push(l);
-  });
-  // 남는 줄(회사명일 가능성이 높은 줄)을 업체명 후보로 씁니다. 담당자를 못 뽑았으면 직급 붙은 줄을 담당자로 먼저 뺍니다.
-  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저)\s*님?$|님$/;
-  const titleIdx = leftover.findIndex(l=>titleRe.test(l));
-  if(titleIdx>=0 && !result.manager){
-    const raw = leftover[titleIdx];
-    const knownTitleRe = /([가-힣]{2,4})\s*(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저)\s*(님)?$/;
-    const km = raw.match(knownTitleRe);
-    if(km){
-      result.manager = `${km[1]}${km[2]}${km[3]||''}`;
-      const prefix = raw.slice(0, km.index).trim();
-      leftover.splice(titleIdx,1);
-      if(prefix) leftover.push(prefix);
-    } else {
-      result.manager = raw;
-      leftover.splice(titleIdx,1);
-    }
-  }
-  if(leftover.length>0) result.customer = leftover[0];
+  // "철수/회수 요청" 같은 말은 떼어내고 나머지를 출고 문자 규칙으로 읽습니다.
+  const cleaned = String(text)
+    .replace(/[★☆]+\s*해성발전기\s*(출고|철수)?\s*요청\s*[★☆]+/g, '\n')
+    .replace(/(지금|즉시|바로|오늘|내일|모레)?\s*(철수|회수)\s*(요청|해주세요|해주시기|부탁드립니다|부탁|바랍니다|요망|예정|합니다|해요)?/g, '\n');
+  const p = parseSmsOrderTextRaw(cleaned, base.getTime());
+  result.phone = p.phone; result.manager = p.manager; result.customer = p.customer; result.address = p.address;
   return result;
+}
+// 철수요청과 출고중 임대(rt)가 같은 현장인지 비교할 때 쓰는 기준 (띄어쓰기·괄호 차이는 무시)
+function rrNormAddr(v){ return String(v||'').replace(/\([^)]*\)/g,' ').replace(/\s+/g,''); }
+function rrAddrMatch(a,b){ const x = rrNormAddr(a), y = rrNormAddr(b); return x.length>=4 && y.length>=4 && (x.includes(y) || y.includes(x)); }
+function rrCustMatch(a,b){ const n = v=>String(v||'').replace(/\s+|\(주\)|㈜|주식회사/g,''); const x = n(a), y = n(b); return x.length>=2 && y.length>=2 && (x.includes(y) || y.includes(x)); }
+function rrPhoneMatch(a,b){ const x = String(a||'').replace(/[^0-9]/g,''), y = String(b||'').replace(/[^0-9]/g,''); return x.length>=9 && x===y; }
+function returnReqMatchesRental(parsed, rt, genId){
+  if(!parsed || !rt) return false;
+  if(parsed.genId && genId) return parsed.genId===genId; // 번호가 적힌 철수요청은 그 번호 발전기에만 해당
+  return rrPhoneMatch(parsed.phone, rt.phone) || rrAddrMatch(parsed.address, rt.address) || rrCustMatch(parsed.customer, rt.customer);
 }
 // 같은 연락처(우선)·업체명으로 24시간 이내에 먼저 등록된 문자오더가 있는데, 주소·도착시간·전압·상차일이 달라졌으면
 // "내용이 바뀐 문자"로 판단해서 알려줍니다 (오타 등으로 뒤늦게 정정 문자가 오는 경우가 있어서, 놓치지 않게 하기 위함입니다).
@@ -10210,14 +10249,14 @@ function detectSmsOrderChange(item, allItems){
 // 철수요청 문자도 같은 방식으로: 연락처/업체명이 같은데 24시간 이내 먼저 온 철수문자와 주소·회수예정일이 달라졌으면 알려줍니다.
 function detectReturnRequestChange(item, allItems){
   if(!item || !item.text || !item.createdAtTs) return null;
-  const cur = parseReturnRequestText(item.text);
+  const cur = parseReturnRequestText(item.text, item.createdAtTs);
   if(!cur.phone && !cur.customer) return null;
   let prior = null, priorParsed = null;
   (allItems||[]).forEach(o=>{
     if(!o || o.id===item.id || !o.text || !o.createdAtTs) return;
     if(o.createdAtTs >= item.createdAtTs) return;
     if(item.createdAtTs - o.createdAtTs > SMS_CHANGE_WINDOW_MS) return;
-    const op = parseReturnRequestText(o.text);
+    const op = parseReturnRequestText(o.text, o.createdAtTs);
     const samePhone = cur.phone && op.phone && cur.phone===op.phone;
     const sameCustomer = !samePhone && cur.customer && op.customer && cur.customer===op.customer;
     if(!samePhone && !sameCustomer) return;
@@ -10230,20 +10269,24 @@ function detectReturnRequestChange(item, allItems){
   return { priorAt: prior.createdAtTs, diffs };
 }
 // 지금 출고중인 발전기 중, 이 철수요청 문자와 연락처(우선)·주소·업체명이 일치하는 것을 찾습니다.
-function findMatchedGenForReturnRequest(text){
-  const parsed = parseReturnRequestText(text);
+function findMatchedGenForReturnRequest(text, baseTs){
+  const parsed = parseReturnRequestText(text, baseTs);
   const outGens = activeGens().filter(g=>g.status==='out' && g.rental);
+  if(parsed.genId){
+    const m = outGens.find(g=>g.id===parsed.genId);
+    if(m) return m;
+  }
   if(parsed.phone){
-    const m = outGens.find(g=>g.rental.phone && g.rental.phone.replace(/[^0-9]/g,'')===parsed.phone);
+    const m = outGens.find(g=>rrPhoneMatch(parsed.phone, g.rental.phone));
     if(m) return m;
   }
   if(parsed.address){
-    const m = outGens.find(g=>g.rental.address && (g.rental.address.includes(parsed.address) || parsed.address.includes(g.rental.address)));
+    const m = outGens.find(g=>rrAddrMatch(parsed.address, g.rental.address));
     if(m) return m;
   }
   if(parsed.customer){
     // 연락처·주소로 못 찾으면(담당자가 바뀐 경우 등) 업체명으로 마지막으로 한 번 더 찾아봅니다.
-    const m = outGens.find(g=>g.rental.customer && (g.rental.customer.includes(parsed.customer) || parsed.customer.includes(g.rental.customer)));
+    const m = outGens.find(g=>rrCustMatch(parsed.customer, g.rental.customer));
     if(m) return m;
   }
   return null;
@@ -10252,7 +10295,7 @@ function viewMatchedReturnRequest(genId, reqId){
   const g = findGen(genId);
   const r = (DB.returnRequests||[]).find(x=>x && x.id===reqId);
   if(!g || !r) return;
-  const parsed = parseReturnRequestText(r.text);
+  const parsed = parseReturnRequestText(r.text, r.createdAtTs);
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
@@ -12538,7 +12581,7 @@ function openPrevRentalPopup(id){
       <div style="height:1px;background:var(--border);margin:2px 0;"></div>
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">출고시 누적</span><span style="font-size:14px;font-weight:700;font-family:var(--mono);">${prev.startHours!=null? prev.startHours.toLocaleString()+'h':'-'}</span></div>
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">입고시 누적</span><span style="font-size:14px;font-weight:700;font-family:var(--mono);">${prev.endHours!=null? prev.endHours.toLocaleString()+'h':'-'}</span></div>
-      <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">발전기 사용시간</span><span style="font-size:15px;font-weight:800;font-family:var(--mono);color:var(--primary-dark);">${(prev.usedHours||0).toLocaleString()}h${prevDays? ` <span style="font-size:12px;font-weight:700;color:var(--ink-soft);">(하루평균 ${Math.round((prev.usedHours||0)/prevDays*10)/10}h/일)</span>`:''}</span></div>
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">발전기 사용시간</span><span style="font-size:15px;font-weight:800;font-family:var(--mono);color:var(--primary-dark);text-align:right;">${rentalUsedHoursHtml(prev)}${(prevDays && !rentalHoursUnknown(prev) && !rentalIncludesPrevUsage(prev))? ` <span style="font-size:12px;font-weight:700;color:var(--ink-soft);">(하루평균 ${Math.round((prev.usedHours||0)/prevDays*10)/10}h/일)</span>`:''}</span></div>
     </div>
     <div class="muted" style="font-size:11px;margin-top:10px;">${rentals.length}건의 임대 이력 중 가장 최근 건입니다.</div>`;
   box.innerHTML = `<div class="modal" style="max-width:420px;text-align:left;" onclick="event.stopPropagation()">
@@ -12886,7 +12929,7 @@ async function submitInFinish(id, isTransfer, vals){
   }
   await saveGens();
   await saveRentals();
-  await autoClearMatchedReturnRequests(rt); // 이 임대가 어떤 식으로 끝나든(현장이동/일반 입고), 매칭되는 철수요청은 이제 처리된 것이니 자동으로 지웁니다.
+  await autoClearMatchedReturnRequests(rt, g.id); // 이 임대가 어떤 식으로 끝나든(현장이동/일반 입고), 매칭되는 철수요청은 이제 처리된 것이니 자동으로 지웁니다.
   if(isTransfer && condition!=='broken'){
     renderContent();
     flash('이번 임대가 종료 처리되었습니다. 이어서 새 현장을 골라주세요.');
@@ -12906,14 +12949,11 @@ async function submitInFinish(id, isTransfer, vals){
 }
 // 방금 종료한 임대(rt)의 연락처·주소·거래처명과 일치하는 철수요청이 있으면 자동으로 지웁니다.
 // (findMatchedGenForReturnRequest는 g.rental이 살아있어야 매칭되는데 이 시점엔 이미 비웠으므로, 방금 종료한 rt로 직접 비교합니다)
-async function autoClearMatchedReturnRequests(rt){
+async function autoClearMatchedReturnRequests(rt, genId){
   const autoMatched = (DB.returnRequests||[]).filter(r=>{
     if(!r) return false;
-    const parsed = parseReturnRequestText(r.text);
-    if(parsed.phone && rt.phone && parsed.phone===rt.phone.replace(/[^0-9]/g,'')) return true;
-    if(parsed.address && rt.address && (rt.address.includes(parsed.address) || parsed.address.includes(rt.address))) return true;
-    if(parsed.customer && rt.customer && (rt.customer.includes(parsed.customer) || parsed.customer.includes(rt.customer))) return true;
-    return false;
+    const parsed = parseReturnRequestText(r.text, r.createdAtTs);
+    return returnReqMatchesRental(parsed, rt, genId);
   });
   if(autoMatched.length>0){
     const autoMatchedIds = new Set(autoMatched.map(r=>r.id));
