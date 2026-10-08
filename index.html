@@ -4366,7 +4366,7 @@ function renderContent(){
   else if(currentTab==='manual') c.innerHTML = renderManualTab();
   else if(currentTab==='improvements') c.innerHTML = renderImprovementsTab();
   else if(currentTab==='settings') c.innerHTML = renderSettingsTab();
-  if(currentTab==='history'){ if(historyViewMode==='customer') renderCustomerHistoryView(); else initHistorySelect(); }
+  if(currentTab==='history'){ if(historyViewMode==='customer') renderCustomerHistoryView(); else initHistorySelect(); renderHistSearchResults(); }
   if(currentTab==='maint') renderMaintList();
   if(currentTab==='consumable-order') renderConsumableOrderTable();
   if(currentTab==='improvements') renderImprovementsList();
@@ -5746,6 +5746,14 @@ function renderHistorySelectOptions(keepId){
 let historyViewMode = 'gen';
 function renderHistoryTab(){
   return `
+    <div class="detail-card" style="margin:0 0 12px;padding:12px 14px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-weight:800;font-size:14px;">🔎 임대이력 검색</span>
+        <input type="search" id="hist-search" value="${escR(histSearchQuery)}" oninput="onHistSearchInput(this.value)" placeholder="거래처명, 현장주소, 담당자, 연락처(뒷자리도 가능), 발전기 번호, 비고… 띄어쓰기로 여러 단어" style="flex:1;min-width:240px;padding:8px 10px;font-size:14px;">
+        ${histSearchQuery? `<button class="btn sm" onclick="onHistSearchInput('');const el=document.getElementById('hist-search');if(el){el.value='';el.focus();}">지우기</button>`:''}
+      </div>
+      <div id="hist-search-result"></div>
+    </div>
     <div class="btn-row" style="margin-bottom:10px;">
       <button class="btn sm${historyViewMode==='gen'?' primary':''}" onclick="switchHistoryView('gen')">발전기별 이력</button>
       <button class="btn sm${historyViewMode==='customer'?' primary':''}" onclick="switchHistoryView('customer')">거래처별 이력</button>
@@ -5761,6 +5769,66 @@ function renderHistoryTab(){
     <div id="customer-history-wrap"></div>
     `}
   `;
+}
+// ===== 임대이력 검색 =====
+// 끝난 임대(이력) + 지금 출고중 + 출고대기를 한 번에 찾아봅니다. 여러 단어를 넣으면 모두 들어간 건만 나옵니다.
+let histSearchQuery = '';
+let _histSearchTimer = null;
+function onHistSearchInput(v){
+  histSearchQuery = String(v||'');
+  clearTimeout(_histSearchTimer);
+  _histSearchTimer = setTimeout(renderHistSearchResults, 200);
+}
+function histSearchRecords(){
+  const all = [];
+  (DB.rentals||[]).forEach(r=>all.push({...r, status:'완료'}));
+  activeGens().forEach(g=>{ if(g.status==='out' && g.rental) all.push({...g.rental, genId:g.id, status:'진행중'}); });
+  (DB.reservations||[]).forEach(r=>{ if(r && (r.customer||r.address||r.phone)) all.push({...r, status: r.genId===UNASSIGNED_GEN_ID ? '예약' : (r.pendingLoad? '상차대기':'예약')}); });
+  return all;
+}
+function renderHistSearchResults(){
+  const box = document.getElementById('hist-search-result');
+  if(!box) return;
+  const q = histSearchQuery.trim();
+  if(!q){ box.innerHTML = ''; return; }
+  const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const hits = histSearchRecords().filter(r=>{
+    const g = findGen(r.genId);
+    const hay = [r.genId, g&&g.model, r.customer, r.site, r.address, r.manager, r.phone, r.note, r.supplies, r.outDate, r.inDate, r.plannedOutDate].filter(Boolean).join(' ').toLowerCase();
+    const hayNoSpace = hay.replace(/\s+/g,'');
+    const digits = String(r.phone||'').replace(/[^0-9]/g,'');
+    return tokens.every(t=>{
+      const tDigits = t.replace(/[^0-9]/g,'');
+      if(tDigits.length>=4 && tDigits===t.replace(/-/g,'') && digits.includes(tDigits)) return true; // 연락처 숫자(하이픈 없이·뒷자리)
+      return hay.includes(t) || hayNoSpace.includes(t.replace(/\s+/g,''));
+    });
+  }).sort((a,b)=>((b.outDate||b.plannedOutDate||'')).localeCompare(a.outDate||a.plannedOutDate||''));
+  if(!hits.length){ box.innerHTML = `<div class="empty" style="margin-top:8px;">"${escR(q)}"(으)로 찾은 임대이력이 없습니다.</div>`; return; }
+  const pill = st => st==='완료' ? '<span class="pill gray">완료</span>' : (st==='진행중' ? '<span class="pill warn">출고중</span>' : `<span class="pill" style="background:var(--primary-tint);color:var(--primary-dark);border-color:var(--primary);">${st}</span>`);
+  const shown = hits.slice(0,100);
+  const custJs = c=>String(c||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  box.innerHTML = `<div class="muted" style="font-size:12.5px;margin:8px 0 4px;">${hits.length}건 찾음${hits.length>100? ' (최근 100건만 표시)':''}</div>
+  <div class="table-scroll"><table>
+    <thead><tr><th>상태</th><th>번호</th><th>거래처</th><th>현장 주소</th><th>담당자 · 연락처</th><th>기간</th><th>사용일수</th><th>사용시간</th><th></th></tr></thead>
+    <tbody>${shown.map(r=>{
+      const g = findGen(r.genId);
+      const period = r.status==='완료' ? `${dow(r.outDate)||'-'} ~ ${dow(r.inDate)||'-'}` : `${dow(r.outDate||r.plannedOutDate)||'-'} ~`;
+      return `<tr>
+        <td>${pill(r.status)}</td>
+        <td class="gid">${r.genId===UNASSIGNED_GEN_ID? '미지정' : escR(r.genId||'-')}${g&&g.model? `<div class="muted" style="font-size:11px;font-weight:400;">${escR(g.model)}</div>`:''}</td>
+        <td class="wrap-ok" style="font-weight:700;">${escR(r.customer||'-')}</td>
+        <td class="wrap-ok" style="font-size:12px;">${escR(r.address||r.site||'-')}${r.note? `<div class="muted" style="font-size:11px;">비고: ${escR(String(r.note).slice(0,60))}${String(r.note).length>60?'…':''}</div>`:''}</td>
+        <td class="wrap-ok" style="font-size:12px;">${escR([r.manager,r.phone].filter(Boolean).join(' · ')||'-')}</td>
+        <td style="font-size:12px;white-space:nowrap;">${period}</td>
+        <td style="font-size:12px;white-space:nowrap;">${escR(historyUsageDaysText(r))}</td>
+        <td style="font-size:12px;">${r.status==='완료'? rentalUsedHoursHtml(r) : '<span class="muted">-</span>'}</td>
+        <td><div class="btn-row" style="flex-wrap:nowrap;">
+          ${(r.genId && r.genId!==UNASSIGNED_GEN_ID && g)? `<button class="btn sm" onclick="historyViewMode='gen';goToHistory('${r.genId}')">발전기 이력</button>`:''}
+          ${r.customer? `<button class="btn sm" onclick="openCustomerNotesModal('${escR(custJs(r.customer))}')">거래처 이력</button>`:''}
+        </div></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
 }
 function switchHistoryView(mode){
   historyViewMode = mode;
