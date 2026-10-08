@@ -1759,6 +1759,19 @@ async function openQmAssignGen(resId){
       listWrap.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">지금 배정할 수 있는(입고 상태인) 발전기가 없습니다.</div>';
       return;
     }
+    if(!alreadyAssigned){
+      // 처음 배정할 때는 여러 대를 골라서 한 번에 배정할 수 있습니다.
+      listWrap.innerHTML = `<div style="font-size:13px;color:#555;margin-bottom:8px;">여러 대가 같이 나가면 여러 개를 눌러 고른 뒤 아래 [배정하기]를 누르세요.</div>` + candidates.map(g=>{
+        const vColor = voltageColor(g.voltage);
+        const vStyle = vColor ? `border:1px solid ${vColor};color:${vColor};background:${vColor}15;` : `border:1px solid #ccc;color:#888;background:#f2f2f2;`;
+        return `<button type="button" class="qmag-pick" data-gen="${escR(g.id)}" onclick="qmToggleAssignPick('${g.id}')" style="width:100%;text-align:left;background:#fff;border:2px solid #ddd;border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+          <div style="text-align:left;min-width:0;"><span class="qmag-check" style="font-size:16px;margin-right:6px;">⬜</span><span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span><span style="font-size:13px;color:#333;margin-left:6px;">${escR(g.model||'미설정')}</span></div>
+          <span style="${vStyle}font-weight:800;font-size:11px;padding:6px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;">${escR(g.voltage)||'전압 미설정'}</span>
+        </button>`;
+      }).join('') + `<button type="button" id="qmag-submit" onclick="submitQmAssignGenMulti('${resId}')" style="position:sticky;bottom:0;width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-top:6px;">배정하기 (0대 선택)</button>`;
+      qmAssignPicks = [];
+      return;
+    }
     listWrap.innerHTML = candidates.map(g=>{
       const vColor = voltageColor(g.voltage);
       const isCurrent = g.id===r.genId;
@@ -1778,6 +1791,51 @@ async function openQmAssignGen(resId){
   }catch(e){
     const sub = document.getElementById('qmag-sub');
     if(sub) sub.textContent = '불러오지 못했습니다.';
+  }
+}
+let qmAssignPicks = [];
+function qmToggleAssignPick(id){
+  qmAssignPicks = qmAssignPicks.includes(id) ? qmAssignPicks.filter(x=>x!==id) : [...qmAssignPicks, id];
+  document.querySelectorAll('.qmag-pick').forEach(b=>{
+    const on = qmAssignPicks.includes(b.dataset.gen);
+    b.style.borderColor = on ? '#2C6E49' : '#ddd';
+    b.style.background = on ? '#EAF5EC' : '#fff';
+    const c = b.querySelector('.qmag-check'); if(c) c.textContent = on ? '✅' : '⬜';
+  });
+  const btn = document.getElementById('qmag-submit');
+  if(btn) btn.textContent = `배정하기 (${qmAssignPicks.length}대 선택)`;
+}
+async function submitQmAssignGenMulti(resId){
+  const ids = [...qmAssignPicks];
+  if(!ids.length){ showInfoModal('발전기를 1대 이상 골라주세요.'); return; }
+  const btn = document.getElementById('qmag-submit');
+  if(btn){ btn.disabled = true; btn.textContent = '배정 중...'; }
+  try{
+    const [resCur, fleetCur] = await Promise.all([
+      window.storage.get('gen-reservations-v1', true),
+      window.storage.get('gen-fleet-v2', true)
+    ]);
+    let list = []; try{ list = resCur ? JSON.parse(resCur.value) : []; }catch(e){ list = []; }
+    if(!Array.isArray(list)) list = [];
+    let gens = []; try{ gens = fleetCur ? JSON.parse(fleetCur.value) : []; }catch(e){ gens = []; }
+    if(!Array.isArray(gens)) gens = [];
+    const r = list.find(x=>x.id===resId);
+    if(!r){ showInfoModal('해당 출고대기 건을 찾을 수 없습니다.'); renderQmReservationList(); return; }
+    const bad = ids.filter(id=>{ const g = gens.find(x=>x && x.id===id); return !g || g.status!=='in' || g.underRepair || list.some(x=>x.id!==resId && x.genId===id); });
+    if(bad.length){ showInfoModal(`${bad.join(', ')} 발전기는 방금 다른 곳에서 배정·출고되어 고를 수 없습니다. 다시 선택해주세요.`); openQmAssignGen(resId); return; }
+    const hoursOf = gid=>{ const g = gens.find(x=>x && x.id===gid); return (g && g.hoursKnown) ? (g.hours||0) : 0; };
+    r.genId = ids[0];
+    r.pendingLoad = true;
+    r.startHours = hoursOf(ids[0]);
+    r.genAssignedBy = qmLabel();
+    r.genAssignedAt = nowDateTimeStr();
+    if(!r.outDate) r.outDate = r.plannedOutDate || null;
+    assignExtraGensToReservation(r, ids.slice(1), list, qmLabel(), hoursOf);
+    await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
+    renderQmReservationList();
+  }catch(e){
+    showInfoModal('배정하지 못했습니다. 다시 시도해주세요.');
+    if(btn){ btn.disabled = false; btn.textContent = `배정하기 (${ids.length}대 선택)`; }
   }
 }
 async function submitQmAssignGen(resId, genId){
@@ -9586,6 +9644,7 @@ function openAssignGenModal(resId){
       <h3>🔧 발전기 배정</h3>
       <div class="modal-sub">${escR(r.customer||r.site||'-')} · 출고예약</div>
       <input type="hidden" id="f-assign-gen" value="${candidates[0].id}">
+      <div class="hint" style="text-align:left;font-size:12.5px;margin-top:2px;">여러 대가 같이 나가면 여러 개를 눌러 고르세요. 다시 누르면 빠집니다. 같은 거래처 정보로 함께 상차대기에 올라갑니다.</div>
       <div id="assign-picked" style="text-align:left;margin-top:6px;padding:8px 12px;border-radius:10px;background:var(--primary-tint);font-size:14px;">선택한 발전기: <b>${candidates[0].id}</b> · ${escR(candidates[0].model||'미설정')}</div>
       ${assignGenCapacityBoardHtml(candidates)}
       <div class="modal-actions">
@@ -9627,34 +9686,71 @@ function assignGenCapacityBoardHtml(candidates){
     <div style="max-height:320px;overflow-y:auto;">${rows || '<div class="muted">입고된 발전기가 없습니다.</div>'}</div>
   </div>`;
 }
+// 발전기 배정: 누를 때마다 선택/해제를 바꿉니다(여러 대 선택 가능). 고른 순서대로 저장됩니다.
 function pickAssignGen(id){
   const sel = document.getElementById('f-assign-gen');
-  if(sel){ sel.value = id; }
-  highlightAssignChip(id);
+  if(!sel) return;
+  let ids = sel.value ? sel.value.split(',').filter(Boolean) : [];
+  ids = ids.includes(id) ? ids.filter(x=>x!==id) : [...ids, id];
+  sel.value = ids.join(',');
+  highlightAssignChip();
 }
-function highlightAssignChip(id){
-  const g = findGen(id);
+function highlightAssignChip(){
+  const sel = document.getElementById('f-assign-gen');
+  const ids = sel && sel.value ? sel.value.split(',').filter(Boolean) : [];
   const box = document.getElementById('assign-picked');
-  if(box && g) box.innerHTML = `선택한 발전기: <b>${escR(g.id)}</b> · ${escR(g.model||'미설정')}`;
+  if(box) box.innerHTML = ids.length===0 ? '<span style="color:var(--danger);">발전기를 1대 이상 골라주세요.</span>'
+    : ids.length===1 ? (()=>{ const g = findGen(ids[0]); return `선택한 발전기: <b>${escR(ids[0])}</b> · ${escR((g&&g.model)||'미설정')}`; })()
+    : `선택한 발전기 <b>${ids.length}대</b>: ${ids.map(id=>`<b>${escR(id)}</b>`).join(', ')}`;
   document.querySelectorAll('.assign-chip').forEach(b=>{
-    const on = b.dataset.gen===id;
+    const on = ids.includes(b.dataset.gen);
     b.style.background = on ? 'var(--primary)' : '#fff';
     b.style.color = on ? '#fff' : 'var(--primary)';
   });
 }
-function confirmAssignGen(resId){
-  const r = DB.reservations.find(x=>x.id===resId);
+// 여러 대를 골랐을 때 2번째부터 들어갈 출고대기 건을 만듭니다. 같은 문자로 이미 나뉘어 있는 미지정 건(예: "2대" 문자)이 있으면
+// 그 건에 먼저 배정하고, 모자라면 거래처 정보를 그대로 복사한 새 건을 만듭니다. 전부 같은 묶음(batchId)으로 이어둡니다.
+function assignExtraGensToReservation(r, extraIds, list, assignedBy, hoursOf){
+  if(!extraIds.length) return [];
+  const sibs = findResGroupSiblings(r, list).filter(x=>x.genId===UNASSIGNED_GEN_ID);
+  const bid = r.batchId || findResGroupSiblings(r, list).map(x=>x.batchId).find(Boolean) || uid();
+  r.batchId = bid;
+  const outDate = r.outDate || r.plannedOutDate || null;
+  const done = [];
+  extraIds.forEach(gid=>{
+    let x = sibs.shift();
+    if(!x){
+      x = { ...r, id: uid(), smsOrder: null, smsOrderAt: null, smsQtyIndex: null, smsQtyTotal: null, smsOrderChecked: false, createdAtTs: Date.now() };
+      list.push(x);
+    }
+    Object.assign(x, {
+      genId: gid, pendingLoad: true, batchId: bid, outDate,
+      customer: r.customer, site: r.site, manager: r.manager, phone: r.phone, address: r.address, note: r.note,
+      arriveTime: r.arriveTime, loadDate: r.loadDate, freightBearer: r.freightBearer, usageDays: r.usageDays,
+      startHours: hoursOf(gid), genAssignedBy: assignedBy, genAssignedAt: nowDateTimeStr()
+    });
+    done.push(x);
+  });
+  return done;
+}
+async function confirmAssignGen(resId){
   const sel = document.getElementById('f-assign-gen');
-  if(!r || !sel || !sel.value) return;
-  const chosenId = sel.value;
-  const g = findGen(chosenId);
-  if(!g || g.status!=='in' || g.underRepair){ showInfoModal('선택한 발전기를 지금은 배정할 수 없습니다. 다시 선택해주세요.'); return; }
+  const ids = sel && sel.value ? sel.value.split(',').filter(Boolean) : [];
+  if(!ids.length){ highlightAssignChip(); return; }
+  await refreshCoreDataNow(); // 그사이 다른 사람이 같은 발전기를 잡았는지 확인
+  const r = DB.reservations.find(x=>x.id===resId);
+  if(!r){ closeModal(); renderTabbar(); renderContent(); showInfoModal('이 건은 그사이 다른 사람이 처리해서 더 이상 없습니다.'); return; }
+  const bad = ids.filter(id=>{ const g = findGen(id); return !g || g.status!=='in' || g.underRepair || DB.reservations.some(o=>o.genId===id && o.id!==resId); });
+  if(bad.length){ showInfoModal(`${bad.join(', ')} 발전기는 지금 배정할 수 없습니다(그사이 다른 건에 배정되었거나 출고·고장 처리됨). 다시 선택해주세요.`); return; }
+  const chosenId = ids[0];
   r.genId = chosenId;
   r.pendingLoad = true; // 발전기가 정해졌으니 이제부터는 일반 상차대기와 동일하게 취급합니다.
   r.genAssignedBy = DB.currentUserName || null;
   r.genAssignedAt = nowDateTimeStr();
+  const extras = assignExtraGensToReservation(r, ids.slice(1), DB.reservations, DB.currentUserName||null, gid=>{ const g = findGen(gid); return g ? (g.hours||0) : 0; });
   saveWithRetry(saveReservations);
   openOutModal(chosenId, resId);
+  if(extras.length) flash(`${ids.length}대 배정: ${ids.join(', ')} · 첫 번째(${chosenId}) 출고 정보를 저장하면 나머지 ${extras.length}대에도 같은 내용이 들어갑니다.`);
 }
 function confirmLoadPrompt(resId, isTransfer){
   const r = DB.reservations.find(x=>x.id===resId);
@@ -10336,6 +10432,101 @@ let _rsvSmsOrderRaw = '';
 let _rsvSmsOrderAt = null; // 문자가 들어온 시각("내일" 계산 기준)
 let _rsvGenOptionsHtml = '';
 let _rsvExtraGenIdx = 0;
+// ===== 출고예약: 용량별로 발전기 고르기 =====
+// [발전기 배정] 창처럼 입고된 발전기를 용량별로 펼쳐 보여주고, 누르면 바로 선택됩니다.
+// 첫 번째로 누른 발전기는 위 "발전기" 칸에, 그다음부터는 "+ 추가" 줄로 들어가 여러 대를 한 번에 고를 수 있고, 다시 누르면 빠집니다.
+let _rsvBoardCandidates = [];
+function genOptionsByCapacityHtml(list){
+  const groups = {};
+  (list||[]).forEach(g=>{ const cap = capacityOf(g); (groups[cap] = groups[cap] || []).push(g); });
+  return Object.keys(groups).map(Number).sort((a,b)=>a-b).map(cap=>
+    `<optgroup label="${cap===Infinity? '용량 미설정' : cap+'kW'} (${groups[cap].length}대)">${groups[cap].sort(sortByIdNatural).map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('')}</optgroup>`
+  ).join('');
+}
+function rsvCapacityBoardHtml(candidates){
+  const okIds = new Set((candidates||[]).map(x=>x.id));
+  const inGens = activeGens().filter(x=>x.status==='in');
+  const groups = {};
+  inGens.forEach(g=>{ const cap = capacityOf(g); (groups[cap] = groups[cap] || []).push(g); });
+  const caps = Object.keys(groups).map(Number).sort((a,b)=>a-b);
+  const rows = caps.map(cap=>{
+    const list = groups[cap].sort(sortByIdNatural);
+    const okCnt = list.filter(g=>okIds.has(g.id)).length;
+    const chips = list.map(g=>{
+      if(okIds.has(g.id)) return `<button type="button" class="rsv-cap-chip" data-gen="${g.id}" onclick="rsvPickFromBoard('${g.id}')" title="${escR(g.model||'')}" style="padding:5px 9px;border-radius:14px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;border:1.5px solid var(--primary);background:#fff;color:var(--primary);">${g.id}</button>`;
+      const why = g.underRepair ? '수리중' : '예약됨';
+      return `<span title="${escR(g.model||'')} · ${why}" style="padding:5px 9px;border-radius:14px;font-size:12px;white-space:nowrap;border:1.5px dashed #bbb;color:#999;background:#f4f4f4;">${g.id} <small>${why}</small></span>`;
+    }).join('');
+    return `<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--line, #e5e5e5);">
+      <div style="min-width:74px;font-weight:800;font-size:13px;padding-top:5px;">${cap===Infinity ? '용량 미설정' : cap+'kW'}<div class="muted" style="font-size:11px;font-weight:400;">${okCnt}/${list.length}대 가능</div></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>
+    </div>`;
+  }).join('');
+  return `<details open style="text-align:left;margin:4px 0 10px;border:1px solid var(--border);border-radius:10px;padding:8px 12px;background:#fff;">
+    <summary style="cursor:pointer;font-weight:800;font-size:13.5px;">📋 용량별로 발전기 고르기 <span class="muted" style="font-weight:400;font-size:12px;">(눌러서 선택 · 여러 대 가능 · 다시 누르면 빠짐)</span></summary>
+    <div id="rsv-board-picked" style="margin:6px 0 2px;font-size:13px;"></div>
+    <div style="max-height:260px;overflow-y:auto;">${rows || '<div class="muted">입고된 발전기가 없습니다.</div>'}</div>
+  </details>`;
+}
+function rsvCapFilterOptionsHtml(list){
+  const cnt = {};
+  (list||[]).forEach(g=>{ const c = capacityOf(g); cnt[c] = (cnt[c]||0)+1; });
+  return `<option value="">용량 전체</option>` + Object.keys(cnt).map(Number).sort((a,b)=>a-b).map(c=>`<option value="${c}">${c===Infinity? '용량 미설정' : c+'kW'} (${cnt[c]}대)</option>`).join('');
+}
+// 용량 필터: 고른 용량의 발전기만 선택칸에 보이게 합니다. (이미 골라둔 발전기는 다른 용량이어도 그대로 남겨둡니다)
+function applyRsvCapFilter(){
+  const fEl = document.getElementById('f-rsv-capfilter');
+  const cap = fEl && fEl.value!=='' ? Number(fEl.value) : null;
+  const list = (_rsvBoardCandidates||[]).filter(g=>cap==null || capacityOf(g)===cap);
+  const keep = id=>{ const g = findGen(id); return (g && !list.some(x=>x.id===id)) ? `<option value="${g.id}">${g.id} · ${escR(g.model||'미설정')}</option>` : ''; };
+  const main = document.getElementById('f-rsv-gen');
+  if(main){ const v = main.value; main.innerHTML = `<option value="${UNASSIGNED_GEN_ID}">🅾 미지정 (나중에 발전기 배정)</option>` + (v && v!==UNASSIGNED_GEN_ID ? keep(v) : '') + genOptionsByCapacityHtml(list); main.value = v || UNASSIGNED_GEN_ID; }
+  _rsvGenOptionsHtml = `<option value="">선택 안함</option>` + genOptionsByCapacityHtml(list);
+  document.querySelectorAll('#f-rsv-extra-gens-wrap .rsv-extra-gen-select').forEach(el=>{ const v = el.value; el.innerHTML = `<option value="">선택 안함</option>` + (v ? keep(v) : '') + genOptionsByCapacityHtml(list); el.value = v; });
+}
+function rsvSelectedGenIds(){
+  const ids = [];
+  const main = document.getElementById('f-rsv-gen');
+  if(main && main.value && main.value!==UNASSIGNED_GEN_ID) ids.push(main.value);
+  document.querySelectorAll('#f-rsv-extra-gens-wrap .rsv-extra-gen-select').forEach(el=>{ if(el.value && !ids.includes(el.value)) ids.push(el.value); });
+  return ids;
+}
+function rsvPickFromBoard(id){
+  const main = document.getElementById('f-rsv-gen');
+  if(!main) return;
+  const chosen = rsvSelectedGenIds();
+  if(chosen.includes(id)){
+    // 이미 고른 발전기를 다시 누르면 뺍니다. 위 칸에서 빠지면 "+ 추가" 줄 첫 번째가 위로 올라갑니다.
+    if(main.value===id){
+      const firstExtra = document.querySelector('#f-rsv-extra-gens-wrap > div');
+      const fsel = firstExtra && firstExtra.querySelector('.rsv-extra-gen-select');
+      if(fsel && fsel.value){ main.value = fsel.value; firstExtra.remove(); }
+      else main.value = UNASSIGNED_GEN_ID;
+    } else {
+      document.querySelectorAll('#f-rsv-extra-gens-wrap > div').forEach(row=>{ const sel = row.querySelector('.rsv-extra-gen-select'); if(sel && sel.value===id) row.remove(); });
+    }
+  } else if(!main.value || main.value===UNASSIGNED_GEN_ID){
+    main.value = id;
+  } else {
+    // 비어 있는 "+ 추가" 줄이 있으면 거기에, 없으면 새 줄을 만들어 넣습니다.
+    let emptySel = Array.from(document.querySelectorAll('#f-rsv-extra-gens-wrap .rsv-extra-gen-select')).find(el=>!el.value);
+    if(!emptySel){ addRsvExtraGenRow(); const all = document.querySelectorAll('#f-rsv-extra-gens-wrap .rsv-extra-gen-select'); emptySel = all[all.length-1]; }
+    if(emptySel){ emptySel.value = id; const row = emptySel.closest('div[id^="rsv-extra-"]'); if(row) onRsvExtraGenChange(row.id); }
+  }
+  onRsvGenChange();
+}
+function refreshRsvBoard(){
+  const chosen = rsvSelectedGenIds();
+  document.querySelectorAll('.rsv-cap-chip').forEach(b=>{
+    const on = chosen.includes(b.dataset.gen);
+    b.style.background = on ? 'var(--primary)' : '#fff';
+    b.style.color = on ? '#fff' : 'var(--primary)';
+  });
+  const box = document.getElementById('rsv-board-picked');
+  if(box) box.innerHTML = chosen.length
+    ? `선택한 발전기 <b>${chosen.length}대</b>: ${chosen.map(id=>{ const g = findGen(id); return `<b>${escR(id)}</b>${g&&g.model? ` <span class="muted">(${escR(g.model)})</span>`:''}`; }).join(', ')}`
+    : '<span class="muted">아직 고른 발전기가 없습니다 (미지정으로 저장하고 나중에 배정해도 됩니다).</span>';
+}
 function addRsvExtraGenRow(){
   const wrap = document.getElementById('f-rsv-extra-gens-wrap');
   if(!wrap) return;
@@ -10346,11 +10537,12 @@ function addRsvExtraGenRow(){
   row.innerHTML = `
     <select class="rsv-extra-gen-select" style="flex:1;min-width:0;padding:5px 6px;font-size:12.5px;" onchange="onRsvExtraGenChange('${rowId}')">${_rsvGenOptionsHtml}</select>
     <input type="number" class="rsv-extra-gen-hours" id="${rowId}-hours" placeholder="누적h" title="출고시 누적 사용시간(h) - 마지막으로 확인된 값" readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;background:var(--surface-2);color:var(--ink-soft);">
-    <button type="button" class="btn sm danger" style="flex:0 0 auto;padding:2px 7px;" onclick="document.getElementById('${rowId}').remove()">×</button>
+    <button type="button" class="btn sm danger" style="flex:0 0 auto;padding:2px 7px;" onclick="document.getElementById('${rowId}').remove();refreshRsvBoard();">×</button>
   `;
   wrap.appendChild(row);
 }
 function onRsvExtraGenChange(rowId){
+  refreshRsvBoard();
   const row = document.getElementById(rowId);
   if(!row) return;
   const sel = row.querySelector('.rsv-extra-gen-select');
@@ -10401,9 +10593,9 @@ function openReserveNoGenModal(resId, draft){
   // 자동으로 채워진 칸만 옅은 노란 배경으로 표시합니다(직접 입력한 칸과 구분되게, 확인 안 하고 지나치지 않도록).
   const autoStyle = (key)=> autoFields[key] ? 'background:#FFF9E0;border-color:#E8B923;' : '';
   const candidates = activeGens().filter(x=>x.status==='in' && !x.underRepair && !DB.reservations.some(r=>r.genId===x.id)).sort(sortByIdNatural);
-  const genOptionsHtml = `<option value="${UNASSIGNED_GEN_ID}" selected>🅾 미지정 (나중에 발전기 배정)</option>` +
-    candidates.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
-  _rsvGenOptionsHtml = `<option value="">선택 안함</option>` + candidates.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
+  const genOptionsHtml = `<option value="${UNASSIGNED_GEN_ID}" selected>🅾 미지정 (나중에 발전기 배정)</option>` + genOptionsByCapacityHtml(candidates);
+  _rsvGenOptionsHtml = `<option value="">선택 안함</option>` + genOptionsByCapacityHtml(candidates);
+  _rsvBoardCandidates = candidates;
   const prefillReturnDate = (()=>{
     if(!pre || !pre.usageDays || !pre.plannedOutDate) return '';
     const d = new Date(pre.plannedOutDate+'T00:00:00');
@@ -10423,7 +10615,8 @@ function openReserveNoGenModal(resId, draft){
         <div style="white-space:pre-wrap;font-size:13.5px;margin-top:8px;color:#333;">${escR(draft.rawText)}</div>
       </details>` : ''}
       <div class="out-row stretch">
-        <div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 <button type="button" class="btn sm" style="padding:1px 7px;font-size:11px;margin-left:4px;" onclick="addRsvExtraGenRow()">+ 추가</button></label>
+        <div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 <button type="button" class="btn sm" style="padding:1px 7px;font-size:11px;margin-left:4px;" onclick="addRsvExtraGenRow()">+ 추가</button>
+          <select id="f-rsv-capfilter" onchange="applyRsvCapFilter()" title="용량으로 걸러서 보기" style="width:auto;font-size:11.5px;padding:1px 4px;margin-left:4px;height:auto;">${rsvCapFilterOptionsHtml(candidates)}</select></label>
           <div style="display:flex;align-items:center;gap:4px;">
             <select id="f-rsv-gen" onchange="onRsvGenChange()" style="flex:1;min-width:0;">${genOptionsHtml}</select>
             <input type="number" id="f-rsv-starthours" value="0" min="0" placeholder="누적h" title="출고시 누적 사용시간(h) - 마지막으로 확인된 값이 자동으로 들어가며, 실제 값과 다르면 [정비관리 → 직접수정]에서 먼저 바로잡아주세요." readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;background:var(--surface-2);color:var(--ink-soft);">
@@ -10527,6 +10720,7 @@ function openReserveNoGenModal(resId, draft){
     </div>
   </div>`;
   initSuppliesPicker('f-rsv-supplies');
+  refreshRsvBoard();
 }
 function reapplySmsOrderToRsvForm(){
   if(!_rsvSmsOrderRaw){ return; }
@@ -10568,6 +10762,7 @@ function reapplySmsOrderToRsvForm(){
   flash('📩 문자 원본 내용대로 다시 채웠습니다');
 }
 function onRsvGenChange(){
+  refreshRsvBoard();
   const sel = document.getElementById('f-rsv-gen');
   const hoursEl = document.getElementById('f-rsv-starthours');
   if(!sel || !hoursEl) return;
@@ -11171,7 +11366,9 @@ function openOutModal(id, reservationId){
     if(!isEditingPending) return '';
     const reservedElsewhere = new Set(DB.reservations.filter(r=>r.id!==reservationId).map(r=>r.genId));
     const candidates = activeGens().filter(x=>x.id===g.id || (x.status==='in' && !x.underRepair && !reservedElsewhere.has(x.id))).sort(sortByIdNatural);
-    return `<option value="${UNASSIGNED_GEN_ID}">🅾 미지정 (나중에 배정)</option>` + candidates.map(x=>`<option value="${x.id}" ${x.id===g.id?'selected':''}>${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
+    _targetGenCandidates = candidates;
+    // 지금 배정된 발전기가 처음에 선택된 상태로 열려야 합니다(안 그러면 "미지정"으로 저장될 수 있음).
+    return `<option value="${UNASSIGNED_GEN_ID}">🅾 미지정 (나중에 배정)</option>` + genOptionsByCapacityHtml(candidates).replace(`<option value="${g.id}">`, `<option value="${g.id}" selected>`);
   })();
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
@@ -11180,11 +11377,12 @@ function openOutModal(id, reservationId){
       <div class="modal-sub" id="out-modal-sub">${g.id} · [${displayModel(g)}]</div>
       ${isEditingPending? `<div class="hint" style="margin-bottom:10px;color:var(--danger);">이 발전기는 이미 [출고 대기]에 상차대기로 등록되어 있습니다. 여기서 수정하면 상차대기 내용이 갱신됩니다.</div>` : ''}
       <div class="out-row stretch">
-        ${isEditingPending? `<div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 번호 (변경 가능)</label>
+        ${isEditingPending? `<div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 번호 (변경 가능) <button type="button" class="btn sm" style="padding:1px 7px;font-size:11px;margin-left:4px;" onclick="addOutExtraGenRow()">+ 추가</button> <select id="f-target-capfilter" onchange="applyTargetCapFilter()" title="용량으로 걸러서 보기" style="width:auto;font-size:11.5px;padding:1px 4px;margin-left:4px;height:auto;">${rsvCapFilterOptionsHtml(_targetGenCandidates)}</select></label>
           <div style="display:flex;align-items:center;gap:4px;">
             <select id="f-target-gen" onchange="onTargetGenChange()" style="flex:1;min-width:0;">${targetGenOptionsHtml}</select>
             ${g.hoursKnown? `<input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;background:var(--surface-2);color:var(--ink-soft);">` : ''}
           </div>
+          <div id="f-out-extra-gens-wrap"></div>
           <details class="info-toggle" style="margin-top:4px;"><summary></summary><p class="muted" style="font-size:12px;">다른 발전기로 바꾸면 옆 누적 사용시간이 그 발전기의 현재 누적시간으로 자동으로 바뀝니다. 이미 입고중이고 다른 곳에 예약되지 않은 발전기만 고를 수 있습니다. 누적시간은 이미 등록된 값이라 여기서 수정할 수 없고, 틀렸으면 [정비관리 → 직접수정]에서 먼저 바로잡아야 합니다.</p></details>
         </div></div>` : (g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="background:var(--surface-2);color:var(--ink-soft);">${g.hoursUnconfirmed? `<div class="hint" style="color:var(--danger);font-weight:700;font-size:11.5px;">⚠️ 지난 입고 때 누적시간 미확인 - 실제와 다를 수 있음</div>`:''}</div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</div></div></div>`)}
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
@@ -11277,6 +11475,38 @@ function toggleFuelFields(toggleId, wrapId){
   const chk = document.getElementById(toggleId);
   const wrap = document.getElementById(wrapId);
   if(wrap) wrap.style.display = chk && chk.checked ? 'block' : 'none';
+}
+// 상차대기 내용수정: "+ 추가"로 같은 거래처 정보로 같이 나갈 발전기를 더 붙입니다(저장하면 상차대기로 같이 올라가고 같은 묶음이 됩니다).
+let _outExtraIdx = 0;
+function addOutExtraGenRow(preset){
+  const wrap = document.getElementById('f-out-extra-gens-wrap');
+  if(!wrap) return;
+  const rowId = 'out-extra-' + (_outExtraIdx++);
+  const row = document.createElement('div');
+  row.id = rowId;
+  row.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:6px;';
+  row.innerHTML = `<select class="out-extra-gen-select" style="flex:1;min-width:0;padding:5px 6px;font-size:12.5px;"><option value="">추가할 발전기 선택</option>${genOptionsByCapacityHtml((_targetGenCandidates||[]).filter(x=>x.id!==((document.getElementById('f-target-gen')||{}).value)))}</select>
+    <button type="button" class="btn sm danger" style="flex:0 0 auto;padding:2px 7px;" onclick="document.getElementById('${rowId}').remove()">×</button>`;
+  wrap.appendChild(row);
+  if(preset){ const sel = row.querySelector('select'); sel.value = preset; }
+}
+function outExtraGenIds(mainId){
+  const ids = [];
+  document.querySelectorAll('#f-out-extra-gens-wrap .out-extra-gen-select').forEach(el=>{ if(el.value && el.value!==mainId && el.value!==UNASSIGNED_GEN_ID && !ids.includes(el.value)) ids.push(el.value); });
+  return ids;
+}
+// 상차대기 내용수정: 발전기 번호 칸을 용량으로 걸러 보기 (지금 고른 발전기는 다른 용량이어도 남겨둡니다)
+let _targetGenCandidates = [];
+function applyTargetCapFilter(){
+  const fEl = document.getElementById('f-target-capfilter');
+  const sel = document.getElementById('f-target-gen');
+  if(!sel) return;
+  const cap = fEl && fEl.value!=='' ? Number(fEl.value) : null;
+  const list = (_targetGenCandidates||[]).filter(g=>cap==null || capacityOf(g)===cap);
+  const v = sel.value;
+  const cur = (v && v!==UNASSIGNED_GEN_ID && !list.some(x=>x.id===v)) ? findGen(v) : null;
+  sel.innerHTML = `<option value="${UNASSIGNED_GEN_ID}">🅾 미지정 (나중에 배정)</option>` + (cur? `<option value="${cur.id}">${cur.id} · ${escR(cur.model||'미설정')}</option>` : '') + genOptionsByCapacityHtml(list);
+  sel.value = v;
 }
 function onTargetGenChange(){
   const sel = document.getElementById('f-target-gen');
@@ -11406,9 +11636,15 @@ async function submitOut(idParam, reservationId){
   };
   const idx = reservationId ? DB.reservations.findIndex(r=>r.id===reservationId) : -1;
   const wasPending = idx>=0 && DB.reservations[idx].pendingLoad;
+  const extraGenIds = outExtraGenIds(id);
+  const badExtra = extraGenIds.filter(gid=>{ const eg = findGen(gid); return !eg || eg.status!=='in' || eg.underRepair || DB.reservations.some(o=>o.genId===gid && o.id!==reservationId); });
+  if(badExtra.length){
+    errEl.textContent = `추가한 발전기 ${badExtra.join(', ')}는 지금 배정할 수 없습니다(그사이 다른 건에 배정됐거나 출고·고장). 빼거나 다른 발전기로 바꿔주세요.`;
+    errEl.style.display='block'; return;
+  }
   pendingOutSubmitCtx = {
-    id, reservationId, pendingData, existing, idx, wasPending,
-    vals: {customer, manager, phone, address, supplies, voltage, qty, fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note, outDate, startHours}
+    id, reservationId, pendingData, existing, idx, wasPending, extraGenIds,
+    vals: {customer, manager, phone, address, supplies, voltage, qty, fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note, outDate, startHours, extraGenIds}
   };
   showOutSubmitPreview(g, pendingData);
 }
@@ -11444,6 +11680,18 @@ async function confirmOutSubmit(){
     keepResSmsMeta(pendingData, existing);
     if(idx>=0) DB.reservations[idx] = pendingData;
     else DB.reservations.push(pendingData);
+    // "+ 추가"로 붙인 발전기는 같은 내용으로 상차대기 건을 새로 만들고 같은 묶음으로 이어둡니다.
+    const extraIds = (ctx.extraGenIds||[]).filter(gid=>gid!==pendingData.genId && !DB.reservations.some(o=>o.genId===gid));
+    if(extraIds.length){
+      const bid = pendingData.batchId || groupSibs3.map(x=>x.batchId).find(Boolean) || uid();
+      pendingData.batchId = bid;
+      extraIds.forEach(gid=>{
+        const eg = findGen(gid);
+        DB.reservations.push({ ...pendingData, id: uid(), genId: gid, pendingLoad: true, batchId: bid,
+          startHours: eg ? (eg.hours||0) : 0, smsOrder: null, smsOrderAt: null, smsQtyIndex: null, smsQtyTotal: null, smsOrderChecked: false,
+          genAssignedBy: DB.currentUserName||null, genAssignedAt: nowDateTimeStr(), createdAt: todayStr(), createdAtTs: Date.now() });
+      });
+    }
     // 같은 문자로 나뉜 N대·같은 묶음의 다른 건(미지정 포함)에도 거래처·주소·담당자·연락처·비고를 먼저 반영합니다.
     syncResGroupSharedFields(pendingData, DB.reservations, groupSibs3);
     // 배치 판별: 명시적으로 batchId가 같으면 그걸로 묶고, batchId가 없는 건들끼리는
@@ -11495,6 +11743,7 @@ async function confirmOutSubmit(){
 function reopenOutModalWithValues(id, reservationId, vals){
   openOutModal(id, reservationId);
   setTimeout(function(){
+    (vals.extraGenIds||[]).forEach(gid=>addOutExtraGenRow(gid));
     const setVal = (elId, v)=>{ const el = document.getElementById(elId); if(el && v!=null && v!=='') el.value = v; };
     setVal('f-starthours', vals.startHours);
     setVal('f-outdate', vals.outDate);
