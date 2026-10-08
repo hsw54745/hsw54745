@@ -1550,7 +1550,7 @@ function qmRenderMaintBody(){
         <div style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(g.id)} <span style="font-weight:600;color:#333;font-size:13.5px;">${displayModel(g)}</span></div>
         ${statusHtml}
       </div>
-      <div style="font-size:12.5px;color:#666;margin-top:3px;">${g.status==='in'? (g.underRepair? '🔧 입고 (고장수리중)' : '📦 입고') : `🚚 출고중${g.rental&&g.rental.customer? ` · ${escR(g.rental.customer)}`:''}`}${(g.hoursKnown && g.hoursUnconfirmed)? ' · <b style="color:#C23B3B;">⏱ 누적시간 미확인</b>':''}</div>
+      <div style="font-size:12.5px;color:#666;margin-top:3px;">${g.status==='in'? (g.underRepair? '🔧 입고 (고장수리중)' : '📦 입고') : `<button type="button" onclick="openGenLocationModal('${g.id}')" style="background:#FFF4E0;border:1.5px solid #D08A1E;color:#8A5A00;font-weight:800;font-size:12.5px;border-radius:12px;padding:3px 10px;cursor:pointer;">🚚 출고중${g.rental&&g.rental.customer? ` · ${escR(g.rental.customer)}`:''} · 위치보기</button>`}${(g.hoursKnown && g.hoursUnconfirmed)? ' · <b style="color:#C23B3B;">⏱ 누적시간 미확인</b>':''}</div>
       ${gauge? `<div style="margin-top:8px;">${gauge}</div>`:''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:12.5px;color:#444;margin-top:8px;">
         <div>현재 누적: <b>${g.hoursKnown? (g.hours||0).toLocaleString()+'h' : '확인불가'}</b></div>
@@ -5327,6 +5327,34 @@ function clearEstDailyFromAll(){
   });
 }
 
+// 정비관리에서 출고중 발전기를 누르면, 지금 나가 있는 현장(거래처·주소·담당자·연락처·기간)을 보여줍니다. 사무실·퀵메뉴 공용.
+function openGenLocationModal(id){
+  const g = findGen(id);
+  if(!g || !g.rental){ showInfoModal('출고 정보가 없습니다.'); return; }
+  const rt = g.rental;
+  const days = rt.outDate ? daysSinceDate(rt.outDate)+1 : null;
+  const expIn = (typeof expectedInDate==='function') ? expectedInDate(rt) : null;
+  const phoneDigits = String(rt.phone||'').replace(/[^0-9]/g,'');
+  const addr = rt.address || rt.site || '';
+  const row = (k,v)=> v ? `<div style="display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);"><span class="muted" style="flex:0 0 74px;font-size:13px;">${k}</span><span style="flex:1;font-size:14px;font-weight:600;word-break:break-all;">${v}</span></div>` : '';
+  const rem = hasHourData(g) ? estRemaining(g) : null;
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal" style="text-align:left;">
+      <h3 style="text-align:center;">📍 ${escR(g.id)} 지금 위치</h3>
+      <div class="modal-sub" style="text-align:center;">${displayModel(g)}</div>
+      ${row('거래처', escR(rt.customer||'미기재'))}
+      ${row('현장 주소', addr? `${escR(addr)} <a href="https://map.naver.com/p/search/${encodeURIComponent(addr)}" target="_blank" rel="noopener" style="font-size:12px;white-space:nowrap;">🗺 지도</a>` : '<span class="muted">미기재</span>')}
+      ${row('담당자', escR(rt.manager||''))}
+      ${row('연락처', rt.phone? `${phoneDigits? `<a href="tel:${phoneDigits}">${escR(rt.phone)}</a>` : escR(rt.phone)}` : '')}
+      ${row('출고일', rt.outDate? `${dow(rt.outDate)}${days? ` · <b>${days}일째</b>`:''}${rt.usageDays? ` (예정 ${rt.usageDays}일)`:''}` : '')}
+      ${row('입고예정', expIn? dow(expIn) : '')}
+      ${row('정비', (g.hoursKnown && rem!=null)? (rem<=0? `<b style="color:var(--danger);">약 ${Math.round(-rem)}h 초과 (추정)</b>` : `약 ${Math.round(rem)}h 남음 (추정)`) : '')}
+      ${row('비고', rt.note? escR(rt.note) : '')}
+      <div class="modal-actions"><button class="btn primary" onclick="closeModal()">닫기</button></div>
+    </div>
+  </div>`;
+}
 function renderMaintTab(){
   return `
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
@@ -5434,7 +5462,7 @@ function renderMaintList(){
       <td>${fuelPerHourCellHtml(g)}</td>
       <td>${tankCapacityCellHtml(g)}</td>
       <td>${(()=>{ const wt = genWeightT(g); return wt ? `<span style="font-weight:700;white-space:nowrap;">${wt}t</span>` : '<span class="muted" style="font-size:11.5px;white-space:nowrap;">미입력</span>'; })()}</td>
-      <td class="muted" style="font-size:12px;">${g.status==='in'?'입고':'출고중'}</td>
+      <td style="font-size:12px;">${g.status==='in'? '<span class="muted">입고</span>' : `<button type="button" class="btn sm" style="white-space:nowrap;color:var(--warn);border-color:var(--warn);font-weight:700;" onclick="openGenLocationModal('${g.id}')" title="지금 나가 있는 현장 보기">🚚 출고중 · 위치</button>${g.rental&&g.rental.customer? `<div class="muted" style="font-size:11px;margin-top:2px;">${escR(g.rental.customer)}</div>`:''}`}</td>
       <td>${known? gaugeHtml(el,rem,getCycle(g),g.status!=='in' && g.rental && effEstDaily(g)>0) : unknownCellHtml}</td>
       <td>${known? pillHtml(maintStatus(rem)) : unknownPillHtml}</td>
       <td><div class="btn-row" style="align-items:center;">
@@ -5746,18 +5774,12 @@ function renderHistorySelectOptions(keepId){
 let historyViewMode = 'gen';
 function renderHistoryTab(){
   return `
-    <div class="detail-card" style="margin:0 0 12px;padding:12px 14px;">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span style="font-weight:800;font-size:14px;">🔎 임대이력 검색</span>
-        <input type="search" id="hist-search" value="${escR(histSearchQuery)}" oninput="onHistSearchInput(this.value)" placeholder="거래처명, 현장주소, 담당자, 연락처(뒷자리도 가능), 발전기 번호, 비고… 띄어쓰기로 여러 단어" style="flex:1;min-width:240px;padding:8px 10px;font-size:14px;">
-        ${histSearchQuery? `<button class="btn sm" onclick="onHistSearchInput('');const el=document.getElementById('hist-search');if(el){el.value='';el.focus();}">지우기</button>`:''}
-      </div>
-      <div id="hist-search-result"></div>
-    </div>
     <div class="btn-row" style="margin-bottom:10px;">
       <button class="btn sm${historyViewMode==='gen'?' primary':''}" onclick="switchHistoryView('gen')">발전기별 이력</button>
       <button class="btn sm${historyViewMode==='customer'?' primary':''}" onclick="switchHistoryView('customer')">거래처별 이력</button>
+      <input type="search" id="hist-search" value="${escR(histSearchQuery)}" oninput="onHistSearchInput(this.value)" placeholder="🔎 거래처·주소·연락처·번호 검색" title="거래처명, 현장주소, 담당자, 연락처(뒷자리도 가능), 발전기 번호, 비고로 찾습니다. 띄어쓰기로 여러 단어도 됩니다." style="width:210px;padding:5px 8px;font-size:13px;margin-left:4px;">
     </div>
+    <div id="hist-search-result" style="margin-bottom:12px;"></div>
     ${historyViewMode==='gen' ? `
     <div class="section-title" style="margin-top:0;">🔍 발전기별 이력 조회</div>
     <div class="toolbar">
