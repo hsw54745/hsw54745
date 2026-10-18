@@ -698,8 +698,7 @@ function renderQuickModeUI(){
       <button type="button" onclick="renderQuickModeStockList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📦 입고된 발전기 리스트 보기</button>
       <button type="button" onclick="renderQuickModeOutList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">🚚 출고중 발전기 리스트 보기</button>
       <button type="button" onclick="renderQuickModeSoonInList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#B2782C;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📅 입고 예정 리스트 보기</button>
-      <button type="button" onclick="renderQmReservationList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">⏳ 출고대기 리스트 보기</button>
-      <button type="button" onclick="renderQmMaintView()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A4FBE;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:20px;">🔧 정비관리 보기</button>
+      <button type="button" onclick="renderQmReservationList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:20px;">⏳ 출고대기 리스트 보기</button>
       <button type="button" onclick="renderQmReturnRequestList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:20px;position:relative;">🔻 철수요청 확인<span id="qm-return-count-badge"></span></button>
       <button type="button" onclick="renderQuickModeTextChoice()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📝 문자 등록하기 (출고/철수)</button>
       <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:14px;cursor:pointer;">📝 출고예약 등록</button>
@@ -862,6 +861,9 @@ async function renderQmStockListInner(){
         maintPill = `<span style="border:1px solid #C23B3B;color:#C23B3B;background:#C23B3B15;font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;white-space:nowrap;">확인불가</span>`;
       }
       const lastIn = lastInMap[g.id];
+      const totalPill = g.hoursKnown
+        ? `<span style="border:1px solid #2C4A66;color:#2C4A66;background:#2C4A6615;font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;white-space:nowrap;">⏱ 누적 ${Math.round(g.hours||0).toLocaleString()}h</span>`
+        : '';
       return `
       <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
@@ -874,6 +876,7 @@ async function renderQmStockListInner(){
         ${lastIn? `<div style="font-size:11px;color:#888;margin-top:3px;">🕐 최근 입고 ${escR(lastIn.date)}</div>` : ''}
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;">
           <button type="button" onclick="openQmVoltageEdit('${g.id}')" style="${vStyle}font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;border-style:solid;border-width:1px;">${escR(g.voltage)||'전압 미설정'}</button>
+          ${totalPill}
           ${maintPill}
         </div>
       </div>`;
@@ -1243,8 +1246,7 @@ async function openQmInProcess(id){
         ${g.hoursKnown ? `
         <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:6px;">입고시(반납) 누적 사용시간(h)</label>
         <input type="number" id="qmin-endhours" placeholder="예: ${Math.round((g.hours||0))}" min="${r.startHours||0}" style="width:100%;font-size:16px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;">
-        <div style="font-size:12.5px;color:#C23B3B;font-weight:700;margin-top:6px;">출고시 누적시간: ${(r.startHours||0).toLocaleString()}h${g.hoursUnconfirmed? ' (⚠️ 실제와 다를 수 있음)':''}</div>
-        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:15px;font-weight:800;color:#333;cursor:pointer;"><input type="checkbox" id="qmin-endhours-unknown" onchange="toggleEndHoursUnknown('qmin-endhours', this.checked)" style="width:20px;height:20px;"> 누적시간 모름 (계기판 확인 못함)</label>
+        <div style="font-size:12.5px;color:#C23B3B;font-weight:700;margin-top:6px;">출고시 누적시간: ${(r.startHours||0).toLocaleString()}h</div>
         ` : `
         <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:4px;">누적 사용시간</label>
         <div style="font-size:14px;color:#C23B3B;font-weight:700;">확인불가</div>
@@ -1334,8 +1336,7 @@ async function submitQmInProcess(id){
     let rentals = []; try{ rentals = curRentals ? JSON.parse(curRentals.value) : []; }catch(e){ rentals = []; }
     if(!Array.isArray(rentals)) rentals = [];
     const g = gens.find(x=>x && String(x.id)===String(id));
-    if(!g){ showErr('해당 발전기를 찾을 수 없습니다.'); return; }
-    if(g.status!=='out'){ showErr('이 발전기는 그사이 다른 사람이 이미 입고 처리했습니다.'); return; }
+    if(!g || g.status!=='out'){ showErr('해당 발전기를 찾을 수 없습니다.'); return; }
     const r = g.rental || {};
 
     const noteAckEl = document.getElementById('qmin-note-ack');
@@ -1344,16 +1345,13 @@ async function submitQmInProcess(id){
     const inDate = document.getElementById('qmin-date').value;
     const voltage = (document.getElementById('qmin-voltage').value||'').trim();
     const endHoursEl = document.getElementById('qmin-endhours');
-    const qmHoursUnknownEl = document.getElementById('qmin-endhours-unknown');
-    const qmHoursUnknown = !!(qmHoursUnknownEl && qmHoursUnknownEl.checked);
-    const endHours = (endHoursEl && !qmHoursUnknown) ? (endHoursEl.value==='' ? null : Number(endHoursEl.value)) : null;
+    const endHours = endHoursEl ? (endHoursEl.value==='' ? null : Number(endHoursEl.value)) : null;
 
-    if(!inDate || (g.hoursKnown && !qmHoursUnknown && (endHours===null || isNaN(endHours) || (endHours < (r.startHours||0) && !g.hoursUnconfirmed)))){
-      showErr('입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다. 계기판을 못 봤으면 "누적시간 모름"을 체크하세요)');
+    if(!inDate || (g.hoursKnown && (endHours===null || isNaN(endHours) || endHours < (r.startHours||0)))){
+      showErr('입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다)');
       return;
     }
-    // 이전에 누적시간을 확인 못한 발전기는 그동안 쓴 시간이 이번에 몰아서 잡히는 게 정상이라 하루 24시간 검사를 건너뜁니다.
-    if(r.outDate && inDate && g.hoursKnown && endHours!==null && !g.hoursUnconfirmed){
+    if(r.outDate && inDate && g.hoursKnown && endHours!==null){
       const usedH = endHours - (r.startHours||0);
       const outD = new Date(r.outDate+'T00:00:00');
       const inD = new Date(inDate+'T00:00:00');
@@ -1375,8 +1373,7 @@ async function submitQmInProcess(id){
     let remainingFuelLiters = null;
     if(measuredFuelHeightCm!=null) remainingFuelLiters = qmComputeFuelLiters(g, measuredFuelHeightCm, materials);
     const fuelExhaustNote = (remainingFuelLiters===0) ? '출고시 연료 모두 소진되어 입고' : '';
-    const qmHoursNote = (g.hoursKnown && endHours===null) ? '입고시 누적시간 미확인' : '';
-    const combinedNote = [r.note, fuelExhaustNote, qmHoursNote].filter(Boolean).join(' / ');
+    const combinedNote = [r.note, fuelExhaustNote].filter(Boolean).join(' / ');
 
     if(btn){ btn.disabled = true; btn.textContent = '처리 중...'; }
 
@@ -1385,15 +1382,14 @@ async function submitQmInProcess(id){
       site: r.site, address: r.address, supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', suppliesRecovered, suppliesNote,
       fuelRequested: r.fuelRequested, fuelActual: r.fuelActual, usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, note: combinedNote,
       outDate: r.outDate, inDate, startHours: r.startHours, endHours,
-      usedHours: (endHours!=null && endHours >= (r.startHours||0)) ? endHours - (r.startHours||0) : null,
+      usedHours: endHours!=null ? endHours - (r.startHours||0) : null,
       voltage, outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: r.loadConfirmedBy||null, inProcessedBy: qmLabel(), inProcessedAt: nowDateTimeStr(),
       measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
       paymentConfirmed: r.paymentConfirmed||false, forcedOut: r.forcedOut||false, forceReason: r.forceReason||'', forcedBy: r.forcedBy||null
     });
 
     g.status = 'in';
-    if(g.hoursKnown && endHours!==null){ g.hours = endHours; g.hoursUnconfirmed = false; }
-    else if(g.hoursKnown) g.hoursUnconfirmed = true;
+    if(g.hoursKnown && endHours!==null) g.hours = endHours;
     const oldVoltageForMaintLog = g.voltage||'';
     g.voltage = voltage;
     g.voltageUpdatedAt = nowDateTimeStr();
@@ -1432,8 +1428,11 @@ async function submitQmInProcess(id){
       if(Array.isArray(rrList2) && rrList2.length>0){
         const autoMatched2 = rrList2.filter(rr=>{
           if(!rr) return false;
-          const parsed = parseReturnRequestText(rr.text, rr.createdAtTs);
-          return returnReqMatchesRental(parsed, r, g.id);
+          const parsed = parseReturnRequestText(rr.text);
+          if(parsed.phone && r.phone && parsed.phone===r.phone.replace(/[^0-9]/g,'')) return true;
+          if(parsed.address && r.address && (r.address.includes(parsed.address) || parsed.address.includes(r.address))) return true;
+          if(parsed.customer && r.customer && (r.customer.includes(parsed.customer) || parsed.customer.includes(r.customer))) return true;
+          return false;
         });
         if(autoMatched2.length>0){
           const autoMatchedIds2 = new Set(autoMatched2.map(rr=>rr.id));
@@ -1451,127 +1450,6 @@ async function submitQmInProcess(id){
     if(btn){ btn.disabled = false; btn.textContent = '입고처리 완료'; }
   }
 }
-// ===== 퀵메뉴: 정비관리 (보기 전용) =====
-// 사무실 [정비 관리] 탭과 같은 내용(정비 주기 현황·출고중 정비 준비 리스트·발전기별 정비 이력)을 폰에서 볼 수만 있게 합니다.
-// 정비 등록·직접수정·정비주기 변경 같은 수정 기능은 넣지 않았습니다.
-let qmMaintCapFilter = null;
-let qmMaintView = 'cycle'; // 'cycle' | 'prep'
-async function qmLoadMaintData(){
-  const keys = [
-    ['gens','gen-fleet-v2',[]], ['maint','gen-maintenance-v2',[]], ['materials','gen-materials-v1',{}],
-    ['modelColors','gen-model-colors-v1',{}], ['genColorOverrides','gen-gen-color-overrides-v1',{}],
-    ['companyInfo','gen-company-info-v1',null], ['warnThreshold','gen-warn-threshold-v1',50], ['partsUnit','gen-parts-unit-v1',{}]
-  ];
-  const res = await Promise.all(keys.map(([,k])=>window.storage.get(k, true).catch(()=>null)));
-  keys.forEach(([name,,def],i)=>{
-    let v = def;
-    try{ if(res[i] && res[i].value!=null) v = JSON.parse(res[i].value); }catch(e){ v = def; }
-    if(v==null) return; // companyInfo가 없으면 기본값 유지
-    if(name==='gens' && !Array.isArray(v)) v = [];
-    if(name==='maint' && !Array.isArray(v)) v = [];
-    DB[name] = v;
-  });
-}
-async function renderQmMaintView(){
-  pwGateShow(`
-    <div style="background:#F4F6F5;border-radius:16px;padding:22px 16px;max-width:560px;width:100%;max-height:92vh;overflow:auto;">
-      <button type="button" onclick="renderQuickModeUI()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
-      <div style="text-align:center;margin-bottom:12px;">
-        <div style="font-size:24px;font-weight:800;color:#8A4FBE;">🔧 정비관리</div>
-        <div style="font-size:13px;color:#777;margin-top:4px;">보기 전용입니다. 등록·수정은 사무실 화면에서 해주세요.</div>
-      </div>
-      <div id="qm-maint-body"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
-    </div>
-  `);
-  try{ await qmLoadMaintData(); }
-  catch(e){ const b = document.getElementById('qm-maint-body'); if(b) b.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">정비 정보를 불러오지 못했습니다.</div>'; return; }
-  qmRenderMaintBody();
-}
-function qmSetMaintView(v){ qmMaintView = v; qmRenderMaintBody(); }
-function qmSetMaintCap(cap){ qmMaintCapFilter = cap; qmRenderMaintBody(); }
-function qmToggleMaintHist(id){
-  const el = document.getElementById('qm-mh-'+id);
-  if(el) el.style.display = el.style.display==='none' ? 'block' : 'none';
-}
-function qmMaintTypePill(t){
-  if(t==='고장수리') return '<span class="pill danger">고장수리</span>';
-  if(t==='전압변경') return '<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>';
-  if(t==='일반점검') return '<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>';
-  return '<span class="pill gray">엔진오일교체</span>';
-}
-function qmMaintHistHtml(genId){
-  const recs = (DB.maint||[]).filter(m=>m && m.genId===genId).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  if(!recs.length) return '<div style="color:#999;font-size:13px;padding:6px 0;">정비 이력이 없습니다.</div>';
-  return recs.map(m=>{
-    const photos = maintPhotosOf(m);
-    const parts = (m.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).filter(Boolean).join(', ');
-    return `<div style="border-top:1px dashed #ddd;padding:8px 0;font-size:13px;line-height:1.5;">
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><b>${escR(dow(m.date)||'-')}</b>${qmMaintTypePill(m.type)}<span style="color:#888;">${(m.hours||0).toLocaleString()}h</span>${m.technician? `<span style="color:#555;">· ${escR(m.technician)}</span>`:''}</div>
-      ${parts? `<div style="color:#555;margin-top:2px;">🔩 ${escR(parts)}</div>`:''}
-      ${m.content? `<div style="color:#333;margin-top:2px;white-space:pre-wrap;">${escR(m.content)}</div>`:''}
-      ${photos.length? `<div style="margin-top:4px;">${photos.map((p,i)=>`<img src="${p}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #ccc;margin:2px;cursor:pointer;" onclick="openImageViewModal('${p}','정비 사진 ${i+1}/${photos.length}')">`).join('')}</div>`:''}
-    </div>`;
-  }).join('');
-}
-function qmRenderMaintBody(){
-  const body = document.getElementById('qm-maint-body');
-  if(!body) return;
-  const allGens = activeGens();
-  const tabBtn = (v,label)=>`<button type="button" onclick="qmSetMaintView('${v}')" style="flex:1;padding:10px 6px;font-size:14px;font-weight:800;border-radius:10px;cursor:pointer;border:2px solid #8A4FBE;${qmMaintView===v?'background:#8A4FBE;color:#fff;':'background:#fff;color:#8A4FBE;'}">${label}</button>`;
-  let html = `<div style="display:flex;gap:6px;margin-bottom:12px;">${tabBtn('cycle','정비 주기 현황')}${tabBtn('prep','출고중 정비 준비')}</div>`;
-  if(qmMaintView==='prep'){
-    body.innerHTML = html + `<div style="background:#fff;border-radius:12px;padding:10px;">${outPrepListHtml()}</div>`;
-    return;
-  }
-  const remOf = g=> hasHourData(g) ? (g.status==='in'? remainingHours(g) : estRemaining(g)) : 9999;
-  const caps = {};
-  allGens.forEach(g=>{ const c = capacityOf(g); if(isFinite(c)) caps[c] = (caps[c]||0)+1; });
-  const capList = Object.keys(caps).map(Number).sort((a,b)=>a-b);
-  const chip = (active,label,onclick)=>`<button type="button" onclick="${onclick}" style="padding:6px 10px;font-size:13px;font-weight:700;border-radius:14px;cursor:pointer;border:1.5px solid #8A4FBE;${active?'background:#8A4FBE;color:#fff;':'background:#fff;color:#8A4FBE;'}">${label}</button>`;
-  html += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">${chip(qmMaintCapFilter==null,'전체','qmSetMaintCap(null)')}${capList.map(c=>chip(qmMaintCapFilter===c, `${c}kW (${caps[c]})`, `qmSetMaintCap(${c})`)).join('')}</div>`;
-  const list = allGens.filter(g=>qmMaintCapFilter==null || capacityOf(g)===qmMaintCapFilter).sort((a,b)=>remOf(a)-remOf(b));
-  let nDanger = 0, nWarn = 0;
-  const cards = list.map(g=>{
-    const hasBase = (g.hours>0 || g.lastMaintHours>0);
-    const known = g.hoursKnown && (g.status==='in' || hasBase);
-    const el = g.status==='in'? elapsedHours(g) : estElapsed(g);
-    const rem = g.status==='in'? remainingHours(g) : estRemaining(g);
-    const st = known ? maintStatus(rem) : null;
-    if(st==='danger') nDanger++; else if(st==='warn') nWarn++;
-    const notYet = g.hoursKnown && !known;
-    const statusHtml = known ? pillHtml(st) : (notYet ? '<span class="pill" style="color:#777;border-color:#bbb;">입고 시 확인</span>' : '<span class="pill danger">확인불가</span>');
-    const gauge = known ? gaugeHtml(el, rem, getCycle(g), g.status!=='in' && g.rental && effEstDaily(g)>0) : '';
-    const histCnt = (DB.maint||[]).filter(m=>m && m.genId===g.id).length;
-    const lastM = g.lastMaintDate ? `${dow(g.lastMaintDate)}${g.hoursKnown? ` · ${(g.lastMaintHours||0).toLocaleString()}h`:''}` : '기록 없음';
-    const border = st==='danger' ? '#C23B3B' : (st==='warn' ? '#D08A1E' : '#ddd');
-    const wt = genWeightT(g);
-    return `<div style="background:#fff;border:1.5px solid ${border};border-radius:12px;padding:12px 14px;margin-bottom:8px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-        <div style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(g.id)} <span style="font-weight:600;color:#333;font-size:13.5px;">${displayModel(g)}</span></div>
-        ${statusHtml}
-      </div>
-      <div style="font-size:12.5px;color:#666;margin-top:3px;">${g.status==='in'? (g.underRepair? '🔧 입고 (고장수리중)' : '📦 입고') : `<button type="button" onclick="openGenLocationModal('${g.id}')" style="background:#FFF4E0;border:1.5px solid #D08A1E;color:#8A5A00;font-weight:800;font-size:12.5px;border-radius:12px;padding:3px 10px;cursor:pointer;">🚚 출고중${g.rental&&g.rental.customer? ` · ${escR(g.rental.customer)}`:''} · 위치보기</button>`}${(g.hoursKnown && g.hoursUnconfirmed)? ' · <b style="color:#C23B3B;">⏱ 누적시간 미확인</b>':''}</div>
-      ${gauge? `<div style="margin-top:8px;">${gauge}</div>`:''}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:12.5px;color:#444;margin-top:8px;">
-        <div>현재 누적: <b>${g.hoursKnown? (g.hours||0).toLocaleString()+'h' : '확인불가'}</b></div>
-        <div>정비주기: <b>${getCycle(g)}h</b></div>
-        <div style="grid-column:1/3;">마지막 정비: <b>${lastM}</b></div>
-        <div>연료소모: ${fuelPerHourCellHtml(g)}</div>
-        <div>탱크: ${tankCapacityCellHtml(g)}</div>
-        <div>총중량: ${wt? `<b>${wt}t</b>` : '<span class="muted">미입력</span>'}</div>
-      </div>
-      <details style="margin-top:8px;"><summary style="cursor:pointer;font-size:13px;font-weight:700;color:#8A4FBE;">🧰 정비 자재 보기</summary><div style="margin-top:6px;">${materialSummaryHtml(g.model)}</div></details>
-      <button type="button" onclick="qmToggleMaintHist('${g.id}')" style="margin-top:8px;width:100%;padding:8px;font-size:13px;font-weight:800;background:#F5EEFB;color:#6A3A9A;border:1.5px solid #C9A9E6;border-radius:10px;cursor:pointer;">📋 정비 이력 (${histCnt}건)</button>
-      <div id="qm-mh-${g.id}" style="display:none;margin-top:4px;">${qmMaintHistHtml(g.id)}</div>
-    </div>`;
-  }).join('');
-  html += `<div style="display:flex;gap:8px;margin-bottom:10px;font-size:13px;font-weight:800;">
-    <span style="background:#FBEAEA;color:#C23B3B;padding:4px 10px;border-radius:10px;">정비필요 ${nDanger}대</span>
-    <span style="background:#FFF4E0;color:#B06A00;padding:4px 10px;border-radius:10px;">임박 ${nWarn}대</span>
-    <span style="background:#eee;color:#555;padding:4px 10px;border-radius:10px;">전체 ${list.length}대</span>
-  </div>`;
-  body.innerHTML = html + (list.length? cards : '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">해당 발전기가 없습니다.</div>');
-}
 async function renderQmReservationList(){
   pwGateShow(`
     <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
@@ -1587,7 +1465,6 @@ async function renderQmReservationList(){
 }
 async function qmRefreshReservationList(){
   const wrap = document.getElementById('qm-res-list');
-  await qmLoadSmsLearnCache();
   try{
     const [cur, curFleet] = await Promise.all([
       window.storage.get('gen-reservations-v1', true),
@@ -1622,16 +1499,11 @@ async function qmRefreshReservationList(){
       ].filter(([k,v])=>v);
       return `
       <div style="background:${assigned?'#EAF5EC':'#fff'};border:1px solid ${assigned?'#2C6E49':'#ddd'};border-radius:10px;padding:12px 14px;margin-bottom:8px;">
-        ${auto? `<div style="font-size:11px;font-weight:800;color:#8A6D00;background:#FFF8E1;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;">🤖 문자 자동인식${auto.learned&&auto.learned.length? ' + 지난 거래기록 참고':''} (사무실 확인 전)</div>` : ''}
+        ${auto? `<div style="font-size:11px;font-weight:800;color:#8A6D00;background:#FFF8E1;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;">🤖 문자 자동인식 (사무실 확인 전)</div>` : ''}
         ${r.smsQtyTotal>1? `<div style="font-size:11px;font-weight:800;color:#1565C0;background:#E8F0FE;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;margin-left:4px;">📦 ${r.smsQtyTotal}대 중 ${r.smsQtyIndex}번째</div>` : ''}
         <div style="font-size:15px;font-weight:800;color:#2C4A66;">${escR(dCustomer)}</div>
-        ${(()=>{
-          // 사무실 확인 전 문자오더는 예약일이 "문자 붙여넣은 날"로 임시로 들어가 있어서, 문자에서 읽은 도착일을 대신 보여줍니다.
-          const unconfirmed = !!(auto && !r.arriveTime);
-          const dDate = unconfirmed ? (auto.outDate||'') : (r.outDate||r.plannedOutDate||'');
-          const dTime = unconfirmed ? (auto.arriveTime||'') : (r.arriveTime||'');
-          return `<div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${dDate? fmtDateKR(dDate) : '미정'}${dTime? ` (${escR(dTime)})`:''}${unconfirmed? ' <span style="color:#8A6D00;">(문자에서 읽음)</span>':''}</div>${dDate? arriveCountdownHtml(dDate) : ''}`;
-        })()}
+        <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${(r.outDate||r.plannedOutDate)? fmtDateKR(r.outDate||r.plannedOutDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
+        ${(r.outDate||r.plannedOutDate)? arriveCountdownHtml(r.outDate||r.plannedOutDate) : ''}
         <div style="font-size:13px;color:#333;margin-top:6px;">
           ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
@@ -1689,12 +1561,11 @@ async function qmRefreshReturnRequestList(){
     // 사무실 화면과 똑같은 기준(연락처 → 주소 → 거래처명 순)으로 어느 발전기인지 추정해봅니다.
     const outGens = gens.filter(g=>g && g.status==='out' && g.rental);
     wrap.innerHTML = list.map((r,i)=>{
-      const parsed = parseReturnRequestText(r.text, r.createdAtTs);
+      const parsed = parseReturnRequestText(r.text);
       let matched = null;
-      if(parsed.genId) matched = outGens.find(g=>g.id===parsed.genId) || null;
-      if(!matched && parsed.phone) matched = outGens.find(g=>rrPhoneMatch(parsed.phone, g.rental.phone));
-      if(!matched && parsed.address) matched = outGens.find(g=>rrAddrMatch(parsed.address, g.rental.address));
-      if(!matched && parsed.customer) matched = outGens.find(g=>rrCustMatch(parsed.customer, g.rental.customer));
+      if(parsed.phone) matched = outGens.find(g=>g.rental.phone && g.rental.phone.replace(/[^0-9]/g,'')===parsed.phone);
+      if(!matched && parsed.address) matched = outGens.find(g=>g.rental.address && (g.rental.address.includes(parsed.address) || parsed.address.includes(g.rental.address)));
+      if(!matched && parsed.customer) matched = outGens.find(g=>g.rental.customer && (g.rental.customer.includes(parsed.customer) || parsed.customer.includes(g.rental.customer)));
       const matchHtml = matched
         ? `<div style="font-size:13px;font-weight:800;color:#1E7B45;background:#E7F5EC;display:inline-block;padding:3px 10px;border-radius:8px;margin-top:6px;">✅ [${escR(matched.id)}] ${escR(matched.model||'')} 로 추정됨</div>`
         : `<div style="font-size:13px;font-weight:800;color:#B23A34;background:#FBEAEA;display:inline-block;padding:3px 10px;border-radius:8px;margin-top:6px;">🅾 어느 발전기인지 자동으로 못 찾았어요, 문자 내용 보고 직접 확인해주세요</div>`;
@@ -1759,19 +1630,6 @@ async function openQmAssignGen(resId){
       listWrap.innerHTML = '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">지금 배정할 수 있는(입고 상태인) 발전기가 없습니다.</div>';
       return;
     }
-    if(!alreadyAssigned){
-      // 처음 배정할 때는 여러 대를 골라서 한 번에 배정할 수 있습니다.
-      listWrap.innerHTML = `<div style="font-size:13px;color:#555;margin-bottom:8px;">여러 대가 같이 나가면 여러 개를 눌러 고른 뒤 아래 [배정하기]를 누르세요.</div>` + candidates.map(g=>{
-        const vColor = voltageColor(g.voltage);
-        const vStyle = vColor ? `border:1px solid ${vColor};color:${vColor};background:${vColor}15;` : `border:1px solid #ccc;color:#888;background:#f2f2f2;`;
-        return `<button type="button" class="qmag-pick" data-gen="${escR(g.id)}" onclick="qmToggleAssignPick('${g.id}')" style="width:100%;text-align:left;background:#fff;border:2px solid #ddd;border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;">
-          <div style="text-align:left;min-width:0;"><span class="qmag-check" style="font-size:16px;margin-right:6px;">⬜</span><span style="font-size:16px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span><span style="font-size:13px;color:#333;margin-left:6px;">${escR(g.model||'미설정')}</span></div>
-          <span style="${vStyle}font-weight:800;font-size:11px;padding:6px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;">${escR(g.voltage)||'전압 미설정'}</span>
-        </button>`;
-      }).join('') + `<button type="button" id="qmag-submit" onclick="submitQmAssignGenMulti('${resId}')" style="position:sticky;bottom:0;width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-top:6px;">배정하기 (0대 선택)</button>`;
-      qmAssignPicks = [];
-      return;
-    }
     listWrap.innerHTML = candidates.map(g=>{
       const vColor = voltageColor(g.voltage);
       const isCurrent = g.id===r.genId;
@@ -1791,51 +1649,6 @@ async function openQmAssignGen(resId){
   }catch(e){
     const sub = document.getElementById('qmag-sub');
     if(sub) sub.textContent = '불러오지 못했습니다.';
-  }
-}
-let qmAssignPicks = [];
-function qmToggleAssignPick(id){
-  qmAssignPicks = qmAssignPicks.includes(id) ? qmAssignPicks.filter(x=>x!==id) : [...qmAssignPicks, id];
-  document.querySelectorAll('.qmag-pick').forEach(b=>{
-    const on = qmAssignPicks.includes(b.dataset.gen);
-    b.style.borderColor = on ? '#2C6E49' : '#ddd';
-    b.style.background = on ? '#EAF5EC' : '#fff';
-    const c = b.querySelector('.qmag-check'); if(c) c.textContent = on ? '✅' : '⬜';
-  });
-  const btn = document.getElementById('qmag-submit');
-  if(btn) btn.textContent = `배정하기 (${qmAssignPicks.length}대 선택)`;
-}
-async function submitQmAssignGenMulti(resId){
-  const ids = [...qmAssignPicks];
-  if(!ids.length){ showInfoModal('발전기를 1대 이상 골라주세요.'); return; }
-  const btn = document.getElementById('qmag-submit');
-  if(btn){ btn.disabled = true; btn.textContent = '배정 중...'; }
-  try{
-    const [resCur, fleetCur] = await Promise.all([
-      window.storage.get('gen-reservations-v1', true),
-      window.storage.get('gen-fleet-v2', true)
-    ]);
-    let list = []; try{ list = resCur ? JSON.parse(resCur.value) : []; }catch(e){ list = []; }
-    if(!Array.isArray(list)) list = [];
-    let gens = []; try{ gens = fleetCur ? JSON.parse(fleetCur.value) : []; }catch(e){ gens = []; }
-    if(!Array.isArray(gens)) gens = [];
-    const r = list.find(x=>x.id===resId);
-    if(!r){ showInfoModal('해당 출고대기 건을 찾을 수 없습니다.'); renderQmReservationList(); return; }
-    const bad = ids.filter(id=>{ const g = gens.find(x=>x && x.id===id); return !g || g.status!=='in' || g.underRepair || list.some(x=>x.id!==resId && x.genId===id); });
-    if(bad.length){ showInfoModal(`${bad.join(', ')} 발전기는 방금 다른 곳에서 배정·출고되어 고를 수 없습니다. 다시 선택해주세요.`); openQmAssignGen(resId); return; }
-    const hoursOf = gid=>{ const g = gens.find(x=>x && x.id===gid); return (g && g.hoursKnown) ? (g.hours||0) : 0; };
-    r.genId = ids[0];
-    r.pendingLoad = true;
-    r.startHours = hoursOf(ids[0]);
-    r.genAssignedBy = qmLabel();
-    r.genAssignedAt = nowDateTimeStr();
-    if(!r.outDate) r.outDate = r.plannedOutDate || null;
-    assignExtraGensToReservation(r, ids.slice(1), list, qmLabel(), hoursOf);
-    await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
-    renderQmReservationList();
-  }catch(e){
-    showInfoModal('배정하지 못했습니다. 다시 시도해주세요.');
-    if(btn){ btn.disabled = false; btn.textContent = `배정하기 (${ids.length}대 선택)`; }
   }
 }
 async function submitQmAssignGen(resId, genId){
@@ -1985,7 +1798,7 @@ async function submitQmConfirmLoad(resId, needFuel){
       supplies: r.supplies, suppliesItems: r.suppliesItems||[], suppliesCustom: r.suppliesCustom||'', voltage: r.voltage, qty: r.qty,
       fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
       usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'', note: r.note, smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
-      outDate: r.outDate, startHours: r.startHours, batchId: r.batchId||null,
+      outDate: r.outDate, startHours: r.startHours,
       outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: qmLabel(), genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now()
     };
     if(r.suppliesItems && r.suppliesItems.length){
@@ -2018,7 +1831,6 @@ async function openQmEditReservation(resId){
       <div id="qmre-body"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
     </div>
   `);
-  await qmLoadSmsLearnCache();
   try{
     const cur = await window.storage.get('gen-reservations-v1', true);
     let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
@@ -2158,18 +1970,14 @@ async function submitQmEditReservation(resId){
       if(btn){ btn.disabled = false; btn.textContent = '저장'; }
       return;
     }
-    const qmGroupSibs = findResGroupSiblings(r, list);
     Object.assign(r, {
       customer, site: customer, address, manager, phone, voltage, outDate, arriveTime,
       freightBearer, note, supplies, suppliesItems, suppliesCustom,
       fuelRequested, fuelActual, loadDate, usageDays
     });
-    if(r.genId===UNASSIGNED_GEN_ID) r.plannedOutDate = outDate;
-    // 같은 현장 묶음(같은 문자로 나뉜 N대, 같이 등록한 발전기)에도 거래처·주소·담당자·연락처·비고를 똑같이 반영합니다.
-    const qmSyncCount = syncResGroupSharedFields(r, list, qmGroupSibs);
     await window.storage.set('gen-reservations-v1', JSON.stringify(list), true);
     box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
-    box.textContent = '✅ 저장되었습니다!' + (qmSyncCount>0? `\n같은 현장 ${qmSyncCount}건에도 같이 반영됐어요.` : '');
+    box.textContent = '✅ 저장되었습니다!';
     if(btn) btn.textContent = '저장';
     setTimeout(()=>{ if(document.getElementById('qmre-status')) renderQmReservationList(); }, 700);
   }catch(e){
@@ -2926,14 +2734,8 @@ async function submitQuickOrder(){
   // "철수/회수" 단어가 있는데 출고 화면에 등록하려는 경우, 그냥 넘어가지 않고 한 번 더 확인을 받습니다.
   proceedWithDupCheck(text);
 }
-let qmSubmitInFlight = false;
-let qmDupChecking = false;
-async function proceedWithDupCheck(text){
-  if(qmSubmitInFlight || qmDupChecking) return; // 버튼을 두 번 눌러도 한 번만 등록되게 막습니다
-  qmDupChecking = true;
-  try{ await proceedWithDupCheckInner(text); } finally { qmDupChecking = false; }
-}
-async function proceedWithDupCheckInner(text){
+function proceedWithDupCheck(text){
+  const box = document.getElementById('qm-status');
   try{
     const lastRaw = localStorage.getItem('qmLastSmsSubmit');
     if(lastRaw){
@@ -2946,41 +2748,10 @@ async function proceedWithDupCheckInner(text){
       }
     }
   }catch(e0){}
-  // 같은 문자를 여러 사람이 받아서 각자 등록하면 출고대기에 똑같은 건이 2번씩 생깁니다.
-  // 등록하기 전에 출고대기 목록을 확인해서, 같은 문자이거나 같은 연락처로 이미 들어와 있는 건이 있으면 먼저 물어봅니다.
-  try{
-    const cur = await window.storage.get('gen-reservations-v1', true);
-    let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
-    if(!Array.isArray(list)) list = [];
-    const norm = t=>String(t||'').replace(/\s+/g,'');
-    const myText = norm(text);
-    const myPhone = (parseSmsOrderText(text).phone)||'';
-    const hits = list.filter(r=>{
-      if(!r) return false;
-      if(r.smsOrder && norm(r.smsOrder)===myText) return true;
-      const ph = String(r.phone||'').replace(/[^0-9]/g,'') || (r.smsOrder ? (parseSmsOrderText(r.smsOrder).phone||'') : '');
-      return !!(myPhone && ph && ph===myPhone);
-    });
-    if(hits.length){
-      const sameText = hits.some(r=>r.smsOrder && norm(r.smsOrder)===myText);
-      const who = [...new Set(hits.map(r=>String(r.outProcessedBy||'').replace(/\(.*\)$/,'')).filter(Boolean))].join(', ');
-      const desc = hits.slice(0,4).map(r=>{
-        const nm = r.customer || (r.smsOrder ? (parseSmsOrderText(r.smsOrder).customer||'') : '') || '거래처 미기재';
-        return `· ${nm} (${r.genId && r.genId!==UNASSIGNED_GEN_ID ? r.genId : '미지정'})`;
-      }).join('\n');
-      const msg = (sameText ? '⚠️ 똑같은 문자가 이미 출고대기에 등록되어 있습니다.' : '⚠️ 같은 연락처로 등록된 출고대기 건이 이미 있습니다.')
-        + `\n${who? `(등록: ${who})\n`:''}\n${desc}${hits.length>4? `\n외 ${hits.length-4}건`:''}`
-        + `\n\n${sameText ? '중복 등록이면 "취소"를 눌러주세요.' : '변경·추가 문자가 아니라 같은 주문이면 "취소"를 눌러주세요.'}`;
-      openConfirmModal(msg, function(){ proceedSubmitQuickOrder(text); }, '그래도 등록', '취소');
-      return;
-    }
-  }catch(e1){ /* 목록 확인이 실패해도 등록은 진행합니다 */ }
   proceedSubmitQuickOrder(text);
 }
 async function proceedSubmitQuickOrder(text){
   if(!qmCurrentUserName){ openQmUserGate(); return; } // 이름을 안 고르면 등록되지 않게 막습니다
-  if(qmSubmitInFlight) return;
-  qmSubmitInFlight = true;
   const textEl = document.getElementById('qm-text');
   const btn = document.getElementById('qm-btn');
   const box = document.getElementById('qm-status');
@@ -3043,7 +2814,6 @@ async function proceedSubmitQuickOrder(text){
     box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34';
     box.textContent = '등록에 실패했습니다. 인터넷 연결을 확인하고 다시 눌러주세요.';
   }finally{
-    qmSubmitInFlight = false;
     btn.disabled=false; btn.textContent='등록하기';
   }
 }
@@ -3719,56 +3489,6 @@ function maintStatus(remaining){
   return 'ok';
 }
 function activeGens(){ return DB.gens.filter(g=>!g.retired); }
-// ===== 같은 현장 묶음 =====
-// "2대"처럼 한 문자로 여러 건이 나뉘어 등록된 건(같은 문자·같은 등록시각)이나, "+ 추가"/일괄출고로 같은 batchId를 가진 건들을
-// 하나의 현장 묶음으로 봅니다. 묶음 안의 한 건에서 거래처·주소·담당자·연락처·비고 등을 고치면 나머지 건에도 똑같이 반영됩니다.
-function resSmsGroupKey(r){
-  return (r && r.smsQtyTotal>1 && r.smsOrder && r.smsOrder.trim()) ? (String(r.createdAtTs||r.smsOrderAt||'')+'|'+r.smsOrder.trim()) : null;
-}
-function findResSmsGroup(r, list){
-  const k = resSmsGroupKey(r);
-  if(!k) return [r];
-  return (list||[]).filter(x=>x && resSmsGroupKey(x)===k);
-}
-function findResGroupSiblings(r, list){
-  if(!r) return [];
-  const out = []; const seen = new Set([r.id]); const queue = [r];
-  while(queue.length){
-    const cur = queue.shift();
-    const bk = cur.batchId; const sk = resSmsGroupKey(cur);
-    (list||[]).forEach(x=>{
-      if(!x || seen.has(x.id)) return;
-      if((bk && x.batchId===bk) || (sk && resSmsGroupKey(x)===sk)){ seen.add(x.id); out.push(x); queue.push(x); }
-    });
-  }
-  return out;
-}
-// 수정 저장할 때 새 객체로 갈아끼우면서 문자 N대 정보(smsQtyIndex/Total)와 최초 등록시각이 빠지던 것을 보존합니다.
-function keepResSmsMeta(target, existing){
-  if(!target || !existing) return;
-  if(existing.createdAtTs && !target.createdAtTs) target.createdAtTs = existing.createdAtTs;
-  if(existing.smsQtyTotal && !target.smsQtyTotal){ target.smsQtyTotal = existing.smsQtyTotal; target.smsQtyIndex = existing.smsQtyIndex||null; }
-  if(existing.smsOrderChecked && target.smsOrderChecked===undefined) target.smsOrderChecked = existing.smsOrderChecked;
-}
-// src(방금 저장한 건)의 현장 공통 정보를 묶음의 다른 건들에 복사합니다. 묶음이 batchId 없이 문자로만 이어져 있으면
-// 이후 수정에도 계속 묶여 있도록 같은 batchId를 붙여줍니다. 반영된 건수를 돌려줍니다.
-function syncResGroupSharedFields(src, list, siblingsOverride){
-  const sibs = siblingsOverride || findResGroupSiblings(src, list);
-  if(!sibs.length) return 0;
-  const bid = src.batchId || sibs.map(x=>x.batchId).find(Boolean) || uid();
-  src.batchId = bid;
-  sibs.forEach(x=>{
-    x.batchId = bid;
-    x.customer = src.customer; x.site = src.site || src.customer;
-    x.address = src.address; x.manager = src.manager; x.phone = src.phone;
-    x.note = src.note;
-    x.arriveTime = src.arriveTime; x.loadDate = src.loadDate; x.freightBearer = src.freightBearer;
-    x.usageDays = src.usageDays;
-    const d = src.genId===UNASSIGNED_GEN_ID ? (src.plannedOutDate||src.outDate) : (src.outDate||src.plannedOutDate);
-    if(d){ if(x.genId===UNASSIGNED_GEN_ID) x.plannedOutDate = d; else x.outDate = d; }
-  });
-  return sibs.length;
-}
 // 문자오더가 있는 건(출고대기의 예약 건 + 이미 출고된 발전기)을 모두 모아, 접수된 순서대로(오래된게 1번)
 // 일련번호를 매깁니다. 출고 전후로도 같은 번호가 유지되어 위 문자카드와 아래 목록을 서로 대조할 수 있습니다.
 function buildSmsOrderNumMap(){
@@ -3966,41 +3686,6 @@ function rentalUsedDaysInclusive(r){
   if(!r || !r.outDate || !r.inDate) return null;
   const d = Math.round((new Date(r.inDate+'T00:00:00') - new Date(r.outDate+'T00:00:00'))/86400000);
   return isNaN(d) ? null : Math.max(1, d+1);
-}
-// 거래처 임대이력용 사용일수 문구 (완료: 실제 사용일수 / 진행중: 며칠째 사용중 / 예약: 예정 일수)
-function historyUsageDaysText(r){
-  const plan = r.usageDays ? `예정 ${r.usageDays}일` : '';
-  if(r.status==='완료'){ const d = rentalDays(r); return d ? `${d}일${plan? ` (${plan})`:''}` : (plan||'-'); }
-  if(r.status==='진행중' && r.outDate){ const d = daysSinceDate(r.outDate)+1; return `${d}일째 사용중${plan? ` / ${plan}`:''}`; }
-  return plan || '미정';
-}
-// ===== 누적시간 미확인 임대 표시 =====
-// 현장이동(공장 미경유)이나 "누적시간 모름"으로 끝난 임대는 사용시간을 알 수 없으므로 0h 대신 "미확인"으로 보여주고,
-// 그 바로 다음 임대의 사용시간에는 앞 현장에서 쓴 시간이 합쳐져 있다는 것을 표시합니다.
-function prevRentalOf(r){
-  if(!r) return null;
-  const key = x=> (x.inDate||'') + ' ' + (x.inProcessedAt||'');
-  return (DB.rentals||[]).filter(x=>x && x.genId===r.genId && x.id!==r.id && x.inDate && (x.inDate||'') <= (r.outDate||'') && (x.outDate||'') <= (r.outDate||''))
-    .sort((a,b)=>key(b).localeCompare(key(a)))[0] || null;
-}
-function rentalHoursUnknown(r){ return !!(r && (r.endHours==null || r.usedHours==null)); }
-function rentalHoursUnknownLabel(r){ return /현장이동/.test((r&&r.note)||'') ? '미확인(현장이동)' : '미확인'; }
-function rentalIncludesPrevUsage(r){
-  if(!r || rentalHoursUnknown(r)) return null;
-  const p = prevRentalOf(r);
-  return (p && rentalHoursUnknown(p)) ? p : null;
-}
-function rentalUsedHoursHtml(r){
-  const g = findGen(r.genId);
-  if(g && !g.hoursKnown && rentalHoursUnknown(r)) return '<span class="muted">-</span>';
-  if(rentalHoursUnknown(r)) return `<span style="color:var(--warn);font-weight:700;white-space:nowrap;">⏱ ${rentalHoursUnknownLabel(r)}</span>`;
-  const p = rentalIncludesPrevUsage(r);
-  return `${(r.usedHours||0).toLocaleString()}h${p? `<div style="font-size:10.5px;color:var(--warn);font-weight:700;line-height:1.3;">⚠️ 이전 현장(${escR(p.customer||'거래처 미기재')}) 사용분 포함</div>`:''}`;
-}
-function rentalUsedHoursText(r){
-  if(rentalHoursUnknown(r)) return rentalHoursUnknownLabel(r);
-  const p = rentalIncludesPrevUsage(r);
-  return `${(r.usedHours||0).toLocaleString()}h${p? ` (이전 현장 ${p.customer||''} 사용분 포함)`:''}`;
 }
 function rentalDays(r){
   if(!r || !r.outDate || !r.inDate) return null;
@@ -4366,7 +4051,7 @@ function renderContent(){
   else if(currentTab==='manual') c.innerHTML = renderManualTab();
   else if(currentTab==='improvements') c.innerHTML = renderImprovementsTab();
   else if(currentTab==='settings') c.innerHTML = renderSettingsTab();
-  if(currentTab==='history'){ if(historyViewMode==='customer') renderCustomerHistoryView(); else initHistorySelect(); renderHistSearchResults(); }
+  if(currentTab==='history'){ if(historyViewMode==='customer') renderCustomerHistoryView(); else initHistorySelect(); }
   if(currentTab==='maint') renderMaintList();
   if(currentTab==='consumable-order') renderConsumableOrderTable();
   if(currentTab==='improvements') renderImprovementsList();
@@ -4555,8 +4240,8 @@ function renderDashboard(){
       <td class="muted" style="font-size:12px;">${daysUsed1? `${daysUsed1}일` : '-'}</td>
       <td class="muted" style="font-size:12px;">${r.startHours!=null? r.startHours.toLocaleString()+'h':'-'}</td>
       <td class="muted" style="font-size:12px;">${r.endHours!=null? r.endHours.toLocaleString()+'h':'-'}</td>
-      <td style="font-size:12px;font-weight:700;">${rentalUsedHoursHtml(r)}</td>
-      <td style="font-size:12px;">${(daysUsed1 && !rentalHoursUnknown(r) && !rentalIncludesPrevUsage(r))? `${Math.round((r.usedHours||0)/daysUsed1*10)/10}h/일` : '-'}</td>
+      <td style="font-size:12px;font-weight:700;">${(r.usedHours||0).toLocaleString()}h</td>
+      <td style="font-size:12px;">${daysUsed1? `${Math.round((r.usedHours||0)/daysUsed1*10)/10}h/일` : '-'}</td>
       <td style="font-size:12px;">${fuelCell}</td>
     </tr>`;
   }).join('');
@@ -4592,9 +4277,7 @@ function renderDashboard(){
   const regionEntries = Object.entries(regionCounts).sort((a,b)=>b[1]-a[1]);
 
   // 출고 대기 최근 요약 (상차대기 우선, 날짜순)
-  // 거래처가 아직 입력 안 된 건(사무실 확인 전 문자오더 등)은 요약에서 뺍니다. [출고 대기] 탭에서는 그대로 보입니다.
-  const reserveSummaryAllCount = DB.reservations.filter(r=>r && String(r.customer||r.site||'').trim()).length;
-  const reserveSummary = DB.reservations.filter(r=>r && String(r.customer||r.site||'').trim())
+  const reserveSummary = [...DB.reservations]
     .sort((a,b)=>{
       const aP = a.pendingLoad?0:1, bP = b.pendingLoad?0:1;
       if(aP!==bP) return aP-bP;
@@ -4723,10 +4406,10 @@ function renderDashboard(){
     </table></div>`}
 
     <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-      <span>⏳ 출고 대기 최근 요약 <span class="cnt">${reserveSummaryAllCount}건</span>${resCount>reserveSummaryAllCount? ` <span class="muted" style="font-size:12px;font-weight:400;">(거래처 미입력 ${resCount-reserveSummaryAllCount}건 제외)</span>`:''}</span>
+      <span>⏳ 출고 대기 최근 요약 <span class="cnt">${resCount}건</span></span>
       <button class="btn sm" onclick="switchTab('reserve')">전체보기</button>
     </div>
-    ${reserveSummary.length===0? `<div class="empty">${resCount>0? '거래처가 입력된 출고 대기가 없습니다.' : '등록된 출고 대기가 없습니다.'}</div>` : `
+    ${reserveSummary.length===0? `<div class="empty">등록된 출고 대기가 없습니다.</div>` : `
     <div class="table-scroll"><table>
       <thead><tr><th>번호</th><th>모델</th><th>거래처/현장</th><th>주소</th><th>도착일/시간</th><th>예상사용일수</th><th>반납일</th><th>담당자</th><th>연락처</th><th>상태</th></tr></thead>
       <tbody>${reserveSummaryRows}</tbody>
@@ -4930,7 +4613,7 @@ function renderInList(){
     return `<tr${isBroken? ` style="background:var(--danger-tint);"`:''}>
       <td>${selectable? `<input type="checkbox" class="bulk-out-chk" data-gid="${g.id}" ${bulkOutSelection.has(g.id)?'checked':''} onchange="toggleBulkOutSelect('${g.id}', this.checked)">` : ''}</td>
       <td class="gid">${g.id}</td>
-      <td class="wrap-ok">${displayModel(g)}${g.borrowed? ` <span class="pill" style="background:var(--primary-tint);color:var(--primary-dark);border:1px solid var(--primary);">🤝 임대</span>`:''}${isPendingOut? ` <span class="pill warn">출고대기</span>`:''}${(g.hoursKnown && g.hoursUnconfirmed)? ` <span class="pill danger" title="지난 입고 때 계기판을 못 봐서 누적시간이 실제와 다를 수 있습니다. 확인되면 [누적시간 수정]으로 넣어주세요.">⏱ 누적시간 미확인</span>`:''}${isBroken? `<div class="muted" style="font-size:11px;color:var(--danger);font-weight:700;">⚠ 고장: ${escR(g.repairNote||'-')}${g.repairPhoto? ` <img src="${g.repairPhoto}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;cursor:pointer;" onclick="openImageViewModal('${g.repairPhoto}','고장 사진')">`:''}</div>`:''}</td>
+      <td class="wrap-ok">${displayModel(g)}${g.borrowed? ` <span class="pill" style="background:var(--primary-tint);color:var(--primary-dark);border:1px solid var(--primary);">🤝 임대</span>`:''}${isPendingOut? ` <span class="pill warn">출고대기</span>`:''}${isBroken? `<div class="muted" style="font-size:11px;color:var(--danger);font-weight:700;">⚠ 고장: ${escR(g.repairNote||'-')}${g.repairPhoto? ` <img src="${g.repairPhoto}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;cursor:pointer;" onclick="openImageViewModal('${g.repairPhoto}','고장 사진')">`:''}</div>`:''}</td>
       <td>${voltagePillHtml(g.id, g.voltage)}</td>
       <td>${usableCapacityCell(g)}</td>
       <td class="muted">${hoursStatus(g)==='known'? `${(g.hours||0).toLocaleString()}h <span style="font-size:11px;">(정비: ${(g.lastMaintHours||0).toLocaleString()}h)</span>` : '<span style="color:var(--danger);font-weight:700;">확인불가</span>'}</td>
@@ -5089,7 +4772,6 @@ function outPrepListHtml(){
     const remTxt = rem<=0 ? `<b style="color:var(--danger);">${Math.round(-rem)}h 초과</b>` : `<b>${Math.round(rem)}h 남음</b>`;
     return `<div class="prep-card">
       <div class="p-head"><span>${g.id} · ${displayModel(g)}</span>${remTxt}</div>
-      <button type="button" onclick="openGenLocationModal('${g.id}')" style="background:#FFF4E0;border:1.5px solid #D08A1E;color:#8A5A00;font-weight:800;font-size:12px;border-radius:12px;padding:3px 10px;cursor:pointer;margin:2px 0 6px;">📍 위치보기</button>
       <div style="font-size:12.5px;font-weight:700;margin-bottom:2px;">${escR(g.rental.customer||'거래처 미기재')} · ${escR(g.rental.site||'-')}</div>
       <div class="muted" style="font-size:12px;margin-bottom:6px;">${escR([g.rental.manager,g.rental.phone].filter(Boolean).join(' · ')||'담당자 미기재')} · 예상 정비 도래: ${pred.overdue? '<b style="color:var(--danger);">이미 도래</b>':`${dow(pred.date)} (약 ${pred.days}일 후)`}</div>
       ${materialSummaryHtml(g.model)}
@@ -5148,7 +4830,7 @@ function renderOutList(){
     if(isLT){ predTxt = pred.overdue ? '<span class="pill danger">정비 도래</span>' : `${dow(pred.date)} (약 ${pred.days}일 후)`; }
     const expIn = expectedInDate(rt);
     const matchedReq = (DB.returnRequests||[]).find(r=>{
-      const m = findMatchedGenForReturnRequest(r.text, r.createdAtTs);
+      const m = findMatchedGenForReturnRequest(r.text);
       return m && m.id===g.id;
     });
     const rowBg = rt.forcedOut ? 'var(--danger-tint)' : (matchedReq ? '#FFF3E0' : null);
@@ -5171,17 +4853,7 @@ function renderOutList(){
         ${matchedReq? `<button class="btn sm" style="color:#B23A34;font-weight:700;border-color:#B23A34;background:#FBEAEA;margin-top:4px;margin-left:4px;" onclick="viewMatchedReturnRequest('${g.id}','${matchedReq.id}')">🔻 철수오더확인${returnReqNumMap[matchedReq.id]? ` #${returnReqNumMap[matchedReq.id]}`:''}</button>`:''}
       </td>
       <td class="muted">${dow(rt.outDate)||'-'}</td>
-      <td>${rt.outDate? (()=>{
-        // 사용일수 강조: 예정 사용일수가 있으면 넘었는지(빨강)·하루 남았는지(주황) 색으로 구분합니다.
-        const d = daysSinceDate(rt.outDate)+1;
-        const plan = Number(rt.usageDays)||0;
-        const over = plan && d>plan, near = plan && !over && d>=plan-1;
-        const color = over ? 'var(--danger)' : (near ? 'var(--warn)' : 'var(--primary-dark)');
-        const bg = over ? 'var(--danger-tint)' : (near ? 'var(--warn-tint)' : 'var(--primary-tint)');
-        return `<div style="display:inline-block;text-align:center;background:${bg};border:1.5px solid ${color};border-radius:10px;padding:4px 10px;white-space:nowrap;">
-          <div style="font-size:20px;font-weight:900;color:${color};line-height:1.15;">${d}<span style="font-size:13px;font-weight:800;">일</span></div>
-          <div style="font-size:11px;font-weight:700;color:${color};">${plan? (over? `예정 ${plan}일 · ${d-plan}일 초과` : `예정 ${plan}일`) : '사용중'}</div>
-        </div>`; })() : '<span class="muted">-</span>'}</td>
+      <td class="muted">${rt.outDate? `${daysSinceDate(rt.outDate)+1}일 사용중` : '-'}</td>
       <td>${isLT? gaugeHtml(el,rem,getCycle(g),true) : ((g.hoursKnown && hasRealBaseline)? '<span class="muted" style="font-size:12px;">반납 시 확인</span>' : (g.hoursKnown? '<span style="font-size:12px;color:var(--ink-soft);">입고 시 확인</span>' : '<span style="font-size:12px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</span>'))}</td>
       <td style="font-size:12px;">${predTxt}</td>
       <td style="font-size:12px;">${expIn? (()=>{ const diff = daysFromToday(expIn); const isLate = diff!=null && diff<0; const cls = isLate?'danger':(diff<=1?'danger':(diff<=3?'warn':'gray')); return `<span class="pill ${cls}">📅 ${inDateLabelFull(expIn)}</span>`; })() : '<span class="muted">-</span>'}</td>
@@ -5190,7 +4862,6 @@ function renderOutList(){
           ${rt.forcedOut? `<button class="btn sm primary" onclick="confirmOutPayment('${g.id}')" style="white-space:nowrap;">입금 확인</button>`:''}
           <button class="btn sm" onclick="openOutInfoEditModal('${g.id}')" style="white-space:nowrap;">정보 수정</button>
           <button class="btn sm" onclick="printReceipt('${g.id}')" style="white-space:nowrap;">인수증</button>
-          ${(()=>{ const bk = outBatchKey(g); const n = batchReceiptCount(bk); return n>1 ? `<button class="btn sm" onclick="printBatchReceipt('${bk}')" style="white-space:nowrap;color:var(--primary-dark);border-color:var(--primary);" title="같은 현장으로 같이 나간 ${n}대를 한 인수증에 모아서 봅니다">📄 일괄인수증(${n}대)</button>` : ''; })()}
           <button class="btn sm primary" onclick="openInModal('${g.id}')" style="white-space:nowrap;">입고 처리</button>
           <button class="btn sm" onclick="openInModal('${g.id}', true)" style="white-space:nowrap;color:#8A5A00;border-color:#8A5A00;" title="공장 입고 없이 바로 다른 현장으로 나가는 경우 사용합니다. 이번 임대를 종료 처리한 뒤, 곧바로 같은 발전기로 새 출고 화면을 열어줍니다.">🔀 현장이동</button>
         </div>
@@ -5328,34 +4999,6 @@ function clearEstDailyFromAll(){
   });
 }
 
-// 정비관리에서 출고중 발전기를 누르면, 지금 나가 있는 현장(거래처·주소·담당자·연락처·기간)을 보여줍니다. 사무실·퀵메뉴 공용.
-function openGenLocationModal(id){
-  const g = findGen(id);
-  if(!g || !g.rental){ showInfoModal('출고 정보가 없습니다.'); return; }
-  const rt = g.rental;
-  const days = rt.outDate ? daysSinceDate(rt.outDate)+1 : null;
-  const expIn = (typeof expectedInDate==='function') ? expectedInDate(rt) : null;
-  const phoneDigits = String(rt.phone||'').replace(/[^0-9]/g,'');
-  const addr = rt.address || rt.site || '';
-  const row = (k,v)=> v ? `<div style="display:flex;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);"><span class="muted" style="flex:0 0 74px;font-size:13px;">${k}</span><span style="flex:1;font-size:14px;font-weight:600;word-break:break-all;">${v}</span></div>` : '';
-  const rem = hasHourData(g) ? estRemaining(g) : null;
-  document.getElementById('modal-root').innerHTML = `
-  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
-    <div class="modal" style="text-align:left;">
-      <h3 style="text-align:center;">📍 ${escR(g.id)} 지금 위치</h3>
-      <div class="modal-sub" style="text-align:center;">${displayModel(g)}</div>
-      ${row('거래처', escR(rt.customer||'미기재'))}
-      ${row('현장 주소', addr? `${escR(addr)} <a href="https://map.naver.com/p/search/${encodeURIComponent(addr)}" target="_blank" rel="noopener" style="font-size:12px;white-space:nowrap;">🗺 지도</a>` : '<span class="muted">미기재</span>')}
-      ${row('담당자', escR(rt.manager||''))}
-      ${row('연락처', rt.phone? `${phoneDigits? `<a href="tel:${phoneDigits}">${escR(rt.phone)}</a>` : escR(rt.phone)}` : '')}
-      ${row('출고일', rt.outDate? `${dow(rt.outDate)}${days? ` · <b>${days}일째</b>`:''}${rt.usageDays? ` (예정 ${rt.usageDays}일)`:''}` : '')}
-      ${row('입고예정', expIn? dow(expIn) : '')}
-      ${row('정비', (g.hoursKnown && rem!=null)? (rem<=0? `<b style="color:var(--danger);">약 ${Math.round(-rem)}h 초과 (추정)</b>` : `약 ${Math.round(rem)}h 남음 (추정)`) : '')}
-      ${row('비고', rt.note? escR(rt.note) : '')}
-      <div class="modal-actions"><button class="btn primary" onclick="closeModal()">닫기</button></div>
-    </div>
-  </div>`;
-}
 function renderMaintTab(){
   return `
     <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
@@ -5463,7 +5106,7 @@ function renderMaintList(){
       <td>${fuelPerHourCellHtml(g)}</td>
       <td>${tankCapacityCellHtml(g)}</td>
       <td>${(()=>{ const wt = genWeightT(g); return wt ? `<span style="font-weight:700;white-space:nowrap;">${wt}t</span>` : '<span class="muted" style="font-size:11.5px;white-space:nowrap;">미입력</span>'; })()}</td>
-      <td style="font-size:12px;">${g.status==='in'? '<span class="muted">입고</span>' : `<button type="button" class="btn sm" style="white-space:nowrap;color:var(--warn);border-color:var(--warn);font-weight:700;" onclick="openGenLocationModal('${g.id}')" title="지금 나가 있는 현장 보기">🚚 출고중 · 위치</button>${g.rental&&g.rental.customer? `<div class="muted" style="font-size:11px;margin-top:2px;">${escR(g.rental.customer)}</div>`:''}`}</td>
+      <td class="muted" style="font-size:12px;">${g.status==='in'?'입고':'출고중'}</td>
       <td>${known? gaugeHtml(el,rem,getCycle(g),g.status!=='in' && g.rental && effEstDaily(g)>0) : unknownCellHtml}</td>
       <td>${known? pillHtml(maintStatus(rem)) : unknownPillHtml}</td>
       <td><div class="btn-row" style="align-items:center;">
@@ -5592,7 +5235,6 @@ async function submitAdjust(id){
   }
   g.hoursUpdatedAt = nowDateTimeStr();
   g.hoursUpdatedBy = DB.currentUserName || null;
-  g.hoursUnconfirmed = false;
   if(voltage !== oldVoltage.trim()){
     g.voltageUpdatedAt = nowDateTimeStr();
     g.voltageUpdatedAtMs = Date.now();
@@ -5727,7 +5369,6 @@ function recomputeLastMaint(genId){
       g.lastMaintDate = null;
       g.hoursUpdatedAt = nowDateTimeStr();
       g.hoursUpdatedBy = DB.currentUserName || null;
-      g.hoursUnconfirmed = false;
     } else {
       g.lastOilChangeDate = null;
     }
@@ -5748,7 +5389,6 @@ function recomputeLastMaint(genId){
   if((g.hours||0) < maxHours) g.hours = maxHours;
   g.hoursUpdatedAt = nowDateTimeStr();
   g.hoursUpdatedBy = DB.currentUserName || null;
-  g.hoursUnconfirmed = false;
   const atMax = recs.filter(r=>(r.hours||0)===maxHours).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   if(atMax.length>0 && atMax[0].date) g.lastMaintDate = atMax[0].date;
 }
@@ -5778,9 +5418,7 @@ function renderHistoryTab(){
     <div class="btn-row" style="margin-bottom:10px;">
       <button class="btn sm${historyViewMode==='gen'?' primary':''}" onclick="switchHistoryView('gen')">발전기별 이력</button>
       <button class="btn sm${historyViewMode==='customer'?' primary':''}" onclick="switchHistoryView('customer')">거래처별 이력</button>
-      <input type="search" id="hist-search" value="${escR(histSearchQuery)}" oninput="onHistSearchInput(this.value)" placeholder="🔎 거래처·주소·연락처·번호 검색" title="거래처명, 현장주소, 담당자, 연락처(뒷자리도 가능), 발전기 번호, 비고로 찾습니다. 띄어쓰기로 여러 단어도 됩니다." style="width:210px;padding:5px 8px;font-size:13px;margin-left:4px;">
     </div>
-    <div id="hist-search-result" style="margin-bottom:12px;"></div>
     ${historyViewMode==='gen' ? `
     <div class="section-title" style="margin-top:0;">🔍 발전기별 이력 조회</div>
     <div class="toolbar">
@@ -5792,66 +5430,6 @@ function renderHistoryTab(){
     <div id="customer-history-wrap"></div>
     `}
   `;
-}
-// ===== 임대이력 검색 =====
-// 끝난 임대(이력) + 지금 출고중 + 출고대기를 한 번에 찾아봅니다. 여러 단어를 넣으면 모두 들어간 건만 나옵니다.
-let histSearchQuery = '';
-let _histSearchTimer = null;
-function onHistSearchInput(v){
-  histSearchQuery = String(v||'');
-  clearTimeout(_histSearchTimer);
-  _histSearchTimer = setTimeout(renderHistSearchResults, 200);
-}
-function histSearchRecords(){
-  const all = [];
-  (DB.rentals||[]).forEach(r=>all.push({...r, status:'완료'}));
-  activeGens().forEach(g=>{ if(g.status==='out' && g.rental) all.push({...g.rental, genId:g.id, status:'진행중'}); });
-  (DB.reservations||[]).forEach(r=>{ if(r && (r.customer||r.address||r.phone)) all.push({...r, status: r.genId===UNASSIGNED_GEN_ID ? '예약' : (r.pendingLoad? '상차대기':'예약')}); });
-  return all;
-}
-function renderHistSearchResults(){
-  const box = document.getElementById('hist-search-result');
-  if(!box) return;
-  const q = histSearchQuery.trim();
-  if(!q){ box.innerHTML = ''; return; }
-  const tokens = q.toLowerCase().split(/\s+/).filter(Boolean);
-  const hits = histSearchRecords().filter(r=>{
-    const g = findGen(r.genId);
-    const hay = [r.genId, g&&g.model, r.customer, r.site, r.address, r.manager, r.phone, r.note, r.supplies, r.outDate, r.inDate, r.plannedOutDate].filter(Boolean).join(' ').toLowerCase();
-    const hayNoSpace = hay.replace(/\s+/g,'');
-    const digits = String(r.phone||'').replace(/[^0-9]/g,'');
-    return tokens.every(t=>{
-      const tDigits = t.replace(/[^0-9]/g,'');
-      if(tDigits.length>=4 && tDigits===t.replace(/-/g,'') && digits.includes(tDigits)) return true; // 연락처 숫자(하이픈 없이·뒷자리)
-      return hay.includes(t) || hayNoSpace.includes(t.replace(/\s+/g,''));
-    });
-  }).sort((a,b)=>((b.outDate||b.plannedOutDate||'')).localeCompare(a.outDate||a.plannedOutDate||''));
-  if(!hits.length){ box.innerHTML = `<div class="empty" style="margin-top:8px;">"${escR(q)}"(으)로 찾은 임대이력이 없습니다.</div>`; return; }
-  const pill = st => st==='완료' ? '<span class="pill gray">완료</span>' : (st==='진행중' ? '<span class="pill warn">출고중</span>' : `<span class="pill" style="background:var(--primary-tint);color:var(--primary-dark);border-color:var(--primary);">${st}</span>`);
-  const shown = hits.slice(0,100);
-  const custJs = c=>String(c||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-  box.innerHTML = `<div class="muted" style="font-size:12.5px;margin:8px 0 4px;">${hits.length}건 찾음${hits.length>100? ' (최근 100건만 표시)':''}</div>
-  <div class="table-scroll"><table>
-    <thead><tr><th>상태</th><th>번호</th><th>거래처</th><th>현장 주소</th><th>담당자 · 연락처</th><th>기간</th><th>사용일수</th><th>사용시간</th><th></th></tr></thead>
-    <tbody>${shown.map(r=>{
-      const g = findGen(r.genId);
-      const period = r.status==='완료' ? `${dow(r.outDate)||'-'} ~ ${dow(r.inDate)||'-'}` : `${dow(r.outDate||r.plannedOutDate)||'-'} ~`;
-      return `<tr>
-        <td>${pill(r.status)}</td>
-        <td class="gid">${r.genId===UNASSIGNED_GEN_ID? '미지정' : escR(r.genId||'-')}${g&&g.model? `<div class="muted" style="font-size:11px;font-weight:400;">${escR(g.model)}</div>`:''}</td>
-        <td class="wrap-ok" style="font-weight:700;">${escR(r.customer||'-')}</td>
-        <td class="wrap-ok" style="font-size:12px;">${escR(r.address||r.site||'-')}${r.note? `<div class="muted" style="font-size:11px;">비고: ${escR(String(r.note).slice(0,60))}${String(r.note).length>60?'…':''}</div>`:''}</td>
-        <td class="wrap-ok" style="font-size:12px;">${escR([r.manager,r.phone].filter(Boolean).join(' · ')||'-')}</td>
-        <td style="font-size:12px;white-space:nowrap;">${period}</td>
-        <td style="font-size:12px;white-space:nowrap;">${escR(historyUsageDaysText(r))}</td>
-        <td style="font-size:12px;">${r.status==='완료'? rentalUsedHoursHtml(r) : '<span class="muted">-</span>'}</td>
-        <td><div class="btn-row" style="flex-wrap:nowrap;">
-          ${(r.genId && r.genId!==UNASSIGNED_GEN_ID && g)? `<button class="btn sm" onclick="historyViewMode='gen';goToHistory('${r.genId}')">발전기 이력</button>`:''}
-          ${r.customer? `<button class="btn sm" onclick="openCustomerNotesModal('${escR(custJs(r.customer))}')">거래처 이력</button>`:''}
-        </div></td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table></div>`;
 }
 function switchHistoryView(mode){
   historyViewMode = mode;
@@ -5920,9 +5498,9 @@ function openCustomerNotesModal(customer){
     const fuel = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     const period = r.status==='완료'
       ? `${dow(r.outDate)||'-'} ~ ${dow(r.inDate)||'-'} (${rentalDays(r)||'-'}일)`
-      : `${dow(r.outDate||r.plannedOutDate)||'-'} 출고`;
+      : `${dow(r.outDate||r.plannedOutDate)||'-'} 출고${r.usageDays? ` · 사용일수 ${r.usageDays}일 예정`:''}`;
     const hoursLine = r.status==='완료'
-      ? `출고시 누적: ${r.startHours!=null? r.startHours.toLocaleString()+'h':'-'} · 입고시 누적: ${r.endHours!=null? r.endHours.toLocaleString()+'h':'-'} · <b style="color:var(--primary-dark);">사용 ${rentalUsedHoursHtml(r)}</b><br>`
+      ? `출고시 누적: ${r.startHours!=null? r.startHours.toLocaleString()+'h':'-'} · 입고시 누적: ${r.endHours!=null? r.endHours.toLocaleString()+'h':'-'} · <b style="color:var(--primary-dark);">사용 ${(r.usedHours||0).toLocaleString()}h</b><br>`
       : '';
     return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
@@ -5932,7 +5510,6 @@ function openCustomerNotesModal(customer){
       </div>
       <div class="muted" style="font-size:12.5px;line-height:1.6;">
         기간: ${period}<br>
-        <b style="color:var(--primary-dark);font-size:13.5px;">사용일수: ${historyUsageDaysText(r)}</b><br>
         ${hoursLine}담당자/연락처: ${escR(r.manager||'-')} / ${escR(r.phone||'-')}<br>
         현장 주소: ${escR(r.address||r.site||'-')}<br>
         전압: ${escR(r.voltage||'-')} · 부자재: ${escR(r.supplies||'없음')} · 연료: ${fuel!=null? fuel+'L':'-'}
@@ -6019,13 +5596,12 @@ function downloadCustomerHistoryPrintFile(customer){
     const g = findGen(r.genId);
     const fuel = r.fuelRequested!=null ? r.fuelRequested : r.fuelActual;
     const period = r.status==='완료'
-      ? `${dow(r.outDate)||'-'} ~ ${dow(r.inDate)||'-'} (${rentalDays(r)||'-'}일, 사용 ${escR(rentalUsedHoursText(r))})`
-      : `${dow(r.outDate||r.plannedOutDate)||'-'} 출고`;
+      ? `${dow(r.outDate)||'-'} ~ ${dow(r.inDate)||'-'} (${rentalDays(r)||'-'}일, 사용 ${(r.usedHours||0).toLocaleString()}h)`
+      : `${dow(r.outDate||r.plannedOutDate)||'-'} 출고${r.usageDays? ` · 사용일수 ${r.usageDays}일 예정`:''}`;
     return `<div class="ch-card">
       <div class="ch-head"><span>${escR(r.genId||'-')}</span><span>${escR(g? (g.model||'모델 미등록') : (r.model||'-'))}</span><span class="ch-status">${escR(r.status)}</span></div>
       <div class="ch-meta">
         기간: ${period}<br>
-        <b>사용일수: ${historyUsageDaysText(r)}</b><br>
         담당자/연락처: ${escR(r.manager||'-')} / ${escR(r.phone||'-')}<br>
         현장 주소: ${escR(r.address||r.site||'-')}<br>
         전압: ${escR(r.voltage||'-')} · 부자재: ${escR(r.supplies||'없음')} · 연료: ${fuel!=null? fuel+'L':'-'}
@@ -6591,7 +6167,7 @@ function handleRestoreFile(input){
 function exportRentalsCsv(id){
   const rentals = DB.rentals.filter(r=>r.genId===id).sort((a,b)=>(a.outDate||'').localeCompare(b.outDate||''));
   const rows = [['도착일','입고일','사용일수','거래처','담당자','연락처','현장','주소','임대사용시간(h)']];
-  rentals.forEach(r=>rows.push([r.outDate,r.inDate,rentalUsedDaysInclusive(r)||'',r.customer,r.manager,r.phone,r.site,r.address,rentalUsedHoursText(r)]));
+  rentals.forEach(r=>rows.push([r.outDate,r.inDate,rentalUsedDaysInclusive(r)||'',r.customer,r.manager,r.phone,r.site,r.address,r.usedHours||0]));
   downloadCsv(`${id}_임대이력.csv`, rows);
 }
 function exportMaintCsv(id){
@@ -6651,8 +6227,8 @@ function renderGenHistory(){
         <td class="wrap-ok">${r.customer||'-'}${(r.manager||r.phone)? `<div class="muted" style="font-size:11px;">${[r.manager,r.phone].filter(Boolean).join(' · ')}</div>`:''}</td>
         <td class="wrap-ok">${[r.site,r.address].filter(Boolean).join(' · ')||'-'}${r.supplies? `<div class="muted" style="font-size:11px;">부자재(출고): ${r.supplies}</div>`:''}${r.supplies? `<div class="muted" style="font-size:11px;">부자재 회수: ${r.suppliesRecovered? '<span class="pill ok">회수됨</span>' : `<span class="pill danger">회수안됨</span>${r.suppliesNote? ` - ${r.suppliesNote}`:''}`}</div>`:''}${r.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${r.fuelRequested}L${r.fuelActual && r.fuelActual!==r.fuelRequested? ` (실제주입 ${r.fuelActual}L)`:''}</div>`:''}${r.fuelNotUsed? `<div class="muted" style="font-size:11px;">반납시 연료: <span class="pill gray">연료사용안함</span></div>`:''}${(!r.fuelNotUsed && r.measuredFuelHeightCm!=null)? `<div class="muted" style="font-size:11px;">반납시 연료: ${(()=>{ const L=computeFuelLiters(g, r.measuredFuelHeightCm); return L!=null? `약 ${L}L ` : ''; })()}(측정높이 ${r.measuredFuelHeightCm}cm)</div>`:''}${(()=>{ const given = r.fuelRequested!=null? r.fuelRequested : r.fuelActual; const remain = r.measuredFuelHeightCm!=null? computeFuelLiters(g, r.measuredFuelHeightCm) : null; if(given==null || remain==null) return ''; const used = Math.round((given-remain)*10)/10; return `<div class="muted" style="font-size:11px;font-weight:700;color:var(--primary-dark);">⛽ ${given}L 중 ${remain}L 남아서 반납 → 사용량 약 ${used}L</div>`; })()}${(r.loadDate||r.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(r.loadDate),r.arriveTime].filter(Boolean).join(' · ')}</div>`:''}${r.freightBearer? `<div class="muted" style="font-size:11px;">배차: ${r.freightBearer}</div>`:''}${r.note? `<div class="muted" style="font-size:11px;">비고: ${r.note}</div>`:''}${(r.loadConfirmedBy||r.outProcessedBy||r.inProcessedBy)? `<div class="muted" style="font-size:11px;">${[(r.loadConfirmedBy||r.outProcessedBy)? `출고: ${escR(r.loadConfirmedBy||r.outProcessedBy)}`:null, r.inProcessedBy? `입고: ${escR(r.inProcessedBy)}`:null].filter(Boolean).join(' · ')}</div>`:''}</td>
         <td class="muted">${r.startHours!=null? r.startHours.toLocaleString()+'h' : '-'}</td>
-        <td class="muted">${r.endHours!=null? r.endHours.toLocaleString()+'h' : (rentalHoursUnknown(r) && (findGen(r.genId)||{}).hoursKnown!==false ? `<span style="color:var(--warn);font-weight:700;">${rentalHoursUnknownLabel(r)}</span>` : '-')}</td>
-        <td class="muted" style="font-weight:700;">${rentalUsedHoursHtml(r)}</td>
+        <td class="muted">${r.endHours!=null? r.endHours.toLocaleString()+'h' : '-'}</td>
+        <td class="muted" style="font-weight:700;">${(r.usedHours||0).toLocaleString()}h</td>
         <td><button class="btn sm danger" onclick="deleteRental('${r.id}','${id}')">삭제</button></td>
       </tr>`).join('')}</tbody>
     </table></div>`}
@@ -8472,7 +8048,6 @@ async function toggleHoursKnownSetting(id, checked){
   }
   g.hoursUpdatedAt = nowDateTimeStr();
   g.hoursUpdatedBy = DB.currentUserName || null;
-  g.hoursUnconfirmed = false;
   await saveGens();
   renderContent();
   flash(checked? `${g.id} 가동시간 확인가능으로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 실제 값을 입력해주세요.` : `${g.id} 누적시간 확인불가로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 마지막 엔진오일교체일을 입력해주세요.`);
@@ -9446,11 +9021,8 @@ function renderReserveTab(){
   const delayedCount = list.filter(r=>!isRawSms(r) && dateOf(r) && daysFromToday(dateOf(r))<0).length;
   const pendingCount = list.filter(r=>r.pendingLoad).length;
   const smsOrderAll = list.filter(r=>r.smsOrder && r.smsOrder.trim());
-  // "2대"처럼 한 문자가 여러 건으로 나뉘어 등록돼도, 위 문자오더 원문 카드는 문자 1통당 1장만 보여줍니다.
-  const smsCardSeen = new Set();
-  const smsOrderUnique = smsOrderAll.filter(r=>{ const k = resSmsGroupKey(r); if(!k) return true; if(smsCardSeen.has(k)) return false; smsCardSeen.add(k); return true; });
-  const smsOrderCards = smsOrderUnique.filter(r=>!r.smsOrderChecked).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
-  const smsOrderHidden = smsOrderUnique.filter(r=>r.smsOrderChecked).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
+  const smsOrderCards = smsOrderAll.filter(r=>!r.smsOrderChecked).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
+  const smsOrderHidden = smsOrderAll.filter(r=>r.smsOrderChecked).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
   const smsOrderNumMapFull = buildSmsOrderNumMap();
   const smsOrderNumMap = {};
   Object.keys(smsOrderNumMapFull).forEach(k=>{ if(k.startsWith('r:')) smsOrderNumMap[k.slice(2)] = smsOrderNumMapFull[k]; });
@@ -9525,7 +9097,7 @@ function renderReserveTab(){
       <td class="muted">${r.usageDays? r.usageDays+'일' : '-'}</td>
       <td><div class="btn-row" style="flex-wrap:nowrap;">
         <button class="btn sm" onclick="printReceiptForReservation('${r.id}')">인수증 미리보기</button>
-        ${r.batchId && batchReceiptCount(r.batchId)>1? `<button class="btn sm" style="color:var(--primary-dark);border-color:var(--primary);" onclick="printBatchReceipt('${r.batchId}')" title="같이 출고 처리된 ${batchReceiptCount(r.batchId)}대(이미 상차완료된 발전기 포함)를 한 인수증에 모아서 봅니다">📄 일괄인수증(${batchReceiptCount(r.batchId)}대)</button>`:''}
+        ${r.batchId && DB.reservations.filter(x=>x.batchId===r.batchId).length>1? `<button class="btn sm" style="color:var(--primary-dark);border-color:var(--primary);" onclick="printBatchReceipt('${r.batchId}')" title="같이 출고 처리된 ${DB.reservations.filter(x=>x.batchId===r.batchId).length}대를 한 인수증에 모아서 봅니다">📄 일괄인수증(${DB.reservations.filter(x=>x.batchId===r.batchId).length}대)</button>`:''}
         ${r.forcedOut? `<button class="btn sm primary" onclick="confirmReservationPayment('${r.id}')">입금 확인</button>`:''}
         ${r.pendingLoad
           ? `<button class="btn sm" onclick="processReservation('${r.id}')">내용보기/수정</button><button class="btn sm primary" onclick="confirmLoadPrompt('${r.id}')">상차완료</button>`
@@ -9545,7 +9117,7 @@ function renderReserveTab(){
           return `
         <div style="width:195px;height:260px;flex-shrink:0;background:#fff;${cardStyle}border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
           ${change? `<div style="background:var(--danger);color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;line-height:1.3;">⚠️ ${change.diffs.join('·')} 변경됨!<br>(${fmtCardDateTime(change.priorAt)} 문자와 다름)</div>` : ''}
-          ${r.smsQtyTotal>1? `<div style="background:#1565C0;color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;">📦 ${r.smsQtyTotal}대 주문 (아래 표에 ${findResSmsGroup(r, DB.reservations).length}건)</div>` : ''}
+          ${r.smsQtyTotal>1? `<div style="background:#1565C0;color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;">📦 ${r.smsQtyTotal}대 중 ${r.smsQtyIndex}번째</div>` : ''}
           <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}${r.outProcessedBy? ` · ${escR(r.outProcessedBy)}` : ''}</div>
           ${smsOrderNumMap[r.id]? `<div style="font-size:10px;color:#8A6D00;font-weight:800;margin-bottom:2px;">#${smsOrderNumMap[r.id]}</div>`:''}
           <div style="font-size:14px;font-weight:700;color:var(--primary-dark);margin-bottom:4px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
@@ -9621,7 +9193,7 @@ function showNoteModal(resId){
 function markSmsOrderChecked(resId){
   const r = DB.reservations.find(x=>x.id===resId);
   if(!r) return;
-  findResSmsGroup(r, DB.reservations).forEach(x=>{ x.smsOrderChecked = true; });
+  r.smsOrderChecked = true;
   saveReservations();
   renderContent();
   flash('✅ 확인완료');
@@ -9629,19 +9201,15 @@ function markSmsOrderChecked(resId){
 function unmarkSmsOrderChecked(resId){
   const r = DB.reservations.find(x=>x.id===resId);
   if(!r) return;
-  findResSmsGroup(r, DB.reservations).forEach(x=>{ x.smsOrderChecked = false; });
+  r.smsOrderChecked = false;
   saveReservations();
   renderContent();
 }
 function deleteSmsOrderCard(resId){
   const r = DB.reservations.find(x=>x.id===resId);
-  const delIds = new Set(r ? findResSmsGroup(r, DB.reservations).map(x=>x.id) : [resId]);
-  const delMsg = delIds.size>1
-    ? `이 문자오더는 ${delIds.size}대 주문이라 출고대기에 ${delIds.size}건으로 나뉘어 있습니다.\n${delIds.size}건을 모두 삭제할까요? 되돌릴 수 없습니다.\n(1대만 빼려면 아래 표에서 해당 건만 "예약 취소"하세요)`
-    : '이 문자오더 건을 완전히 삭제할까요? 출고대기 목록에서도 함께 삭제되며, 되돌릴 수 없습니다.';
-  openConfirmModal(delMsg, async function(){
-    const summary = r ? `문자오더${delIds.size>1? `(${delIds.size}건)`:''}: ${(r.smsOrder||'').slice(0,40)}${(r.smsOrder||'').length>40?'…':''}` : '문자오더 삭제';
-    DB.reservations = DB.reservations.filter(x=>!delIds.has(x.id));
+  openConfirmModal('이 문자오더 건을 완전히 삭제할까요? 출고대기 목록에서도 함께 삭제되며, 되돌릴 수 없습니다.', async function(){
+    const summary = r ? `문자오더: ${(r.smsOrder||'').slice(0,40)}${(r.smsOrder||'').length>40?'…':''}` : '문자오더 삭제';
+    DB.reservations = DB.reservations.filter(r=>r.id!==resId);
     await saveWithRetry(saveReservations);
     await logDeletion('문자오더 삭제', summary);
     closeModal();
@@ -9735,7 +9303,6 @@ function openAssignGenModal(resId){
       <h3>🔧 발전기 배정</h3>
       <div class="modal-sub">${escR(r.customer||r.site||'-')} · 출고예약</div>
       <input type="hidden" id="f-assign-gen" value="${candidates[0].id}">
-      <div class="hint" style="text-align:left;font-size:12.5px;margin-top:2px;">여러 대가 같이 나가면 여러 개를 눌러 고르세요. 다시 누르면 빠집니다. 같은 거래처 정보로 함께 상차대기에 올라갑니다.</div>
       <div id="assign-picked" style="text-align:left;margin-top:6px;padding:8px 12px;border-radius:10px;background:var(--primary-tint);font-size:14px;">선택한 발전기: <b>${candidates[0].id}</b> · ${escR(candidates[0].model||'미설정')}</div>
       ${assignGenCapacityBoardHtml(candidates)}
       <div class="modal-actions">
@@ -9777,71 +9344,34 @@ function assignGenCapacityBoardHtml(candidates){
     <div style="max-height:320px;overflow-y:auto;">${rows || '<div class="muted">입고된 발전기가 없습니다.</div>'}</div>
   </div>`;
 }
-// 발전기 배정: 누를 때마다 선택/해제를 바꿉니다(여러 대 선택 가능). 고른 순서대로 저장됩니다.
 function pickAssignGen(id){
   const sel = document.getElementById('f-assign-gen');
-  if(!sel) return;
-  let ids = sel.value ? sel.value.split(',').filter(Boolean) : [];
-  ids = ids.includes(id) ? ids.filter(x=>x!==id) : [...ids, id];
-  sel.value = ids.join(',');
-  highlightAssignChip();
+  if(sel){ sel.value = id; }
+  highlightAssignChip(id);
 }
-function highlightAssignChip(){
-  const sel = document.getElementById('f-assign-gen');
-  const ids = sel && sel.value ? sel.value.split(',').filter(Boolean) : [];
+function highlightAssignChip(id){
+  const g = findGen(id);
   const box = document.getElementById('assign-picked');
-  if(box) box.innerHTML = ids.length===0 ? '<span style="color:var(--danger);">발전기를 1대 이상 골라주세요.</span>'
-    : ids.length===1 ? (()=>{ const g = findGen(ids[0]); return `선택한 발전기: <b>${escR(ids[0])}</b> · ${escR((g&&g.model)||'미설정')}`; })()
-    : `선택한 발전기 <b>${ids.length}대</b>: ${ids.map(id=>`<b>${escR(id)}</b>`).join(', ')}`;
+  if(box && g) box.innerHTML = `선택한 발전기: <b>${escR(g.id)}</b> · ${escR(g.model||'미설정')}`;
   document.querySelectorAll('.assign-chip').forEach(b=>{
-    const on = ids.includes(b.dataset.gen);
+    const on = b.dataset.gen===id;
     b.style.background = on ? 'var(--primary)' : '#fff';
     b.style.color = on ? '#fff' : 'var(--primary)';
   });
 }
-// 여러 대를 골랐을 때 2번째부터 들어갈 출고대기 건을 만듭니다. 같은 문자로 이미 나뉘어 있는 미지정 건(예: "2대" 문자)이 있으면
-// 그 건에 먼저 배정하고, 모자라면 거래처 정보를 그대로 복사한 새 건을 만듭니다. 전부 같은 묶음(batchId)으로 이어둡니다.
-function assignExtraGensToReservation(r, extraIds, list, assignedBy, hoursOf){
-  if(!extraIds.length) return [];
-  const sibs = findResGroupSiblings(r, list).filter(x=>x.genId===UNASSIGNED_GEN_ID);
-  const bid = r.batchId || findResGroupSiblings(r, list).map(x=>x.batchId).find(Boolean) || uid();
-  r.batchId = bid;
-  const outDate = r.outDate || r.plannedOutDate || null;
-  const done = [];
-  extraIds.forEach(gid=>{
-    let x = sibs.shift();
-    if(!x){
-      x = { ...r, id: uid(), smsOrder: null, smsOrderAt: null, smsQtyIndex: null, smsQtyTotal: null, smsOrderChecked: false, createdAtTs: Date.now() };
-      list.push(x);
-    }
-    Object.assign(x, {
-      genId: gid, pendingLoad: true, batchId: bid, outDate,
-      customer: r.customer, site: r.site, manager: r.manager, phone: r.phone, address: r.address, note: r.note,
-      arriveTime: r.arriveTime, loadDate: r.loadDate, freightBearer: r.freightBearer, usageDays: r.usageDays,
-      startHours: hoursOf(gid), genAssignedBy: assignedBy, genAssignedAt: nowDateTimeStr()
-    });
-    done.push(x);
-  });
-  return done;
-}
-async function confirmAssignGen(resId){
-  const sel = document.getElementById('f-assign-gen');
-  const ids = sel && sel.value ? sel.value.split(',').filter(Boolean) : [];
-  if(!ids.length){ highlightAssignChip(); return; }
-  await refreshCoreDataNow(); // 그사이 다른 사람이 같은 발전기를 잡았는지 확인
+function confirmAssignGen(resId){
   const r = DB.reservations.find(x=>x.id===resId);
-  if(!r){ closeModal(); renderTabbar(); renderContent(); showInfoModal('이 건은 그사이 다른 사람이 처리해서 더 이상 없습니다.'); return; }
-  const bad = ids.filter(id=>{ const g = findGen(id); return !g || g.status!=='in' || g.underRepair || DB.reservations.some(o=>o.genId===id && o.id!==resId); });
-  if(bad.length){ showInfoModal(`${bad.join(', ')} 발전기는 지금 배정할 수 없습니다(그사이 다른 건에 배정되었거나 출고·고장 처리됨). 다시 선택해주세요.`); return; }
-  const chosenId = ids[0];
+  const sel = document.getElementById('f-assign-gen');
+  if(!r || !sel || !sel.value) return;
+  const chosenId = sel.value;
+  const g = findGen(chosenId);
+  if(!g || g.status!=='in' || g.underRepair){ showInfoModal('선택한 발전기를 지금은 배정할 수 없습니다. 다시 선택해주세요.'); return; }
   r.genId = chosenId;
   r.pendingLoad = true; // 발전기가 정해졌으니 이제부터는 일반 상차대기와 동일하게 취급합니다.
   r.genAssignedBy = DB.currentUserName || null;
   r.genAssignedAt = nowDateTimeStr();
-  const extras = assignExtraGensToReservation(r, ids.slice(1), DB.reservations, DB.currentUserName||null, gid=>{ const g = findGen(gid); return g ? (g.hours||0) : 0; });
   saveWithRetry(saveReservations);
   openOutModal(chosenId, resId);
-  if(extras.length) flash(`${ids.length}대 배정: ${ids.join(', ')} · 첫 번째(${chosenId}) 출고 정보를 저장하면 나머지 ${extras.length}대에도 같은 내용이 들어갑니다.`);
 }
 function confirmLoadPrompt(resId, isTransfer){
   const r = DB.reservations.find(x=>x.id===resId);
@@ -9923,9 +9453,8 @@ function submitConfirmLoadWithFuelCheck(resId){
   confirmLoad(resId);
 }
 async function confirmLoad(resId, isTransfer){
-  await refreshCoreDataNow();
   const r = DB.reservations.find(x=>x.id===resId);
-  if(!r){ closeModal(); renderTabbar(); renderContent(); showInfoModal('이 건은 그사이 다른 사람이 이미 상차완료(또는 취소) 처리했습니다.'); return; }
+  if(!r){ return; }
   const g = findGen(r.genId);
   if(!g){ showInfoModal('해당 발전기를 찾을 수 없습니다.'); return; }
   if(g.status==='out'){
@@ -9950,7 +9479,7 @@ async function confirmLoad(resId, isTransfer){
     fuelRequested: r.fuelRequested, fuelActual: r.fuelActual,
     usageDays: r.usageDays, loadDate: r.loadDate, arriveTime: r.arriveTime, freightBearer: r.freightBearer, paymentNote: r.paymentNote||'',
     note: [r.note, transferFuelNote].filter(Boolean).join(' / '), smsOrder: r.smsOrder||null, smsOrderAt: r.smsOrderAt||r.createdAtTs||null,
-    outDate: r.outDate, startHours: r.startHours, batchId: r.batchId||null,
+    outDate: r.outDate, startHours: r.startHours,
     outProcessedBy: r.outProcessedBy || null, loadConfirmedBy: DB.currentUserName || null, genAssignedBy: r.genAssignedBy||null, genAssignedAt: r.genAssignedAt||null, outConfirmedAt: Date.now()
   };
   if(r.suppliesItems && r.suppliesItems.length){
@@ -10009,68 +9538,7 @@ function showInfoModal(message){
 // 문자오더 원문에서 업체명·현장·주소·담당자·연락처·전압·도착일시·비고(부자재)를 최대한 뽑아냅니다.
 // 100% 정확하진 않으니, 이미 값이 있는 칸은 절대 덮어쓰지 않고 "비어있는 칸만" 채우는 용도로 씁니다.
 // baseTs: 문자가 들어온 시각. "내일/오늘/27일"은 사무실에서 여는 날이 아니라 문자가 온 날 기준으로 계산해야 합니다.
-// ===== 문자 자동인식 학습 =====
-// 사무실에서 고쳐서 저장해둔 거래 기록(출고중·출고대기·지난 임대이력)을 기준으로, 새 문자의 연락처나 거래처명이
-// 예전에 고쳐둔 건과 같으면 그때 확정한 거래처명·담당자·전압을 그대로 가져다 씁니다.
-// (문자를 고칠 때마다 규칙을 새로 짤 필요 없이, 사무실에서 한 번 고쳐두면 다음부터는 그대로 인식됩니다)
-let smsLearnQmCache = null, smsLearnQmCacheAt = 0;
-async function qmLoadSmsLearnCache(force){
-  if(!force && smsLearnQmCache && Date.now()-smsLearnQmCacheAt < 60000) return;
-  try{
-    const [cg, cr, ch] = await Promise.all([
-      window.storage.get('gen-fleet-v2', true).catch(()=>null),
-      window.storage.get('gen-reservations-v1', true).catch(()=>null),
-      window.storage.get('gen-rentals-v2', true).catch(()=>null)
-    ]);
-    const pj = c=>{ try{ const v = c ? JSON.parse(c.value) : []; return Array.isArray(v) ? v : []; }catch(e){ return []; } };
-    smsLearnQmCache = { gens: pj(cg), reservations: pj(cr), rentals: pj(ch) };
-    smsLearnQmCacheAt = Date.now();
-  }catch(e){ /* 못 불러오면 학습 없이 기본 인식만 합니다 */ }
-}
-function getSmsLearnRecords(){
-  let src = null;
-  try{ if(!isQuickMode() && typeof DB!=='undefined' && DB && ((DB.rentals||[]).length || (DB.gens||[]).length)) src = {gens: DB.gens||[], reservations: DB.reservations||[], rentals: DB.rentals||[]}; }catch(e){}
-  if(!src) src = smsLearnQmCache;
-  if(!src) return [];
-  const recs = [];
-  const add = (r, ts)=>{ if(r && (r.customer||r.manager) && (r.phone||r.customer)) recs.push({customer:r.customer||'', manager:r.manager||'', phone:String(r.phone||'').replace(/[^0-9]/g,''), voltage:r.voltage||'', smsOrder:r.smsOrder||'', ts}); };
-  (src.rentals||[]).forEach(r=>add(r, Date.parse(r.outDate||r.inDate||'')||0));
-  (src.gens||[]).forEach(g=>{ if(g && g.rental) add(g.rental, g.rental.smsOrderAt || Date.parse(g.rental.outDate||'') || 0); });
-  (src.reservations||[]).forEach(r=>add(r, r.smsOrderAt || r.createdAtTs || Date.parse(r.outDate||r.plannedOutDate||'') || 0));
-  recs.sort((a,b)=>b.ts-a.ts); // 최근에 고친 기록이 우선
-  return recs;
-}
-function applySmsLearning(result, text, recs){
-  recs = recs || getSmsLearnRecords();
-  result.learned = [];
-  if(!recs.length) return result;
-  const norm = s=>String(s||'').replace(/\s+|\(주\)|㈜|주식회사|님$/g,'').toLowerCase();
-  const similar = (a,b)=>{ a=norm(a); b=norm(b); return !!(a && b && (a.includes(b) || b.includes(a))); };
-  const titleOnly = /^(담당자?|대표|사장|소장|팀장|과장|부장|차장|이사|반장|실장|매니저|매니져|주임|대리|기사|협회장|회장)님?$/;
-  const myText = norm(text);
-  // 원문이 똑같은 문자를 예전에 고쳐둔 적이 있으면 그 결과를 가장 먼저 씁니다.
-  let rec = recs.find(r=>r.smsOrder && norm(r.smsOrder)===myText);
-  let by = rec ? 'text' : '';
-  if(!rec && result.phone){ rec = recs.find(r=>r.phone && r.phone===result.phone); if(rec) by = 'phone'; }
-  if(!rec && result.customer && norm(result.customer).length>=2){ rec = recs.find(r=>r.customer && norm(r.customer)===norm(result.customer)) || recs.find(r=>r.customer && norm(result.customer).length>=3 && similar(r.customer, result.customer)); if(rec) by = 'customer'; }
-  if(!rec) return result;
-  const set = (k,v)=>{ if(v && result[k]!==v){ result[k] = v; result.learned.push(k); } };
-  if(by==='text' || by==='phone'){
-    // 같은 연락처면 같은 사람·같은 회사입니다. 문자에 다른 회사명이 분명히 적혀 있으면 문자를 따릅니다.
-    if(by==='text' || !result.customer || similar(result.customer, rec.customer) || (typeof siteReForLearn!=='undefined' && siteReForLearn.test(result.customer))) set('customer', rec.customer);
-    if(by==='text' || !result.manager || titleOnly.test(result.manager) || similar(result.manager, rec.manager)) set('manager', rec.manager);
-  } else {
-    set('customer', rec.customer); // 거래처명은 사무실에서 확정한 표기로 맞춥니다
-    if(!result.phone && rec.phone){ set('phone', rec.phone); if(!result.manager || titleOnly.test(result.manager)) set('manager', rec.manager); }
-  }
-  if(!result.voltage && rec.voltage) set('voltage', rec.voltage);
-  return result;
-}
-const siteReForLearn = /(학교|대학교|운동장|공원|부대|정수장|센터|병원|아파트|현장|공장|체육관|야영장|캠핑장|행사장|주차장|청사|구청|시청|군청|교회|성당|축제|광장)/;
-function parseSmsOrderText(text, baseTs, learnRecs){
-  return applySmsLearning(parseSmsOrderTextRaw(text, baseTs), text, learnRecs);
-}
-function parseSmsOrderTextRaw(text, baseTs){
+function parseSmsOrderText(text, baseTs){
   const result = {customer:'', address:'', manager:'', phone:'', voltage:'', arriveTime:'', outDate:'', loadDate:'', note:'', usageDays:'', fuelRequested:null, fuelActual:null};
   if(!text) return result;
   const base = baseTs ? new Date(baseTs) : new Date();
@@ -10078,39 +9546,11 @@ function parseSmsOrderTextRaw(text, baseTs){
   // 소수점(1.4톤, 2.5T)과 괄호 안의 마침표·쉼표("분전반(메인250.분기150A.4P,3P 100)")는 보호해두고,
   // 그 외 줄바꿈/쉼표/마침표를 전부 구분자로 써서 잘게 쪼갭니다.
   // (문자가 "구형(L9)380볼트.분전반,내일8시도착.OO리820-1번지.다온스틸텍.김신경이사"처럼 마침표/쉼표로만 구분되는 경우가 많습니다)
-  // "행사명 : 한성백제문화제", "담당자: 홍길동"처럼 "항목 : 내용" 형식으로 온 줄은 줄 단위로 먼저 처리합니다.
-  // (쉼표로 잘게 쪼개면 "필요인력 : 발전기 온/오프 진행, 중간 기름체크" 뒷부분이 업체명·주소로 잘못 들어가던 문제)
-  const labeledNotes = [];
-  const labeled = {customer:'', site:'', address:'', manager:'', phone:'', arrival:''};
-  text = String(text).split(/\n/).filter(line=>{
-    const lm = line.match(/^\s*[*•\-]?\s*([가-힣A-Za-z ]{2,8}?)\s*[:：]\s*(.+)$/);
-    if(!lm) return true;
-    const key = lm[1].replace(/\s+/g,''); const val = lm[2].trim();
-    if(/^(업체명?|업체|거래처명?|회사명?|상호|발주처|고객사?)$/.test(key)){ labeled.customer = val; return false; }
-    if(/^(행사명|현장명?|공사명|행사|현장위치)$/.test(key)){ labeled.site = val; return false; }
-    if(/^(주소|위치|장소|현장주소|설치장소|설치위치)$/.test(key)){ labeled.address = val; return false; }
-    if(/^(담당자?|담당자명|성함|이름|현장담당자?)$/.test(key)){
-      const ph = val.match(/01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/);
-      if(ph){ labeled.phone = ph[0].replace(/[^0-9]/g,''); labeled.manager = val.replace(ph[0],'').trim(); }
-      else labeled.manager = val;
-      return false;
-    }
-    if(/^(연락처|전화|전화번호|휴대폰|핸드폰|번호)$/.test(key)){ const ph = val.match(/01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/); if(ph){ labeled.phone = ph[0].replace(/[^0-9]/g,''); return false; } return true; }
-    if(/^(도착|도착일시?|도착시간|투입|투입일시?|일시|날짜|날자|행사날짜|행사날자|행사일시?|기간|행사기간|사용기간|출고일)$/.test(key)){
-      labeled.arrival = labeled.arrival ? labeled.arrival+' '+val : val;
-      if(/~|부터|까지/.test(val)) labeledNotes.push(`${lm[1].trim()}: ${val}`);
-      return false;
-    }
-    if(/^(전압|용량|발전기|필요발전기|규격)$/.test(key)) return true; // 아래 일반 처리(전압·용량 인식)로 넘깁니다
-    // 운영시간·필요인력·비고 등 나머지 항목은 통째로 비고로 남깁니다.
-    labeledNotes.push(`${lm[1].trim()}: ${val}`);
-    return false;
-  }).join('\n');
   const DOT='\u2027', COMMA='\u201A';
   let protectedText = text.replace(/(\d)\.(\d)/g, '$1'+DOT+'$2');
   protectedText = protectedText.replace(/\([^)\n]*\)/g, m=>m.replace(/\./g,DOT).replace(/,/g,COMMA));
   const restore = s=>s.split(DOT).join('.').split(COMMA).join(',');
-  const pieces = protectedText.split(/[\n,]+|\.+|(?<=[가-힣A-Za-z)])\s*-\s+/).map(l=>restore(l).trim()).filter(Boolean);
+  const pieces = protectedText.split(/[\n,]+|\.+/).map(l=>restore(l).trim()).filter(Boolean);
 
   const phoneRe = /01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/;
   const capacityRe = /\d+(\.\d+)?\s*(키로|kw)/i;
@@ -10128,25 +9568,15 @@ function parseSmsOrderTextRaw(text, baseTs){
   const requestRe = /(주세요|바랍니다|부탁|해서|같이|요$)/;
   // 날짜/시간이 들어있는 조각 ("27일", "10월 1일(목)", "오후5시투입", "내일 9시 도착")
   const arrivalRe = /도착|상차|투입|오늘|내일|모레|\d{1,2}\s*월\s*\d{1,2}\s*일|^\d{1,2}\s*일\s*(\([^)]*\))?$|^(오전|오후|아침|저녁)?\s*\d{1,2}\s*시/;
-  const titleAlt = '협회장|부회장|회장|대표이사|현장소장|공장장|지점장|본부장|소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|담당자|담당|계장|국장|원장|매니저|매니져|제작팀|총무|감독|주무관|선생님|교수|상무|전무|위원장|사무장|조장|선임|책임|팀';
+  const titleAlt = '지점장|본부장|소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저|매니져|제작팀|팀';
   // "정현산업종봉섭대표" → 업체 "정현산업" + 담당자 "종봉섭대표", "씨앤오 정윤석부장님" → "씨앤오" + "정윤석부장님"
   const personRe = new RegExp(`^(.*?)([가-힣]{2,3})?\\s*(${titleAlt})\\s*(님)?$`);
   const splitCompanyPerson = s=>{
     const m = s.match(personRe);
     if(!m) return null;
-    let company = m[1].trim(), person = `${m[2]||''}${m[3]}${m[4]||''}`;
-    if(company.length===1){ person = company+person; company=''; } // "협회장"이 "협"+"회장"으로 쪼개지지 않게
-    else if(!m[2]){ const sm = company.match(/^(.*\S)\s+([가-힣])$/); if(sm){ company = sm[1].trim(); person = sm[2]+person; } } // "세원산업 정대리" → 정대리
-    return {company, person};
+    return {company: m[1].trim(), person: `${m[2]||''}${m[3]}${m[4]||''}`};
   };
 
-  // 띄어쓰기 없이 "대전유성한밭대학교", "대전자운대"처럼 지역명으로 시작하는 조각은 번지가 없어도 주소로 봅니다.
-  const regionRe = /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|충청|전라|경상|수원|성남|용인|고양|화성|평택|안산|안양|김포|파주|시흥|광명|하남|이천|오산|의정부|남양주|구리|포천|양주|동두천|연천|천안|아산|청주|충주|제천|전주|군산|익산|포항|구미|경주|창원|김해|진주|원주|춘천|강릉|당진|서산|논산|공주|보령|여주|양평|가평|안성|과천|군포|의왕|부천|인제|홍천|평창|정선|영월|태안|예산|홍성|음성|진천|괴산|부안|김제|정읍|목포|여수|순천|광양|거제|통영|양산|울주|기장|청라|송도|영종|판교|동탄|위례)/;
-  const companyRe = /(산업|전기|전력|건설|엔지니어링|이엔지|엔지$|ENC|E&C|이엔씨|엔씨|㈜|\(주\)|기업|상사|테크|개발|종합|공사|기술|시스템|에너지|이벤트|기획|컴퍼니|코리아|글로벌|통신|설비|중공업|스틸|철강|플랜트)/i;
-  const siteRe = /(학교|대학교|운동장|공원|부대|정수장|센터|병원|아파트|현장|공장|체육관|야영장|캠핑장|행사장|주차장|청사|구청|시청|군청|교회|성당|축제|광장|터미널|역사|물류|단지|본부|부지|휴게소|해수욕장|경기장)/;
-  // 상차·차량·연락 관련 안내("차량인적사항오늘통보", "인적사항통보", "지게차는 해성에서")는 비고로 보냅니다.
-  // ("오늘"이 들어있어서 도착일이 오늘로 잘못 잡히던 문제)
-  const memoRe = /(통보|인적사항|연락\s*(바람|주세요|요망|부탁)|사전연락|출입|신분증|차량번호|요망|필수|주의|지게차|하차|크레인)/;
   const leftover = []; // {text, pos}
   const noteParts = [];
   const arrivalParts = [];
@@ -10154,7 +9584,6 @@ function parseSmsOrderTextRaw(text, baseTs){
   let isLoadDateHint = false; // "상차"라고만 되어 있으면(도착 언급 없이) 그 날짜 자체가 상차일이라 -1일 계산을 안 합니다.
 
   const fillerRe = /\s*(입니다|이에요|예요|이요|요)\s*$/;
-  let lastAddrPos = -99, instPiece = '';
   // 한 조각 처리. 날짜·주소·전화번호가 띄어쓰기 없이 붙은 조각("30일10시도착천안동남구…입니다01096861959")은
   // 알아본 부분을 떼어내고 남은 부분을 다시 이 함수로 처리합니다.
   const processPiece = (piece, pos)=>{
@@ -10167,22 +9596,15 @@ function parseSmsOrderTextRaw(text, baseTs){
     const fpm0 = l.match(fuelParenRe);
     if(fpm0){ result.fuelRequested = Number(fpm0[1]); result.fuelActual = Number(fpm0[2]); return; }
     const fsm0 = l.match(fuelSimpleRe);
-    if(fsm0 && !/^\s*연료\s*\d+\s*만/.test(l)){ result.fuelRequested = Number(fsm0[1]); result.fuelActual = Number(fsm0[1]); return; }
-    if(/^(연료|연로|기름|경유)/.test(l)){ noteParts.push(l.replace(/^연로/,'연료')); return; } // "연로7만"(연료 7만원어치)처럼 금액이거나 오타인 경우는 비고로
+    if(fsm0){ result.fuelRequested = Number(fsm0[1]); result.fuelActual = Number(fsm0[1]); return; }
     if(/구형|신형/.test(l) && !noteParts.some(n=>/구형|신형/.test(n))) noteParts.push((l.match(/구형|신형/)||[''])[0]);
     if(capacityRe.test(l)){
       const um0 = l.match(usageDaysRe);
       if(um0) result.usageDays = um0[1] || um0[2];
-      // "150키로 380볼트 오늘 지금 바로 출고"처럼 용량 줄에 날짜·도착 정보가 같이 있으면 그 부분도 읽습니다.
-      if(/(오늘|내일|모레|지금|도착|투입|\d{1,2}\s*월\s*\d{1,2}\s*일)/.test(l)) arrivalParts.push(l.replace(/\d+(\.\d+)?\s*(키로|kw)/ig,' '));
-      // 용량·전압·대수를 떼고도 주소처럼 보이는 내용이 남으면("50키로 당진송악면가곡로185") 그 부분은 따로 읽습니다.
-      const restCap = l.replace(/\d+(\.\d+)?\s*(키로|kw)(\s*\([^)]*\))?/ig,' ').replace(voltageRe,' ').replace(/\d{1,2}\s*대/g,' ').replace(/(오늘|내일|모레|지금|즉시|바로)\s*(출고|도착)?/g,' ').replace(/\s+/g,' ').trim();
-      if(restCap && !restCap.startsWith('(') && addressRe.test(restCap) && !supplyRe.test(restCap)) processPiece(restCap, pos);
       return;
     }
-    if(/^\*?\s*[A-Za-z]{1,2}-\d{1,3}$/.test(l)){ noteParts.push('지정 발전기 '+l.replace(/^\*\s*/,'').toUpperCase()); return; }
     if(l.startsWith('*')){ noteParts.push(l.slice(1).trim()); return; }
-    if((l.includes('철수') || l.includes('회수')) && !splitCompanyPerson(l.replace(phoneRe,'').trim())){ noteParts.push(l); return; } // "10월 11일(일) 철수"는 출고일이 아니라 참고사항 (단, "김철수소장님" 같은 이름은 제외)
+    if(l.includes('철수') || l.includes('회수')){ noteParts.push(l); return; } // "10월 11일(일) 철수"는 출고일이 아니라 참고사항
     const um = l.match(usageDaysRe);
     if(um){ result.usageDays = um[1] || um[2]; return; }
     const mm = l.match(usageMonthRe);
@@ -10190,28 +9612,15 @@ function parseSmsOrderTextRaw(text, baseTs){
     const pm = l.match(phoneRe);
     if(pm){
       result.phone = pm[0].replace(/[^0-9]/g,'');
-      const preP = l.slice(0, pm.index).replace(fillerRe,'').trim(), postP = l.slice(pm.index + pm[0].length).trim();
-      if(preP && postP && splitCompanyPerson(preP)){
-        // 번호 앞이 담당자, 뒤는 다른 내용(메모 등)인 경우 따로 처리합니다.
-        const sp1 = splitCompanyPerson(preP);
-        result.manager = sp1.person; if(sp1.company) customerFromManager = sp1.company;
-        if(managerPos<0) managerPos = pos;
-        processPiece(postP, pos);
-        return;
-      }
       const rest = l.replace(phoneRe,' ').replace(fillerRe,'').replace(/\s+/g,' ').trim();
       if(managerPos<0) managerPos = pos;
       if(rest){
         const sp = splitCompanyPerson(rest);
         if(sp){ result.manager = sp.person; if(sp.company) customerFromManager = sp.company; }
-        else if(/^[가-힣]{2,4}$/.test(rest) && !companyRe.test(rest) && !regionRe.test(rest) && !siteRe.test(rest) && !/(도착|투입|상차|오늘|내일|모레|입니다)/.test(rest)){
-          result.manager = rest; // 직급 없이 이름만 붙은 경우("이승민01083288104")
-        }
         else { managerPos = -1; processPiece(rest, pos); } // 담당자가 아니면(날짜·주소 등) 다시 처리
       }
       return;
     }
-    if(memoRe.test(l) && !/도착|투입/.test(l)){ noteParts.push(l); return; }
     // "30일10시도착천안동남구…"처럼 도착/투입/상차 뒤에 다른 내용이 붙어 있으면 잘라서 따로 처리합니다.
     const am = l.match(/^(.*?(도착|투입|상차))\s*(\S.*)$/);
     if(am && !/^(예정|요망|바랍니다|해주세요|부탁)/.test(am[3])){
@@ -10219,12 +9628,7 @@ function parseSmsOrderTextRaw(text, baseTs){
       processPiece(am[3], pos);
       return;
     }
-    // "7일오전중"처럼 도착·투입이라는 말 없이 날짜+시간대만 있는 조각은, 다른 곳에 도착 날짜가 따로 있으면
-    // 상차(출발) 안내로 보고 비고에 남깁니다. (예: "11톤.7일오전중.…8일10시도착")
-    if(/^\d{1,2}\s*일\s*(\([^)]*\))?\s*(오전|오후|아침|저녁)\s*(중|\d{1,2}\s*시)?$/.test(l) && /\d\s*일[^\n]{0,12}(도착|투입)/.test(text)){
-      noteParts.push('상차 '+l); return;
-    }
-    if(arrivalRe.test(l) || /^\d{1,2}\s*\/\s*\d{1,2}(\s*\/|\s|$)/.test(l)){
+    if(arrivalRe.test(l)){
       arrivalParts.push(l);
       if(l.includes('상차') && !l.includes('도착')) isLoadDateHint = true;
       if(l.includes('~')) noteParts.push(l); // "10월 5일(월)~ 10월24일" 같은 기간은 비고에도 남겨둡니다
@@ -10234,16 +9638,7 @@ function parseSmsOrderTextRaw(text, baseTs){
     if(qtyOnlyRe.test(l) || (supplyRe.test(l) && l.length<40)){ noteParts.push(l); return; }
     // "2시간대기후철수"처럼 대기시간을 설명하는 조각은 거래처명이 아니라 비고로 보내야 합니다.
     if(/\d+\s*시간.*(대기|후|뒤)/.test(l)){ noteParts.push(l); return; }
-    // 앞 조각이 "…고음달로"처럼 도로명으로 끝나고 이번 조각이 번지로 시작하면("152담현스틸") 번지는 주소에 붙이고 나머지는 현장명으로 봅니다.
-    if(result.address && lastAddrPos===pos-1 && /(로|길|리|동)$/.test(result.address)){
-      const bm = l.match(/^(\d+(?:-\d+)?)(\s*번지)?\s*(.*)$/);
-      if(bm){ result.address += ' '+bm[1]+(bm[2]||''); lastAddrPos = pos; if(bm[3]) processPiece(bm[3], pos); return; }
-    }
-    { const spx = splitCompanyPerson(l); if(spx && spx.person.length>=3 && !/\d/.test(l) && l.length<=20){ leftover.push({text:l.replace(fillerRe,'').trim(), pos}); return; } }
-    if(addressRe.test(l) || (regionRe.test(l) && l.length>=3 && !companyRe.test(l))){
-      if(!addressRe.test(l) && siteRe.test(l) && !instPiece) instPiece = l; // "대전유성한밭대학교"처럼 기관 자체가 현장(=거래처)인 경우
-      result.address = result.address ? result.address+' '+l : l; lastAddrPos = pos; return;
-    }
+    if(addressRe.test(l)){ result.address = result.address ? result.address+' '+l : l; return; }
     if(vm) return; // 전압만 있고 다른 정보가 없는 조각(예: "380볼트")은 업체명 후보에서 제외합니다.
     if(requestRe.test(l) && l.length>=8){ noteParts.push(l); return; } // "군산거하고 같이 한차로 해주세요"
     l = l.replace(fillerRe,'').trim();
@@ -10271,35 +9666,18 @@ function parseSmsOrderTextRaw(text, baseTs){
   if(customerFromManager){
     result.customer = customerFromManager;
   } else if(leftover.length){
-    const bareRegion = x=> regionRe.test(x.text) && x.text.length<=4 && !companyRe.test(x.text); // "평택" 같은 지역명 한 단어
-    const notSite = x=> (!siteRe.test(x.text) || companyRe.test(x.text)) && !bareRegion(x);
     if(managerPos>=0){
-      for(let i=leftover.length-1;i>=0;i--){ if(leftover[i].pos <= managerPos && companyRe.test(leftover[i].text) && !siteRe.test(leftover[i].text)){ custIdx = i; break; } }
+      for(let i=leftover.length-1;i>=0;i--){ if(leftover[i].pos < managerPos){ custIdx = i; break; } }
     }
-    if(custIdx<0 && managerPos>=0){
-      for(let i=leftover.length-1;i>=0;i--){ if(leftover[i].pos < managerPos && notSite(leftover[i])){ custIdx = i; break; } }
-      if(custIdx<0) for(let i=leftover.length-1;i>=0;i--){ if(leftover[i].pos < managerPos){ custIdx = i; break; } }
-    }
-    if(custIdx<0){ custIdx = leftover.findIndex(notSite); if(custIdx<0) custIdx = 0; }
+    if(custIdx<0) custIdx = 0;
     result.customer = leftover[custIdx].text;
   }
-  // 업체명 후보가 "대운동장"처럼 현장 이름뿐이고, 주소가 "대전유성한밭대학교"처럼 기관이면 기관을 거래처로, 현장 이름은 주소 뒤로 보냅니다.
-  if(!customerFromManager && instPiece && result.customer && siteRe.test(result.customer) && !companyRe.test(result.customer)){
-    result.address = result.address + ' ' + result.customer;
-    result.customer = instPiece;
-  }
   // 나머지 조각(현장명 등)은 주소 뒤에 괄호로 붙여둡니다.
-  const siteParts = leftover.filter((x,i)=>i!==custIdx).map(x=>x.text).filter(t=> !(regionRe.test(t) && t.length<=4 && result.address && result.address.includes(t))); // 주소에 이미 있는 지역명은 빼기
+  const siteParts = leftover.filter((x,i)=>i!==custIdx).map(x=>x.text);
   if(siteParts.length){
     result.address = result.address ? `${result.address} (${siteParts.join(' ')})` : siteParts.join(' ');
   }
-  if(labeled.customer) result.customer = labeled.customer;
-  if(labeled.manager) result.manager = labeled.manager;
-  if(labeled.phone) result.phone = labeled.phone;
-  if(labeled.address) result.address = labeled.address + (result.address && !result.address.includes(labeled.address) ? ` (${result.address})` : '');
-  if(labeled.site) result.address = result.address ? `${result.address} (${labeled.site})` : labeled.site;
-  if(labeled.arrival) arrivalParts.unshift(labeled.arrival);
-  result.note = [...noteParts, ...labeledNotes].join(', ');
+  result.note = noteParts.join(', ');
 
   // 도착 시간/날짜 파싱 (여러 조각에 나뉘어 있어도 합쳐서 봅니다. 예: "27일" + "오후5시투입")
   const arrivalLine = arrivalParts.join(' ');
@@ -10309,20 +9687,14 @@ function parseSmsOrderTextRaw(text, baseTs){
       const tm = arrivalLine.match(/(오전|오후|아침|저녁|밤)?\s*(\d{1,2})\s*시\s*(반|(\d{1,2})\s*분)?/);
       if(tm){
         let ampm = tm[1]==='아침' ? '오전' : ((tm[1]==='저녁'||tm[1]==='밤') ? '오후' : tm[1]);
-        let hour = Number(tm[2]);
-        if(hour>12 && hour<=24){ ampm = '오후'; hour -= 12; } // "14시" → "오후 2시"
+        const hour = Number(tm[2]);
         if(!ampm) ampm = (hour>=7 && hour<=12) ? '오전' : '오후';
         const minute = tm[3]==='반' ? 30 : (tm[4]? Number(tm[4]) : 0);
         result.arriveTime = minute>0 ? `${ampm} ${hour}시 ${minute}분` : `${ampm} ${hour}시`;
-        const after = arrivalLine.slice(tm.index + tm[0].length);
-        if(/^\s*(전|이전|까지)/.test(after)) result.arriveTime += ' 전'; // "오후4시전도착"
-        else if(/^\s*(이후|후|부터)/.test(after)) result.arriveTime += ' 이후';
       } else if(/오전\s*중/.test(arrivalLine)) result.arriveTime = '오전중';
       else if(/오후\s*중/.test(arrivalLine)) result.arriveTime = '오후중';
     }
-    let md = arrivalLine.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
-    // "9/11", "10/8(목)" 형식 날짜도 월/일로 읽습니다.
-    if(!md){ const sm = arrivalLine.match(/(?:^|[^\d])(\d{1,2})\s*\/\s*(\d{1,2})(?!\d)/); if(sm && Number(sm[1])>=1 && Number(sm[1])<=12 && Number(sm[2])>=1 && Number(sm[2])<=31) md = sm; }
+    const md = arrivalLine.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
     if(arrivalLine.includes('오늘') || arrivalLine.includes('지금')) result.outDate = toLocalDateStr(baseDay);
     else if(arrivalLine.includes('모레')){ const d = new Date(baseDay); d.setDate(d.getDate()+2); result.outDate = toLocalDateStr(d); }
     else if(arrivalLine.includes('내일')){ const d = new Date(baseDay); d.setDate(d.getDate()+1); result.outDate = toLocalDateStr(d); }
@@ -10357,57 +9729,67 @@ function parseSmsOrderTextRaw(text, baseTs){
 }
 // 철수(회수) 요청 문자에서 주소·연락처·담당자·회수예정일을 뽑아냅니다.
 // 오늘/내일/"OO일 후"/특정 날짜("18일") 표현을 인식합니다. 시간은 철수 요청에서는 안 쓰므로 뽑지 않습니다.
-// 철수(회수) 요청 문자 인식. 거래처·담당자·연락처·주소는 출고 문자와 같은 인식 규칙(parseSmsOrderTextRaw)을 그대로 씁니다.
-// (예전엔 줄바꿈으로만 나눠서, "50키로 지금철수당진…태산엔지니어링.이문기팀장010…"처럼 한 줄로 온 문자를 통째로 버렸습니다)
-function parseReturnRequestText(text, baseTs){
-  const result = {address:'', phone:'', manager:'', customer:'', recallDate:'', genId:''};
+function parseReturnRequestText(text){
+  const result = {address:'', phone:'', manager:'', customer:'', recallDate:''};
   if(!text) return result;
-  // 발전기 번호가 적혀 있으면("S-33 자운대 철수") 그 번호로 바로 찾습니다.
-  const gm = String(text).match(/(?:^|[^A-Za-z0-9])([A-Za-z]{1,2})\s*-\s*(\d{1,3})(?![\d-])/);
-  if(gm) result.genId = `${gm[1].toUpperCase()}-${gm[2]}`;
-  text = gm ? String(text).replace(gm[0], gm[0].charAt(0).match(/[A-Za-z0-9]/)? ' ' : gm[0].charAt(0)+' ') : text;
-  const base = baseTs ? new Date(baseTs) : new Date();
-  const baseDay = new Date(base.getFullYear(), base.getMonth(), base.getDate());
-  // 회수일: 더 구체적인 표현(월/일 > N일 후 > N일 > 모레 > 내일 > 오늘·지금) 순으로 찾습니다. 문자 받은 날 기준입니다.
-  const md = text.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const phoneRe = /01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/;
+  const addressRe = /(시|도|군|구|읍|면|동|리|로|길)[\s]*\d|산\s*\d|(^|\s)[가-힣]{2,}(시|도|군|구|읍|면|동|리)(\s|$)/;
+  const today = new Date();
+  const leftover = [];
+
+  // 날짜는 더 구체적인 표현(특정 날짜 > N일 후 > 내일 > 오늘) 순으로 찾습니다.
   const relMatch = text.match(/(\d{1,2})\s*일\s*(후|뒤)/);
-  const dayMatch = text.match(/(?:^|[^\d\-])(\d{1,2})\s*일(?!\s*(후|뒤|간|동안))/);
-  if(md){
-    let d = new Date(baseDay.getFullYear(), Number(md[1])-1, Number(md[2]));
-    if(d < new Date(baseDay.getFullYear(), baseDay.getMonth()-2, baseDay.getDate())) d = new Date(baseDay.getFullYear()+1, Number(md[1])-1, Number(md[2]));
-    result.recallDate = toLocalDateStr(d);
-  } else if(relMatch){
-    const d = new Date(baseDay); d.setDate(d.getDate()+Number(relMatch[1]));
+  const dayMatch = text.match(/(\d{1,2})\s*일(?!\s*(후|뒤))/);
+  if(relMatch){
+    const d = new Date(today); d.setDate(d.getDate()+Number(relMatch[1]));
     result.recallDate = toLocalDateStr(d);
   } else if(dayMatch){
     const day = Number(dayMatch[1]);
-    let d = new Date(baseDay.getFullYear(), baseDay.getMonth(), day);
-    if(d < baseDay) d = new Date(baseDay.getFullYear(), baseDay.getMonth()+1, day);
+    let d = new Date(today.getFullYear(), today.getMonth(), day);
+    if(d < new Date(today.getFullYear(), today.getMonth(), today.getDate())) d = new Date(today.getFullYear(), today.getMonth()+1, day);
     result.recallDate = toLocalDateStr(d);
-  } else if(/모레/.test(text)){
-    const d = new Date(baseDay); d.setDate(d.getDate()+2); result.recallDate = toLocalDateStr(d);
   } else if(/내일/.test(text)){
-    const d = new Date(baseDay); d.setDate(d.getDate()+1); result.recallDate = toLocalDateStr(d);
-  } else if(/오늘|지금|즉시|바로/.test(text)){
-    result.recallDate = toLocalDateStr(baseDay);
+    const d = new Date(today); d.setDate(d.getDate()+1);
+    result.recallDate = toLocalDateStr(d);
+  } else if(/오늘|지금/.test(text)){
+    result.recallDate = toLocalDateStr(today);
   }
-  // "철수/회수 요청" 같은 말은 떼어내고 나머지를 출고 문자 규칙으로 읽습니다.
-  const cleaned = String(text)
-    .replace(/[★☆]+\s*해성발전기\s*(출고|철수)?\s*요청\s*[★☆]+/g, '\n')
-    .replace(/(지금|즉시|바로|오늘|내일|모레)?\s*(철수|회수)\s*(요청|해주세요|해주시기|부탁드립니다|부탁|바랍니다|요망|예정|합니다|해요)?/g, '\n');
-  const p = parseSmsOrderTextRaw(cleaned, base.getTime());
-  result.phone = p.phone; result.manager = p.manager; result.customer = p.customer; result.address = p.address;
+
+  lines.forEach(line=>{
+    let l = line.replace(/[★☆]+\s*해성발전기\s*(출고|철수)?\s*요청\s*[★☆]+/g, '').trim();
+    if(!l) return;
+    if(/\d+(\.\d+)?\s*(키로|kw)/i.test(l)) return; // 용량 줄은 "키로"의 "로"가 주소 패턴과 헷갈릴 수 있어 건너뜁니다.
+    if(l.startsWith('*')) return; // "*지금철수" 같은 메모 줄
+    const pm = l.match(phoneRe);
+    if(pm){
+      result.phone = pm[0].replace(/[^0-9]/g,'');
+      const rest = l.replace(phoneRe,'').trim();
+      if(rest) result.manager = rest;
+      return;
+    }
+    if(addressRe.test(l)){ result.address = result.address ? result.address+' '+l : l; return; }
+    leftover.push(l);
+  });
+  // 남는 줄(회사명일 가능성이 높은 줄)을 업체명 후보로 씁니다. 담당자를 못 뽑았으면 직급 붙은 줄을 담당자로 먼저 뺍니다.
+  const titleRe = /(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저)\s*님?$|님$/;
+  const titleIdx = leftover.findIndex(l=>titleRe.test(l));
+  if(titleIdx>=0 && !result.manager){
+    const raw = leftover[titleIdx];
+    const knownTitleRe = /([가-힣]{2,4})\s*(소장|이사|사장|대리|과장|부장|실장|팀장|기사|대표|주임|차장|반장|관리자|계장|국장|원장|매니저)\s*(님)?$/;
+    const km = raw.match(knownTitleRe);
+    if(km){
+      result.manager = `${km[1]}${km[2]}${km[3]||''}`;
+      const prefix = raw.slice(0, km.index).trim();
+      leftover.splice(titleIdx,1);
+      if(prefix) leftover.push(prefix);
+    } else {
+      result.manager = raw;
+      leftover.splice(titleIdx,1);
+    }
+  }
+  if(leftover.length>0) result.customer = leftover[0];
   return result;
-}
-// 철수요청과 출고중 임대(rt)가 같은 현장인지 비교할 때 쓰는 기준 (띄어쓰기·괄호 차이는 무시)
-function rrNormAddr(v){ return String(v||'').replace(/\([^)]*\)/g,' ').replace(/\s+/g,''); }
-function rrAddrMatch(a,b){ const x = rrNormAddr(a), y = rrNormAddr(b); return x.length>=4 && y.length>=4 && (x.includes(y) || y.includes(x)); }
-function rrCustMatch(a,b){ const n = v=>String(v||'').replace(/\s+|\(주\)|㈜|주식회사/g,''); const x = n(a), y = n(b); return x.length>=2 && y.length>=2 && (x.includes(y) || y.includes(x)); }
-function rrPhoneMatch(a,b){ const x = String(a||'').replace(/[^0-9]/g,''), y = String(b||'').replace(/[^0-9]/g,''); return x.length>=9 && x===y; }
-function returnReqMatchesRental(parsed, rt, genId){
-  if(!parsed || !rt) return false;
-  if(parsed.genId && genId) return parsed.genId===genId; // 번호가 적힌 철수요청은 그 번호 발전기에만 해당
-  return rrPhoneMatch(parsed.phone, rt.phone) || rrAddrMatch(parsed.address, rt.address) || rrCustMatch(parsed.customer, rt.customer);
 }
 // 같은 연락처(우선)·업체명으로 24시간 이내에 먼저 등록된 문자오더가 있는데, 주소·도착시간·전압·상차일이 달라졌으면
 // "내용이 바뀐 문자"로 판단해서 알려줍니다 (오타 등으로 뒤늦게 정정 문자가 오는 경우가 있어서, 놓치지 않게 하기 위함입니다).
@@ -10436,14 +9818,14 @@ function detectSmsOrderChange(item, allItems){
 // 철수요청 문자도 같은 방식으로: 연락처/업체명이 같은데 24시간 이내 먼저 온 철수문자와 주소·회수예정일이 달라졌으면 알려줍니다.
 function detectReturnRequestChange(item, allItems){
   if(!item || !item.text || !item.createdAtTs) return null;
-  const cur = parseReturnRequestText(item.text, item.createdAtTs);
+  const cur = parseReturnRequestText(item.text);
   if(!cur.phone && !cur.customer) return null;
   let prior = null, priorParsed = null;
   (allItems||[]).forEach(o=>{
     if(!o || o.id===item.id || !o.text || !o.createdAtTs) return;
     if(o.createdAtTs >= item.createdAtTs) return;
     if(item.createdAtTs - o.createdAtTs > SMS_CHANGE_WINDOW_MS) return;
-    const op = parseReturnRequestText(o.text, o.createdAtTs);
+    const op = parseReturnRequestText(o.text);
     const samePhone = cur.phone && op.phone && cur.phone===op.phone;
     const sameCustomer = !samePhone && cur.customer && op.customer && cur.customer===op.customer;
     if(!samePhone && !sameCustomer) return;
@@ -10456,24 +9838,20 @@ function detectReturnRequestChange(item, allItems){
   return { priorAt: prior.createdAtTs, diffs };
 }
 // 지금 출고중인 발전기 중, 이 철수요청 문자와 연락처(우선)·주소·업체명이 일치하는 것을 찾습니다.
-function findMatchedGenForReturnRequest(text, baseTs){
-  const parsed = parseReturnRequestText(text, baseTs);
+function findMatchedGenForReturnRequest(text){
+  const parsed = parseReturnRequestText(text);
   const outGens = activeGens().filter(g=>g.status==='out' && g.rental);
-  if(parsed.genId){
-    const m = outGens.find(g=>g.id===parsed.genId);
-    if(m) return m;
-  }
   if(parsed.phone){
-    const m = outGens.find(g=>rrPhoneMatch(parsed.phone, g.rental.phone));
+    const m = outGens.find(g=>g.rental.phone && g.rental.phone.replace(/[^0-9]/g,'')===parsed.phone);
     if(m) return m;
   }
   if(parsed.address){
-    const m = outGens.find(g=>rrAddrMatch(parsed.address, g.rental.address));
+    const m = outGens.find(g=>g.rental.address && (g.rental.address.includes(parsed.address) || parsed.address.includes(g.rental.address)));
     if(m) return m;
   }
   if(parsed.customer){
     // 연락처·주소로 못 찾으면(담당자가 바뀐 경우 등) 업체명으로 마지막으로 한 번 더 찾아봅니다.
-    const m = outGens.find(g=>rrCustMatch(parsed.customer, g.rental.customer));
+    const m = outGens.find(g=>g.rental.customer && (g.rental.customer.includes(parsed.customer) || parsed.customer.includes(g.rental.customer)));
     if(m) return m;
   }
   return null;
@@ -10482,7 +9860,7 @@ function viewMatchedReturnRequest(genId, reqId){
   const g = findGen(genId);
   const r = (DB.returnRequests||[]).find(x=>x && x.id===reqId);
   if(!g || !r) return;
-  const parsed = parseReturnRequestText(r.text, r.createdAtTs);
+  const parsed = parseReturnRequestText(r.text);
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
@@ -10523,101 +9901,6 @@ let _rsvSmsOrderRaw = '';
 let _rsvSmsOrderAt = null; // 문자가 들어온 시각("내일" 계산 기준)
 let _rsvGenOptionsHtml = '';
 let _rsvExtraGenIdx = 0;
-// ===== 출고예약: 용량별로 발전기 고르기 =====
-// [발전기 배정] 창처럼 입고된 발전기를 용량별로 펼쳐 보여주고, 누르면 바로 선택됩니다.
-// 첫 번째로 누른 발전기는 위 "발전기" 칸에, 그다음부터는 "+ 추가" 줄로 들어가 여러 대를 한 번에 고를 수 있고, 다시 누르면 빠집니다.
-let _rsvBoardCandidates = [];
-function genOptionsByCapacityHtml(list){
-  const groups = {};
-  (list||[]).forEach(g=>{ const cap = capacityOf(g); (groups[cap] = groups[cap] || []).push(g); });
-  return Object.keys(groups).map(Number).sort((a,b)=>a-b).map(cap=>
-    `<optgroup label="${cap===Infinity? '용량 미설정' : cap+'kW'} (${groups[cap].length}대)">${groups[cap].sort(sortByIdNatural).map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('')}</optgroup>`
-  ).join('');
-}
-function rsvCapacityBoardHtml(candidates){
-  const okIds = new Set((candidates||[]).map(x=>x.id));
-  const inGens = activeGens().filter(x=>x.status==='in');
-  const groups = {};
-  inGens.forEach(g=>{ const cap = capacityOf(g); (groups[cap] = groups[cap] || []).push(g); });
-  const caps = Object.keys(groups).map(Number).sort((a,b)=>a-b);
-  const rows = caps.map(cap=>{
-    const list = groups[cap].sort(sortByIdNatural);
-    const okCnt = list.filter(g=>okIds.has(g.id)).length;
-    const chips = list.map(g=>{
-      if(okIds.has(g.id)) return `<button type="button" class="rsv-cap-chip" data-gen="${g.id}" onclick="rsvPickFromBoard('${g.id}')" title="${escR(g.model||'')}" style="padding:5px 9px;border-radius:14px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;border:1.5px solid var(--primary);background:#fff;color:var(--primary);">${g.id}</button>`;
-      const why = g.underRepair ? '수리중' : '예약됨';
-      return `<span title="${escR(g.model||'')} · ${why}" style="padding:5px 9px;border-radius:14px;font-size:12px;white-space:nowrap;border:1.5px dashed #bbb;color:#999;background:#f4f4f4;">${g.id} <small>${why}</small></span>`;
-    }).join('');
-    return `<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--line, #e5e5e5);">
-      <div style="min-width:74px;font-weight:800;font-size:13px;padding-top:5px;">${cap===Infinity ? '용량 미설정' : cap+'kW'}<div class="muted" style="font-size:11px;font-weight:400;">${okCnt}/${list.length}대 가능</div></div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>
-    </div>`;
-  }).join('');
-  return `<details open style="text-align:left;margin:4px 0 10px;border:1px solid var(--border);border-radius:10px;padding:8px 12px;background:#fff;">
-    <summary style="cursor:pointer;font-weight:800;font-size:13.5px;">📋 용량별로 발전기 고르기 <span class="muted" style="font-weight:400;font-size:12px;">(눌러서 선택 · 여러 대 가능 · 다시 누르면 빠짐)</span></summary>
-    <div id="rsv-board-picked" style="margin:6px 0 2px;font-size:13px;"></div>
-    <div style="max-height:260px;overflow-y:auto;">${rows || '<div class="muted">입고된 발전기가 없습니다.</div>'}</div>
-  </details>`;
-}
-function rsvCapFilterOptionsHtml(list){
-  const cnt = {};
-  (list||[]).forEach(g=>{ const c = capacityOf(g); cnt[c] = (cnt[c]||0)+1; });
-  return `<option value="">용량 전체</option>` + Object.keys(cnt).map(Number).sort((a,b)=>a-b).map(c=>`<option value="${c}">${c===Infinity? '용량 미설정' : c+'kW'} (${cnt[c]}대)</option>`).join('');
-}
-// 용량 필터: 고른 용량의 발전기만 선택칸에 보이게 합니다. (이미 골라둔 발전기는 다른 용량이어도 그대로 남겨둡니다)
-function applyRsvCapFilter(){
-  const fEl = document.getElementById('f-rsv-capfilter');
-  const cap = fEl && fEl.value!=='' ? Number(fEl.value) : null;
-  const list = (_rsvBoardCandidates||[]).filter(g=>cap==null || capacityOf(g)===cap);
-  const keep = id=>{ const g = findGen(id); return (g && !list.some(x=>x.id===id)) ? `<option value="${g.id}">${g.id} · ${escR(g.model||'미설정')}</option>` : ''; };
-  const main = document.getElementById('f-rsv-gen');
-  if(main){ const v = main.value; main.innerHTML = `<option value="${UNASSIGNED_GEN_ID}">🅾 미지정 (나중에 발전기 배정)</option>` + (v && v!==UNASSIGNED_GEN_ID ? keep(v) : '') + genOptionsByCapacityHtml(list); main.value = v || UNASSIGNED_GEN_ID; }
-  _rsvGenOptionsHtml = `<option value="">선택 안함</option>` + genOptionsByCapacityHtml(list);
-  document.querySelectorAll('#f-rsv-extra-gens-wrap .rsv-extra-gen-select').forEach(el=>{ const v = el.value; el.innerHTML = `<option value="">선택 안함</option>` + (v ? keep(v) : '') + genOptionsByCapacityHtml(list); el.value = v; });
-}
-function rsvSelectedGenIds(){
-  const ids = [];
-  const main = document.getElementById('f-rsv-gen');
-  if(main && main.value && main.value!==UNASSIGNED_GEN_ID) ids.push(main.value);
-  document.querySelectorAll('#f-rsv-extra-gens-wrap .rsv-extra-gen-select').forEach(el=>{ if(el.value && !ids.includes(el.value)) ids.push(el.value); });
-  return ids;
-}
-function rsvPickFromBoard(id){
-  const main = document.getElementById('f-rsv-gen');
-  if(!main) return;
-  const chosen = rsvSelectedGenIds();
-  if(chosen.includes(id)){
-    // 이미 고른 발전기를 다시 누르면 뺍니다. 위 칸에서 빠지면 "+ 추가" 줄 첫 번째가 위로 올라갑니다.
-    if(main.value===id){
-      const firstExtra = document.querySelector('#f-rsv-extra-gens-wrap > div');
-      const fsel = firstExtra && firstExtra.querySelector('.rsv-extra-gen-select');
-      if(fsel && fsel.value){ main.value = fsel.value; firstExtra.remove(); }
-      else main.value = UNASSIGNED_GEN_ID;
-    } else {
-      document.querySelectorAll('#f-rsv-extra-gens-wrap > div').forEach(row=>{ const sel = row.querySelector('.rsv-extra-gen-select'); if(sel && sel.value===id) row.remove(); });
-    }
-  } else if(!main.value || main.value===UNASSIGNED_GEN_ID){
-    main.value = id;
-  } else {
-    // 비어 있는 "+ 추가" 줄이 있으면 거기에, 없으면 새 줄을 만들어 넣습니다.
-    let emptySel = Array.from(document.querySelectorAll('#f-rsv-extra-gens-wrap .rsv-extra-gen-select')).find(el=>!el.value);
-    if(!emptySel){ addRsvExtraGenRow(); const all = document.querySelectorAll('#f-rsv-extra-gens-wrap .rsv-extra-gen-select'); emptySel = all[all.length-1]; }
-    if(emptySel){ emptySel.value = id; const row = emptySel.closest('div[id^="rsv-extra-"]'); if(row) onRsvExtraGenChange(row.id); }
-  }
-  onRsvGenChange();
-}
-function refreshRsvBoard(){
-  const chosen = rsvSelectedGenIds();
-  document.querySelectorAll('.rsv-cap-chip').forEach(b=>{
-    const on = chosen.includes(b.dataset.gen);
-    b.style.background = on ? 'var(--primary)' : '#fff';
-    b.style.color = on ? '#fff' : 'var(--primary)';
-  });
-  const box = document.getElementById('rsv-board-picked');
-  if(box) box.innerHTML = chosen.length
-    ? `선택한 발전기 <b>${chosen.length}대</b>: ${chosen.map(id=>{ const g = findGen(id); return `<b>${escR(id)}</b>${g&&g.model? ` <span class="muted">(${escR(g.model)})</span>`:''}`; }).join(', ')}`
-    : '<span class="muted">아직 고른 발전기가 없습니다 (미지정으로 저장하고 나중에 배정해도 됩니다).</span>';
-}
 function addRsvExtraGenRow(){
   const wrap = document.getElementById('f-rsv-extra-gens-wrap');
   if(!wrap) return;
@@ -10628,12 +9911,11 @@ function addRsvExtraGenRow(){
   row.innerHTML = `
     <select class="rsv-extra-gen-select" style="flex:1;min-width:0;padding:5px 6px;font-size:12.5px;" onchange="onRsvExtraGenChange('${rowId}')">${_rsvGenOptionsHtml}</select>
     <input type="number" class="rsv-extra-gen-hours" id="${rowId}-hours" placeholder="누적h" title="출고시 누적 사용시간(h) - 마지막으로 확인된 값" readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;background:var(--surface-2);color:var(--ink-soft);">
-    <button type="button" class="btn sm danger" style="flex:0 0 auto;padding:2px 7px;" onclick="document.getElementById('${rowId}').remove();refreshRsvBoard();">×</button>
+    <button type="button" class="btn sm danger" style="flex:0 0 auto;padding:2px 7px;" onclick="document.getElementById('${rowId}').remove()">×</button>
   `;
   wrap.appendChild(row);
 }
 function onRsvExtraGenChange(rowId){
-  refreshRsvBoard();
   const row = document.getElementById(rowId);
   if(!row) return;
   const sel = row.querySelector('.rsv-extra-gen-select');
@@ -10684,9 +9966,9 @@ function openReserveNoGenModal(resId, draft){
   // 자동으로 채워진 칸만 옅은 노란 배경으로 표시합니다(직접 입력한 칸과 구분되게, 확인 안 하고 지나치지 않도록).
   const autoStyle = (key)=> autoFields[key] ? 'background:#FFF9E0;border-color:#E8B923;' : '';
   const candidates = activeGens().filter(x=>x.status==='in' && !x.underRepair && !DB.reservations.some(r=>r.genId===x.id)).sort(sortByIdNatural);
-  const genOptionsHtml = `<option value="${UNASSIGNED_GEN_ID}" selected>🅾 미지정 (나중에 발전기 배정)</option>` + genOptionsByCapacityHtml(candidates);
-  _rsvGenOptionsHtml = `<option value="">선택 안함</option>` + genOptionsByCapacityHtml(candidates);
-  _rsvBoardCandidates = candidates;
+  const genOptionsHtml = `<option value="${UNASSIGNED_GEN_ID}" selected>🅾 미지정 (나중에 발전기 배정)</option>` +
+    candidates.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
+  _rsvGenOptionsHtml = `<option value="">선택 안함</option>` + candidates.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
   const prefillReturnDate = (()=>{
     if(!pre || !pre.usageDays || !pre.plannedOutDate) return '';
     const d = new Date(pre.plannedOutDate+'T00:00:00');
@@ -10706,8 +9988,7 @@ function openReserveNoGenModal(resId, draft){
         <div style="white-space:pre-wrap;font-size:13.5px;margin-top:8px;color:#333;">${escR(draft.rawText)}</div>
       </details>` : ''}
       <div class="out-row stretch">
-        <div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 <button type="button" class="btn sm" style="padding:1px 7px;font-size:11px;margin-left:4px;" onclick="addRsvExtraGenRow()">+ 추가</button>
-          <select id="f-rsv-capfilter" onchange="applyRsvCapFilter()" title="용량으로 걸러서 보기" style="width:auto;font-size:11.5px;padding:1px 4px;margin-left:4px;height:auto;">${rsvCapFilterOptionsHtml(candidates)}</select></label>
+        <div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 <button type="button" class="btn sm" style="padding:1px 7px;font-size:11px;margin-left:4px;" onclick="addRsvExtraGenRow()">+ 추가</button></label>
           <div style="display:flex;align-items:center;gap:4px;">
             <select id="f-rsv-gen" onchange="onRsvGenChange()" style="flex:1;min-width:0;">${genOptionsHtml}</select>
             <input type="number" id="f-rsv-starthours" value="0" min="0" placeholder="누적h" title="출고시 누적 사용시간(h) - 마지막으로 확인된 값이 자동으로 들어가며, 실제 값과 다르면 [정비관리 → 직접수정]에서 먼저 바로잡아주세요." readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;background:var(--surface-2);color:var(--ink-soft);">
@@ -10811,7 +10092,6 @@ function openReserveNoGenModal(resId, draft){
     </div>
   </div>`;
   initSuppliesPicker('f-rsv-supplies');
-  refreshRsvBoard();
 }
 function reapplySmsOrderToRsvForm(){
   if(!_rsvSmsOrderRaw){ return; }
@@ -10853,7 +10133,6 @@ function reapplySmsOrderToRsvForm(){
   flash('📩 문자 원본 내용대로 다시 채웠습니다');
 }
 function onRsvGenChange(){
-  refreshRsvBoard();
   const sel = document.getElementById('f-rsv-gen');
   const hoursEl = document.getElementById('f-rsv-starthours');
   if(!sel || !hoursEl) return;
@@ -10916,33 +10195,7 @@ function onRsvArriveTimeSelect(){
     input.value = sel.value;
   }
 }
-async function submitReserveNoGen(resId){
-  await refreshCoreDataNow();
-  if(resId && !DB.reservations.some(x=>x.id===resId)){
-    const errEl0 = document.getElementById('f-rsv-err') || document.getElementById('f-err');
-    alert('이 출고예약 건은 그사이 다른 사람이 처리(출고·취소)해서 더 이상 없습니다. 목록을 새로 확인해주세요.');
-    closeModal(); renderTabbar(); renderContent(); return;
-  }
-  if(!resId){
-    const customer0 = (document.getElementById('f-rsv-site')||{}).value||'';
-    const address0 = (document.getElementById('f-rsv-address')||{}).value||'';
-    const phone0 = (document.getElementById('f-rsv-phone')||{}).value||'';
-    const dups = findDuplicateOrder({customer: customer0.trim(), address: address0.trim(), phone: phone0.trim()});
-    if(dups.length && !confirm(`⚠️ 같은 거래처(연락처/주소)로 이미 등록된 건이 있습니다.\n\n${dups.slice(0,5).join('\n')}\n\n다른 사람이 먼저 등록한 같은 건이면 [취소]를 누르세요.\n추가 주문이 맞으면 [확인]을 누르면 등록됩니다.`)) return;
-  }
-  // 고른 발전기를 그사이 다른 사람이 먼저 배정·출고했는지 확인합니다.
-  const genSel0 = (document.getElementById('f-rsv-gen')||{}).value;
-  if(genSel0 && genSel0!==UNASSIGNED_GEN_ID){
-    const g0 = findGen(genSel0);
-    const takenBy = DB.reservations.find(x=>x.genId===genSel0 && x.id!==resId);
-    if(!g0 || g0.status!=='in' || g0.underRepair || takenBy){
-      alert(`⚠️ ${genSel0} 발전기는 그사이 ${takenBy? '다른 출고대기 건에 배정' : '출고 또는 고장 처리'}되었습니다. 다른 발전기를 골라주세요.`);
-      return;
-    }
-  }
-  return submitReserveNoGenCore(resId);
-}
-function submitReserveNoGenCore(resId){
+function submitReserveNoGen(resId){
   const existing = resId ? DB.reservations.find(x=>x.id===resId) : null;
   const genSel = document.getElementById('f-rsv-gen').value;
   const customer = document.getElementById('f-rsv-site').value.trim();
@@ -11018,23 +10271,26 @@ function submitReserveNoGenCore(resId){
       genAssignedBy: (existing && existing.genId===genSel && existing.genAssignedBy) ? existing.genAssignedBy : (DB.currentUserName||null),
       genAssignedAt: (existing && existing.genId===genSel && existing.genAssignedAt) ? existing.genAssignedAt : nowDateTimeStr()
     };
-    const groupSibs = existing ? findResGroupSiblings(existing, DB.reservations) : [];
-    keepResSmsMeta(pendingData, existing);
     if(existing){
       const idx = DB.reservations.findIndex(x=>x.id===existing.id);
       if(idx>=0) DB.reservations[idx] = pendingData;
     } else {
       DB.reservations.push(pendingData);
     }
-    // "+ 추가"로 같이 등록한 발전기들은 같은 묶음(batchId)으로 이어둡니다. (나중에 한 곳만 고쳐도 같이 바뀌게)
-    if(extraPendingList.length){
-      const bid = pendingData.batchId || groupSibs.map(x=>x.batchId).find(Boolean) || uid();
-      pendingData.batchId = bid;
-      extraPendingList.forEach(x=>{ x.batchId = bid; });
-    }
     DB.reservations.push(...extraPendingList);
-    // 같은 묶음(batchId 또는 같은 문자로 나뉜 N대)으로 출고 대기중인 다른 건에도 거래처·주소·담당자·연락처·비고를 똑같이 반영합니다.
-    const batchSiblingCount = syncResGroupSharedFields(pendingData, DB.reservations, groupSibs);
+    // 같은 묶음(batchId)으로 같이 출고 대기중인 다른 건에도 거래처 관련 정보만 똑같이 반영합니다.
+    let batchSiblingCount = 0;
+    if(existing && existing.batchId){
+      DB.reservations.forEach(x=>{
+        if(x.id!==pendingData.id && x.batchId===existing.batchId){
+          x.customer = customer; x.site = site; x.manager = manager; x.phone = phone; x.address = address;
+          x.arriveTime = arriveTime; x.loadDate = loadDate; x.freightBearer = freightBearer;
+          x.usageDays = usageDays;
+          if(x.genId===UNASSIGNED_GEN_ID) x.plannedOutDate = outDate; else x.outDate = outDate;
+          batchSiblingCount++;
+        }
+      });
+    }
     saveWithRetry(saveReservations);
     closeModal();
     currentTab = 'reserve'; renderTabbar(); renderContent();
@@ -11049,22 +10305,26 @@ function submitReserveNoGenCore(resId){
     outProcessedBy: existing ? (existing.outProcessedBy || '미상') : (DB.currentUserName || null), createdAt: (existing&&existing.createdAt) || todayStr(),
     lastEditedBy: existing ? (DB.currentUserName||null) : null, lastEditedAt: existing ? nowDateTimeStr() : null
   };
-  const groupSibs2 = existing ? findResGroupSiblings(existing, DB.reservations) : [];
-  keepResSmsMeta(pendingData, existing);
   if(existing){
     const idx = DB.reservations.findIndex(x=>x.id===existing.id);
     if(idx>=0) DB.reservations[idx] = pendingData;
   } else {
     DB.reservations.push(pendingData);
   }
-  if(extraPendingList.length){
-    const bid = pendingData.batchId || groupSibs2.map(x=>x.batchId).find(Boolean) || uid();
-    pendingData.batchId = bid;
-    extraPendingList.forEach(x=>{ x.batchId = bid; });
-  }
   DB.reservations.push(...extraPendingList);
-  // 같은 묶음(batchId 또는 같은 문자로 나뉜 N대)으로 출고 대기중인 다른 건에도 거래처·주소·담당자·연락처·비고를 똑같이 반영합니다.
-  const batchSiblingCount2 = syncResGroupSharedFields(pendingData, DB.reservations, groupSibs2);
+  // 같은 묶음(batchId)으로 같이 출고 대기중인 다른 건에도 거래처 관련 정보만 똑같이 반영합니다.
+  let batchSiblingCount2 = 0;
+  if(existing && existing.batchId){
+    DB.reservations.forEach(x=>{
+      if(x.id!==pendingData.id && x.batchId===existing.batchId){
+        x.customer = customer; x.site = site; x.manager = manager; x.phone = phone; x.address = address;
+        x.arriveTime = arriveTime; x.loadDate = loadDate; x.freightBearer = freightBearer;
+        x.usageDays = usageDays;
+        if(x.genId===UNASSIGNED_GEN_ID) x.plannedOutDate = outDate; else x.outDate = outDate;
+        batchSiblingCount2++;
+      }
+    });
+  }
   saveWithRetry(saveReservations);
   closeModal();
   currentTab = 'reserve'; renderTabbar(); renderContent();
@@ -11457,9 +10717,7 @@ function openOutModal(id, reservationId){
     if(!isEditingPending) return '';
     const reservedElsewhere = new Set(DB.reservations.filter(r=>r.id!==reservationId).map(r=>r.genId));
     const candidates = activeGens().filter(x=>x.id===g.id || (x.status==='in' && !x.underRepair && !reservedElsewhere.has(x.id))).sort(sortByIdNatural);
-    _targetGenCandidates = candidates;
-    // 지금 배정된 발전기가 처음에 선택된 상태로 열려야 합니다(안 그러면 "미지정"으로 저장될 수 있음).
-    return `<option value="${UNASSIGNED_GEN_ID}">🅾 미지정 (나중에 배정)</option>` + genOptionsByCapacityHtml(candidates).replace(`<option value="${g.id}">`, `<option value="${g.id}" selected>`);
+    return `<option value="${UNASSIGNED_GEN_ID}">🅾 미지정 (나중에 배정)</option>` + candidates.map(x=>`<option value="${x.id}" ${x.id===g.id?'selected':''}>${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
   })();
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
@@ -11468,14 +10726,13 @@ function openOutModal(id, reservationId){
       <div class="modal-sub" id="out-modal-sub">${g.id} · [${displayModel(g)}]</div>
       ${isEditingPending? `<div class="hint" style="margin-bottom:10px;color:var(--danger);">이 발전기는 이미 [출고 대기]에 상차대기로 등록되어 있습니다. 여기서 수정하면 상차대기 내용이 갱신됩니다.</div>` : ''}
       <div class="out-row stretch">
-        ${isEditingPending? `<div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 번호 (변경 가능) <button type="button" class="btn sm" style="padding:1px 7px;font-size:11px;margin-left:4px;" onclick="addOutExtraGenRow()">+ 추가</button> <select id="f-target-capfilter" onchange="applyTargetCapFilter()" title="용량으로 걸러서 보기" style="width:auto;font-size:11.5px;padding:1px 4px;margin-left:4px;height:auto;">${rsvCapFilterOptionsHtml(_targetGenCandidates)}</select></label>
+        ${isEditingPending? `<div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 번호 (변경 가능)</label>
           <div style="display:flex;align-items:center;gap:4px;">
             <select id="f-target-gen" onchange="onTargetGenChange()" style="flex:1;min-width:0;">${targetGenOptionsHtml}</select>
             ${g.hoursKnown? `<input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;background:var(--surface-2);color:var(--ink-soft);">` : ''}
           </div>
-          <div id="f-out-extra-gens-wrap"></div>
           <details class="info-toggle" style="margin-top:4px;"><summary></summary><p class="muted" style="font-size:12px;">다른 발전기로 바꾸면 옆 누적 사용시간이 그 발전기의 현재 누적시간으로 자동으로 바뀝니다. 이미 입고중이고 다른 곳에 예약되지 않은 발전기만 고를 수 있습니다. 누적시간은 이미 등록된 값이라 여기서 수정할 수 없고, 틀렸으면 [정비관리 → 직접수정]에서 먼저 바로잡아야 합니다.</p></details>
-        </div></div>` : (g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="background:var(--surface-2);color:var(--ink-soft);">${g.hoursUnconfirmed? `<div class="hint" style="color:var(--danger);font-weight:700;font-size:11.5px;">⚠️ 지난 입고 때 누적시간 미확인 - 실제와 다를 수 있음</div>`:''}</div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</div></div></div>`)}
+        </div></div>` : (g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="background:var(--surface-2);color:var(--ink-soft);"></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</div></div></div>`)}
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
           <input type="date" id="f-outdate" value="${(res&&(res.outDate||res.plannedOutDate))||todayStr()}" onchange="syncReturnDateToUsageDays()">
         </div></div>
@@ -11567,38 +10824,6 @@ function toggleFuelFields(toggleId, wrapId){
   const wrap = document.getElementById(wrapId);
   if(wrap) wrap.style.display = chk && chk.checked ? 'block' : 'none';
 }
-// 상차대기 내용수정: "+ 추가"로 같은 거래처 정보로 같이 나갈 발전기를 더 붙입니다(저장하면 상차대기로 같이 올라가고 같은 묶음이 됩니다).
-let _outExtraIdx = 0;
-function addOutExtraGenRow(preset){
-  const wrap = document.getElementById('f-out-extra-gens-wrap');
-  if(!wrap) return;
-  const rowId = 'out-extra-' + (_outExtraIdx++);
-  const row = document.createElement('div');
-  row.id = rowId;
-  row.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:6px;';
-  row.innerHTML = `<select class="out-extra-gen-select" style="flex:1;min-width:0;padding:5px 6px;font-size:12.5px;"><option value="">추가할 발전기 선택</option>${genOptionsByCapacityHtml((_targetGenCandidates||[]).filter(x=>x.id!==((document.getElementById('f-target-gen')||{}).value)))}</select>
-    <button type="button" class="btn sm danger" style="flex:0 0 auto;padding:2px 7px;" onclick="document.getElementById('${rowId}').remove()">×</button>`;
-  wrap.appendChild(row);
-  if(preset){ const sel = row.querySelector('select'); sel.value = preset; }
-}
-function outExtraGenIds(mainId){
-  const ids = [];
-  document.querySelectorAll('#f-out-extra-gens-wrap .out-extra-gen-select').forEach(el=>{ if(el.value && el.value!==mainId && el.value!==UNASSIGNED_GEN_ID && !ids.includes(el.value)) ids.push(el.value); });
-  return ids;
-}
-// 상차대기 내용수정: 발전기 번호 칸을 용량으로 걸러 보기 (지금 고른 발전기는 다른 용량이어도 남겨둡니다)
-let _targetGenCandidates = [];
-function applyTargetCapFilter(){
-  const fEl = document.getElementById('f-target-capfilter');
-  const sel = document.getElementById('f-target-gen');
-  if(!sel) return;
-  const cap = fEl && fEl.value!=='' ? Number(fEl.value) : null;
-  const list = (_targetGenCandidates||[]).filter(g=>cap==null || capacityOf(g)===cap);
-  const v = sel.value;
-  const cur = (v && v!==UNASSIGNED_GEN_ID && !list.some(x=>x.id===v)) ? findGen(v) : null;
-  sel.innerHTML = `<option value="${UNASSIGNED_GEN_ID}">🅾 미지정 (나중에 배정)</option>` + (cur? `<option value="${cur.id}">${cur.id} · ${escR(cur.model||'미설정')}</option>` : '') + genOptionsByCapacityHtml(list);
-  sel.value = v;
-}
 function onTargetGenChange(){
   const sel = document.getElementById('f-target-gen');
   if(!sel) return;
@@ -11618,26 +10843,6 @@ function onTargetGenChange(){
 async function submitOut(idParam, reservationId){
   const targetSelEl = document.getElementById('f-target-gen');
   const id = targetSelEl ? targetSelEl.value : idParam;
-  await refreshCoreDataNow();
-  if(reservationId && !DB.reservations.some(x=>x.id===reservationId)){
-    alert('이 출고대기 건은 그사이 다른 사람이 처리(상차완료·취소)해서 더 이상 없습니다. 목록을 새로 확인해주세요.');
-    closeModal(); renderTabbar(); renderContent(); return;
-  }
-  if(id && id!==UNASSIGNED_GEN_ID){
-    const gNow = findGen(id);
-    const takenBy = DB.reservations.find(x=>x.genId===id && x.id!==reservationId);
-    if(gNow && (gNow.status==='out' || takenBy)){
-      alert(`⚠️ ${id} 발전기는 그사이 ${takenBy? `다른 사람이 출고대기에 등록${takenBy.outProcessedBy? '('+String(takenBy.outProcessedBy).replace(/\(.*\)$/,'')+')':''}` : '다른 사람이 출고 처리'}했습니다. 중복 출고를 막기 위해 저장하지 않았습니다.`);
-      closeModal(); renderTabbar(); renderContent(); return;
-    }
-  }
-  if(!reservationId){
-    const c0 = ((document.getElementById('f-site')||{}).value||'').trim();
-    const a0 = ((document.getElementById('f-address')||{}).value||'').trim();
-    const p0 = ((document.getElementById('f-phone')||{}).value||'').trim();
-    const dups = findDuplicateOrder({customer:c0, address:a0, phone:p0});
-    if(dups.length && !confirm(`⚠️ 같은 거래처(연락처/주소)로 이미 등록된 건이 있습니다.\n\n${dups.slice(0,5).join('\n')}\n\n다른 사람이 먼저 등록한 같은 건이면 [취소]를 누르세요.\n추가로 1대 더 나가는 게 맞으면 [확인]을 누르세요.`)) return;
-  }
   if(targetSelEl && id===UNASSIGNED_GEN_ID){
     // 발전기를 다시 "미지정"으로 되돌립니다 (지금 배정된 발전기는 재고로 풀어주고, 이 건은 발전기 없이 대기 상태로 남깁니다).
     if(!reservationId){ return; }
@@ -11727,15 +10932,9 @@ async function submitOut(idParam, reservationId){
   };
   const idx = reservationId ? DB.reservations.findIndex(r=>r.id===reservationId) : -1;
   const wasPending = idx>=0 && DB.reservations[idx].pendingLoad;
-  const extraGenIds = outExtraGenIds(id);
-  const badExtra = extraGenIds.filter(gid=>{ const eg = findGen(gid); return !eg || eg.status!=='in' || eg.underRepair || DB.reservations.some(o=>o.genId===gid && o.id!==reservationId); });
-  if(badExtra.length){
-    errEl.textContent = `추가한 발전기 ${badExtra.join(', ')}는 지금 배정할 수 없습니다(그사이 다른 건에 배정됐거나 출고·고장). 빼거나 다른 발전기로 바꿔주세요.`;
-    errEl.style.display='block'; return;
-  }
   pendingOutSubmitCtx = {
-    id, reservationId, pendingData, existing, idx, wasPending, extraGenIds,
-    vals: {customer, manager, phone, address, supplies, voltage, qty, fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note, outDate, startHours, extraGenIds}
+    id, reservationId, pendingData, existing, idx, wasPending,
+    vals: {customer, manager, phone, address, supplies, voltage, qty, fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note, outDate, startHours}
   };
   showOutSubmitPreview(g, pendingData);
 }
@@ -11767,24 +10966,8 @@ async function confirmOutSubmit(){
   if(!ctx) return;
   const {reservationId, pendingData, existing, idx, wasPending} = ctx;
   try{
-    const groupSibs3 = existing ? findResGroupSiblings(existing, DB.reservations) : [];
-    keepResSmsMeta(pendingData, existing);
     if(idx>=0) DB.reservations[idx] = pendingData;
     else DB.reservations.push(pendingData);
-    // "+ 추가"로 붙인 발전기는 같은 내용으로 상차대기 건을 새로 만들고 같은 묶음으로 이어둡니다.
-    const extraIds = (ctx.extraGenIds||[]).filter(gid=>gid!==pendingData.genId && !DB.reservations.some(o=>o.genId===gid));
-    if(extraIds.length){
-      const bid = pendingData.batchId || groupSibs3.map(x=>x.batchId).find(Boolean) || uid();
-      pendingData.batchId = bid;
-      extraIds.forEach(gid=>{
-        const eg = findGen(gid);
-        DB.reservations.push({ ...pendingData, id: uid(), genId: gid, pendingLoad: true, batchId: bid,
-          startHours: eg ? (eg.hours||0) : 0, smsOrder: null, smsOrderAt: null, smsQtyIndex: null, smsQtyTotal: null, smsOrderChecked: false,
-          genAssignedBy: DB.currentUserName||null, genAssignedAt: nowDateTimeStr(), createdAt: todayStr(), createdAtTs: Date.now() });
-      });
-    }
-    // 같은 문자로 나뉜 N대·같은 묶음의 다른 건(미지정 포함)에도 거래처·주소·담당자·연락처·비고를 먼저 반영합니다.
-    syncResGroupSharedFields(pendingData, DB.reservations, groupSibs3);
     // 배치 판별: 명시적으로 batchId가 같으면 그걸로 묶고, batchId가 없는 건들끼리는
     // 거래처명+현장주소가 같으면 "같이 나가는 묶음"으로 보고 같은 batchId를 새로 붙여줍니다.
     const siblings = DB.reservations.filter(r=>{
@@ -11834,7 +11017,6 @@ async function confirmOutSubmit(){
 function reopenOutModalWithValues(id, reservationId, vals){
   openOutModal(id, reservationId);
   setTimeout(function(){
-    (vals.extraGenIds||[]).forEach(gid=>addOutExtraGenRow(gid));
     const setVal = (elId, v)=>{ const el = document.getElementById(elId); if(el && v!=null && v!=='') el.value = v; };
     setVal('f-starthours', vals.startHours);
     setVal('f-outdate', vals.outDate);
@@ -12128,7 +11310,7 @@ function openBulkInModal(){
     return `
     <div class="field-row" style="align-items:flex-end;">
       <div style="flex:0 0 auto;min-width:110px;font-size:13px;font-weight:700;padding-bottom:8px;">${g.id}${g.model? ` <span class="muted" style="font-weight:400;font-size:11.5px;">· ${escR(g.model)}</span>`:''}<div class="muted" style="font-size:11px;font-weight:400;">${escR(rt.customer||'-')}</div></div>
-      <div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">입고시 누적 사용시간(h)</label><input type="number" id="fbi-hours-${g.id}" value="${suggested}" min="${rt.startHours||0}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(rt.startHours||0).toLocaleString()}h${g.hoursUnconfirmed? ' (⚠️ 실제와 다를 수 있음)':''}</div><label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;margin-top:4px;cursor:pointer;"><input type="checkbox" id="fbi-hours-unknown-${g.id}" onchange="toggleEndHoursUnknown('fbi-hours-${g.id}', this.checked)"> 누적시간 모름</label></div>
+      <div class="field" style="flex:1;margin-bottom:0;"><label style="font-size:11.5px;">입고시 누적 사용시간(h)</label><input type="number" id="fbi-hours-${g.id}" value="${suggested}" min="${rt.startHours||0}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(rt.startHours||0).toLocaleString()}h</div></div>
     </div>`;
   }).join('');
   document.getElementById('modal-root').innerHTML = `
@@ -12191,16 +11373,14 @@ async function submitBulkIn(){
   for(const g of gens){
     if(!g.hoursKnown) continue;
     const el = document.getElementById(`fbi-hours-${g.id}`);
-    const unkEl = document.getElementById(`fbi-hours-unknown-${g.id}`);
-    if(unkEl && unkEl.checked){ hoursMap[g.id] = null; continue; } // 계기판 확인 못함
-    const v = (el && el.value!=='') ? Number(el.value) : NaN;
-    if(isNaN(v) || (v < (g.rental.startHours||0) && !g.hoursUnconfirmed)){
+    const v = el ? Number(el.value) : NaN;
+    if(isNaN(v) || v < (g.rental.startHours||0)){
       errEl.textContent = `${g.id}의 누적 사용시간을 확인해주세요. (출고시 누적시간 ${(g.rental.startHours||0).toLocaleString()}h보다 작을 수 없습니다)`;
       errEl.style.display='block'; return;
     }
     // 하루 24시간을 초과하는 물리적으로 불가능한 사용시간 감지 (데이터 입력 실수 방지)
     const rt = g.rental;
-    if(rt.outDate && inDate && !g.hoursUnconfirmed){
+    if(rt.outDate && inDate){
       const usedH = v - (rt.startHours||0);
       const outD = new Date(rt.outDate+'T00:00:00');
       const inD = new Date(inDate+'T00:00:00');
@@ -12218,17 +11398,16 @@ async function submitBulkIn(){
     const endHours = hoursMap[g.id]!=null ? hoursMap[g.id] : null;
     DB.rentals.push({
       id: uid(), genId: g.id, customer: rt.customer, manager: rt.manager, phone: rt.phone,
-      site: rt.site, address: rt.address, supplies: rt.supplies, suppliesRecovered: !!rt.supplies, suppliesNote: '', fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: [rt.note, (g.hoursKnown && endHours==null) ? '입고시 누적시간 미확인' : ''].filter(Boolean).join(' / '), smsOrder: rt.smsOrder||null,
+      site: rt.site, address: rt.address, supplies: rt.supplies, suppliesRecovered: !!rt.supplies, suppliesNote: '', fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: rt.note, smsOrder: rt.smsOrder||null,
       outDate: rt.outDate, inDate, startHours: rt.startHours, endHours,
-      usedHours: (endHours!=null && endHours >= (rt.startHours||0)) ? endHours - (rt.startHours||0) : null,
+      usedHours: endHours!=null ? endHours - (rt.startHours||0) : null,
       voltage: g.voltage||rt.voltage||'', outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null,
       measuredFuelHeightCm: null, remainingFuelLiters: null,
       paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null
     });
     if(g.hoursKnown && endHours!=null){
       g.hours = endHours;
-      g.hoursUnconfirmed = false;
-    } else if(g.hoursKnown) g.hoursUnconfirmed = true;
+    }
     // 부자재 재고 복원 (개별 입고 처리와 동일하게, 회수 확인된 건은 재고를 다시 채워줍니다)
     if(g.rental && g.rental.suppliesItems && g.rental.suppliesItems.length){
       DB.suppliesStock = DB.suppliesStock || {};
@@ -12407,32 +11586,8 @@ function receiptCopyHtmlBatch(items, copyLabel, rt){
     <div class="r-notice">※ 인수자 서명 후 본 인수증을 사진찍어 문자 전송해 주시기 바랍니다 ※</div>
   </div>`;
 }
-// 출고중 발전기의 묶음 키: 상차완료 때 넘어온 batchId가 있으면 그걸 쓰고, 예전에 나간 건(batchId 없음)은
-// [정보 수정]과 같은 기준(거래처명+현장주소+도착일이 같음)으로 같이 나간 묶음으로 봅니다.
-function outBatchKey(g){
-  if(!g || !g.rental) return null;
-  if(g.rental.batchId) return g.rental.batchId;
-  const rt = g.rental;
-  if(!(rt.customer||'').trim() || !(rt.address||'').trim()) return null;
-  // 따옴표 등이 버튼 코드에 섞이지 않게 짧은 숫자 키로 바꿉니다.
-  const str = [rt.customer.trim(), rt.address.trim(), rt.outDate||''].join('|');
-  let h = 0; for(let i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i)) | 0; }
-  return 'auto:' + (h>>>0).toString(36);
-}
-function outBatchGens(key){
-  if(!key) return [];
-  return activeGens().filter(g=>g.status==='out' && g.rental && outBatchKey(g)===key);
-}
-function batchReceiptCount(key){
-  if(!key) return 0;
-  const pend = String(key).startsWith('auto:') ? 0 : DB.reservations.filter(r=>r.batchId===key).length;
-  return pend + outBatchGens(key).length;
-}
 function batchReceiptParts(batchId){
-  // 출고대기(아직 상차 전) 건과, 같은 묶음으로 이미 상차완료되어 출고중인 발전기를 한 인수증에 같이 모읍니다.
-  const pendList = String(batchId).startsWith('auto:') ? [] : DB.reservations.filter(r=>r.batchId===batchId);
-  const outList = outBatchGens(batchId).filter(g=>!pendList.some(r=>r.genId===g.id)).map(g=>({...g.rental, genId: g.id}));
-  const resList = [...pendList, ...outList];
+  const resList = DB.reservations.filter(r=>r.batchId===batchId);
   const items = resList.map(res=>({g: findGen(res.genId), res})).filter(x=>x.g).sort((a,b)=>sortByIdNatural(a.g,b.g));
   const rt = resList[0] || null;
   return {resList, items, rt};
@@ -12921,7 +12076,7 @@ function openPrevRentalPopup(id){
       <div style="height:1px;background:var(--border);margin:2px 0;"></div>
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">출고시 누적</span><span style="font-size:14px;font-weight:700;font-family:var(--mono);">${prev.startHours!=null? prev.startHours.toLocaleString()+'h':'-'}</span></div>
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">입고시 누적</span><span style="font-size:14px;font-weight:700;font-family:var(--mono);">${prev.endHours!=null? prev.endHours.toLocaleString()+'h':'-'}</span></div>
-      <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">발전기 사용시간</span><span style="font-size:15px;font-weight:800;font-family:var(--mono);color:var(--primary-dark);text-align:right;">${rentalUsedHoursHtml(prev)}${(prevDays && !rentalHoursUnknown(prev) && !rentalIncludesPrevUsage(prev))? ` <span style="font-size:12px;font-weight:700;color:var(--ink-soft);">(하루평균 ${Math.round((prev.usedHours||0)/prevDays*10)/10}h/일)</span>`:''}</span></div>
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">발전기 사용시간</span><span style="font-size:15px;font-weight:800;font-family:var(--mono);color:var(--primary-dark);">${(prev.usedHours||0).toLocaleString()}h${prevDays? ` <span style="font-size:12px;font-weight:700;color:var(--ink-soft);">(하루평균 ${Math.round((prev.usedHours||0)/prevDays*10)/10}h/일)</span>`:''}</span></div>
     </div>
     <div class="muted" style="font-size:11px;margin-top:10px;">${rentals.length}건의 임대 이력 중 가장 최근 건입니다.</div>`;
   box.innerHTML = `<div class="modal" style="max-width:420px;text-align:left;" onclick="event.stopPropagation()">
@@ -12974,8 +12129,7 @@ function openInModal(id, isTransfer){
         ${g.hoursKnown? `<div class="field f-md"><div class="out-card">
           <label>입고시(반납) 누적 사용시간(h)</label>
           <input type="number" id="f-endhours" placeholder="${isTransfer? '모르면 비워두세요' : `예: ${suggested}`}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
-          <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h${g.hoursUnconfirmed? ' (⚠️ 실제와 다를 수 있음 - 이전 누적시간 미확인)':''}</div>
-          ${isTransfer? '' : `<label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:13px;font-weight:700;cursor:pointer;"><input type="checkbox" id="f-endhours-unknown" onchange="toggleEndHoursUnknown('f-endhours', this.checked)" style="width:18px;height:18px;"> 누적시간 모름 (계기판 확인 못함)</label>`}
+          <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
         </div></div>` : `<div class="field f-md"><div class="out-card">
           <label>누적 사용시간</label>
           <div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</div>
@@ -13130,25 +12284,11 @@ function setSuppliesRecovered(recovered){
     applySuppliesNo();
   }
 }
-// "누적시간 모름"을 체크하면 누적시간 칸을 비우고 잠급니다.
-function toggleEndHoursUnknown(inputId, checked){
-  const el = document.getElementById(inputId);
-  if(!el) return;
-  if(checked){ el.value = ''; el.disabled = true; el.placeholder = '미확인 (다음 확인 때 입력)'; }
-  else { el.disabled = false; el.placeholder = ''; }
-}
 async function submitIn(id, isTransfer){
-  await refreshCoreDataNow();
-  if(!findGen(id) || findGen(id).status!=='out' || !findGen(id).rental){
-    alert(`${id} 발전기는 그사이 다른 사람이 이미 ${isTransfer? '처리' : '입고 처리'}했습니다. 중복 입고를 막기 위해 저장하지 않았습니다.`);
-    closeModal(); renderTabbar(); renderContent(); return;
-  }
   const g = findGen(id);
   const inDate = document.getElementById('f-indate').value;
   const endHoursEl = document.getElementById('f-endhours');
-  const hoursUnknownEl = document.getElementById('f-endhours-unknown');
-  const hoursUnknown = !!(hoursUnknownEl && hoursUnknownEl.checked);
-  const endHours = (endHoursEl && !hoursUnknown) ? (endHoursEl.value==='' ? null : Number(endHoursEl.value)) : null;
+  const endHours = endHoursEl ? (endHoursEl.value==='' ? null : Number(endHoursEl.value)) : null;
   const voltage = document.getElementById('f-in-voltage').value.trim();
   const oldVoltageForLog = g ? (g.voltage||'') : '';
   const supRecoveredEl = document.getElementById('f-sup-recovered');
@@ -13170,15 +12310,15 @@ async function submitIn(id, isTransfer){
   }
   // 누적시간 확인불가은 입력을 생략할 수 있습니다. (설정 → 발전기 모델 설정에서 지정)
   // 현장이동(공장 미경유)은 계기판을 직접 볼 수 없는 경우가 많아, 누적시간 입력을 필수로 강제하지 않습니다.
-  if(!inDate || (g.hoursKnown && !isTransfer && !hoursUnknown && (endHours===null || isNaN(endHours) || (endHours < g.rental.startHours && !g.hoursUnconfirmed)))){
-    errEl.textContent = '입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다. 계기판을 못 봤으면 "누적시간 모름"을 체크하세요)';
+  if(!inDate || (g.hoursKnown && !isTransfer && (endHours===null || isNaN(endHours) || endHours < g.rental.startHours))){
+    errEl.textContent = '입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다)';
     errEl.style.display='block';
     if(g.hoursKnown && !isTransfer && (endHours===null || isNaN(endHours)) && isWithinVoiceAlertHours()){
       speakText('누적 사용시간을 입력하지 않으면 입고 처리가 안 됩니다. 확인해주세요.');
     }
     return;
   }
-  if(isTransfer && endHours!==null && !isNaN(endHours) && endHours < g.rental.startHours && !g.hoursUnconfirmed){
+  if(isTransfer && endHours!==null && !isNaN(endHours) && endHours < g.rental.startHours){
     errEl.textContent = '입력한 누적시간이 출고시 누적시간보다 작습니다. 확인 후 다시 입력해주세요.';
     errEl.style.display='block'; return;
   }
@@ -13205,7 +12345,7 @@ async function submitIn(id, isTransfer){
     const days = Math.max(1, Math.round((inD-outD)/86400000));
     const avgDaily = usedH/days;
     if(avgDaily > 24){
-      const recentTransferNote = g.hoursUnconfirmed || (g.rental.note && g.rental.note.includes('현장이동')) || (g.rental.note && g.rental.note.includes('누적시간 미확인'));
+      const recentTransferNote = (g.rental.note && g.rental.note.includes('현장이동')) || (g.rental.note && g.rental.note.includes('누적시간 미확인'));
       openConfirmModal(
         `입력하신 누적시간 차이(${usedH.toLocaleString()}h)를 임대일수(${days}일)로 나누면 하루 평균 ${avgDaily.toFixed(1)}시간이 됩니다. 하루는 24시간을 넘을 수 없습니다.\n\n${recentTransferNote? '이 발전기는 최근 현장이동으로 누적시간을 한동안 확인 못한 이력이 있어서, 그 구간 사용량이 이번에 한꺼번에 잡혀 정상적으로 큰 값이 나올 수 있습니다.\n\n' : ''}오타가 아니라 실제로 확인하신 숫자가 맞다면 계속 진행하세요.`,
         function(){ submitInFinish(id, isTransfer, {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm}); },
@@ -13228,14 +12368,14 @@ async function submitInFinish(id, isTransfer, vals){
   }
   const fuelExhaustNote = (remainingFuelLiters===0) ? '출고시 연료 모두 소진되어 입고' : '';
   const rt = g.rental;
-  const transferNote = (isTransfer && g.hoursKnown && endHours===null) ? '현장이동(공장 미경유)으로 종료 - 반납시 누적시간 미확인' : (isTransfer ? '현장이동(공장 미경유)으로 종료' : ((g.hoursKnown && endHours===null) ? '입고시 누적시간 미확인' : ''));
+  const transferNote = (isTransfer && g.hoursKnown && endHours===null) ? '현장이동(공장 미경유)으로 종료 - 반납시 누적시간 미확인' : (isTransfer ? '현장이동(공장 미경유)으로 종료' : '');
   const combinedNote = [rt.note, fuelExhaustNote, transferNote].filter(Boolean).join(' / ');
   const newRentalId = uid();
   DB.rentals.push({
     id: newRentalId, genId: g.id, customer: rt.customer, manager: rt.manager, phone: rt.phone,
     site: rt.site, address: rt.address, supplies: rt.supplies, suppliesItems: rt.suppliesItems||[], suppliesCustom: rt.suppliesCustom||'', suppliesRecovered, suppliesNote, fuelRequested: rt.fuelRequested, fuelActual: rt.fuelActual, usageDays: rt.usageDays, loadDate: rt.loadDate, arriveTime: rt.arriveTime, freightBearer: rt.freightBearer, note: combinedNote,
     outDate: rt.outDate, inDate, startHours: rt.startHours, endHours,
-    usedHours: (endHours!=null && endHours >= (rt.startHours||0)) ? endHours - rt.startHours : null,
+    usedHours: endHours!=null ? endHours - rt.startHours : null,
     voltage, outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null, inProcessedAt: nowDateTimeStr(),
     measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
     paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null
@@ -13243,10 +12383,6 @@ async function submitInFinish(id, isTransfer, vals){
   // 누적시간 확인불가(설정에서 지정)은 여기서 hoursKnown을 절대 자동으로 켜지 않습니다.
   if(g.hoursKnown && endHours!==null){
     g.hours = endHours;
-    g.hoursUnconfirmed = false;
-  } else if(g.hoursKnown){
-    // 계기판을 못 보고 입고했으면, 다음에 실제 숫자를 확인할 때까지 "누적시간 미확인" 상태로 표시해둡니다.
-    g.hoursUnconfirmed = true;
   }
   g.status = 'in';
   g.voltage = voltage;
@@ -13269,7 +12405,7 @@ async function submitInFinish(id, isTransfer, vals){
   }
   await saveGens();
   await saveRentals();
-  await autoClearMatchedReturnRequests(rt, g.id); // 이 임대가 어떤 식으로 끝나든(현장이동/일반 입고), 매칭되는 철수요청은 이제 처리된 것이니 자동으로 지웁니다.
+  await autoClearMatchedReturnRequests(rt); // 이 임대가 어떤 식으로 끝나든(현장이동/일반 입고), 매칭되는 철수요청은 이제 처리된 것이니 자동으로 지웁니다.
   if(isTransfer && condition!=='broken'){
     renderContent();
     flash('이번 임대가 종료 처리되었습니다. 이어서 새 현장을 골라주세요.');
@@ -13289,11 +12425,14 @@ async function submitInFinish(id, isTransfer, vals){
 }
 // 방금 종료한 임대(rt)의 연락처·주소·거래처명과 일치하는 철수요청이 있으면 자동으로 지웁니다.
 // (findMatchedGenForReturnRequest는 g.rental이 살아있어야 매칭되는데 이 시점엔 이미 비웠으므로, 방금 종료한 rt로 직접 비교합니다)
-async function autoClearMatchedReturnRequests(rt, genId){
+async function autoClearMatchedReturnRequests(rt){
   const autoMatched = (DB.returnRequests||[]).filter(r=>{
     if(!r) return false;
-    const parsed = parseReturnRequestText(r.text, r.createdAtTs);
-    return returnReqMatchesRental(parsed, rt, genId);
+    const parsed = parseReturnRequestText(r.text);
+    if(parsed.phone && rt.phone && parsed.phone===rt.phone.replace(/[^0-9]/g,'')) return true;
+    if(parsed.address && rt.address && (rt.address.includes(parsed.address) || parsed.address.includes(rt.address))) return true;
+    if(parsed.customer && rt.customer && (rt.customer.includes(parsed.customer) || parsed.customer.includes(rt.customer))) return true;
+    return false;
   });
   if(autoMatched.length>0){
     const autoMatchedIds = new Set(autoMatched.map(r=>r.id));
@@ -13847,31 +12986,6 @@ function shouldSkipSync(){
 }
 let syncInFlight = false;
 let syncFrequentInFlight = false;
-// ===== 저장 직전 최신 확인 =====
-// 두 사람이 동시에 쓰면, 입력창(팝업)이 열려 있는 동안은 화면 동기화가 멈춰 있어서 다른 사람이 방금 넣은 내용을 못 보고
-// 똑같은 건을 또 등록하는 일이 생깁니다. 그래서 등록·출고·입고·상차완료 버튼을 누르는 순간 서버에서 최신 목록을 한 번 더 받아와 확인합니다.
-async function refreshCoreDataNow(){
-  try{
-    const [gens, reservations] = await Promise.all([
-      peekStorage('gen-fleet-v2', DB.gens),
-      peekStorage('gen-reservations-v1', DB.reservations)
-    ]);
-    if(Array.isArray(gens) && gens.length){ DB.gens = gens; lastSyncedGensSnapshot = snapshotGens(DB.gens); }
-    if(Array.isArray(reservations)){ DB.reservations = reservations; lastSyncedReservationsSnapshot = snapshotById(DB.reservations); }
-    seenReservationIds = new Set((DB.reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID).map(r=>r.id));
-  }catch(e){ /* 못 받아오면 지금 가진 데이터로 진행합니다 */ }
-}
-// 새로 등록하려는 거래처와 같은 연락처(또는 같은 거래처명+주소)로 이미 출고대기에 있거나, 최근 하루 사이 출고된 건을 찾습니다.
-function findDuplicateOrder({customer, address, phone}, excludeResId){
-  const ph = String(phone||'').replace(/[^0-9]/g,'');
-  const norm = v=>String(v||'').replace(/\s+/g,'');
-  const same = x=> (ph && ph.length>=9 && String(x.phone||'').replace(/[^0-9]/g,'')===ph) || (norm(customer) && norm(address) && norm(x.customer)===norm(customer) && norm(x.address)===norm(address));
-  const hits = [];
-  (DB.reservations||[]).forEach(r=>{ if(r && r.id!==excludeResId && same(r)) hits.push(`· 출고대기 ${r.genId===UNASSIGNED_GEN_ID? '미지정' : r.genId} / ${r.customer||'-'} (${(r.outDate||r.plannedOutDate)||'날짜미정'})${r.outProcessedBy? ' - '+String(r.outProcessedBy).replace(/\(.*\)$/,'')+' 등록':''}`); });
-  const dayAgo = Date.now() - 24*60*60*1000;
-  activeGens().forEach(g=>{ if(g.status==='out' && g.rental && (g.rental.outConfirmedAt||0) >= dayAgo && same(g.rental)) hits.push(`· 오늘·어제 출고됨 ${g.id} / ${g.rental.customer||'-'}${g.rental.loadConfirmedBy? ' - '+String(g.rental.loadConfirmedBy).replace(/\(.*\)$/,'')+' 처리':''}`); });
-  return hits;
-}
 // 자주 바뀌는 핵심 데이터(입고/출고대기/출고중 = 발전기 목록·예약)만 짧은 주기로 동기화합니다.
 // 나머지(부자재·정비이력 등, 자주 안 바뀌는 데이터)는 아래 syncFromStorage에서 긴 주기로 처리합니다.
 // 이렇게 나눈 이유: 매번 전체 항목을 다 받아오면 파이어베이스 무료 다운로드 한도(월 10GB)를 금방 넘기게 되어,
@@ -14202,10 +13316,8 @@ function checkIdleRefresh(){
 }
 if(!isQuickMode()) setInterval(checkIdleRefresh, 60000);
 document.addEventListener('visibilitychange', function(){
-  if(document.visibilityState==='visible'){ checkIdleRefresh(); if(!isQuickMode()) syncFrequentData(); }
+  if(document.visibilityState==='visible') checkIdleRefresh();
 });
-// 다른 프로그램을 보다가 이 창으로 돌아오면(창 클릭) 30초를 기다리지 않고 바로 최신 목록을 받아옵니다.
-window.addEventListener('focus', function(){ if(!isQuickMode()) syncFrequentData(); });
 
 // ===== 입력 오류(빨간 안내문구) 음성으로 읽어주기 (띵동 소리 없이 바로 읽음) =====
 function speakErrorText(text){
