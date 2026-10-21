@@ -12715,7 +12715,7 @@ function openMaintModal(id, editId, repairComplete){
   const kindToPartIndex = {};
   candidates.forEach((p,i)=>{ if(p.kind) kindToPartIndex[p.kind] = i; });
   const CONTENT_TO_KIND = {'엔진오일교체':'engineOil','오일필터1차교체':'oilFilter1','오일필터2차교체':'oilFilter2','연료필터1교체':'fuelFilter1','연료필터2교체':'fuelFilter2','에어필터교체':'airFilter'};
-  const contentOptions = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1차교체','오일필터1차점검','오일필터2차교체','오일필터2차점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검 및 보충','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소'];
+  const contentOptions = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1차교체','오일필터1차점검','오일필터2차교체','오일필터2차점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검 및 보충','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소','연료통청소'];
   const prevContentList = rec && rec.contentItems ? rec.contentItems : [];
   const contentCheckLabel = (c,i)=>{
     const kind = CONTENT_TO_KIND[c];
@@ -12729,7 +12729,7 @@ function openMaintModal(id, editId, repairComplete){
     const lockNote = oilLocked ? ` <span class="muted" style="font-size:11px;color:var(--danger);">(위에서 "엔진오일교체" 유형 선택시에만 체크 가능)</span>` : '';
     return `<label class="part-check"${isOilChangeItem? ' id="f-mcontent-oilchange-label"':''} style="flex:1;border-bottom:none;padding:2px 0;${oilLocked?'opacity:.5;':''}"><input type="checkbox" id="f-mcontent-${i}"${isOilChangeItem? ' data-oilchange="1"':''} value="${c}" ${checked}${syncAttr}${disabledAttr}> ${c}${linkTxt}${lockNote}</label>`;
   };
-  const pairGroups = [['엔진오일교체','엔진오일점검'],['에어필터교체','에어필터점검'],['오일필터1차교체','오일필터1차점검'],['오일필터2차교체','오일필터2차점검'],['연료필터1교체','연료필터1점검'],['연료필터2교체','연료필터2점검'],['부동액교체','부동액점검 및 보충'],['배터리교체','배터리점검'],['팬벨트교체','출력단자체결상태'],['누전차단기볼트교체','배터리터미널조임상태']];
+  const pairGroups = [['엔진오일교체','엔진오일점검'],['에어필터교체','에어필터점검'],['오일필터1차교체','오일필터1차점검'],['오일필터2차교체','오일필터2차점검'],['연료필터1교체','연료필터1점검'],['연료필터2교체','연료필터2점검'],['부동액교체','부동액점검 및 보충'],['배터리교체','배터리점검'],['팬벨트교체','출력단자체결상태'],['누전차단기볼트교체','배터리터미널조임상태'],['팬청소','연료통청소']];
   const pairedItems = new Set(pairGroups.flat());
   let contentChecksHtml = '';
   const doneItems = new Set();
@@ -12823,7 +12823,7 @@ async function submitMaint(id, editId, completeRepair){
   const hours = mhoursEl ? Number(mhoursEl.value) : 0;
   const type = document.getElementById('f-mtype').value;
   const technician = document.getElementById('f-mtech').value;
-  const contentOptions = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1차교체','오일필터1차점검','오일필터2차교체','오일필터2차점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검 및 보충','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소'];
+  const contentOptions = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1차교체','오일필터1차점검','오일필터2차교체','오일필터2차점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검 및 보충','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소','연료통청소'];
   const contentItems = contentOptions.filter((c,i)=>{
     const el = document.getElementById(`f-mcontent-${i}`);
     return el && el.checked;
