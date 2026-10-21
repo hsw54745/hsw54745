@@ -4575,6 +4575,22 @@ function genFuelPerHour(g){
   const m = (g && DB.materials[g.model]) || {};
   return m.fuelPerHour>0 ? m.fuelPerHour : null;
 }
+// 마지막 연료통(탱크) 청소 날짜 - 정비등록에서 "연료통청소"를 체크한 기록 중 가장 최근 날짜
+function lastTankCleanDate(gid){
+  let last = '';
+  (DB.maint||[]).forEach(m=>{
+    if(!m || m.genId!==gid || !m.date) return;
+    const hit = (Array.isArray(m.contentItems) && m.contentItems.includes('연료통청소')) || /연료통\s*청소|탱크\s*청소/.test(String(m.content||'') + ' ' + String(m.contentEtc||''));
+    if(hit && m.date > last) last = m.date;
+  });
+  return last;
+}
+function tankCleanCellHtml(g){
+  const d = lastTankCleanDate(g.id);
+  return d
+    ? `<span style="font-weight:700;white-space:nowrap;font-size:12px;">${d.slice(2).replace(/-/g,'.')}</span>`
+    : '<span class="muted" style="font-size:11.5px;white-space:nowrap;">미실시</span>';
+}
 function fuelPerHourCellHtml(g){
   const v = genFuelPerHour(g);
   return v!=null
@@ -5131,6 +5147,7 @@ function renderMaintList(){
     return `<tr>
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
+      <td>${tankCleanCellHtml(g)}</td>
       <td>${fuelPerHourCellHtml(g)}</td>
       <td>${tankCapacityCellHtml(g)}</td>
       <td>${(()=>{ const wt = genWeightT(g); return wt ? `<span style="font-weight:700;white-space:nowrap;">${wt}t</span>` : '<span class="muted" style="font-size:11.5px;white-space:nowrap;">미입력</span>'; })()}</td>
@@ -5152,7 +5169,7 @@ function renderMaintList(){
     ${capacityButtonsHtml}
     ${sorted.length===0 ? `<div class="empty">${maintCapacityFilter!=null? `${maintCapacityFilter}kW 용량의 발전기가 없습니다.` : '검색 결과가 없습니다.'}</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
+      <thead><tr><th>번호</th><th>모델</th><th>탱크청소</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`}`;
 }
