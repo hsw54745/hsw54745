@@ -1040,6 +1040,7 @@ async function renderQmOutListInner(){
           </div>
           <button type="button" onclick="openQmOutDetail('${g.id}')" style="background:#5B7FA6;border:none;color:#fff;font-weight:800;font-size:12px;padding:8px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0;">상세보기</button>
         </div>
+        ${genLengthCm(g)? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${genLengthCm(g).toLocaleString()}cm</div>` : ''}
         ${outDate? `<div style="font-size:11px;color:#888;margin-top:3px;">🚚 출고일 ${escR(outDate)}</div>` : ''}
         <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
           <span class="pill" style="background:#EAF2E9;color:#2C6E49;border:1px solid #2C6E49;font-size:10px;white-space:nowrap;">${escR(g.voltage)||'전압 미설정'}</span>
@@ -1523,7 +1524,7 @@ async function qmRefreshReservationList(){
         <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${(r.outDate||r.plannedOutDate)? fmtDateKR(r.outDate||r.plannedOutDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
         ${(r.outDate||r.plannedOutDate)? arriveCountdownHtml(r.outDate||r.plannedOutDate) : ''}
         <div style="font-size:13px;color:#333;margin-top:6px;">
-          ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span>${lengthById[r.genId]? ` <span style="font-size:11px;font-weight:800;color:#5B4A2E;">📏 ${lengthById[r.genId].toLocaleString()}cm</span>`:''} <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
+          ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>${lengthById[r.genId]? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${lengthById[r.genId].toLocaleString()}cm</div>`:''}` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
         ${infoRows.length? `
         <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;display:flex;flex-direction:column;gap:4px;">
@@ -2906,7 +2907,10 @@ async function proceedSubmitQuickReturnOrder(text){
 async function initPasswordGate(){
   if(sessionStorage.getItem('gen-pw-unlocked')==='yes'){ init(); return; }
   const stored = await getStoredPassword();
-  if(!stored){ renderPwSetupScreen(); }
+  let afterAutoLogout = false;
+  try{ afterAutoLogout = !!localStorage.getItem('gen-auto-logout-at'); localStorage.removeItem('gen-auto-logout-at'); }catch(e){}
+  // 비밀번호를 안 쓰는 상태에서 자동 로그아웃된 경우엔 "비밀번호 설정" 화면 없이 바로 사용자 선택으로 갑니다.
+  if(!stored){ if(afterAutoLogout){ skipPwSetup(); return; } renderPwSetupScreen(); }
   else { renderPwLoginScreen(); }
 }
 function renderPwSetupScreen(){
@@ -4896,7 +4900,7 @@ function renderOutList(){
     return `<tr${rowBg? ` style="background:${rowBg};"`:''}>
       <td><input type="checkbox" class="bulk-in-chk" data-gid="${g.id}" ${bulkInSelection.has(g.id)?'checked':''} onchange="toggleBulkInSelect('${g.id}', this.checked)"></td>
       <td class="gid">${g.id}</td>
-      <td class="wrap-ok">${displayModel(g)}${usableCapacityHtml(g)}${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
+      <td class="wrap-ok">${displayModel(g)}${genLengthHtml(g)}${usableCapacityHtml(g)}${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
       <td class="muted" style="font-size:11px;">${rt.loadConfirmedBy? escR(rt.loadConfirmedBy) : (rt.outProcessedBy? escR(rt.outProcessedBy) : '-')}</td>
       <td>${(()=>{ const v=g.voltage||rt.voltage; const c=voltageColor(v); return v? `<span style="${c?`color:${c};font-weight:700;`:''}">${escR(v)}</span>` : '<span class="muted">-</span>'; })()}</td>
       <td class="wrap-ok">
@@ -13552,6 +13556,59 @@ function checkIdleRefresh(){
 if(!isQuickMode()) setInterval(checkIdleRefresh, 60000);
 document.addEventListener('visibilitychange', function(){
   if(document.visibilityState==='visible') checkIdleRefresh();
+});
+
+// ===== 자동 로그아웃 (10분 동안 조작이 없으면) =====
+// 사무실 화면: 접속 비밀번호 잠금 + 사용자 선택을 다시 하게 됩니다.
+// 퀵메뉴(폰): 사용자 선택을 다시 하게 됩니다.
+// 9분이 지나면 화면 아래에 "1분 뒤 로그아웃" 안내가 뜨고, 그 사이 화면을 만지면 취소됩니다.
+const AUTO_LOGOUT_MS = 10*60*1000;
+const AUTO_LOGOUT_WARN_MS = 60*1000;
+function doAutoLogout(){
+  try{ sessionStorage.removeItem('gen-pw-unlocked'); }catch(e){}
+  try{
+    if(isQuickMode()) localStorage.removeItem('gen-qm-user-name-v1');
+    else localStorage.removeItem('gen-user-name-v1');
+  }catch(e){}
+  try{ localStorage.setItem('gen-auto-logout-at', String(Date.now())); }catch(e){}
+  location.reload();
+}
+function autoLogoutBannerEl(){
+  let el = document.getElementById('auto-logout-banner');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'auto-logout-banner';
+    el.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:100000;background:#2C4A66;color:#fff;font-weight:800;font-size:15px;padding:12px 18px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.25);display:none;text-align:center;max-width:92vw;';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function isLoggedInForAutoLogout(){
+  if(isQuickMode()) return !!qmCurrentUserName;
+  let unlocked = false;
+  try{ unlocked = sessionStorage.getItem('gen-pw-unlocked')==='yes'; }catch(e){}
+  return unlocked && !!(typeof DB!=='undefined' && DB.currentUserName);
+}
+function checkAutoLogout(){
+  if(!isLoggedInForAutoLogout()){ lastActivityAt = Math.max(lastActivityAt, Date.now()-1000); const b = document.getElementById('auto-logout-banner'); if(b) b.style.display='none'; return; }
+  const idle = Date.now() - lastActivityAt;
+  const banner = autoLogoutBannerEl();
+  if(idle >= AUTO_LOGOUT_MS){
+    if(typeof saveInFlightCount!=='undefined' && saveInFlightCount>0) return; // 저장 중이면 끝난 뒤에
+    doAutoLogout();
+    return;
+  }
+  if(idle >= AUTO_LOGOUT_MS - AUTO_LOGOUT_WARN_MS){
+    const sec = Math.max(0, Math.ceil((AUTO_LOGOUT_MS - idle)/1000));
+    banner.textContent = `⏱ ${sec}초 뒤 자동 로그아웃됩니다 · 화면을 누르면 계속 사용`;
+    banner.style.display = 'block';
+  } else if(banner.style.display!=='none'){
+    banner.style.display = 'none';
+  }
+}
+setInterval(checkAutoLogout, 1000);
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState==='visible') checkAutoLogout();
 });
 
 // ===== 입력 오류(빨간 안내문구) 음성으로 읽어주기 (띵동 소리 없이 바로 읽음) =====
