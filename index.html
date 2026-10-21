@@ -873,6 +873,7 @@ async function renderQmStockListInner(){
           </div>
           <input type="checkbox" style="width:24px;height:24px;flex-shrink:0;">
         </div>
+        ${genLengthCm(g)? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${genLengthCm(g).toLocaleString()}cm</div>` : ''}
         ${lastIn? `<div style="font-size:11px;color:#888;margin-top:3px;">🕐 최근 입고 ${escR(lastIn.date)}</div>` : ''}
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;">
           <button type="button" onclick="openQmVoltageEdit('${g.id}')" style="${vStyle}font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;border-style:solid;border-width:1px;">${escR(g.voltage)||'전압 미설정'}</button>
@@ -1491,7 +1492,7 @@ async function qmRefreshReservationList(){
     if(!Array.isArray(list)) list = [];
     let gens = []; try{ gens = curFleet ? JSON.parse(curFleet.value) : []; }catch(e){ gens = []; }
     if(!Array.isArray(gens)) gens = [];
-    const modelById = {}; gens.forEach(g=>{ if(g) modelById[g.id] = g.model; });
+    const modelById = {}, lengthById = {}; gens.forEach(g=>{ if(g){ modelById[g.id] = g.model; lengthById[g.id] = genLengthCm(g); } });
     list.sort((a,b)=>(a.outDate||'').localeCompare(b.outDate||''));
     if(!document.getElementById('qm-res-list')) return; // 화면이 이미 닫혔으면 무시
     if(list.length===0){
@@ -1522,7 +1523,7 @@ async function qmRefreshReservationList(){
         <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${(r.outDate||r.plannedOutDate)? fmtDateKR(r.outDate||r.plannedOutDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
         ${(r.outDate||r.plannedOutDate)? arriveCountdownHtml(r.outDate||r.plannedOutDate) : ''}
         <div style="font-size:13px;color:#333;margin-top:6px;">
-          ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
+          ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span>${lengthById[r.genId]? ` <span style="font-size:11px;font-weight:800;color:#5B4A2E;">📏 ${lengthById[r.genId].toLocaleString()}cm</span>`:''} <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
         ${infoRows.length? `
         <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;display:flex;flex-direction:column;gap:4px;">
@@ -4493,6 +4494,20 @@ function sortModelsByCapacity(models){
     return a.localeCompare(b,'ko');
   });
 }
+// 발전기 길이(cm) - [설정 → 발전기 모델 설정]에서 발전기마다 입력 (예전 데이터의 genWidth 값을 그대로 씁니다)
+function genLengthCm(g){ const v = Number(g && g.genWidth); return v>0 ? v : null; }
+function genLengthHtml(g){
+  const v = genLengthCm(g);
+  return v ? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;">📏 길이 ${v.toLocaleString()}cm</div>` : '';
+}
+async function updateGenLength(id, value){
+  const g = findGen(id);
+  if(!g) return;
+  const v = Number(String(value||'').trim());
+  g.genWidth = v>0 ? v : null;
+  await saveGens();
+  flash('저장되었습니다');
+}
 function usableCapacityHtml(g){
   const cap = capacityOf(g);
   const ratio = g.usageRatio && g.usageRatio>0 && g.usageRatio<100 ? g.usageRatio : 100;
@@ -4657,7 +4672,7 @@ function renderInList(){
     return `<tr${isBroken? ` style="background:var(--danger-tint);"`:''}>
       <td>${selectable? `<input type="checkbox" class="bulk-out-chk" data-gid="${g.id}" ${bulkOutSelection.has(g.id)?'checked':''} onchange="toggleBulkOutSelect('${g.id}', this.checked)">` : ''}</td>
       <td class="gid">${g.id}</td>
-      <td class="wrap-ok">${displayModel(g)}${g.borrowed? ` <span class="pill" style="background:var(--primary-tint);color:var(--primary-dark);border:1px solid var(--primary);">🤝 임대</span>`:''}${isPendingOut? ` <span class="pill warn">출고대기</span>`:''}${isBroken? `<div class="muted" style="font-size:11px;color:var(--danger);font-weight:700;">⚠ 고장: ${escR(g.repairNote||'-')}${g.repairPhoto? ` <img src="${g.repairPhoto}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;cursor:pointer;" onclick="openImageViewModal('${g.repairPhoto}','고장 사진')">`:''}</div>`:''}</td>
+      <td class="wrap-ok">${displayModel(g)}${genLengthHtml(g)}${g.borrowed? ` <span class="pill" style="background:var(--primary-tint);color:var(--primary-dark);border:1px solid var(--primary);">🤝 임대</span>`:''}${isPendingOut? ` <span class="pill warn">출고대기</span>`:''}${isBroken? `<div class="muted" style="font-size:11px;color:var(--danger);font-weight:700;">⚠ 고장: ${escR(g.repairNote||'-')}${g.repairPhoto? ` <img src="${g.repairPhoto}" style="width:20px;height:20px;object-fit:cover;border-radius:4px;vertical-align:middle;cursor:pointer;" onclick="openImageViewModal('${g.repairPhoto}','고장 사진')">`:''}</div>`:''}</td>
       <td>${voltagePillHtml(g.id, g.voltage)}</td>
       <td>${usableCapacityCell(g)}</td>
       <td class="muted">${hoursStatus(g)==='known'? `${(g.hours||0).toLocaleString()}h <span style="font-size:11px;">(정비: ${(g.lastMaintHours||0).toLocaleString()}h)</span>` : '<span style="color:var(--danger);font-weight:700;">확인불가</span>'}</td>
@@ -5180,8 +5195,8 @@ function renderMaintByGen(){
   const recs = DB.maint.filter(m=>m.genId===genId).sort((a,b)=>b.date.localeCompare(a.date));
   if(recs.length===0){ el.innerHTML = `<div class="empty">"${genId}" 발전기의 정비 이력이 없습니다.</div>`; return; }
   el.innerHTML = `<div class="table-scroll"><table>
-    <thead><tr><th>정비일</th><th>번호</th><th>정비시 누적시간</th><th>구분</th><th>정비자</th><th>사용부품</th><th>정비 내용</th></tr></thead>
-    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':(r.type==='전압변경'?'<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>':(r.type==='일반점검'?'<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>':'<span class="pill gray">엔진오일교체</span>'))}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;">${(r.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td><td class="wrap-ok">${r.content||'-'}</td></tr>`).join('')}</tbody>
+    <thead><tr><th>정비일</th><th>번호</th><th>정비시 누적시간</th><th>구분</th><th>정비자</th><th>사용부품</th><th>정비 내용</th><th></th></tr></thead>
+    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':(r.type==='전압변경'?'<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>':(r.type==='일반점검'?'<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>':'<span class="pill gray">엔진오일교체</span>'))}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;">${(r.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td><td class="wrap-ok">${r.content||'-'}</td><td><div class="btn-row" style="flex-wrap:nowrap;"><button class="btn sm" onclick="editMaintFrom('gen:${genId}','${r.genId}','${r.id}')">수정</button><button class="btn sm danger" onclick="deleteMaintFrom('gen:${genId}','${r.id}','${r.genId}')">삭제</button></div></td></tr>`).join('')}</tbody>
   </table></div>`;
 }
 function renderMaintByModel(){
@@ -5191,8 +5206,8 @@ function renderMaintByModel(){
   const recs = DB.maint.filter(m=>m.model===model).sort((a,b)=>b.date.localeCompare(a.date));
   if(recs.length===0){ el.innerHTML = `<div class="empty">"${model}" 모델의 정비 이력이 없습니다.</div>`; return; }
   el.innerHTML = `<div class="table-scroll"><table>
-    <thead><tr><th>정비일</th><th>번호</th><th>정비시 누적시간</th><th>구분</th><th>정비자</th><th>사용부품</th><th>정비 내용</th></tr></thead>
-    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':(r.type==='전압변경'?'<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>':(r.type==='일반점검'?'<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>':'<span class="pill gray">엔진오일교체</span>'))}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;">${(r.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td><td class="wrap-ok">${r.content||'-'}</td></tr>`).join('')}</tbody>
+    <thead><tr><th>정비일</th><th>번호</th><th>정비시 누적시간</th><th>구분</th><th>정비자</th><th>사용부품</th><th>정비 내용</th><th></th></tr></thead>
+    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':(r.type==='전압변경'?'<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>':(r.type==='일반점검'?'<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>':'<span class="pill gray">엔진오일교체</span>'))}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;">${(r.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td><td class="wrap-ok">${r.content||'-'}</td><td><div class="btn-row" style="flex-wrap:nowrap;"><button class="btn sm" onclick="editMaintFrom('model:${escR(model).replace(/'/g,"\\'")}','${r.genId}','${r.id}')">수정</button><button class="btn sm danger" onclick="deleteMaintFrom('model:${escR(model).replace(/'/g,"\\'")}','${r.id}','${r.genId}')">삭제</button></div></td></tr>`).join('')}</tbody>
   </table></div>`;
 }
 
@@ -5398,7 +5413,7 @@ async function submitCycle(id){
   }
 }
 
-function recomputeLastMaint(genId){
+function recomputeLastMaint(genId, allowLower){
   const g = findGen(genId);
   if(!g) return;
   // 정비주기는 "마지막 엔진오일교환"(정기정비) 기준으로만 관리합니다.
@@ -5430,7 +5445,8 @@ function recomputeLastMaint(genId){
   // 정비 기록 중 하나가 0이거나 비정상적으로 낮은 값으로 잘못 저장되어 있어도,
   // "마지막 정비시 누적시간"이 실수로 확 떨어지는 일이 없도록 기존 값보다 낮아지지는 않게 막습니다.
   // (진짜로 정정해야 하면 [정비관리 → 직접수정]에서 의도적으로 낮출 수 있습니다)
-  g.lastMaintHours = Math.max(maxHours, g.lastMaintHours||0);
+  // 단, 엔진오일교체 기록을 지우거나 다른 유형으로 고친 경우(allowLower)에는 남은 기록 기준으로 되돌립니다.
+  g.lastMaintHours = allowLower ? maxHours : Math.max(maxHours, g.lastMaintHours||0);
   if((g.hours||0) < maxHours) g.hours = maxHours;
   g.hoursUpdatedAt = nowDateTimeStr();
   g.hoursUpdatedBy = DB.currentUserName || null;
@@ -6294,8 +6310,8 @@ function maintHistoryTableHtml(id, maints){
         <td class="wrap-ok">${m.content||'-'}</td>
         <td>${(()=>{ const photos = maintPhotosOf(m); return photos.length>0 ? photos.map((p,i)=>`<img src="${p}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--border-strong);cursor:pointer;margin:1px;" onclick="openImageViewModal('${p}','정비 사진 ${i+1}/${photos.length}')">`).join('') : '<span class="muted">-</span>'; })()}</td>
         <td><div class="btn-row">
-          <button class="btn sm" onclick="openMaintModal('${id}','${m.id}')">수정</button>
-          <button class="btn sm danger" onclick="deleteMaint('${m.id}','${id}')">삭제</button>
+          <button class="btn sm" onclick="editMaintFrom('hist:${id}','${id}','${m.id}')">수정</button>
+          <button class="btn sm danger" onclick="deleteMaintFrom('hist:${id}','${m.id}','${id}')">삭제</button>
         </div></td>
       </tr>`).join('')}</tbody>
     </table></div>
@@ -6339,11 +6355,15 @@ function deleteMaint(mid, genId){
       }
       if(changed) await savePartsStock();
     }
+    const wasOilChange = !!(rec && (rec.type||'정기정비')==='정기정비');
     DB.maint = DB.maint.filter(m=>m.id!==mid);
-    recomputeLastMaint(genId);
+    recomputeLastMaint(genId, wasOilChange);
     await saveMaint();
     await saveGens();
+    closeModal();
     renderGenHistory();
+    if(currentTab==='maint') renderContent();
+    maintAfterChange();
     flash('삭제되었습니다');
   }, '삭제');
 }
@@ -7141,7 +7161,7 @@ function renderCalendar(){
     const evHtml = evs.slice(0,6).map(({ev:e,tag})=>{
       const t = CAL_TAG_STYLE[tag];
       const color = t ? t.color : 'var(--primary-dark)';
-      return `<div style="margin-top:3px;">${t? `<div style="color:${color};font-weight:800;font-size:11.5px;">${calTagLabel(tag,e)}</div>`:''}<div style="color:${color};font-weight:600;font-size:11.5px;word-break:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escR(e.text)}</div></div>`;
+      return `<div style="margin-top:4px;padding:2px 4px 3px 5px;border-left:3px solid ${color};background:var(--surface-2,#F4F4F2);border-radius:3px;">${t? `<div style="color:${color};font-weight:800;font-size:11.5px;">${calTagLabel(tag,e)}</div>`:''}<div style="color:${color};font-weight:600;font-size:11.5px;word-break:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${escR(e.text)}</div></div>`;
     }).join('');
     const moreTxt = evs.length>6? `<div class="muted" style="font-size:10.5px;margin-top:1px;">+${evs.length-6}건 더</div>` : '';
     const numColor = holiday? 'var(--danger)' : (dowIdx===0?'var(--danger)':dowIdx===6?'#1565C0':'var(--ink)');
@@ -7605,10 +7625,10 @@ function renderSettingsTab(){
         const modelRowHtml = g=>{
           const cap = capacityOf(g);
           const ratioOptions = [100,90,80,70,60,50,40,30].map(r=>`<option value="${r}" ${(g.usageRatio||100)===r?'selected':''}>${r}%</option>`).join('');
-          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·출고중 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
+          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><input type="number" min="0" step="1" value="${genLengthCm(g)||''}" placeholder="cm" onchange="updateGenLength('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·출고중 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
         };
         const half = Math.ceil(activeList.length/2);
-        const thead = `<thead><tr><th style="width:42px;">번호</th><th style="width:112px;">모델/용량</th><th style="width:56px;">년식</th><th style="width:78px;">정격대비사용</th><th style="width:64px;">가동시간<br>확인가능</th><th style="width:74px;"></th></tr></thead>`;
+        const thead = `<thead><tr><th style="width:42px;">번호</th><th style="width:112px;">모델/용량</th><th style="width:56px;">년식</th><th style="width:58px;">길이(cm)</th><th style="width:78px;">정격대비사용</th><th style="width:64px;">가동시간<br>확인가능</th><th style="width:74px;"></th></tr></thead>`;
         return `<div class="util-two-col model-settings-table">
           <div class="settings-table"><table>${thead}<tbody>${activeList.slice(0,half).map(modelRowHtml).join('')}</tbody></table></div>
           <div class="settings-table"><table>${thead}<tbody>${activeList.slice(half).map(modelRowHtml).join('')}</tbody></table></div>
@@ -9195,7 +9215,7 @@ function renderReserveTab(){
     const smsMarker = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 출고오더확인${smsOrderNumMap[r.id]? ` #${smsOrderNumMap[r.id]}`:''}</button>` : '';
     return `<tr${isDelayed? ` style="background:var(--danger-tint);"`:''}>
       <td class="gid">${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)}</td>
-      <td class="wrap-ok" style="max-width:130px;">${g? displayModel(g): '-'}</td>
+      <td class="wrap-ok" style="max-width:130px;">${g? displayModel(g)+genLengthHtml(g): '-'}</td>
       <td class="muted" style="font-size:11px;">${r.outProcessedBy? escR(r.outProcessedBy) : '-'}</td>
       <td class="wrap-ok" style="font-size:12px;">
         ${r.customer||r.site||'<span class="muted">미기재</span>'}
@@ -12296,9 +12316,9 @@ function openInModal(id, isTransfer){
       <div class="out-row stretch">
         <div class="field f-md"><div class="out-card">
           <label>입고 상태</label>
-          <input type="hidden" id="f-in-condition" value="ok">
+          <input type="hidden" id="f-in-condition" value="${isTransfer? 'ok' : ''}">
           <div class="btn-row" style="justify-content:center;">
-            <button type="button" class="btn sm primary" id="f-in-cond-btn-ok" onclick="setInCondition('ok')">정상입고</button>
+            <button type="button" class="btn sm${isTransfer? ' primary':''}" id="f-in-cond-btn-ok" onclick="setInCondition('ok')">정상입고</button>
             <button type="button" class="btn sm" id="f-in-cond-btn-broken" onclick="setInCondition('broken')">고장입고</button>
           </div>
           <div id="f-in-repairnote-wrap" style="display:none;margin-top:8px;">
@@ -12507,7 +12527,12 @@ async function submitIn(id, isTransfer){
     errEl.style.display='block'; return;
   }
   const conditionEl = document.getElementById('f-in-condition');
-  const condition = conditionEl ? conditionEl.value : 'ok';
+  const condition = conditionEl ? (conditionEl.value || (isTransfer? 'ok' : '')) : 'ok';
+  // 입고 상태는 미리 골라두지 않으므로, 정상입고/고장입고 중 하나를 꼭 눌러야 입고됩니다.
+  if(!condition){
+    errEl.textContent = '입고 상태(정상입고 / 고장입고)를 선택해주세요.';
+    errEl.style.display='block'; return;
+  }
   const repairNoteEl = document.getElementById('f-in-repairnote');
   const repairNote = repairNoteEl ? repairNoteEl.value.trim() : '';
   if(condition==='broken' && !repairNote){
@@ -12761,14 +12786,28 @@ function syncContentPartCheck(sourceEl, targetId){
   const target = document.getElementById(targetId);
   if(target) target.checked = sourceEl.checked;
 }
+// 정비이력 표에서 수정/삭제했을 때, 끝나면 보던 화면(정비이력조회 창 / 발전기별·모델별 이력)으로 돌아가게 합니다.
+let maintReturnTo = null;
+function editMaintFrom(ret, genId, mid){ openMaintModal(genId, mid); maintReturnTo = ret; }
+function deleteMaintFrom(ret, mid, genId){ deleteMaint(mid, genId); maintReturnTo = ret; }
+function maintAfterChange(){
+  const ret = maintReturnTo; maintReturnTo = null;
+  if(!ret) return;
+  if(ret.startsWith('hist:')){ openMaintHistoryModal(ret.slice(5)); return; }
+  if(ret.startsWith('gen:')){ const sel = document.getElementById('maint-gen-filter'); if(sel){ sel.value = ret.slice(4); renderMaintByGen(); } return; }
+  if(ret.startsWith('model:')){ const sel = document.getElementById('maint-model-filter'); if(sel){ sel.value = ret.slice(6); renderMaintByModel(); } }
+}
+function cancelMaintModal(){ closeModal(); maintAfterChange(); }
 function openMaintModal(id, editId, repairComplete){
+  maintReturnTo = null;
   const g = findGen(id);
   const rec = editId ? DB.maint.find(m=>m.id===editId) : null;
   const techs = (DB.technicians||[]).filter(t=>t && t.trim());
   const candidates = materialCandidateParts(g.model);
   const selectedLabels = new Set(((rec && rec.partsUsed) || []).map(p=>typeof p==='string'?p:p.label));
   const isVoltageChangeRec = !!(rec && (rec.type==='전압변경' || (rec.content||'').includes('전압변경')));
-  const currentType = repairComplete ? '고장수리' : (rec&&rec.type ? rec.type : (isVoltageChangeRec ? '전압변경' : '정기정비'));
+  // 새로 등록할 때는 정비 유형을 미리 골라두지 않습니다(엔진오일교체가 기본으로 잡혀 있어 도장·점검 같은 기록이 엔진오일교체로 저장되던 문제 방지).
+  const currentType = repairComplete ? '고장수리' : (rec ? (rec.type || (isVoltageChangeRec ? '전압변경' : '정기정비')) : '');
   const typeButtonsHtml = `
     <input type="hidden" id="f-mtype" value="${currentType}">
     <div class="btn-row">
@@ -12827,7 +12866,8 @@ function openMaintModal(id, editId, repairComplete){
       doneItems.add(c);
     }
   });
-  const prevEtc = rec ? (rec.contentEtc!=null ? rec.contentEtc : (rec.contentItems? '' : (rec.content||''))) : '';
+  // 체크항목 없이 내용만 있는 기록(전압변경 자동기록 등)은 수정할 때 그 내용이 기타칸에 그대로 들어가게 합니다.
+  const prevEtc = rec ? ((rec.contentEtc) ? rec.contentEtc : ((rec.contentItems && rec.contentItems.length) ? '' : (rec.content||''))) : '';
   maintPhotosPending = rec ? maintPhotosOf(rec) : [];
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
@@ -12856,7 +12896,7 @@ function openMaintModal(id, editId, repairComplete){
       </div>
       <div id="f-err" class="err" style="display:none;"></div>
       <div class="modal-actions">
-        <button class="btn" onclick="closeModal()">취소</button>
+        <button class="btn" onclick="cancelMaintModal()">취소</button>
         <button class="btn primary" onclick="submitMaint('${g.id}', ${editId? `'${editId}'`:'null'}, ${repairComplete? 'true':'false'})">${repairComplete? '수리 완료 처리':(editId?'수정':'정비 등록')}</button>
       </div>
     </div>
@@ -12913,6 +12953,14 @@ async function submitMaint(id, editId, completeRepair){
   const contentEtc = document.getElementById('f-mcontent-etc').value.trim();
   const content = [contentItems.join(', '), contentEtc].filter(Boolean).join(' / ');
   const errEl = document.getElementById('f-err');
+  if(!type){
+    errEl.textContent = '정비 유형(엔진오일교체 / 일반점검 / 고장·긴급수리)을 선택해주세요.';
+    errEl.style.display='block'; return;
+  }
+  if(!String(technician||'').trim() && type!=='전압변경'){
+    errEl.textContent = '정비자를 선택해주세요.';
+    errEl.style.display='block'; return;
+  }
   if(!date || (g.hoursKnown && (isNaN(hours) || hours<0))){
     errEl.textContent = '정비일과 누적 사용시간을 확인해주세요.';
     errEl.style.display='block'; return;
@@ -12933,9 +12981,11 @@ async function submitMaint(id, editId, completeRepair){
       if(!isUnlimitedPart(p.partName)) DB.partsStock[p.partName] = (DB.partsStock[p.partName]!==undefined ? DB.partsStock[p.partName] : 0) - (p.qty||1);
     }
   });
+  let editedFromOilChange = false;
   if(editId){
     const rec = DB.maint.find(m=>m.id===editId);
     if(rec){
+      editedFromOilChange = (rec.type||'정기정비')==='정기정비';
       rec.date = date; rec.hours = hours; rec.content = content;
       rec.contentItems = contentItems; rec.contentEtc = contentEtc;
       rec.technician = technician; rec.partsUsed = partsUsed; rec.model = g.model; rec.type = type;
@@ -12946,7 +12996,7 @@ async function submitMaint(id, editId, completeRepair){
     DB.maint.push({id: uid(), genId: g.id, model: g.model, date, hours, content, contentItems, contentEtc, technician, partsUsed, type, photos: maintPhotosPending.slice(0,5)});
   }
   maintPhotosPending = [];
-  recomputeLastMaint(g.id);
+  recomputeLastMaint(g.id, editedFromOilChange);
   if(completeRepair){
     g.underRepair = false;
     g.repairNote = '';
@@ -12956,6 +13006,7 @@ async function submitMaint(id, editId, completeRepair){
   await savePartsStock();
   closeModal();
   renderContent();
+  maintAfterChange();
   flash(completeRepair ? '수리 완료 처리되었습니다. 이제 출고할 수 있습니다.' : (editId? '정비 기록이 수정되었습니다' : '정비 등록되었습니다'));
 }
 
