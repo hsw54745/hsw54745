@@ -6883,17 +6883,11 @@ function renderNoticeTab(){
   const cnt = (DB.notices||[]).length;
   return `
     <div class="material-card" style="background:#FDF2F0;border-left:4px solid #C0392B;">
-      <div class="section-title" style="margin-top:0;">📌 공지사항 <span class="cnt">${cnt}건</span></div>
-      <details class="info-toggle"><summary></summary><p class="muted">팀 전체에 공지할 내용을 올려주세요. 작성자와 작성일이 함께 기록되고, 아래에서 댓글로 답변을 남길 수 있습니다.</p></details>
-      <div class="field" style="max-width:100%;margin-top:6px;">
-        <label>공지 작성 (작성자: ${escR(DB.currentUserName||'이름 미선택')})</label>
-        <input type="text" id="f-notice-title" placeholder="제목" style="margin-bottom:6px;">
-        <div class="consumable-row" style="flex-wrap:wrap;">
-          <textarea id="f-notice-content" placeholder="내용을 입력하세요" style="flex:1;min-width:220px;min-height:70px;"></textarea>
-          <button type="button" class="btn sm primary" style="align-self:flex-start;" onclick="addNotice()">등록</button>
-        </div>
+      <div class="section-title" style="margin-top:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">📌 공지사항 <span class="cnt">${cnt}건</span>
+        <button type="button" class="btn sm primary" style="margin-left:auto;" onclick="openNoticeWriteModal()">✏️ 글쓰기</button>
       </div>
-      <div id="notice-wrap" style="margin-top:14px;"></div>
+      <details class="info-toggle"><summary></summary><p class="muted">팀 전체에 공지할 내용을 올리는 게시판입니다. 제목을 누르면 내용과 댓글을 볼 수 있고, 댓글로 답변을 남길 수 있습니다.</p></details>
+      <div id="notice-wrap" style="margin-top:10px;"></div>
     </div>
 
     <div class="material-card" style="margin-top:20px;background:#EEF5FB;border-left:4px solid #1E6FA8;">
@@ -6911,41 +6905,97 @@ function renderNoticeTab(){
     </div>
   `;
 }
+let noticePage = 1;
+const NOTICE_PAGE_SIZE = 10;
+function sortedNotices(){
+  return [...(DB.notices||[])].sort((a,b)=>(b.createdDate||'').localeCompare(a.createdDate||'') || String(b.id||'').localeCompare(String(a.id||'')));
+}
 function renderNoticeList(){
   const wrap = document.getElementById('notice-wrap');
   if(!wrap) return;
-  const list = [...(DB.notices||[])].sort((a,b)=>(b.createdDate||'').localeCompare(a.createdDate||'') || String(b.id||'').localeCompare(String(a.id||'')));
-  if(list.length===0){ wrap.innerHTML = `<div class="empty">등록된 공지사항이 없습니다. 위에서 작성해주세요.</div>`; return; }
-  wrap.innerHTML = list.map(item=>{
-    const comments = item.comments||[];
-    const commentsHtml = comments.map(cm=>`
-      <div style="padding:6px 0;border-top:1px dashed var(--border);font-size:12.5px;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-          <span class="muted" style="font-size:11px;">💬 ${escR(cm.authorBy||'이름미상')} · ${dow(cm.createdDate)||'-'}</span>
-          <button type="button" onclick="removeNoticeComment('${item.id}','${cm.id}')" style="border:none;background:none;cursor:pointer;color:var(--danger);font-size:11px;padding:0;">삭제</button>
-        </div>
-        <div style="white-space:pre-wrap;line-height:1.5;margin-top:2px;font-size:13.5px;">${escR(cm.content)}</div>
+  const list = sortedNotices();
+  if(list.length===0){ wrap.innerHTML = `<div class="empty">등록된 공지사항이 없습니다. "✏️ 글쓰기"로 작성해주세요.</div>`; return; }
+  const pages = Math.max(1, Math.ceil(list.length/NOTICE_PAGE_SIZE));
+  if(noticePage>pages) noticePage = pages;
+  if(noticePage<1) noticePage = 1;
+  const start = (noticePage-1)*NOTICE_PAGE_SIZE;
+  const today = todayStr();
+  const rows = list.slice(start, start+NOTICE_PAGE_SIZE).map((item,i)=>{
+    const num = list.length - (start+i);
+    const cc = (item.comments||[]).length;
+    const isNew = item.createdDate && daysFromToday(item.createdDate) > -3;
+    return `<tr style="cursor:pointer;" onclick="openNoticeView('${item.id}')">
+      <td class="muted" style="width:46px;text-align:center;font-size:12px;">${num}</td>
+      <td style="text-align:left;">
+        <span style="font-weight:700;font-size:13.5px;">${escR(item.title||'(제목 없음)')}</span>
+        ${cc? `<span style="color:var(--danger);font-weight:800;font-size:12px;margin-left:4px;">[${cc}]</span>`:''}
+        ${isNew? `<span style="background:#C0392B;color:#fff;font-size:9.5px;font-weight:800;border-radius:4px;padding:1px 4px;margin-left:4px;vertical-align:1px;">N</span>`:''}
+      </td>
+      <td class="muted" style="width:150px;font-size:12px;white-space:nowrap;">${escR(item.authorBy||'이름미상')}</td>
+      <td class="muted" style="width:90px;font-size:12px;white-space:nowrap;">${item.createdDate? escR(item.createdDate.slice(2).replace(/-/g,'.')) : '-'}</td>
+    </tr>`;
+  }).join('');
+  const pager = pages<=1 ? '' : `<div style="display:flex;justify-content:center;gap:4px;margin-top:10px;flex-wrap:wrap;">
+    ${Array.from({length:pages},(_,k)=>k+1).map(n=>`<button type="button" class="btn sm${n===noticePage?' primary':''}" style="min-width:30px;" onclick="noticePage=${n};renderNoticeList();">${n}</button>`).join('')}
+  </div>`;
+  wrap.innerHTML = `<div class="table-scroll"><table style="background:#fff;">
+    <thead><tr><th style="text-align:center;">번호</th><th style="text-align:left;">제목</th><th>작성자</th><th>작성일</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>${pager}`;
+}
+function openNoticeView(id){
+  const item = (DB.notices||[]).find(x=>x.id===id);
+  if(!item){ closeModal(); renderNoticeList(); return; }
+  const comments = item.comments||[];
+  const commentsHtml = comments.map(cm=>`
+    <div style="padding:7px 0;border-top:1px dashed var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <span class="muted" style="font-size:11px;">💬 ${escR(cm.authorBy||'이름미상')} · ${dow(cm.createdDate)||'-'}</span>
+        <button type="button" onclick="removeNoticeComment('${item.id}','${cm.id}')" style="border:none;background:none;cursor:pointer;color:var(--danger);font-size:11px;padding:0;">삭제</button>
       </div>
-    `).join('');
-    return `<div class="material-card">
-      <div class="m-title" style="align-items:flex-start;">
-        <span style="font-weight:800;font-size:16.5px;">${escR(item.title||'(제목 없음)')}</span>
-        <div class="btn-row" style="flex-wrap:nowrap;">
-          <button type="button" class="btn sm danger" onclick="removeNotice('${item.id}')">삭제</button>
-        </div>
-      </div>
-      <div class="muted" style="font-size:11.5px;margin:-4px 0 6px;">✍ ${escR(item.authorBy||'이름미상')} · ${dow(item.createdDate)||'-'}</div>
-      ${item.content? `<div style="font-size:15px;white-space:pre-wrap;line-height:1.55;">${escR(item.content)}</div>`:''}
-      <div style="margin-top:10px;">
+      <div style="white-space:pre-wrap;line-height:1.5;margin-top:2px;font-size:13.5px;">${escR(cm.content)}</div>
+    </div>`).join('');
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeNoticeView)">
+    <div class="modal" style="max-width:640px;text-align:left;">
+      <div style="font-weight:800;font-size:18px;line-height:1.4;word-break:break-all;">${escR(item.title||'(제목 없음)')}</div>
+      <div class="muted" style="font-size:12px;margin:4px 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border);">✍ ${escR(item.authorBy||'이름미상')} · ${dow(item.createdDate)||'-'}${item.editedDate? ` · 수정 ${dow(item.editedDate)}`:''}</div>
+      <div style="font-size:14.5px;white-space:pre-wrap;line-height:1.6;min-height:60px;max-height:45vh;overflow:auto;">${item.content? escR(item.content) : '<span class="muted">(내용 없음)</span>'}</div>
+      <div style="margin-top:14px;background:var(--surface-2,#F6F6F6);border-radius:8px;padding:8px 10px;">
         <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:2px;">댓글 ${comments.length}개</div>
-        ${commentsHtml}
+        <div style="max-height:30vh;overflow:auto;">${commentsHtml}</div>
         <div class="consumable-row" style="flex-wrap:wrap;margin-top:8px;">
           <input type="text" id="f-notice-comment-${item.id}" placeholder="댓글 입력 (${escR(DB.currentUserName||'이름 미선택')})" style="flex:1;min-width:160px;" onkeydown="if(event.key==='Enter'){addNoticeComment('${item.id}');}">
           <button type="button" class="btn sm" onclick="addNoticeComment('${item.id}')">댓글달기</button>
         </div>
       </div>
-    </div>`;
-  }).join('');
+      <div class="modal-actions" style="justify-content:space-between;">
+        <div class="btn-row">
+          <button class="btn sm" onclick="openNoticeWriteModal('${item.id}')">수정</button>
+          <button class="btn sm danger" onclick="removeNotice('${item.id}')">삭제</button>
+        </div>
+        <button class="btn primary" style="flex:0 0 auto;" onclick="closeNoticeView()">목록으로</button>
+      </div>
+    </div>
+  </div>`;
+}
+function closeNoticeView(){ closeModal(); renderNoticeList(); }
+function openNoticeWriteModal(id){
+  const item = id ? (DB.notices||[]).find(x=>x.id===id) : null;
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal" style="max-width:640px;text-align:left;">
+      <h3 style="text-align:center;">${item? '✏️ 공지 수정' : '✏️ 공지 글쓰기'}</h3>
+      <div class="modal-sub">작성자: ${escR(item? (item.authorBy||'이름미상') : (DB.currentUserName||'이름 미선택'))}</div>
+      <input type="text" id="f-notice-title" placeholder="제목" value="${escR(item? item.title||'' : '')}" style="width:100%;margin-bottom:8px;">
+      <textarea id="f-notice-content" placeholder="내용을 입력하세요" style="width:100%;min-height:200px;">${escR(item? item.content||'' : '')}</textarea>
+      <div class="modal-actions">
+        <button class="btn" onclick="${item? `openNoticeView('${item.id}')` : 'closeModal()'}">취소</button>
+        <button class="btn primary" onclick="${item? `saveNoticeEdit('${item.id}')` : 'addNotice()'}">${item? '수정 저장' : '등록'}</button>
+      </div>
+    </div>
+  </div>`;
+  setTimeout(()=>{ const t = document.getElementById('f-notice-title'); if(t) t.focus(); }, 30);
 }
 async function addNotice(){
   const titleEl = document.getElementById('f-notice-title');
@@ -6960,17 +7010,31 @@ async function addNotice(){
   seenNoticeIds.add(newId);
   markOneReadFor('notice', newId);
   await saveNotices();
-  titleEl.value=''; contentEl.value='';
-  renderNoticeList();
+  closeModal();
+  noticePage = 1;
+  renderContent();
   renderTabbar();
   flash('공지사항이 등록되었습니다');
+}
+async function saveNoticeEdit(id){
+  const item = (DB.notices||[]).find(x=>x.id===id);
+  if(!item){ closeModal(); return; }
+  const title = document.getElementById('f-notice-title').value.trim();
+  const content = document.getElementById('f-notice-content').value.trim();
+  if(!title && !content){ flash('제목이나 내용을 입력해주세요'); return; }
+  item.title = title; item.content = content; item.editedDate = todayStr();
+  await saveNotices();
+  openNoticeView(id);
+  renderNoticeList();
+  flash('수정되었습니다');
 }
 function removeNotice(id){
   openConfirmModal('이 공지사항을 삭제할까요? 댓글도 함께 삭제됩니다.', async function(){
     DB.notices = (DB.notices||[]).filter(x=>x.id!==id);
     await saveNotices();
     closeModal();
-    renderNoticeList();
+    renderContent();
+    renderTabbar();
     flash('삭제되었습니다');
   }, '삭제');
 }
@@ -6984,6 +7048,7 @@ async function addNoticeComment(noticeId){
   if(!item.comments) item.comments = [];
   item.comments.push({id: uid(), content, authorBy: DB.currentUserName||'이름미상', createdDate: todayStr()});
   await saveNotices();
+  openNoticeView(noticeId);
   renderNoticeList();
   flash('댓글이 등록되었습니다');
 }
@@ -6993,7 +7058,7 @@ function removeNoticeComment(noticeId, commentId){
   openConfirmModal('이 댓글을 삭제할까요?', async function(){
     item.comments = (item.comments||[]).filter(c=>c.id!==commentId);
     await saveNotices();
-    closeModal();
+    openNoticeView(noticeId);
     renderNoticeList();
     flash('삭제되었습니다');
   }, '삭제');
