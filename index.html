@@ -6572,7 +6572,7 @@ function renderManualTab(){
       ['인수증 미리보기', '거래처에 보여줄 인수증을 미리 봅니다. 이 버튼은 미리보기일 뿐 실제로 출고 처리가 되는 건 아니라서, 실제로 발전기를 내보내려면 이거랑 별도로 "상차완료" 버튼을 눌러야 합니다. 연료를 넣기로 되어 있는 건은 인수증을 열기 전에 연료 안내 알림이 먼저 뜨고, 확인해야 인수증이 열립니다. 고객요청량과 실제주입량이 다르면 "고객요청 OOL (실제주입 OOL) 주유하시기 바랍니다"처럼 둘 다 함께 표시되고, 같으면 요청량만 표시됩니다. "🖨 인쇄하기"로 바로 인쇄하거나, 파일로 다운로드·공유할 수 있습니다. 공급자용에는 연료 요청량과 실제주입량이 함께 표시되고, 공급받는자용에는 요청량만 표시됩니다.'],
       ['인수증 공유 · 📱 문자로 보내기', '"📱 문자로 보내기" 버튼은 인수증 미리보기 상단 툴바(공유하기 버튼 바로 왼쪽)와, "공유하기"를 눌러서 뜨는 화면 둘 다에 있습니다. 공유 화면에서 받는 사람 번호를 콤마로 여러 개 넣으면(예: 01012345678, 01087654321) 눌렀을 때 휴대폰 문자 앱이 단체문자로 열리면서 인수증 내용이 자동으로 채워집니다. 상단 툴바 버튼은 번호 입력 없이 바로 눌러서, 문자 앱이 열린 뒤 받는 사람을 직접 골라도 됩니다. 별도 문자 발송 서비스 가입이나 비용 없이, 사용 중인 휴대폰 문자 앱을 그대로 이용하는 방식입니다. PC에는 문자 앱이 없어 동작하지 않고, 받는 사람이 많거나 내용이 길면 기기에 따라 일부만 채워질 수 있어 그럴 땐 "복사하기"로 붙여넣어 사용하면 됩니다.'],
       ['📇 연락처 저장', '인수증 미리보기 상단과 공유 화면에 있는 버튼입니다. 누르면 연락처 파일(.vcf)이 다운로드되고, 스마트폰에서 그 파일을 열면 이번 출고 건의 거래처명·담당자·전화번호·현장주소가 담긴 "연락처 추가" 화면이 바로 뜹니다. 방문 전 담당자 연락처를 폰에 저장해두고 싶을 때 쓰면 편리합니다.'],
-      ['내용보기/수정', '상차대기 상태인 항목의 세부 내용을 확인하거나 고칩니다. 맨 위 "발전기 번호 (변경 가능)" 드롭다운으로 다른 발전기로 바꿀 수도 있는데, 지금 입고 상태이고 다른 곳에 예약되지 않은 발전기만 고를 수 있고 바꾸면 "출고시 누적 사용시간"이 그 발전기의 현재 누적시간으로 자동으로 채워집니다.'],
+      ['내용보기/수정', '상차대기 상태인 항목의 세부 내용을 확인하거나 고칩니다. 맨 위 "발전기 번호 (변경 가능)" 드롭다운으로 다른 발전기로 바꿀 수도 있는데, 지금 입고 상태이고 다른 곳에 예약되지 않은 발전기만 고를 수 있고 바꾸면 "출고시 누적 사용시간"이 그 발전기의 현재 누적시간으로 자동으로 채워집니다. 옆의 "+ 추가"로 같은 거래처·현장에 발전기를 더 붙일 수 있고, 붙인 발전기는 같은 묶음으로 상차대기에 등록되어 "📄 일괄인수증" 한 장으로 볼 수 있습니다. 거래처명·주소·담당자·연락처·비고 등을 고치면 같은 묶음(또는 거래처·주소가 같은 건)에도 함께 반영되고, 전압·연료·부자재는 발전기마다 따로 유지됩니다.'],
       ['상차완료', '실제로 발전기를 싣고 출발했을 때 누르면 정식으로 [출고중] 상태가 됩니다. 이 버튼을 눌러야 실제로 출고 처리가 되고, 처리 후 인수증이 자동으로 뜹니다("인수증 미리보기"와 달리 이건 실제 출고 처리입니다). 연료 요청·주입 기록이 있는 건은 "연료를 실제로 넣었습니다" 체크박스를 눌러야만 완료 처리가 되어, 연료 안 넣고 그냥 상차하는 실수를 막아줍니다. 목록의 연료량도 크고 굵게 표시됩니다.'],
       ['출고하기', '상차대기가 아닌 일반 예약 건을 실제 출고 처리합니다.'],
       ['출고 취소 / 예약 취소', '해당 건을 취소하고 목록에서 제거합니다.'],
@@ -9097,7 +9097,7 @@ function renderReserveTab(){
       <td class="muted">${r.usageDays? r.usageDays+'일' : '-'}</td>
       <td><div class="btn-row" style="flex-wrap:nowrap;">
         <button class="btn sm" onclick="printReceiptForReservation('${r.id}')">인수증 미리보기</button>
-        ${r.batchId && DB.reservations.filter(x=>x.batchId===r.batchId).length>1? `<button class="btn sm" style="color:var(--primary-dark);border-color:var(--primary);" onclick="printBatchReceipt('${r.batchId}')" title="같이 출고 처리된 ${DB.reservations.filter(x=>x.batchId===r.batchId).length}대를 한 인수증에 모아서 봅니다">📄 일괄인수증(${DB.reservations.filter(x=>x.batchId===r.batchId).length}대)</button>`:''}
+        ${(()=>{ const grp = reservationBatchGroup(r); return grp.length>1? `<button class="btn sm" style="color:var(--primary-dark);border-color:var(--primary);" onclick="printBatchReceipt('r:${r.id}')" title="같은 거래처·현장으로 같이 나가는 ${grp.length}대를 한 인수증에 모아서 봅니다">📄 일괄인수증(${grp.length}대)</button>`:''; })()}
         ${r.forcedOut? `<button class="btn sm primary" onclick="confirmReservationPayment('${r.id}')">입금 확인</button>`:''}
         ${r.pendingLoad
           ? `<button class="btn sm" onclick="processReservation('${r.id}')">내용보기/수정</button><button class="btn sm primary" onclick="confirmLoadPrompt('${r.id}')">상차완료</button>`
@@ -10719,6 +10719,11 @@ function openOutModal(id, reservationId){
     const candidates = activeGens().filter(x=>x.id===g.id || (x.status==='in' && !x.underRepair && !reservedElsewhere.has(x.id))).sort(sortByIdNatural);
     return `<option value="${UNASSIGNED_GEN_ID}">🅾 미지정 (나중에 배정)</option>` + candidates.map(x=>`<option value="${x.id}" ${x.id===g.id?'selected':''}>${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
   })();
+  if(isEditingPending){
+    // "+ 추가"로 붙일 수 있는 발전기: 지금 입고 상태이고, 수리중이 아니고, 어디에도 예약되지 않은 발전기
+    const extraCands = activeGens().filter(x=>x.status==='in' && !x.underRepair && !DB.reservations.some(r=>r.genId===x.id)).sort(sortByIdNatural);
+    _rsvGenOptionsHtml = `<option value="">선택 안함</option>` + extraCands.map(x=>`<option value="${x.id}">${x.id} · ${escR(x.model||'미설정')}</option>`).join('');
+  }
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal modal-wide" style="text-align:left;${isEditingPending? 'max-height:96vh;':''}">
@@ -10726,11 +10731,12 @@ function openOutModal(id, reservationId){
       <div class="modal-sub" id="out-modal-sub">${g.id} · [${displayModel(g)}]</div>
       ${isEditingPending? `<div class="hint" style="margin-bottom:10px;color:var(--danger);">이 발전기는 이미 [출고 대기]에 상차대기로 등록되어 있습니다. 여기서 수정하면 상차대기 내용이 갱신됩니다.</div>` : ''}
       <div class="out-row stretch">
-        ${isEditingPending? `<div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 번호 (변경 가능)</label>
+        ${isEditingPending? `<div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 번호 (변경 가능) <button type="button" class="btn sm" style="padding:1px 7px;font-size:11px;margin-left:4px;" onclick="addRsvExtraGenRow()" title="같은 거래처·현장으로 발전기를 더 붙여서 상차대기로 등록합니다">+ 추가</button></label>
           <div style="display:flex;align-items:center;gap:4px;">
             <select id="f-target-gen" onchange="onTargetGenChange()" style="flex:1;min-width:0;">${targetGenOptionsHtml}</select>
             ${g.hoursKnown? `<input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;background:var(--surface-2);color:var(--ink-soft);">` : ''}
           </div>
+          <div id="f-rsv-extra-gens-wrap"></div>
           <details class="info-toggle" style="margin-top:4px;"><summary></summary><p class="muted" style="font-size:12px;">다른 발전기로 바꾸면 옆 누적 사용시간이 그 발전기의 현재 누적시간으로 자동으로 바뀝니다. 이미 입고중이고 다른 곳에 예약되지 않은 발전기만 고를 수 있습니다. 누적시간은 이미 등록된 값이라 여기서 수정할 수 없고, 틀렸으면 [정비관리 → 직접수정]에서 먼저 바로잡아야 합니다.</p></details>
         </div></div>` : (g.hoursKnown? `<div class="field f-sm"><div class="out-card"><label>출고시 누적 사용시간(h)</label><input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="background:var(--surface-2);color:var(--ink-soft);"></div></div>` : `<div class="field f-sm"><div class="out-card"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</div></div></div>`)}
         <div class="field f-sm"><div class="out-card"><label>도착일</label>
@@ -10921,6 +10927,18 @@ async function submitOut(idParam, reservationId){
     errEl.style.display='block'; return;
   }
   const existing = reservationId ? DB.reservations.find(r=>r.id===reservationId) : null;
+  // "+ 추가"로 붙인 발전기들 (상차대기 수정 화면에서만 나옵니다)
+  const extraGenIds = [];
+  for(const selEl of document.querySelectorAll('#f-rsv-extra-gens-wrap .rsv-extra-gen-select')){
+    const v = selEl.value;
+    if(!v || v===id || extraGenIds.includes(v)) continue;
+    const eg = findGen(v);
+    if(!eg || eg.status!=='in' || eg.underRepair || DB.reservations.some(r=>r.genId===v)){
+      errEl.textContent = `추가한 ${v}은(는) 지금 출고대기에 넣을 수 없는 상태입니다. 다시 골라주세요.`;
+      errEl.style.display='block'; return;
+    }
+    extraGenIds.push(v);
+  }
   const pendingData = {
     id: reservationId || uid(), genId: id, pendingLoad: true, batchId: (existing && existing.batchId) || null,
     customer, manager, phone, site, address, supplies, suppliesItems, suppliesCustom, voltage, qty,
@@ -10933,8 +10951,8 @@ async function submitOut(idParam, reservationId){
   const idx = reservationId ? DB.reservations.findIndex(r=>r.id===reservationId) : -1;
   const wasPending = idx>=0 && DB.reservations[idx].pendingLoad;
   pendingOutSubmitCtx = {
-    id, reservationId, pendingData, existing, idx, wasPending,
-    vals: {customer, manager, phone, address, supplies, voltage, qty, fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note, outDate, startHours}
+    id, reservationId, pendingData, existing, idx, wasPending, extraGenIds,
+    vals: {customer, manager, phone, address, supplies, voltage, qty, fuelRequested, fuelActual, usageDays, loadDate, arriveTime, freightBearer, paymentNote, note, outDate, startHours, extraGenIds}
   };
   showOutSubmitPreview(g, pendingData);
 }
@@ -10979,18 +10997,33 @@ async function confirmOutSubmit(){
     if(siblings.length>0){
       if(!pendingData.batchId) pendingData.batchId = uid();
       siblings.forEach(r=>{
+        // 거래처 관련 정보만 같이 바꿉니다. 전압·연료·부자재는 발전기마다 다를 수 있어서 각자 그대로 둡니다.
         r.batchId = pendingData.batchId;
         r.customer = pendingData.customer; r.manager = pendingData.manager; r.phone = pendingData.phone;
-        r.site = pendingData.site; r.address = pendingData.address; r.supplies = pendingData.supplies;
-        r.suppliesItems = pendingData.suppliesItems; r.suppliesCustom = pendingData.suppliesCustom;
-        r.voltage = pendingData.voltage; r.qty = pendingData.qty;
-        r.fuelRequested = pendingData.fuelRequested; r.fuelActual = pendingData.fuelActual;
+        r.site = pendingData.site; r.address = pendingData.address;
         r.usageDays = pendingData.usageDays; r.loadDate = pendingData.loadDate; r.arriveTime = pendingData.arriveTime;
         r.freightBearer = pendingData.freightBearer; r.paymentNote = pendingData.paymentNote;
         r.note = pendingData.note; r.outDate = pendingData.outDate;
       });
     }
     const siblingCount = siblings.length;
+    // "+ 추가"로 붙인 발전기는 같은 묶음(일괄인수증 한 장)으로 상차대기에 새로 등록합니다.
+    const extraIds = (ctx.extraGenIds||[]).filter(gid=>!DB.reservations.some(r=>r.genId===gid));
+    if(extraIds.length){
+      if(!pendingData.batchId) pendingData.batchId = uid();
+      extraIds.forEach(gid=>{
+        const eg = findGen(gid);
+        DB.reservations.push(Object.assign({}, pendingData, {
+          id: uid(), genId: gid, startHours: (eg && eg.hoursKnown) ? (eg.hours||0) : ((eg&&eg.hours)||0),
+          voltage: pendingData.voltage || (eg&&eg.voltage) || '',
+          suppliesItems: [], supplies: '', suppliesCustom: '', // 부자재는 원래 건에만 남겨 중복 출고 안 되게
+          smsOrder: null, smsOrderAt: null, smsOrderChecked: undefined,
+          outProcessedBy: DB.currentUserName || pendingData.outProcessedBy || null,
+          genAssignedBy: DB.currentUserName||null, genAssignedAt: nowDateTimeStr(),
+          createdAt: todayStr(), createdAtTs: Date.now()
+        }));
+      });
+    }
     await saveReservations();
     pendingOutSubmitCtx = null;
     if(pendingOutIsTransfer){
@@ -11006,10 +11039,11 @@ async function confirmOutSubmit(){
     renderTabbar();
     renderContent();
     flash(wasPending
-      ? (siblingCount>0? `상차대기 내용이 수정되었습니다. (거래처·주소가 같은 ${siblingCount}대에도 함께 적용됨)` : '상차대기 내용이 수정되었습니다.')
+      ? ((siblingCount>0? `상차대기 내용이 수정되었습니다. (거래처·주소가 같은 ${siblingCount}대에도 함께 적용됨)` : '상차대기 내용이 수정되었습니다.') + (extraIds.length? ` · 발전기 ${extraIds.length}대 추가됨(${extraIds.join(', ')})` : ''))
       : '출고 대기(상차대기)에 등록되었습니다. 상차완료를 눌러야 출고됩니다.');
   }catch(err){
     if(idx>=0) DB.reservations[idx] = existing; else DB.reservations = DB.reservations.filter(r=>r!==pendingData);
+    if(ctx.extraGenIds && ctx.extraGenIds.length){ const addedIds = new Set(ctx.extraGenIds); DB.reservations = DB.reservations.filter(r=>!(addedIds.has(r.genId) && r.batchId===pendingData.batchId && r.id!==pendingData.id)); }
     const errEl = document.getElementById('f-preview-err');
     if(errEl){ errEl.textContent = '저장 중 오류가 발생했습니다: ' + (err && err.message ? err.message : err); errEl.style.display='block'; }
   }
@@ -11035,6 +11069,13 @@ function reopenOutModalWithValues(id, reservationId, vals){
     }
     setVal('f-note', vals.note);
     setVal('f-payment-note', vals.paymentNote);
+    (vals.extraGenIds||[]).forEach(gid=>{
+      addRsvExtraGenRow();
+      const rows = document.querySelectorAll('#f-rsv-extra-gens-wrap > div');
+      const row = rows[rows.length-1];
+      const sel = row && row.querySelector('.rsv-extra-gen-select');
+      if(sel){ sel.value = gid; onRsvExtraGenChange(row.id); }
+    });
     const atSel = document.getElementById('f-arrivetime-select');
     if(atSel && vals.arriveTime){
       const opts = [...atSel.options].map(o=>o.value);
@@ -11586,8 +11627,26 @@ function receiptCopyHtmlBatch(items, copyLabel, rt){
     <div class="r-notice">※ 인수자 서명 후 본 인수증을 사진찍어 문자 전송해 주시기 바랍니다 ※</div>
   </div>`;
 }
+// 같이 나가는 묶음: batchId가 같거나, 거래처명+현장주소+도착일이 같은 (발전기 배정된) 출고대기 건
+function reservationBatchGroup(r){
+  if(!r || r.genId===UNASSIGNED_GEN_ID) return [];
+  const norm = v=>String(v||'').replace(/\s+/g,'').toLowerCase();
+  const dOf = x=>x.outDate||x.plannedOutDate||'';
+  const c = norm(r.customer||r.site), a = norm(r.address);
+  return DB.reservations.filter(x=>{
+    if(x.genId===UNASSIGNED_GEN_ID) return false;
+    if(x.id===r.id) return true;
+    if(r.batchId && x.batchId===r.batchId) return true;
+    return !!c && !!a && norm(x.customer||x.site)===c && norm(x.address)===a && dOf(x)===dOf(r);
+  });
+}
 function batchReceiptParts(batchId){
-  const resList = DB.reservations.filter(r=>r.batchId===batchId);
+  let resList;
+  if(String(batchId).startsWith('r:')){
+    resList = reservationBatchGroup(DB.reservations.find(r=>r.id===String(batchId).slice(2)));
+  } else {
+    resList = DB.reservations.filter(r=>r.batchId===batchId);
+  }
   const items = resList.map(res=>({g: findGen(res.genId), res})).filter(x=>x.g).sort((a,b)=>sortByIdNatural(a.g,b.g));
   const rt = resList[0] || null;
   return {resList, items, rt};
