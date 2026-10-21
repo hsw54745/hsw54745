@@ -934,11 +934,28 @@ async function submitQmVoltageEdit(id){
       if(btn){ btn.disabled = false; btn.textContent = '저장'; }
       return;
     }
+    const oldVoltageForLog = g.voltage||'';
     g.voltage = value;
     g.voltageUpdatedAt = nowDateTimeStr();
     g.voltageUpdatedAtMs = Date.now();
     g.voltageUpdatedBy = qmLabel();
     await window.storage.set('gen-fleet-v2', JSON.stringify(gens), true);
+    // 사무실·퀵메뉴 입고처리와 똑같이, 전압이 바뀌었으면 정비이력에 전압변경 기록을 남깁니다.
+    try{
+      if(value && value!==oldVoltageForLog){
+        const maintCur = await window.storage.get('gen-maintenance-v2', true);
+        let maintList = []; try{ maintList = maintCur ? JSON.parse(maintCur.value) : []; }catch(eMt){ maintList = []; }
+        if(!Array.isArray(maintList)) maintList = [];
+        const dateStr = todayStr();
+        const timeStr = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
+        maintList.push({
+          id: uid(), genId: g.id, model: g.model||'', date: dateStr, hours: g.hours||0,
+          content: `⚡ 전압변경: ${oldVoltageForLog||'미설정'} → ${value} (${qmLabel()} · ${dateStr} ${timeStr})`,
+          contentItems: [], contentEtc: '', technician: qmLabel(), partsUsed: [], type: '전압변경', photo: null
+        });
+        await window.storage.set('gen-maintenance-v2', JSON.stringify(maintList), true);
+      }
+    }catch(eMaint){ /* 기록 실패는 전압 저장을 막지 않습니다 */ }
     box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
     box.textContent = '✅ 전압이 저장되었습니다!';
     if(btn) btn.textContent = '저장';
@@ -3491,16 +3508,27 @@ function maintStatus(remaining){
 function activeGens(){ return DB.gens.filter(g=>!g.retired); }
 // 문자오더가 있는 건(출고대기의 예약 건 + 이미 출고된 발전기)을 모두 모아, 접수된 순서대로(오래된게 1번)
 // 일련번호를 매깁니다. 출고 전후로도 같은 번호가 유지되어 위 문자카드와 아래 목록을 서로 대조할 수 있습니다.
+// 같은 문자 한 통에서 나온 건들(예: "500키로 2대" → 2건으로 나눠 등록)을 하나로 묶는 키
+function smsGroupKey(r){
+  const ts = r.createdAtTs || r.smsOrderAt;
+  return ts ? ('t:'+ts+'|'+String(r.smsOrder||'').trim()) : ('id:'+r.id);
+}
+function smsGroupMembers(r){
+  if(!r) return [];
+  const k = smsGroupKey(r);
+  return (DB.reservations||[]).filter(x=>x.smsOrder && x.smsOrder.trim() && smsGroupKey(x)===k);
+}
 function buildSmsOrderNumMap(){
   // 출고대기(예약) 중인 문자오더에만 번호를 매깁니다. 이미 출고되어 발전기가 배정된 뒤에는
   // 번호로 구분할 필요가 없으므로(발전기 번호 자체로 이미 구분됨) 대상에서 제외합니다.
   const items = [];
   (DB.reservations||[]).forEach(r=>{
-    if(r.smsOrder && r.smsOrder.trim()) items.push({ts: r.smsOrderAt||r.createdAtTs||0, key: 'r:'+r.id});
+    if(r.smsOrder && r.smsOrder.trim()) items.push({ts: r.smsOrderAt||r.createdAtTs||0, key: 'r:'+r.id, g: smsGroupKey(r)});
   });
   items.sort((a,b)=> a.ts - b.ts);
-  const map = {};
-  items.forEach((it,i)=>{ map[it.key] = i+1; });
+  const map = {}, groupNum = {};
+  let n = 0;
+  items.forEach(it=>{ if(!groupNum[it.g]) groupNum[it.g] = ++n; map[it.key] = groupNum[it.g]; }); // 같은 문자에서 나온 건은 같은 번호
   return map;
 }
 function buildReturnReqNumMap(){
@@ -9021,8 +9049,17 @@ function renderReserveTab(){
   const delayedCount = list.filter(r=>!isRawSms(r) && dateOf(r) && daysFromToday(dateOf(r))<0).length;
   const pendingCount = list.filter(r=>r.pendingLoad).length;
   const smsOrderAll = list.filter(r=>r.smsOrder && r.smsOrder.trim());
-  const smsOrderCards = smsOrderAll.filter(r=>!r.smsOrderChecked).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
-  const smsOrderHidden = smsOrderAll.filter(r=>r.smsOrderChecked).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
+  // 같은 문자 한 통에서 여러 건으로 나뉜 오더는 노란 카드 1장으로만 보여줍니다(표에는 대수만큼 그대로 나옴).
+  const smsGroupCount = {}, smsGroupFirst = {}, smsGroupAllChecked = {};
+  smsOrderAll.forEach(r=>{
+    const k = smsGroupKey(r);
+    smsGroupCount[k] = (smsGroupCount[k]||0) + 1;
+    if(!smsGroupFirst[k] || (r.smsQtyIndex||99) < (smsGroupFirst[k].smsQtyIndex||99)) smsGroupFirst[k] = r;
+    smsGroupAllChecked[k] = (smsGroupAllChecked[k]!==false) && !!r.smsOrderChecked;
+  });
+  const smsGroupReps = Object.keys(smsGroupFirst).map(k=>smsGroupFirst[k]);
+  const smsOrderCards = smsGroupReps.filter(r=>!smsGroupAllChecked[smsGroupKey(r)]).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
+  const smsOrderHidden = smsGroupReps.filter(r=>smsGroupAllChecked[smsGroupKey(r)]).sort((a,b)=>(b.createdAtTs||0)-(a.createdAtTs||0));
   const smsOrderNumMapFull = buildSmsOrderNumMap();
   const smsOrderNumMap = {};
   Object.keys(smsOrderNumMapFull).forEach(k=>{ if(k.startsWith('r:')) smsOrderNumMap[k.slice(2)] = smsOrderNumMapFull[k]; });
@@ -9117,7 +9154,7 @@ function renderReserveTab(){
           return `
         <div style="width:195px;height:260px;flex-shrink:0;background:#fff;${cardStyle}border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
           ${change? `<div style="background:var(--danger);color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;line-height:1.3;">⚠️ ${change.diffs.join('·')} 변경됨!<br>(${fmtCardDateTime(change.priorAt)} 문자와 다름)</div>` : ''}
-          ${r.smsQtyTotal>1? `<div style="background:#1565C0;color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;">📦 ${r.smsQtyTotal}대 중 ${r.smsQtyIndex}번째</div>` : ''}
+          ${smsGroupCount[smsGroupKey(r)]>1? `<div style="background:#1565C0;color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;">📦 ${smsGroupCount[smsGroupKey(r)]}대 오더 (아래 표에 ${smsGroupCount[smsGroupKey(r)]}건)</div>` : ''}
           <div class="muted" style="font-size:11px;margin-bottom:2px;">${fmtCardDateTime(r.createdAtTs)}${r.outProcessedBy? ` · ${escR(r.outProcessedBy)}` : ''}</div>
           ${smsOrderNumMap[r.id]? `<div style="font-size:10px;color:#8A6D00;font-weight:800;margin-bottom:2px;">#${smsOrderNumMap[r.id]}</div>`:''}
           <div style="font-size:14px;font-weight:700;color:var(--primary-dark);margin-bottom:4px;">${escR(r.customer||r.site||'거래처 미기재')}</div>
@@ -9193,6 +9230,7 @@ function showNoteModal(resId){
 function markSmsOrderChecked(resId){
   const r = DB.reservations.find(x=>x.id===resId);
   if(!r) return;
+  smsGroupMembers(r).forEach(x=>{ x.smsOrderChecked = true; });
   r.smsOrderChecked = true;
   saveReservations();
   renderContent();
@@ -9201,15 +9239,20 @@ function markSmsOrderChecked(resId){
 function unmarkSmsOrderChecked(resId){
   const r = DB.reservations.find(x=>x.id===resId);
   if(!r) return;
+  smsGroupMembers(r).forEach(x=>{ x.smsOrderChecked = false; });
   r.smsOrderChecked = false;
   saveReservations();
   renderContent();
 }
 function deleteSmsOrderCard(resId){
   const r = DB.reservations.find(x=>x.id===resId);
-  openConfirmModal('이 문자오더 건을 완전히 삭제할까요? 출고대기 목록에서도 함께 삭제되며, 되돌릴 수 없습니다.', async function(){
-    const summary = r ? `문자오더: ${(r.smsOrder||'').slice(0,40)}${(r.smsOrder||'').length>40?'…':''}` : '문자오더 삭제';
-    DB.reservations = DB.reservations.filter(r=>r.id!==resId);
+  const members = r ? smsGroupMembers(r) : [];
+  const delIds = new Set(members.length? members.map(x=>x.id) : [resId]);
+  openConfirmModal(delIds.size>1
+    ? `이 문자오더로 등록된 ${delIds.size}건을 모두 완전히 삭제할까요? 출고대기 목록에서도 함께 삭제되며, 되돌릴 수 없습니다.`
+    : '이 문자오더 건을 완전히 삭제할까요? 출고대기 목록에서도 함께 삭제되며, 되돌릴 수 없습니다.', async function(){
+    const summary = r ? `문자오더${delIds.size>1? `(${delIds.size}건)`:''}: ${(r.smsOrder||'').slice(0,40)}${(r.smsOrder||'').length>40?'…':''}` : '문자오더 삭제';
+    DB.reservations = DB.reservations.filter(x=>!delIds.has(x.id));
     await saveWithRetry(saveReservations);
     await logDeletion('문자오더 삭제', summary);
     closeModal();
