@@ -873,7 +873,7 @@ async function renderQmStockListInner(){
           </div>
           <input type="checkbox" style="width:24px;height:24px;flex-shrink:0;">
         </div>
-        ${genLengthCm(g)? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${genLengthCm(g).toLocaleString()}cm</div>` : ''}
+        ${genLengthCm(g)? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${genLengthText(g)}</div>` : ''}
         ${lastIn? `<div style="font-size:11px;color:#888;margin-top:3px;">🕐 최근 입고 ${escR(lastIn.date)}</div>` : ''}
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;">
           <button type="button" onclick="openQmVoltageEdit('${g.id}')" style="${vStyle}font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;border-style:solid;border-width:1px;">${escR(g.voltage)||'전압 미설정'}</button>
@@ -1040,7 +1040,7 @@ async function renderQmOutListInner(){
           </div>
           <button type="button" onclick="openQmOutDetail('${g.id}')" style="background:#5B7FA6;border:none;color:#fff;font-weight:800;font-size:12px;padding:8px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0;">상세보기</button>
         </div>
-        ${genLengthCm(g)? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${genLengthCm(g).toLocaleString()}cm</div>` : ''}
+        ${genLengthCm(g)? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${genLengthText(g)}</div>` : ''}
         ${outDate? `<div style="font-size:11px;color:#888;margin-top:3px;">🚚 출고일 ${escR(outDate)}</div>` : ''}
         <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
           <span class="pill" style="background:#EAF2E9;color:#2C6E49;border:1px solid #2C6E49;font-size:10px;white-space:nowrap;">${escR(g.voltage)||'전압 미설정'}</span>
@@ -1524,7 +1524,7 @@ async function qmRefreshReservationList(){
         <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${(r.outDate||r.plannedOutDate)? fmtDateKR(r.outDate||r.plannedOutDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
         ${(r.outDate||r.plannedOutDate)? arriveCountdownHtml(r.outDate||r.plannedOutDate) : ''}
         <div style="font-size:13px;color:#333;margin-top:6px;">
-          ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>${lengthById[r.genId]? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${lengthById[r.genId].toLocaleString()}cm</div>`:''}` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
+          ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>${lengthById[r.genId]? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${fmtGenLength(lengthById[r.genId])}</div>`:''}` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
         ${infoRows.length? `
         <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;display:flex;flex-direction:column;gap:4px;">
@@ -4499,15 +4499,27 @@ function sortModelsByCapacity(models){
   });
 }
 // 발전기 길이(cm) - [설정 → 발전기 모델 설정]에서 발전기마다 입력 (예전 데이터의 genWidth 값을 그대로 씁니다)
+// 저장은 cm 단위(genWidth), 입력은 미터(예: 3.5 = 3m 50cm)로 받습니다.
 function genLengthCm(g){ const v = Number(g && g.genWidth); return v>0 ? v : null; }
+function fmtGenLength(cm){
+  if(!(cm>0)) return '';
+  const total = Math.round(cm);
+  const m = Math.floor(total/100), rest = total%100;
+  if(m===0) return `${rest}cm`;
+  return rest ? `${m}m ${rest}cm` : `${m}m`;
+}
+function genLengthText(g){ const v = genLengthCm(g); return v ? fmtGenLength(v) : ''; }
+function genLengthMeterValue(g){ const v = genLengthCm(g); return v ? String(Math.round(v)/100) : ''; }
 function genLengthHtml(g){
-  const v = genLengthCm(g);
-  return v ? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;">📏 길이 ${v.toLocaleString()}cm</div>` : '';
+  const t = genLengthText(g);
+  return t ? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;">📏 길이 ${t}</div>` : '';
 }
 async function updateGenLength(id, value){
   const g = findGen(id);
   if(!g) return;
-  const v = Number(String(value||'').trim());
+  let v = Number(String(value||'').trim());
+  // 미터로 입력(예: 3.5). 실수로 cm로 넣은 큰 값(예: 350)은 cm로 보고 그대로 둡니다.
+  if(v>0 && v<30) v = Math.round(v*100);
   g.genWidth = v>0 ? v : null;
   await saveGens();
   flash('저장되었습니다');
@@ -7629,10 +7641,10 @@ function renderSettingsTab(){
         const modelRowHtml = g=>{
           const cap = capacityOf(g);
           const ratioOptions = [100,90,80,70,60,50,40,30].map(r=>`<option value="${r}" ${(g.usageRatio||100)===r?'selected':''}>${r}%</option>`).join('');
-          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><input type="number" min="0" step="1" value="${genLengthCm(g)||''}" placeholder="cm" onchange="updateGenLength('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·출고중 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
+          return `<tr><td class="gid">${g.id}</td><td><input type="text" value="${(g.model||'').replace(/"/g,'&quot;')}" placeholder="예: 100kW" onchange="updateModel('${g.id}', this.value)"></td><td><input type="number" min="1980" max="2100" step="1" value="${(g.manufactureDate||'').toString().slice(0,4)}" placeholder="예: 2020" onchange="updateManufactureDate('${g.id}', this.value)"></td><td><input type="number" min="0" step="0.01" value="${genLengthMeterValue(g)}" placeholder="예: 3.5" onchange="updateGenLength('${g.id}', this.value)"></td><td><select onchange="updateUsageRatio('${g.id}', this.value)" ${!isFinite(cap)?'disabled title="모델에서 kW 용량을 인식할 수 없습니다"':''}>${ratioOptions}</select></td><td style="text-align:center;"><input type="checkbox" ${g.hoursKnown?'checked':''} onchange="toggleHoursKnownSetting('${g.id}', this.checked)" title="체크 해제하면 이 발전기는 목록·정비관리·출고중 예상시점 등 어디에서도 누적시간·정비 도래 정보가 표시되지 않고 &quot;누적시간 확인불가&quot;로 고정 표시됩니다."></td><td><button class="btn sm" onclick="openGenManageModal('${g.id}')">관리</button></td></tr>`;
         };
         const half = Math.ceil(activeList.length/2);
-        const thead = `<thead><tr><th style="width:42px;">번호</th><th style="width:112px;">모델/용량</th><th style="width:56px;">년식</th><th style="width:58px;">길이(cm)</th><th style="width:78px;">정격대비사용</th><th style="width:64px;">가동시간<br>확인가능</th><th style="width:74px;"></th></tr></thead>`;
+        const thead = `<thead><tr><th style="width:42px;">번호</th><th style="width:112px;">모델/용량</th><th style="width:56px;">년식</th><th style="width:58px;">길이(m)</th><th style="width:78px;">정격대비사용</th><th style="width:64px;">가동시간<br>확인가능</th><th style="width:74px;"></th></tr></thead>`;
         return `<div class="util-two-col model-settings-table">
           <div class="settings-table"><table>${thead}<tbody>${activeList.slice(0,half).map(modelRowHtml).join('')}</tbody></table></div>
           <div class="settings-table"><table>${thead}<tbody>${activeList.slice(half).map(modelRowHtml).join('')}</tbody></table></div>
