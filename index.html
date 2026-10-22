@@ -797,6 +797,7 @@ async function renderQmStockListInner(){
   const capWrap = document.getElementById('qm-stock-capbtns');
   const wrap = document.getElementById('qm-stock-list');
   try{
+    await qmEnsureMaterials();
     const [cur, curThresh, curRentals] = await Promise.all([
       window.storage.get('gen-fleet-v2', true),
       window.storage.get('gen-warn-threshold-v1', true).catch(()=>null),
@@ -873,7 +874,7 @@ async function renderQmStockListInner(){
           </div>
           <input type="checkbox" style="width:24px;height:24px;flex-shrink:0;">
         </div>
-        ${genLengthCm(g)? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${genLengthText(g)}</div>` : ''}
+        ${qmGenSpecHtml(g)}
         ${lastIn? `<div style="font-size:11px;color:#888;margin-top:3px;">🕐 최근 입고 ${escR(lastIn.date)}</div>` : ''}
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px;">
           <button type="button" onclick="openQmVoltageEdit('${g.id}')" style="${vStyle}font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;border-style:solid;border-width:1px;">${escR(g.voltage)||'전압 미설정'}</button>
@@ -995,6 +996,7 @@ async function renderQmOutListInner(){
   const regionWrap = document.getElementById('qm-out-regionbtns');
   const wrap = document.getElementById('qm-out-list');
   try{
+    await qmEnsureMaterials();
     const cur = await window.storage.get('gen-fleet-v2', true);
     let gens = [];
     try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
@@ -1040,7 +1042,7 @@ async function renderQmOutListInner(){
           </div>
           <button type="button" onclick="openQmOutDetail('${g.id}')" style="background:#5B7FA6;border:none;color:#fff;font-weight:800;font-size:12px;padding:8px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0;">상세보기</button>
         </div>
-        ${genLengthCm(g)? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${genLengthText(g)}</div>` : ''}
+        ${qmGenSpecHtml(g)}
         ${outDate? `<div style="font-size:11px;color:#888;margin-top:3px;">🚚 출고일 ${escR(outDate)}</div>` : ''}
         <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
           <span class="pill" style="background:#EAF2E9;color:#2C6E49;border:1px solid #2C6E49;font-size:10px;white-space:nowrap;">${escR(g.voltage)||'전압 미설정'}</span>
@@ -1082,6 +1084,7 @@ async function renderQmSoonInListInner(){
   const regionWrap = document.getElementById('qm-soon-regionbtns');
   const wrap = document.getElementById('qm-soon-list');
   try{
+    await qmEnsureMaterials();
     const cur = await window.storage.get('gen-fleet-v2', true);
     let gens = [];
     try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
@@ -1127,7 +1130,7 @@ async function renderQmSoonInListInner(){
           </div>
           <span style="background:${labelColor};color:#fff;font-weight:800;font-size:12px;padding:6px 10px;border-radius:14px;white-space:nowrap;flex-shrink:0;">${inDCountLabel(x.date)}</span>
         </div>
-        ${genLengthCm(g)? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${genLengthText(g)}</div>` : ''}
+        ${qmGenSpecHtml(g)}
         <div style="font-size:11px;color:#888;margin-top:3px;">${escR(g.rental.customer||g.rental.site||'거래처 미기재')} · 입고예정 ${fmtDateKR(x.date)}</div>
         <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
           <span class="pill" style="background:#EAF2E9;color:#2C6E49;border:1px solid #2C6E49;font-size:10px;white-space:nowrap;">${escR(g.voltage)||'전압 미설정'}</span>
@@ -1486,6 +1489,7 @@ async function renderQmReservationList(){
 async function qmRefreshReservationList(){
   const wrap = document.getElementById('qm-res-list');
   try{
+    await qmEnsureMaterials();
     const [cur, curFleet] = await Promise.all([
       window.storage.get('gen-reservations-v1', true),
       window.storage.get('gen-fleet-v2', true).catch(()=>null)
@@ -1494,7 +1498,7 @@ async function qmRefreshReservationList(){
     if(!Array.isArray(list)) list = [];
     let gens = []; try{ gens = curFleet ? JSON.parse(curFleet.value) : []; }catch(e){ gens = []; }
     if(!Array.isArray(gens)) gens = [];
-    const modelById = {}, lengthById = {}; gens.forEach(g=>{ if(g){ modelById[g.id] = g.model; lengthById[g.id] = genLengthCm(g); } });
+    const modelById = {}, specById = {}; gens.forEach(g=>{ if(g){ modelById[g.id] = g.model; specById[g.id] = genSpecText(g); } });
     list.sort((a,b)=>(a.outDate||'').localeCompare(b.outDate||''));
     if(!document.getElementById('qm-res-list')) return; // 화면이 이미 닫혔으면 무시
     if(list.length===0){
@@ -1525,7 +1529,7 @@ async function qmRefreshReservationList(){
         <div style="font-size:12px;color:#888;margin-top:2px;">도착일: ${(r.outDate||r.plannedOutDate)? fmtDateKR(r.outDate||r.plannedOutDate) : '미정'}${r.arriveTime? ` (${escR(r.arriveTime)})`:''}</div>
         ${(r.outDate||r.plannedOutDate)? arriveCountdownHtml(r.outDate||r.plannedOutDate) : ''}
         <div style="font-size:13px;color:#333;margin-top:6px;">
-          ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>${lengthById[r.genId]? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">📏 길이 ${fmtGenLength(lengthById[r.genId])}</div>`:''}` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
+          ${assigned? `<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;"><span style="font-weight:800;color:#2C6E49;">${escR(r.genId)}</span> <span style="color:#333;">${escR(modelById[r.genId]||'')}</span> <span style="font-size:11px;font-weight:800;color:#2C6E49;">✅ 상차준비완료</span> <button type="button" onclick="openQmAssignGen('${r.id}')" style="background:#fff;border:2px solid #5B7FA6;color:#5B7FA6;font-size:13px;font-weight:800;border-radius:14px;cursor:pointer;padding:5px 12px;">🔧 발전기 변경</button></div>${specById[r.genId]? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">${specById[r.genId]}</div>`:''}` : `<span style="color:#C97A1E;font-weight:700;">🅾 미지정</span>`}
         </div>
         ${infoRows.length? `
         <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;display:flex;flex-direction:column;gap:4px;">
@@ -4511,9 +4515,30 @@ function fmtGenLength(cm){
 }
 function genLengthText(g){ const v = genLengthCm(g); return v ? fmtGenLength(v) : ''; }
 function genLengthMeterValue(g){ const v = genLengthCm(g); return v ? String(Math.round(v)/100) : ''; }
+// 길이 · 탱크용량 한 줄 (값 있는 것만)
+function genSpecText(g){
+  const parts = [];
+  const t = genLengthText(g); if(t) parts.push(`📏 길이 ${t}`);
+  const cap = tankCapacityL(g); if(cap) parts.push(`⛽ 탱크 ${cap.toLocaleString()}L`);
+  return parts.join(' · ');
+}
 function genLengthHtml(g){
-  const t = genLengthText(g);
-  return t ? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;">📏 길이 ${t}</div>` : '';
+  const t = genSpecText(g);
+  return t ? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;">${t}</div>` : '';
+}
+function qmGenSpecHtml(g){
+  const t = genSpecText(g);
+  return t ? `<div style="font-size:11px;color:#5B4A2E;font-weight:700;margin-top:3px;">${t}</div>` : '';
+}
+// 퀵메뉴는 사무실 데이터 전체를 불러오지 않으므로, 탱크 규격(모델별 제원)만 따로 받아둡니다(5분 캐시, 용량 작음).
+let qmMaterialsLoadedAt = 0;
+async function qmEnsureMaterials(){
+  if(Date.now() - qmMaterialsLoadedAt < 5*60*1000 && DB.materials && Object.keys(DB.materials).length) return;
+  try{
+    const cur = await window.storage.get('gen-materials-v1', true);
+    const m = cur ? JSON.parse(cur.value) : null;
+    if(m && typeof m==='object'){ DB.materials = m; qmMaterialsLoadedAt = Date.now(); }
+  }catch(e){ /* 못 불러오면 탱크용량만 빠지고 나머지는 그대로 */ }
 }
 async function updateGenLength(id, value){
   const g = findGen(id);
