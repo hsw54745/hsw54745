@@ -5455,7 +5455,9 @@ async function submitCycle(id){
   }
 }
 
-function recomputeLastMaint(genId, allowLower){
+// removedRec: 지우거나 다른 유형으로 바꾼 엔진오일교체 기록(있으면). 그 기록을 등록하기 직전 값(prevLastMaint*)이
+// 저장돼 있으면, 그 값으로 되돌립니다(직접수정으로 넣어둔 값까지 정확히 복원).
+function recomputeLastMaint(genId, allowLower, removedRec){
   const g = findGen(genId);
   if(!g) return;
   // 정비주기는 "마지막 엔진오일교환"(정기정비) 기준으로만 관리합니다.
@@ -5468,14 +5470,19 @@ function recomputeLastMaint(genId, allowLower){
     // (예전엔 전압변경 기록만 남겨도 이 값이 현재 누적시간으로 덮어써져서, 정비 안 한 발전기가 방금 정비한 것처럼 바뀌는 문제가 있었습니다)
     // 엔진오일교체 기록을 직접 지우거나 다른 유형으로 바꾼 경우(allowLower)에만 아래처럼 정리합니다.
     if(!allowLower) return;
-    if(g.hoursKnown){
-      g.lastMaintHours = g.hours||0;
-      g.lastMaintDate = null;
+    const prev = removedRec && removedRec.prevLastMaint;
+    if(prev){
+      // 이 기록을 등록하기 직전 상태로 되돌립니다.
+      g.lastMaintHours = prev.hours||0;
+      g.lastMaintDate = prev.date||null;
+      g.lastOilChangeDate = prev.oilDate||null;
       g.hoursUpdatedAt = nowDateTimeStr();
       g.hoursUpdatedBy = DB.currentUserName || null;
-    } else {
+    } else if(!g.hoursKnown){
       g.lastOilChangeDate = null;
     }
+    // 되돌릴 값을 모르면(예전에 등록된 기록) 지금 값을 그대로 둡니다. 필요하면 [직접수정]에서 바로잡으면 됩니다.
+    // (예전엔 여기서 "현재 누적시간"으로 덮어써서 방금 정비한 것처럼 바뀌었습니다)
     return;
   }
   const atMax0 = [...recs].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -5490,6 +5497,15 @@ function recomputeLastMaint(genId, allowLower){
   // "마지막 정비시 누적시간"이 실수로 확 떨어지는 일이 없도록 기존 값보다 낮아지지는 않게 막습니다.
   // (진짜로 정정해야 하면 [정비관리 → 직접수정]에서 의도적으로 낮출 수 있습니다)
   // 단, 엔진오일교체 기록을 지우거나 다른 유형으로 고친 경우(allowLower)에는 남은 기록 기준으로 되돌립니다.
+  const prevR = allowLower && removedRec && removedRec.prevLastMaint;
+  if(prevR && (prevR.hours||0) > maxHours){
+    // 지운 기록 등록 전 값(직접수정 등)이 남은 기록보다 최근이면 그 값으로 되돌립니다.
+    g.lastMaintHours = prevR.hours||0;
+    g.lastMaintDate = prevR.date||null;
+    g.hoursUpdatedAt = nowDateTimeStr();
+    g.hoursUpdatedBy = DB.currentUserName || null;
+    return;
+  }
   g.lastMaintHours = allowLower ? maxHours : Math.max(maxHours, g.lastMaintHours||0);
   if((g.hours||0) < maxHours) g.hours = maxHours;
   g.hoursUpdatedAt = nowDateTimeStr();
@@ -6401,7 +6417,7 @@ function deleteMaint(mid, genId){
     }
     const wasOilChange = !!(rec && (rec.type||'정기정비')==='정기정비');
     DB.maint = DB.maint.filter(m=>m.id!==mid);
-    recomputeLastMaint(genId, wasOilChange);
+    if(wasOilChange) recomputeLastMaint(genId, true, rec);
     await saveMaint();
     await saveGens();
     closeModal();
@@ -8212,19 +8228,25 @@ function renderGenColorOverrideList(){
 }
 async function toggleHoursKnownSetting(id, checked){
   const g = findGen(id);
-  g.hoursKnown = checked;
-  g.hoursNA = !checked;
-  if(!checked){
-    // 누적시간 확인불가로 전환할 때 시간 수치는 정리하되, 마지막 정비일자(엔진오일교체일)는
-    // [입고] 목록의 "마지막 엔진오일교체후 ○○일 초과" 표시에 그대로 쓰이므로 남겨둡니다.
-    g.hours = 0;
-    g.lastMaintHours = 0;
-  }
-  g.hoursUpdatedAt = nowDateTimeStr();
-  g.hoursUpdatedBy = DB.currentUserName || null;
-  await saveGens();
-  renderContent();
-  flash(checked? `${g.id} 가동시간 확인가능으로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 실제 값을 입력해주세요.` : `${g.id} 누적시간 확인불가로 전환되었습니다. [정비관리] 탭의 [직접수정] 버튼에서 마지막 엔진오일교체일을 입력해주세요.`);
+  if(!g) return;
+  // 체크박스 하나로 바로 바뀌어 실수로 누르기 쉬워서, 한 번 더 확인합니다.
+  // 확인불가로 바꿔도 누적시간·마지막 정비값은 지우지 않고 보관합니다(다시 켜면 그대로 돌아옴).
+  // (예전엔 확인불가로 바꾸는 순간 0으로 지워져서, 실수로 눌러도 원래 값을 되살릴 수 없었습니다)
+  const msg = checked
+    ? `${g.id}을(를) "가동시간 확인가능"으로 바꿀까요?${(g.hours||g.lastMaintHours)? `\n\n보관돼 있던 값: 누적 ${(g.hours||0).toLocaleString()}h · 마지막 정비 ${(g.lastMaintHours||0).toLocaleString()}h` : ''}`
+    : `${g.id}을(를) "누적시간 확인불가"로 바꿀까요?\n\n누적시간·정비주기가 표시되지 않습니다.\n지금 값(누적 ${(g.hours||0).toLocaleString()}h · 마지막 정비 ${(g.lastMaintHours||0).toLocaleString()}h)은 지워지지 않고 보관되어, 다시 켜면 그대로 돌아옵니다.`;
+  openConfirmModal(msg, async function(){
+    g.hoursKnown = checked;
+    g.hoursNA = !checked;
+    g.hoursUpdatedAt = nowDateTimeStr();
+    g.hoursUpdatedBy = DB.currentUserName || null;
+    await saveGens();
+    renderContent();
+    flash(checked? `${g.id} 가동시간 확인가능으로 전환되었습니다.` : `${g.id} 누적시간 확인불가로 전환되었습니다.`);
+  }, checked? '확인가능으로 변경' : '확인불가로 변경', '취소');
+  // 취소하면 체크박스를 원래대로 되돌립니다.
+  const cancelBtn = document.getElementById('confirm-cancel-btn');
+  if(cancelBtn) cancelBtn.addEventListener('click', ()=>renderContent());
 }
 async function updateManufactureDate(id, value){
   const g = findGen(id);
@@ -8516,7 +8538,7 @@ async function logVoltageChangeMaint(genId, oldVoltage, newVoltage){
     content: `⚡ 전압변경: ${oldVoltage||'미설정'} → ${newVoltage} (${DB.currentUserName||'이름미상'} · ${dateStr} ${timeStr})`,
     contentItems: [], contentEtc: '', technician: DB.currentUserName||'', partsUsed: [], type: '전압변경', photo: null
   });
-  recomputeLastMaint(genId);
+  // 전압변경 기록은 정비주기와 무관하므로 "마지막 정비" 값을 다시 계산하지 않습니다.
   await saveMaint();
   renderContent();
   flash('정비 기록에 전압변경 내역이 저장되었습니다');
@@ -13025,11 +13047,16 @@ async function submitMaint(id, editId, completeRepair){
       if(!isUnlimitedPart(p.partName)) DB.partsStock[p.partName] = (DB.partsStock[p.partName]!==undefined ? DB.partsStock[p.partName] : 0) - (p.qty||1);
     }
   });
-  let editedFromOilChange = false;
+  let editedFromOilChange = false, removedOilRec = null;
+  // 엔진오일교체 기록을 새로 만들 때, 등록 직전의 "마지막 정비" 값을 기록에 같이 남겨둡니다.
+  // 나중에 이 기록을 지우거나 다른 유형으로 고치면 이 값으로 정확히 되돌리기 위함입니다.
+  const prevLastMaintSnap = {hours: g.lastMaintHours||0, date: g.lastMaintDate||null, oilDate: g.lastOilChangeDate||null};
   if(editId){
     const rec = DB.maint.find(m=>m.id===editId);
     if(rec){
       editedFromOilChange = (rec.type||'정기정비')==='정기정비';
+      if(editedFromOilChange && type!=='정기정비') removedOilRec = Object.assign({}, rec);
+      if(!editedFromOilChange && type==='정기정비') rec.prevLastMaint = prevLastMaintSnap;
       rec.date = date; rec.hours = hours; rec.content = content;
       rec.contentItems = contentItems; rec.contentEtc = contentEtc;
       rec.technician = technician; rec.partsUsed = partsUsed; rec.model = g.model; rec.type = type;
@@ -13037,10 +13064,13 @@ async function submitMaint(id, editId, completeRepair){
       delete rec.photo;
     }
   } else {
-    DB.maint.push({id: uid(), genId: g.id, model: g.model, date, hours, content, contentItems, contentEtc, technician, partsUsed, type, photos: maintPhotosPending.slice(0,5)});
+    const newRec = {id: uid(), genId: g.id, model: g.model, date, hours, content, contentItems, contentEtc, technician, partsUsed, type, photos: maintPhotosPending.slice(0,5)};
+    if(type==='정기정비') newRec.prevLastMaint = prevLastMaintSnap;
+    DB.maint.push(newRec);
   }
   maintPhotosPending = [];
-  recomputeLastMaint(g.id, editedFromOilChange);
+  // 엔진오일교체 기록이 새로 생기거나 바뀐 경우에만 "마지막 정비"를 다시 계산합니다(일반점검·고장수리·전압변경은 정비주기와 무관).
+  if(type==='정기정비' || editedFromOilChange) recomputeLastMaint(g.id, editedFromOilChange, removedOilRec);
   if(completeRepair){
     g.underRepair = false;
     g.repairNote = '';
