@@ -5464,8 +5464,10 @@ function recomputeLastMaint(genId, allowLower){
   // 이 값을 덮어쓰지는 않습니다. (고장수리 중에 오일도 같이 교환했다면 정기정비로 등록해주세요.)
   const recs = DB.maint.filter(m=>m.genId===genId && m.type!=='전압변경' && m.type!=='고장수리' && m.type!=='일반점검');
   if(recs.length===0){
-    // 정비 이력이 전부 삭제된 경우 "마지막 정비시 누적시간"이 예전 값에 그대로 남아있으면
-    // 실제 상태와 어긋나므로, 현재 누적시간과 같은 값으로 맞춰 "정비필요"가 잘못 표시되지 않게 합니다.
+    // 엔진오일교체 기록이 하나도 없으면, 직접수정 등으로 넣어둔 "마지막 정비시 누적시간"을 그대로 둡니다.
+    // (예전엔 전압변경 기록만 남겨도 이 값이 현재 누적시간으로 덮어써져서, 정비 안 한 발전기가 방금 정비한 것처럼 바뀌는 문제가 있었습니다)
+    // 엔진오일교체 기록을 직접 지우거나 다른 유형으로 바꾼 경우(allowLower)에만 아래처럼 정리합니다.
+    if(!allowLower) return;
     if(g.hoursKnown){
       g.lastMaintHours = g.hours||0;
       g.lastMaintDate = null;
