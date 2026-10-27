@@ -5313,7 +5313,7 @@ function renderMaintByGen(){
   if(recs.length===0){ el.innerHTML = `<div class="empty">"${genId}" 발전기의 정비 이력이 없습니다.</div>`; return; }
   el.innerHTML = `<div class="table-scroll"><table>
     <thead><tr><th>정비일</th><th>번호</th><th>정비시 누적시간</th><th>구분</th><th>정비자</th><th>사용부품</th><th>정비 내용</th><th></th></tr></thead>
-    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':(r.type==='전압변경'?'<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>':(r.type==='일반점검'?'<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>':(r.type==='유지보수'?'<span class="pill" style="background:#E0F2F1;color:#00796B;border-color:#00796B;">유지보수</span>':'<span class="pill gray">엔진오일교체</span>')))}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;">${(r.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td><td class="wrap-ok">${r.content||'-'}</td><td><div class="btn-row" style="flex-wrap:nowrap;"><button class="btn sm" onclick="editMaintFrom('gen:${genId}','${r.genId}','${r.id}')">수정</button><button class="btn sm danger" onclick="deleteMaintFrom('gen:${genId}','${r.id}','${r.genId}')">삭제</button></div></td></tr>`).join('')}</tbody>
+    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':(r.type==='전압변경'?'<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>':(r.type==='일반점검'?'<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>':(r.type==='유지보수'?'<span class="pill" style="background:#E0F2F1;color:#00796B;border-color:#00796B;">유지보수</span>':'<span class="pill gray">엔진오일교체</span>')))}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;min-width:150px;">${partsUsedListHtml(r.partsUsed)}</td><td class="wrap-ok">${r.content||'-'}</td><td><div class="btn-row" style="flex-wrap:nowrap;"><button class="btn sm" onclick="editMaintFrom('gen:${genId}','${r.genId}','${r.id}')">수정</button><button class="btn sm danger" onclick="deleteMaintFrom('gen:${genId}','${r.id}','${r.genId}')">삭제</button></div></td></tr>`).join('')}</tbody>
   </table></div>`;
 }
 function renderMaintByModel(){
@@ -5324,7 +5324,7 @@ function renderMaintByModel(){
   if(recs.length===0){ el.innerHTML = `<div class="empty">"${model}" 모델의 정비 이력이 없습니다.</div>`; return; }
   el.innerHTML = `<div class="table-scroll"><table>
     <thead><tr><th>정비일</th><th>번호</th><th>정비시 누적시간</th><th>구분</th><th>정비자</th><th>사용부품</th><th>정비 내용</th><th></th></tr></thead>
-    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':(r.type==='전압변경'?'<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>':(r.type==='일반점검'?'<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>':(r.type==='유지보수'?'<span class="pill" style="background:#E0F2F1;color:#00796B;border-color:#00796B;">유지보수</span>':'<span class="pill gray">엔진오일교체</span>')))}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;">${(r.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td><td class="wrap-ok">${r.content||'-'}</td><td><div class="btn-row" style="flex-wrap:nowrap;"><button class="btn sm" onclick="editMaintFrom('model:${escR(model).replace(/'/g,"\\'")}','${r.genId}','${r.id}')">수정</button><button class="btn sm danger" onclick="deleteMaintFrom('model:${escR(model).replace(/'/g,"\\'")}','${r.id}','${r.genId}')">삭제</button></div></td></tr>`).join('')}</tbody>
+    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':(r.type==='전압변경'?'<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>':(r.type==='일반점검'?'<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>':(r.type==='유지보수'?'<span class="pill" style="background:#E0F2F1;color:#00796B;border-color:#00796B;">유지보수</span>':'<span class="pill gray">엔진오일교체</span>')))}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;min-width:150px;">${partsUsedListHtml(r.partsUsed)}</td><td class="wrap-ok">${r.content||'-'}</td><td><div class="btn-row" style="flex-wrap:nowrap;"><button class="btn sm" onclick="editMaintFrom('model:${escR(model).replace(/'/g,"\\'")}','${r.genId}','${r.id}')">수정</button><button class="btn sm danger" onclick="deleteMaintFrom('model:${escR(model).replace(/'/g,"\\'")}','${r.id}','${r.genId}')">삭제</button></div></td></tr>`).join('')}</tbody>
   </table></div>`;
 }
 
@@ -5884,7 +5884,7 @@ function renderRecentMaint(){
       <td class="muted">${(m.hours||0).toLocaleString()}h</td>
       <td>${m.type==='고장수리'? '<span class="pill danger">고장수리</span>' : (m.type==='전압변경'? '<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>' : (m.type==='일반점검'? '<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>' : (m.type==='유지보수'? '<span class="pill" style="background:#E0F2F1;color:#00796B;border-color:#00796B;">유지보수</span>' : '<span class="pill gray">엔진오일교체</span>')))}</td>
       <td>${m.technician||'-'}</td>
-      <td class="wrap-ok" style="font-size:12px;">${(m.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td>
+      <td class="wrap-ok" style="font-size:12px;min-width:150px;">${partsUsedListHtml(m.partsUsed)}</td>
       <td class="wrap-ok">${m.content||'-'}</td>
       <td><button class="btn sm" onclick="goToHistory('${m.genId}')">이력보기</button></td>
     </tr>`;
@@ -6431,6 +6431,12 @@ function renderGenHistory(){
     </table></div>`}
   `;
 }
+// 정비 사용부품: 한 줄에 하나씩 아래로 (옆으로 길어져 스크롤 생기지 않게)
+function partsUsedListHtml(list){
+  const items = (list||[]).map(p=>typeof p==='string'?p:p.label).filter(Boolean);
+  if(!items.length) return '-';
+  return items.map(t=>`<div style="line-height:1.35;padding:1px 0;">· ${escR(t)}</div>`).join('');
+}
 function maintHistoryTableHtml(id, maints){
   return `
     <div class="section-title">🔧 정비 이력 <span class="cnt">${maints.length}건</span>${maints.length>0?` <button class="btn sm" onclick="exportMaintCsv('${id}')">CSV 내보내기</button>`:''}</div>
@@ -6442,8 +6448,8 @@ function maintHistoryTableHtml(id, maints){
         <td class="muted">${(m.hours||0).toLocaleString()}h</td>
         <td>${m.type==='고장수리'? '<span class="pill danger">고장수리</span>' : (m.type==='전압변경'? '<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>' : (m.type==='일반점검'? '<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>' : (m.type==='유지보수'? '<span class="pill" style="background:#E0F2F1;color:#00796B;border-color:#00796B;">유지보수</span>' : '<span class="pill gray">엔진오일교체</span>')))}</td>
         <td>${m.technician||'-'}</td>
-        <td style="font-size:12px;">${(m.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(', ')||'-'}</td>
-        <td class="wrap-ok">${m.content||'-'}</td>
+        <td class="wrap-ok" style="font-size:12px;min-width:150px;">${partsUsedListHtml(m.partsUsed)}</td>
+        <td class="wrap-ok" style="min-width:160px;">${m.content||'-'}</td>
         <td>${(()=>{ const photos = maintPhotosOf(m); return photos.length>0 ? photos.map((p,i)=>`<img src="${p}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--border-strong);cursor:pointer;margin:1px;" onclick="openImageViewModal('${p}','정비 사진 ${i+1}/${photos.length}')">`).join('') : '<span class="muted">-</span>'; })()}</td>
         <td><div class="btn-row">
           <button class="btn sm" onclick="editMaintFrom('hist:${id}','${id}','${m.id}')">수정</button>
