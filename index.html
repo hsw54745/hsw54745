@@ -7944,6 +7944,7 @@ function renderSettingsTab(){
             <span class="muted" style="font-size:11px;">×</span>
             <input type="number" min="0" value="${g.tankHeight||''}" placeholder="${defH||'높이'}" title="높이(cm) - 비우면 모델 기본값(${defH||'미등록'}) 사용" style="width:56px;padding:5px 4px;${suspicious?'border-color:var(--danger);':''}" onchange="updateGenTankDim('${g.id}','tankHeight',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();focusNextTankInput(this);}">
             <span class="muted" style="font-size:11px;">cm</span>
+            <span class="tankcap-${escR(g.id)}" style="font-weight:800;font-size:12px;color:var(--primary-dark);white-space:nowrap;" title="가로×세로×높이 기준 탱크 전체 용량 (비운 칸은 모델 기본값으로 계산)">${genTankCapText(g)}</span>
             <span class="muted" style="font-size:10.5px;white-space:nowrap;margin-left:8px;">📏 기준높이</span>
             <input type="number" min="0" step="0.5" value="${g.fuelBaselineHeight||''}" placeholder="${modelBaselineDefault||'0'}" title="비우면 모델 기본값(${modelBaselineDefault||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenFuelBaseline('${g.id}', this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();focusNextTankInput(this);}">
             <span class="muted" style="font-size:11px;">cm</span>
@@ -7977,6 +7978,7 @@ function renderSettingsTab(){
             <span class="muted" style="font-size:11px;">×</span>
             <input type="number" min="0" value="${g.tankHeight||''}" placeholder="${defH||'높이'}" title="높이(cm) - 비우면 모델 기본값(${defH||'미등록'}) 사용" style="width:56px;padding:5px 4px;${suspicious?'border-color:var(--danger);':''}" onchange="updateGenTankDim('${g.id}','tankHeight',this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();focusNextTankInput(this);}">
             <span class="muted" style="font-size:11px;">cm</span>
+            <span class="tankcap-${escR(g.id)}" style="font-weight:800;font-size:12px;color:var(--primary-dark);white-space:nowrap;" title="가로×세로×높이 기준 탱크 전체 용량 (비운 칸은 모델 기본값으로 계산)">${genTankCapText(g)}</span>
             <span class="muted" style="font-size:10.5px;white-space:nowrap;margin-left:8px;">📏 기준높이</span>
             <input type="number" min="0" step="0.5" value="${g.fuelBaselineHeight||''}" placeholder="${modelBaselineDefault||'0'}" title="비우면 모델 기본값(${modelBaselineDefault||'미등록'}) 사용" style="width:56px;padding:5px 4px;" onchange="updateGenFuelBaseline('${g.id}', this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();focusNextTankInput(this);}">
             <span class="muted" style="font-size:11px;">cm</span>
@@ -8045,11 +8047,14 @@ function focusNextTankInput(el){
     el.blur();
   }
 }
+function genTankCapText(g){ const cap = tankCapacityL(g); return cap ? `= ${cap.toLocaleString()}L` : '용량 계산 불가'; }
 async function updateGenTankDim(id, field, value){
   const g = findGen(id);
   if(!g) return;
   const v = Number(value);
   g[field] = (v && v>0) ? v : null;
+  // 입력 칸 포커스는 그대로 두고, 옆에 보이는 탱크 용량만 바로 다시 계산해서 보여줍니다.
+  document.querySelectorAll('.tankcap-'+CSS.escape(id)).forEach(el=>{ el.textContent = genTankCapText(g); });
   await saveGens();
   flash('저장되었습니다');
 }
