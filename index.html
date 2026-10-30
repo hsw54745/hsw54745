@@ -9177,13 +9177,30 @@ function orderListPrintCss(){
 function outFieldListRowsHtml(list, showMaintCol){
   return list.map(g=>{
     const rt = g.rental||{};
+    // 현장: 거래처명과 같은 값이면 빼고 주소만 (예전엔 거래처명이 현장 칸에 또 나왔음)
+    const siteTxt = (rt.site && rt.site.trim() && rt.site.trim()!==(rt.customer||'').trim()) ? rt.site.trim() : '';
+    const placeTxt = [siteTxt, rt.address].filter(Boolean).join(' · ') || '-';
+    // 담당자 / 연락처는 두 줄로 (연락처가 잘리지 않게)
+    const mgrHtml = (rt.manager||rt.phone) ? `${escR(rt.manager||'')}${rt.manager&&rt.phone?'<br>':''}<span style="white-space:nowrap;">${escR(rt.phone||'')}</span>` : '-';
+    const usedDays = rt.outDate ? (daysSinceDate(rt.outDate)+1) : null;
+    let maintTxt = '-';
+    if(g.hoursKnown && (g.hours>0 || g.lastMaintHours>0)){
+      const rem = Math.round(estRemaining(g));
+      const est = effEstDaily(g)>0;
+      maintTxt = rem<=0 ? `<b>${Math.abs(rem).toLocaleString()}h 초과</b>` : `${rem.toLocaleString()}h 남음`;
+      if(est) maintTxt += `<div style="font-size:9px;color:#666;">(추정)</div>`;
+    } else {
+      maintTxt = '<span style="color:#888;">확인불가</span>';
+    }
     return `<tr>
-      <td>${escR(g.id)}</td>
+      <td style="white-space:nowrap;">${escR(g.id)}</td>
       <td class="name">${escR(g.model||'-')}</td>
       <td>${escR(rt.customer||'-')}</td>
-      <td class="name">${escR([rt.site,rt.address].filter(Boolean).join(' · ')||'-')}</td>
-      <td>${escR([rt.manager,rt.phone].filter(Boolean).join(' · ')||'-')}</td>
+      <td class="name">${escR(placeTxt)}</td>
+      <td>${mgrHtml}</td>
       <td style="white-space:nowrap;">${dow(rt.outDate)||'-'}</td>
+      <td style="white-space:nowrap;">${usedDays? usedDays+'일째' : '-'}</td>
+      <td style="white-space:nowrap;">${maintTxt}</td>
       ${showMaintCol? '<td></td>' : ''}
     </tr>`;
   }).join('');
@@ -9224,13 +9241,13 @@ function prepPartsSummaryHtml(gensList){
   </div>`;
 }
 function outFieldListSectionHtml(title, list, pageBreak, showMaintCol, extraHtml){
-  const colCount = showMaintCol? 7 : 6;
+  const colCount = showMaintCol? 9 : 8;
   const rows = list.length? outFieldListRowsHtml(list, showMaintCol) : `<tr><td colspan="${colCount}" style="text-align:center;color:#888;padding:20px;">해당 발전기가 없습니다.</td></tr>`;
   return `<div class="ol-wrap"${pageBreak? ' style="page-break-after:always;"':''}>
     <div class="ol-title">${title}</div>
     <div class="ol-sub">${dow(todayStr())} 기준 · 총 ${list.length}대</div>
     <table class="ol-table">
-      <thead><tr><th style="width:7%;">번호</th><th style="width:15%;">모델</th><th style="width:13%;">거래처</th><th style="width:21%;">현장</th><th style="width:15%;">담당자/연락처</th><th style="width:13%;white-space:nowrap;">출고일</th>${showMaintCol? '<th>정비확인</th>' : ''}</tr></thead>
+      <thead><tr><th style="width:5%;">번호</th><th style="width:16%;">모델</th><th style="width:12%;">거래처</th><th style="width:22%;">현장 주소</th><th style="width:11%;">담당자/연락처</th><th style="width:9%;white-space:nowrap;">출고일</th><th style="width:6%;white-space:nowrap;">사용일수</th><th style="width:8%;white-space:nowrap;">정비주기</th>${showMaintCol? '<th>정비확인</th>' : ''}</tr></thead>
       <tbody>${rows}</tbody>
     </table>
     ${extraHtml||''}
@@ -9248,6 +9265,10 @@ function downloadOutFieldListFile(){
 <style>
   @page{ size:A4 landscape !important; margin:12mm 10mm; }
   .ol-wrap{ padding:0 2mm; }
+  /* 출고 리스트는 칸이 많아서 글자를 조금 작게 (모델명이 잘리지 않게) */
+  .ol-table{ font-size:11px; table-layout:fixed; }
+  .ol-table th, .ol-table td{ padding:5px 5px; word-break:keep-all; overflow-wrap:anywhere; }
+  .ol-table th{ font-size:11px; }
 </style>
 </head><body>
 ${body}
