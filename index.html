@@ -11057,6 +11057,7 @@ function openOutInfoEditModal(id){
       </div>
       <div id="f-err" class="err" style="display:none;"></div>
       <div class="modal-actions" style="justify-content:center;">
+        <button class="btn danger" style="margin-right:auto;" onclick="clearOutInfo('${g.id}')" title="잘못 적은 거래처·주소·담당자·연락처 등을 이 발전기에서만 비웁니다">🗑 입력 내용 지우기</button>
         <button class="btn" onclick="closeModal()">취소</button>
         <button class="btn primary" onclick="submitOutInfoEdit('${g.id}')">저장</button>
       </div>
@@ -11101,6 +11102,19 @@ function syncOieReturnDateToUsageDays(){
   const end = new Date(retEl.value+'T00:00:00');
   const days = Math.round((end-start)/86400000);
   if(days>0) daysEl.value = days;
+}
+// 잘못 적은 출고 정보(거래처·주소·담당자 등)를 이 발전기에서만 지웁니다. 출고일·누적시간·전압은 그대로 둡니다.
+function clearOutInfo(id){
+  const g = findGen(id);
+  if(!g || !g.rental) return;
+  const rt = g.rental;
+  openConfirmModal(`${g.id}의 출고 정보를 지울까요?\n\n거래처: ${rt.customer||'-'}\n주소: ${rt.address||'-'}\n담당자: ${[rt.manager,rt.phone].filter(Boolean).join(' ')||'-'}\n\n거래처명·현장·주소·담당자·연락처·도착시간·사용일수·비고가 비워집니다.\n(이 발전기만 지워지고, 같이 나간 다른 발전기는 그대로입니다. 출고일·누적시간·전압은 유지)`, async function(){
+    rt.customer = ''; rt.site = ''; rt.address = ''; rt.manager = ''; rt.phone = '';
+    rt.arriveTime = null; rt.usageDays = null; rt.note = '';
+    await saveWithRetry(saveGens);
+    renderContent();
+    flash(`${g.id} 출고 정보를 지웠습니다`);
+  }, '지우기', '취소');
 }
 async function submitOutInfoEdit(id){
   const g = findGen(id);
