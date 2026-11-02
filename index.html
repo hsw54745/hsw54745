@@ -4758,7 +4758,9 @@ function patrolCellHtml(g){
   if(!d) return '<span class="muted" style="font-size:11.5px;white-space:nowrap;">-</span>';
   // 출고중인데 이번 출고 전 점검이면 흐리게 (이번 현장은 아직 안 함)
   const stale = g.status==='out' && g.rental && g.rental.outDate && d < g.rental.outDate;
-  return stale ? `<span class="muted" style="font-size:11.5px;white-space:nowrap;" title="이번 출고 전 점검">${d.slice(2).replace(/-/g,'.')}</span>` : patrolPillHtml(d);
+  if(stale) return `<span class="muted" style="font-size:11.5px;white-space:nowrap;" title="이번 출고 전 점검">${d.slice(2).replace(/-/g,'.')}</span>`;
+  // 정비관리: "순회점검완료" 아래 줄에 날짜
+  return `<div style="text-align:center;line-height:1.3;white-space:nowrap;"><span class="pill" style="background:#EDE7F6;color:#5E35B1;border-color:#5E35B1;">✅ 순회점검완료</span><div style="font-size:11.5px;font-weight:700;color:#5E35B1;margin-top:2px;">${d.slice(2).replace(/-/g,'.')}</div></div>`;
 }
 function tankCleanCellHtml(g){
   const d = lastTankCleanDate(g.id);
@@ -5322,6 +5324,7 @@ function renderMaintList(){
     return `<tr>
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
+      <td style="white-space:nowrap;">${(g.status==='out' && g.rental) ? `<span class="pill" style="background:#E8EEF4;color:#5B7FA6;border-color:#5B7FA6;">${escR(cityOf(g.rental.address||g.rental.site||''))}</span>` : '<span class="muted" style="font-size:11.5px;">-</span>'}</td>
       <td>${patrolCellHtml(g)}</td>
       <td>${tankCleanCellHtml(g)}</td>
       <td>${fuelPerHourCellHtml(g)}</td>
@@ -5345,7 +5348,7 @@ function renderMaintList(){
     ${capacityButtonsHtml}
     ${sorted.length===0 ? `<div class="empty">${maintCapacityFilter!=null? `${maintCapacityFilter}kW 용량의 발전기가 없습니다.` : '검색 결과가 없습니다.'}</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th>순회점검</th><th>탱크청소</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
+      <thead><tr><th>번호</th><th>모델</th><th>출고지역</th><th>순회점검</th><th>탱크청소</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`}`;
 }
