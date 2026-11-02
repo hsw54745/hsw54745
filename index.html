@@ -4717,6 +4717,49 @@ function lastTankCleanDate(gid){
   });
   return last;
 }
+// ---------- 정비 유형 (여러 개 선택 가능) ----------
+// 예전 기록은 type 하나만, 새 기록은 types 배열(여러 개) + type(대표 유형, 호환용)으로 저장합니다.
+const MAINT_TYPE_ORDER = ['정기정비','고장수리','정기순회점검','유지보수','일반점검','전압변경'];
+function maintTypesOf(m){
+  if(!m) return [];
+  if(Array.isArray(m.types) && m.types.length) return m.types;
+  return [m.type || '정기정비'];
+}
+function maintHasType(m, t){ return maintTypesOf(m).includes(t); }
+function sortMaintTypes(list){ return [...new Set(list)].sort((a,b)=>MAINT_TYPE_ORDER.indexOf(a)-MAINT_TYPE_ORDER.indexOf(b)); }
+function maintTypePillHtml(t){
+  if(t==='고장수리') return '<span class="pill danger">고장수리</span>';
+  if(t==='전압변경') return '<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>';
+  if(t==='일반점검') return '<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>';
+  if(t==='유지보수') return '<span class="pill" style="background:#E0F2F1;color:#00796B;border-color:#00796B;">유지보수</span>';
+  if(t==='정기순회점검') return '<span class="pill" style="background:#EDE7F6;color:#5E35B1;border-color:#5E35B1;">정기순회점검</span>';
+  return '<span class="pill gray">엔진오일교체</span>';
+}
+function maintTypePillsHtml(m){
+  return `<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">${maintTypesOf(m).map(maintTypePillHtml).join('')}</div>`;
+}
+// 마지막 정기순회점검 날짜 (정비등록에서 유형 "정기순회점검"으로 등록한 기록 중 가장 최근)
+function lastPatrolDate(gid){
+  let last = '';
+  (DB.maint||[]).forEach(m=>{ if(m && m.genId===gid && maintHasType(m,'정기순회점검') && m.date && m.date>last) last = m.date; });
+  return last;
+}
+function patrolPillHtml(d){
+  return `<span class="pill" style="background:#EDE7F6;color:#5E35B1;border-color:#5E35B1;white-space:nowrap;">✅ 순회점검완료 ${d.slice(2).replace(/-/g,'.')}</span>`;
+}
+// 출고중: 이번 출고 이후에 순회점검을 했으면 표시
+function outPatrolHtml(g){
+  const d = lastPatrolDate(g.id);
+  const since = (g.rental && g.rental.outDate) || '';
+  return (d && d>=since) ? `<div style="margin-top:3px;">${patrolPillHtml(d)}</div>` : '';
+}
+function patrolCellHtml(g){
+  const d = lastPatrolDate(g.id);
+  if(!d) return '<span class="muted" style="font-size:11.5px;white-space:nowrap;">-</span>';
+  // 출고중인데 이번 출고 전 점검이면 흐리게 (이번 현장은 아직 안 함)
+  const stale = g.status==='out' && g.rental && g.rental.outDate && d < g.rental.outDate;
+  return stale ? `<span class="muted" style="font-size:11.5px;white-space:nowrap;" title="이번 출고 전 점검">${d.slice(2).replace(/-/g,'.')}</span>` : patrolPillHtml(d);
+}
 function tankCleanCellHtml(g){
   const d = lastTankCleanDate(g.id);
   return d
@@ -5013,7 +5056,7 @@ function renderOutList(){
     return `<tr${rowBg? ` style="background:${rowBg};"`:''}>
       <td><input type="checkbox" class="bulk-in-chk" data-gid="${g.id}" ${bulkInSelection.has(g.id)?'checked':''} onchange="toggleBulkInSelect('${g.id}', this.checked)"></td>
       <td class="gid">${g.id}</td>
-      <td class="wrap-ok">${displayModel(g)}${genLengthHtml(g)}${usableCapacityHtml(g)}${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
+      <td class="wrap-ok">${displayModel(g)}${genLengthHtml(g)}${outPatrolHtml(g)}${usableCapacityHtml(g)}${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
       <td class="muted" style="font-size:11px;">${rt.loadConfirmedBy? escR(rt.loadConfirmedBy) : (rt.outProcessedBy? escR(rt.outProcessedBy) : '-')}</td>
       <td>${(()=>{ const v=g.voltage||rt.voltage; const c=voltageColor(v); return v? `<span style="${c?`color:${c};font-weight:700;`:''}">${escR(v)}</span>` : '<span class="muted">-</span>'; })()}</td>
       <td class="wrap-ok">
@@ -5279,6 +5322,7 @@ function renderMaintList(){
     return `<tr>
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
+      <td>${patrolCellHtml(g)}</td>
       <td>${tankCleanCellHtml(g)}</td>
       <td>${fuelPerHourCellHtml(g)}</td>
       <td>${tankCapacityCellHtml(g)}</td>
@@ -5301,7 +5345,7 @@ function renderMaintList(){
     ${capacityButtonsHtml}
     ${sorted.length===0 ? `<div class="empty">${maintCapacityFilter!=null? `${maintCapacityFilter}kW 용량의 발전기가 없습니다.` : '검색 결과가 없습니다.'}</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th>탱크청소</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
+      <thead><tr><th>번호</th><th>모델</th><th>순회점검</th><th>탱크청소</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`}`;
 }
@@ -5313,7 +5357,7 @@ function renderMaintByGen(){
   if(recs.length===0){ el.innerHTML = `<div class="empty">"${genId}" 발전기의 정비 이력이 없습니다.</div>`; return; }
   el.innerHTML = `<div class="table-scroll"><table>
     <thead><tr><th>정비일</th><th>번호</th><th>정비시 누적시간</th><th>구분</th><th>정비자</th><th>사용부품</th><th>정비 내용</th><th></th></tr></thead>
-    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':(r.type==='전압변경'?'<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>':(r.type==='일반점검'?'<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>':(r.type==='유지보수'?'<span class="pill" style="background:#E0F2F1;color:#00796B;border-color:#00796B;">유지보수</span>':(r.type==='정기순회점검'?'<span class="pill" style="background:#EDE7F6;color:#5E35B1;border-color:#5E35B1;">정기순회점검</span>':'<span class="pill gray">엔진오일교체</span>'))))}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;min-width:150px;">${partsUsedListHtml(r.partsUsed)}</td><td class="wrap-ok">${r.content||'-'}</td><td><div class="btn-row" style="flex-wrap:nowrap;"><button class="btn sm" onclick="editMaintFrom('gen:${genId}','${r.genId}','${r.id}')">수정</button><button class="btn sm danger" onclick="deleteMaintFrom('gen:${genId}','${r.id}','${r.genId}')">삭제</button></div></td></tr>`).join('')}</tbody>
+    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${maintTypePillsHtml(r)}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;min-width:150px;">${partsUsedListHtml(r.partsUsed)}</td><td class="wrap-ok">${r.content||'-'}</td><td><div class="btn-row" style="flex-wrap:nowrap;"><button class="btn sm" onclick="editMaintFrom('gen:${genId}','${r.genId}','${r.id}')">수정</button><button class="btn sm danger" onclick="deleteMaintFrom('gen:${genId}','${r.id}','${r.genId}')">삭제</button></div></td></tr>`).join('')}</tbody>
   </table></div>`;
 }
 function renderMaintByModel(){
@@ -5324,7 +5368,7 @@ function renderMaintByModel(){
   if(recs.length===0){ el.innerHTML = `<div class="empty">"${model}" 모델의 정비 이력이 없습니다.</div>`; return; }
   el.innerHTML = `<div class="table-scroll"><table>
     <thead><tr><th>정비일</th><th>번호</th><th>정비시 누적시간</th><th>구분</th><th>정비자</th><th>사용부품</th><th>정비 내용</th><th></th></tr></thead>
-    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${r.type==='고장수리'?'<span class="pill danger">고장수리</span>':(r.type==='전압변경'?'<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>':(r.type==='일반점검'?'<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>':(r.type==='유지보수'?'<span class="pill" style="background:#E0F2F1;color:#00796B;border-color:#00796B;">유지보수</span>':(r.type==='정기순회점검'?'<span class="pill" style="background:#EDE7F6;color:#5E35B1;border-color:#5E35B1;">정기순회점검</span>':'<span class="pill gray">엔진오일교체</span>'))))}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;min-width:150px;">${partsUsedListHtml(r.partsUsed)}</td><td class="wrap-ok">${r.content||'-'}</td><td><div class="btn-row" style="flex-wrap:nowrap;"><button class="btn sm" onclick="editMaintFrom('model:${escR(model).replace(/'/g,"\\'")}','${r.genId}','${r.id}')">수정</button><button class="btn sm danger" onclick="deleteMaintFrom('model:${escR(model).replace(/'/g,"\\'")}','${r.id}','${r.genId}')">삭제</button></div></td></tr>`).join('')}</tbody>
+    <tbody>${recs.map(r=>`<tr><td>${dow(r.date)}</td><td class="gid">${r.genId}</td><td class="muted">${(r.hours||0).toLocaleString()}h</td><td>${maintTypePillsHtml(r)}</td><td>${r.technician||'-'}</td><td class="wrap-ok" style="font-size:12px;min-width:150px;">${partsUsedListHtml(r.partsUsed)}</td><td class="wrap-ok">${r.content||'-'}</td><td><div class="btn-row" style="flex-wrap:nowrap;"><button class="btn sm" onclick="editMaintFrom('model:${escR(model).replace(/'/g,"\\'")}','${r.genId}','${r.id}')">수정</button><button class="btn sm danger" onclick="deleteMaintFrom('model:${escR(model).replace(/'/g,"\\'")}','${r.id}','${r.genId}')">삭제</button></div></td></tr>`).join('')}</tbody>
   </table></div>`;
 }
 
@@ -5540,7 +5584,7 @@ function recomputeLastMaint(genId, allowLower, removedRec){
   // "마지막 엔진오일교환" 계산에서는 제외합니다 — 고장수리 기록 자체는 이력에 그대로 남지만,
   // 이 값을 덮어쓰지는 않습니다. (고장수리 중에 오일도 같이 교환했다면 정기정비로 등록해주세요.)
   // 엔진오일교체(정기정비, 예전 기록은 유형 없음)만 정비주기 기준으로 씁니다. 일반점검·유지보수·고장수리·전압변경은 제외.
-  const recs = DB.maint.filter(m=>m.genId===genId && (m.type||'정기정비')==='정기정비');
+  const recs = DB.maint.filter(m=>m.genId===genId && maintHasType(m,'정기정비'));
   if(recs.length===0){
     // 엔진오일교체 기록이 하나도 없으면, 직접수정 등으로 넣어둔 "마지막 정비시 누적시간"을 그대로 둡니다.
     // (예전엔 전압변경 기록만 남겨도 이 값이 현재 누적시간으로 덮어써져서, 정비 안 한 발전기가 방금 정비한 것처럼 바뀌는 문제가 있었습니다)
@@ -5574,7 +5618,7 @@ function recomputeLastMaint(genId, allowLower, removedRec){
   // (진짜로 정정해야 하면 [정비관리 → 직접수정]에서 의도적으로 낮출 수 있습니다)
   // 단, 엔진오일교체 기록을 지우거나 다른 유형으로 고친 경우(allowLower)에는 남은 기록 기준으로 되돌립니다.
   const prevR = allowLower && removedRec && removedRec.prevLastMaint;
-  if(prevR && (prevR.hours||0) > maxHours){
+  if(prevR && (prevR.hours||0) >= maxHours){
     // 지운 기록 등록 전 값(직접수정 등)이 남은 기록보다 최근이면 그 값으로 되돌립니다.
     g.lastMaintHours = prevR.hours||0;
     g.lastMaintDate = prevR.date||null;
@@ -5882,7 +5926,7 @@ function renderRecentMaint(){
       <td class="gid">${m.genId}</td>
       <td class="wrap-ok">${g? displayModel(g): '-'}</td>
       <td class="muted">${(m.hours||0).toLocaleString()}h</td>
-      <td>${m.type==='고장수리'? '<span class="pill danger">고장수리</span>' : (m.type==='전압변경'? '<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>' : (m.type==='일반점검'? '<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>' : (m.type==='유지보수'? '<span class="pill" style="background:#E0F2F1;color:#00796B;border-color:#00796B;">유지보수</span>' : (m.type==='정기순회점검'? '<span class="pill" style="background:#EDE7F6;color:#5E35B1;border-color:#5E35B1;">정기순회점검</span>' : '<span class="pill gray">엔진오일교체</span>'))))}</td>
+      <td>${maintTypePillsHtml(m)}</td>
       <td>${m.technician||'-'}</td>
       <td class="wrap-ok" style="font-size:12px;min-width:150px;">${partsUsedListHtml(m.partsUsed)}</td>
       <td class="wrap-ok">${m.content||'-'}</td>
@@ -6370,7 +6414,7 @@ function exportRentalsCsv(id){
 function exportMaintCsv(id){
   const maints = DB.maint.filter(m=>m.genId===id).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   const rows = [['정비일','누적시간(h)','구분','정비자','사용부품','정비내용']];
-  maints.forEach(m=>rows.push([m.date,m.hours||0,m.type||'정기정비',m.technician,(m.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(' / '),m.content]));
+  maints.forEach(m=>rows.push([m.date,m.hours||0,maintTypesOf(m).map(t=>t==='정기정비'?'엔진오일교체':t).join('+'),m.technician,(m.partsUsed||[]).map(p=>typeof p==='string'?p:p.label).join(' / '),m.content]));
   downloadCsv(`${id}_정비이력.csv`, rows);
 }
 function renderGenHistory(){
@@ -6446,7 +6490,7 @@ function maintHistoryTableHtml(id, maints){
       <tbody>${maints.map(m=>`<tr>
         <td>${dow(m.date)}</td>
         <td class="muted">${(m.hours||0).toLocaleString()}h</td>
-        <td>${m.type==='고장수리'? '<span class="pill danger">고장수리</span>' : (m.type==='전압변경'? '<span class="pill" style="background:#E8F0FE;color:#1565C0;border-color:#1565C0;">전압변경</span>' : (m.type==='일반점검'? '<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>' : (m.type==='유지보수'? '<span class="pill" style="background:#E0F2F1;color:#00796B;border-color:#00796B;">유지보수</span>' : (m.type==='정기순회점검'? '<span class="pill" style="background:#EDE7F6;color:#5E35B1;border-color:#5E35B1;">정기순회점검</span>' : '<span class="pill gray">엔진오일교체</span>'))))}</td>
+        <td>${maintTypePillsHtml(m)}</td>
         <td>${m.technician||'-'}</td>
         <td class="wrap-ok" style="font-size:12px;min-width:150px;">${partsUsedListHtml(m.partsUsed)}</td>
         <td class="wrap-ok" style="min-width:160px;">${m.content||'-'}</td>
@@ -6497,7 +6541,7 @@ function deleteMaint(mid, genId){
       }
       if(changed) await savePartsStock();
     }
-    const wasOilChange = !!(rec && (rec.type||'정기정비')==='정기정비');
+    const wasOilChange = !!(rec && maintHasType(rec,'정기정비'));
     DB.maint = DB.maint.filter(m=>m.id!==mid);
     if(wasOilChange) recomputeLastMaint(genId, true, rec);
     await saveMaint();
@@ -12976,18 +13020,20 @@ function pickTransferReservation(genId, resId){
   pendingTransferAutoNote = '';
 }
 function setMaintType(type){
+  // 누를 때마다 선택/해제 (여러 개 선택 가능)
   const el = document.getElementById('f-mtype');
-  if(el) el.value = type;
-  ['정기정비','고장수리','전압변경','일반점검','유지보수','정기순회점검'].forEach(t=>{
+  let list = el && el.value ? el.value.split(',').filter(Boolean) : [];
+  list = list.includes(type) ? list.filter(t=>t!==type) : sortMaintTypes([...list, type]);
+  if(el) el.value = list.join(',');
+  MAINT_TYPE_ORDER.forEach(t=>{
     const btn = document.getElementById(`f-mtype-btn-${t}`);
-    if(btn) btn.classList.toggle('primary', t===type);
+    if(btn) btn.classList.toggle('primary', list.includes(t));
   });
-  // "엔진오일교체" 정비 내용 항목은, 유형을 "엔진오일교체"로 선택했을 때만 체크할 수 있게 합니다.
-  // (일반점검·고장수리 등으로 등록하면서 엔진오일교체를 같이 체크하면 정비주기가 헷갈리게 됩니다.)
+  // "엔진오일교체" 정비 내용 항목은, 유형에 "엔진오일교체"가 들어 있을 때만 체크할 수 있게 합니다.
   const oilChk = document.querySelector('input[data-oilchange="1"]');
   const oilLabel = document.getElementById('f-mcontent-oilchange-label');
   if(oilChk){
-    const locked = type!=='정기정비';
+    const locked = !list.includes('정기정비');
     oilChk.disabled = locked;
     if(locked) oilChk.checked = false;
     if(oilLabel) oilLabel.style.opacity = locked? '.5' : '1';
@@ -13081,16 +13127,18 @@ function openMaintModal(id, editId, repairComplete){
   const selectedLabels = new Set(((rec && rec.partsUsed) || []).map(p=>typeof p==='string'?p:p.label));
   const isVoltageChangeRec = !!(rec && (rec.type==='전압변경' || (rec.content||'').includes('전압변경')));
   // 새로 등록할 때는 정비 유형을 미리 골라두지 않습니다(엔진오일교체가 기본으로 잡혀 있어 도장·점검 같은 기록이 엔진오일교체로 저장되던 문제 방지).
-  const currentType = repairComplete ? '고장수리' : (rec ? (rec.type || (isVoltageChangeRec ? '전압변경' : '정기정비')) : '');
+  // 새로 등록할 때는 아무것도 미리 고르지 않습니다. 여러 개를 함께 고를 수 있습니다.
+  const currentTypes = repairComplete ? ['고장수리'] : (rec ? ((!rec.type && !(rec.types&&rec.types.length) && isVoltageChangeRec) ? ['전압변경'] : maintTypesOf(rec)) : []);
+  const currentType = currentTypes.join(',');
   const typeButtonsHtml = `
     <input type="hidden" id="f-mtype" value="${currentType}">
     <div class="btn-row">
-      <button type="button" class="btn sm${currentType==='정기정비'?' primary':''}" id="f-mtype-btn-정기정비" onclick="setMaintType('정기정비')" title="정비주기(엔진오일교체 기준) 타이머가 여기서 초기화됩니다.">엔진오일교체</button>
-      <button type="button" class="btn sm${currentType==='일반점검'?' primary':''}" id="f-mtype-btn-일반점검" onclick="setMaintType('일반점검')" title="누적시간·점검 내용만 기록되고, 정비주기에는 영향을 주지 않습니다.">일반점검</button>
-      <button type="button" class="btn sm${currentType==='유지보수'?' primary':''}" id="f-mtype-btn-유지보수" onclick="setMaintType('유지보수')" title="도장·부품 손질 등 유지보수 작업을 기록합니다. 정비주기에는 영향을 주지 않습니다.">유지보수</button>
-      <button type="button" class="btn sm${currentType==='정기순회점검'?' primary':''}" id="f-mtype-btn-정기순회점검" onclick="setMaintType('정기순회점검')" title="출고중인 현장을 돌며 하는 정기 순회점검을 기록합니다. 정비주기에는 영향을 주지 않습니다.">정기순회점검</button>
-      <button type="button" class="btn sm${currentType==='고장수리'?' primary':''}" id="f-mtype-btn-고장수리" onclick="setMaintType('고장수리')" title="정비주기에는 영향을 주지 않습니다.">고장/긴급수리</button>
-      ${isVoltageChangeRec? `<button type="button" class="btn sm${currentType==='전압변경'?' primary':''}" id="f-mtype-btn-전압변경" onclick="setMaintType('전압변경')" title="전압변경 자동기록은 정비가 아니라 언제·누가 바꿨는지 남기는 기록입니다.">전압변경</button>` : ''}
+      <button type="button" class="btn sm${currentTypes.includes('정기정비')?' primary':''}" id="f-mtype-btn-정기정비" onclick="setMaintType('정기정비')" title="정비주기(엔진오일교체 기준) 타이머가 여기서 초기화됩니다.">엔진오일교체</button>
+      <button type="button" class="btn sm${currentTypes.includes('일반점검')?' primary':''}" id="f-mtype-btn-일반점검" onclick="setMaintType('일반점검')" title="누적시간·점검 내용만 기록되고, 정비주기에는 영향을 주지 않습니다.">일반점검</button>
+      <button type="button" class="btn sm${currentTypes.includes('유지보수')?' primary':''}" id="f-mtype-btn-유지보수" onclick="setMaintType('유지보수')" title="도장·부품 손질 등 유지보수 작업을 기록합니다. 정비주기에는 영향을 주지 않습니다.">유지보수</button>
+      <button type="button" class="btn sm${currentTypes.includes('정기순회점검')?' primary':''}" id="f-mtype-btn-정기순회점검" onclick="setMaintType('정기순회점검')" title="출고중인 현장을 돌며 하는 정기 순회점검을 기록합니다. 정비주기에는 영향을 주지 않습니다.">정기순회점검</button>
+      <button type="button" class="btn sm${currentTypes.includes('고장수리')?' primary':''}" id="f-mtype-btn-고장수리" onclick="setMaintType('고장수리')" title="정비주기에는 영향을 주지 않습니다.">고장/긴급수리</button>
+      ${isVoltageChangeRec? `<button type="button" class="btn sm${currentTypes.includes('전압변경')?' primary':''}" id="f-mtype-btn-전압변경" onclick="setMaintType('전압변경')" title="전압변경 자동기록은 정비가 아니라 언제·누가 바꿨는지 남기는 기록입니다.">전압변경</button>` : ''}
     </div>`;
   const currentTech = rec ? (rec.technician||'') : '';
   const techButtonOptions = techs;
@@ -13120,7 +13168,7 @@ function openMaintModal(id, editId, repairComplete){
     const syncAttr = partIdx!==undefined ? ` onchange="syncContentPartCheck(this,'f-part-${partIdx}')"` : '';
     const linkTxt = partIdx!==undefined ? ` <span class="muted" style="font-size:11px;">(체크시 아래 사용부품 자동선택)</span>` : '';
     const isOilChangeItem = c==='엔진오일교체';
-    const oilLocked = isOilChangeItem && currentType!=='정기정비';
+    const oilLocked = isOilChangeItem && !currentTypes.includes('정기정비');
     const disabledAttr = oilLocked ? ' disabled' : '';
     const checked = (!oilLocked && prevContentList.includes(c)) ? 'checked' : '';
     const lockNote = oilLocked ? ` <span class="muted" style="font-size:11px;color:var(--danger);">(위에서 "엔진오일교체" 유형 선택시에만 체크 가능)</span>` : '';
@@ -13159,7 +13207,7 @@ function openMaintModal(id, editId, repairComplete){
         ${g.hoursKnown? `<div class="field"><label>정비시 누적 사용시간(h)</label><input type="number" id="f-mhours" value="${rec? (rec.hours||0) : (g.hours||0)}"><div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">현재 ${(g.hours||0).toLocaleString()}h</div></div>` : `<div class="field"><label>누적 사용시간</label><div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</div></div>`}
       </div>
       <div class="field-row">
-        <div class="field"><label>정비 유형</label>${typeButtonsHtml}</div>
+        <div class="field"><label>정비 유형 <span class="muted" style="font-weight:400;font-size:11.5px;">(여러 개 선택 가능)</span></label>${typeButtonsHtml}</div>
         <div class="field"><label>정비자</label>${techButtonsHtml}</div>
       </div>
       <div class="field"><label>사용 부품 (등록된 자재 중 선택)</label>${partsHtml}<div class="hint">여기서 체크한 부품만큼 정비 등록시 부품 재고에서 자동 차감됩니다.</div></div>
@@ -13219,7 +13267,9 @@ async function submitMaint(id, editId, completeRepair){
   const date = document.getElementById('f-mdate').value;
   const mhoursEl = document.getElementById('f-mhours');
   const hours = mhoursEl ? Number(mhoursEl.value) : 0;
-  const type = document.getElementById('f-mtype').value;
+  const types = sortMaintTypes((document.getElementById('f-mtype').value||'').split(',').filter(Boolean));
+  const type = types[0] || ''; // 대표 유형 (예전 화면·기록과 호환용)
+  const isOil = types.includes('정기정비');
   const technician = document.getElementById('f-mtech').value;
   const contentOptions = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1차교체','오일필터1차점검','오일필터2차교체','오일필터2차점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검 및 보충','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소','연료통청소'];
   const contentItems = contentOptions.filter((c,i)=>{
@@ -13230,10 +13280,10 @@ async function submitMaint(id, editId, completeRepair){
   const content = [contentItems.join(', '), contentEtc].filter(Boolean).join(' / ');
   const errEl = document.getElementById('f-err');
   if(!type){
-    errEl.textContent = '정비 유형(엔진오일교체 / 일반점검 / 유지보수 / 정기순회점검 / 고장·긴급수리)을 선택해주세요.';
+    errEl.textContent = '정비 유형을 하나 이상 선택해주세요. (여러 개 함께 선택 가능)';
     errEl.style.display='block'; return;
   }
-  if(!String(technician||'').trim() && type!=='전압변경'){
+  if(!String(technician||'').trim() && !(types.length===1 && types[0]==='전압변경')){
     errEl.textContent = '정비자를 선택해주세요.';
     errEl.style.display='block'; return;
   }
@@ -13264,23 +13314,23 @@ async function submitMaint(id, editId, completeRepair){
   if(editId){
     const rec = DB.maint.find(m=>m.id===editId);
     if(rec){
-      editedFromOilChange = (rec.type||'정기정비')==='정기정비';
-      if(editedFromOilChange && type!=='정기정비') removedOilRec = Object.assign({}, rec);
-      if(!editedFromOilChange && type==='정기정비') rec.prevLastMaint = prevLastMaintSnap;
+      editedFromOilChange = maintHasType(rec,'정기정비');
+      if(editedFromOilChange && !isOil) removedOilRec = Object.assign({}, rec);
+      if(!editedFromOilChange && isOil) rec.prevLastMaint = prevLastMaintSnap;
       rec.date = date; rec.hours = hours; rec.content = content;
       rec.contentItems = contentItems; rec.contentEtc = contentEtc;
-      rec.technician = technician; rec.partsUsed = partsUsed; rec.model = g.model; rec.type = type;
+      rec.technician = technician; rec.partsUsed = partsUsed; rec.model = g.model; rec.type = type; rec.types = types;
       rec.photos = maintPhotosPending.slice(0,5);
       delete rec.photo;
     }
   } else {
-    const newRec = {id: uid(), genId: g.id, model: g.model, date, hours, content, contentItems, contentEtc, technician, partsUsed, type, photos: maintPhotosPending.slice(0,5)};
-    if(type==='정기정비') newRec.prevLastMaint = prevLastMaintSnap;
+    const newRec = {id: uid(), genId: g.id, model: g.model, date, hours, content, contentItems, contentEtc, technician, partsUsed, type, types, photos: maintPhotosPending.slice(0,5)};
+    if(isOil) newRec.prevLastMaint = prevLastMaintSnap;
     DB.maint.push(newRec);
   }
   maintPhotosPending = [];
   // 엔진오일교체 기록이 새로 생기거나 바뀐 경우에만 "마지막 정비"를 다시 계산합니다(일반점검·고장수리·전압변경은 정비주기와 무관).
-  if(type==='정기정비' || editedFromOilChange) recomputeLastMaint(g.id, editedFromOilChange, removedOilRec);
+  if(isOil || editedFromOilChange) recomputeLastMaint(g.id, editedFromOilChange, removedOilRec);
   if(completeRepair){
     g.underRepair = false;
     g.repairNote = '';
