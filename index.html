@@ -10945,8 +10945,11 @@ async function submitOutInfoEdit(id){
   if(!isNaN(startHours)) g.hours = startHours;
   // 같은 묶음으로 같이 출고된 다른 발전기들에도 거래처 관련 정보(거래처명·주소·담당자·연락처)만 똑같이 반영합니다.
   // 부자재·연료·전압·출고시 누적시간처럼 발전기마다 다를 수 있는 항목은 각자 값을 그대로 둡니다.
-  const batchSiblings = (DB.gens||[]).filter(og=>og.id!==g.id && og.status==='out' && og.rental
-    && og.rental.customer===oldCustomerForBatch && og.rental.address===oldAddressForBatch && og.rental.outDate===oldOutDateForBatch);
+  // 거래처명이 비어 있던 건(정보 없이 강제출고·이력 없이 출고된 발전기)은 서로 묶인 게 아니므로 같이 바꾸지 않습니다.
+  // (예전엔 빈 칸끼리 "같은 거래처"로 보고, 한 대만 고쳐도 정보 없는 출고중 발전기 전체가 한꺼번에 바뀌었습니다)
+  const oldCustKey = String(oldCustomerForBatch||'').trim();
+  const batchSiblings = !oldCustKey ? [] : (DB.gens||[]).filter(og=>og.id!==g.id && og.status==='out' && og.rental
+    && String(og.rental.customer||'').trim()===oldCustKey && String(og.rental.address||'').trim()===String(oldAddressForBatch||'').trim() && og.rental.outDate===oldOutDateForBatch);
   batchSiblings.forEach(og=>{
     og.rental.customer = site;
     og.rental.site = site;
