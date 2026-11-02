@@ -5264,7 +5264,168 @@ function renderMaintTab(){
     ${outPrepListHtml()}
     <div class="section-title">🔧 정비 주기 현황 <span class="cnt" id="maint-list-cnt"></span></div>
     <div id="maint-list-wrap"></div>
+    <div id="patrol-route-wrap">${patrolRouteCardHtml()}</div>
   `;
+}
+// ===================== 🚐 출장(순회점검) 동선 =====================
+// 지도 API 없이, 시·군(일부는 동네) 중심 좌표로 직선거리를 구해 가장 짧은 순서를 계산합니다.
+// 실제 도로거리와는 차이가 있어 "대략 순서"로 보시면 됩니다. (직선거리 × 1.3 ≒ 도로거리로 표시)
+const CITY_COORDS = {
+  '서울':[37.5665,126.978],'인천':[37.4563,126.7052],'대전':[36.3504,127.3845],'세종':[36.48,127.289],'대구':[35.8714,128.6014],'부산':[35.1796,129.0756],'울산':[35.5384,129.3114],'제주':[33.4996,126.5312],'서귀포':[33.2541,126.5601],'광주':[35.1595,126.8526],'경기광주':[37.4295,127.255],'강화군':[37.7466,126.4878],'옹진군':[37.4467,126.6366],'달성군':[35.7746,128.4314],'기장군':[35.2445,129.2222],'울주군':[35.5622,129.2425],
+  '고양':[37.6584,126.832],'파주':[37.76,126.78],'의정부':[37.738,127.0337],'동두천':[37.9036,127.0606],'양주':[37.7853,127.0458],'포천':[37.8949,127.2003],'연천':[38.0966,127.0748],'가평':[37.8315,127.5105],'남양주':[37.636,127.2165],'구리':[37.5943,127.1296],'김포':[37.6153,126.7156],'양평':[37.4917,127.4875],
+  '수원':[37.2636,127.0286],'성남':[37.42,127.1265],'용인':[37.2411,127.1776],'안양':[37.3943,126.9568],'부천':[37.5034,126.766],'안산':[37.3219,126.8309],'평택':[36.9921,127.1129],'화성':[37.1995,126.8312],'시흥':[37.38,126.8029],'군포':[37.3617,126.9352],'의왕':[37.3448,126.9683],'하남':[37.5393,127.2148],'오산':[37.1498,127.0772],'이천':[37.272,127.435],'안성':[37.008,127.2797],'여주':[37.2984,127.6371],'과천':[37.4292,126.9876],'광명':[37.4786,126.8646],
+  '천안':[36.8151,127.1139],'아산':[36.79,127.0025],'서산':[36.7848,126.45],'당진':[36.8898,126.6458],'논산':[36.1872,127.0987],'공주':[36.4466,127.119],'보령':[36.3333,126.6127],'계룡':[36.2745,127.2489],'금산':[36.1089,127.488],'부여':[36.2757,126.9098],'서천':[36.0803,126.6918],'청양':[36.4592,126.8023],'홍성':[36.6011,126.6608],'예산':[36.6826,126.845],'태안':[36.7456,126.2978],
+  '청주':[36.6424,127.489],'충주':[36.991,127.926],'제천':[37.1326,128.191],'보은':[36.4895,127.7295],'옥천':[36.3064,127.5713],'영동':[36.175,127.7764],'증평':[36.7853,127.5815],'진천':[36.8554,127.4356],'괴산':[36.8154,127.7867],'음성':[36.9403,127.6905],'단양':[36.9846,128.3655],
+  '춘천':[37.8813,127.7298],'원주':[37.3422,127.9202],'강릉':[37.7519,128.8761],'동해':[37.5247,129.1143],'태백':[37.164,128.9856],'속초':[38.207,128.5918],'삼척':[37.4499,129.1652],'홍천':[37.697,127.8888],'횡성':[37.4917,127.985],'영월':[37.1837,128.4617],'평창':[37.3708,128.39],'정선':[37.3807,128.6608],'철원':[38.1466,127.3132],'화천':[38.1062,127.7082],'양구':[38.11,127.99],'인제':[38.0697,128.1707],'고성':[38.3806,128.4678],'양양':[38.0754,128.6189],
+  '포항':[36.019,129.3435],'경주':[35.8562,129.2247],'김천':[36.1398,128.1136],'안동':[36.5684,128.7294],'구미':[36.1195,128.3446],'영주':[36.8057,128.624],'영천':[35.9733,128.9386],'상주':[36.4109,128.159],'문경':[36.5865,128.1867],'경산':[35.8251,128.7414],'군위':[36.2428,128.5728],'의성':[36.3527,128.697],'청송':[36.4359,129.057],'영양':[36.6667,129.1124],'영덕':[36.415,129.3655],'청도':[35.6475,128.7339],'고령':[35.7284,128.2632],'성주':[35.9193,128.2829],'칠곡':[35.9956,128.4018],'예천':[36.6577,128.4529],'봉화':[36.893,128.7325],'울진':[36.993,129.4004],'울릉':[37.4845,130.9058],
+  '창원':[35.2279,128.6811],'진주':[35.18,128.1076],'통영':[34.8544,128.4332],'사천':[35.0037,128.0642],'김해':[35.2285,128.8894],'밀양':[35.5038,128.7467],'거제':[34.8806,128.6211],'양산':[35.335,129.0372],'의령':[35.3222,128.2617],'함안':[35.2725,128.4065],'창녕':[35.5444,128.4923],'남해':[34.8376,127.8924],'하동':[35.0674,127.7513],'산청':[35.4156,127.8734],'함양':[35.5205,127.7251],'거창':[35.6867,127.9095],'합천':[35.5666,128.1658],
+  '전주':[35.8242,127.148],'군산':[35.9676,126.7369],'익산':[35.9483,126.9577],'정읍':[35.5699,126.856],'남원':[35.4164,127.3904],'김제':[35.8036,126.8809],'완주':[35.9046,127.162],'진안':[35.7917,127.4249],'무주':[36.0068,127.6608],'장수':[35.6474,127.5212],'임실':[35.6178,127.289],'순창':[35.3744,127.1374],'고창':[35.4358,126.702],'부안':[35.7318,126.7334],
+  '목포':[34.8118,126.3922],'여수':[34.7604,127.6622],'순천':[34.9506,127.4872],'나주':[35.0158,126.7108],'광양':[34.9406,127.6959],'담양':[35.3211,126.9882],'곡성':[35.282,127.292],'구례':[35.2025,127.4627],'고흥':[34.6112,127.285],'보성':[34.7715,127.08],'화순':[35.0646,126.9866],'장흥':[34.6817,126.907],'강진':[34.642,126.7672],'해남':[34.5734,126.5993],'영암':[34.8,126.6968],'무안':[34.9904,126.4817],'함평':[35.0659,126.5165],'영광':[35.2772,126.512],'장성':[35.3018,126.7849],'완도':[34.311,126.755],'진도':[34.4868,126.2635],'신안':[34.8335,126.3517]
+};
+// 같은 시 안에서도 많이 떨어진 동네는 따로 좌표를 둡니다 (주소에 이 단어가 있으면 우선 적용)
+const AREA_COORDS = [
+  [/동탄/,[37.2005,127.0735]],[/송산|송상면/,[37.214,126.72]],[/향남/,[37.13,126.92]],[/남양읍|남양동/,[37.21,126.82]],[/봉담/,[37.22,126.95]],
+  [/처인/,[37.234,127.201]],[/백암/,[37.161,127.375]],[/원삼/,[37.17,127.31]],[/기흥/,[37.28,127.115]],[/수지/,[37.32,127.098]],
+  [/일산/,[37.676,126.77]],[/강일|강동/,[37.55,127.15]],[/부평/,[37.507,126.722]],[/정왕|배곧/,[37.346,126.738]],
+  [/포승|평택항/,[36.97,126.84]],[/현덕/,[36.93,126.93]],[/고덕/,[37.04,127.04]]
+];
+function routeCoordOf(address){
+  const a = String(address||'');
+  for(const [re, c] of AREA_COORDS){ if(re.test(a)) return c; }
+  let city = cityOf(a);
+  if(city==='광주' && regionOf(a)==='경기남부') city = '경기광주';
+  return CITY_COORDS[city] || null;
+}
+// 출장 동선은 도 단위로 크게 묶습니다 (전라도·경상도·충청도 등)
+const ROUTE_GROUP_ORDER = ['서울','인천','경기북부','경기남부','강원도','충청도','전라도','경상도','제주','기타'];
+function routeGroupOf(address){
+  const r = regionOf(address);
+  if(r==='경기(기타)') return '경기남부';
+  if(['충남','충북','대전','세종'].includes(r)) return '충청도';
+  if(['전북','전남','광주'].includes(r)) return '전라도';
+  if(['경북','경남','대구','부산','울산'].includes(r)) return '경상도';
+  if(r==='강원') return '강원도';
+  return r;
+}
+function routeKm(a, b){
+  const R = 6371, toR = x=>x*Math.PI/180;
+  const dLat = toR(b[0]-a[0]), dLng = toR(b[1]-a[1]);
+  const h = Math.sin(dLat/2)**2 + Math.cos(toR(a[0]))*Math.cos(toR(b[0]))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h)) * 1.3; // 도로거리 대략 = 직선 × 1.3
+}
+// 출발지에서 시작해 모든 곳을 돌고 돌아오는 가장 짧은 순서 (가까운 곳 먼저 + 2-opt 개선)
+function shortestRouteOrder(base, stops){
+  if(stops.length<=1) return stops.slice();
+  const left = stops.slice(); const order = []; let cur = base;
+  while(left.length){
+    let bi = 0, bd = Infinity;
+    left.forEach((s,i)=>{ const d = routeKm(cur, s.coord); if(d<bd){ bd=d; bi=i; } });
+    const nx = left.splice(bi,1)[0]; order.push(nx); cur = nx.coord;
+  }
+  const pts = [base, ...order.map(s=>s.coord), base];
+  const total = arr=>{ let t=0; for(let i=0;i<arr.length-1;i++) t+=routeKm(arr[i],arr[i+1]); return t; };
+  let route = order.slice(), improved = true, guard = 0;
+  while(improved && guard++<50){
+    improved = false;
+    for(let i=0;i<route.length-1;i++){
+      for(let k=i+1;k<route.length;k++){
+        const cand = [...route.slice(0,i), ...route.slice(i,k+1).reverse(), ...route.slice(k+1)];
+        if(total([base,...cand.map(s=>s.coord),base]) + 0.01 < total([base,...route.map(s=>s.coord),base])){ route = cand; improved = true; }
+      }
+    }
+  }
+  return route;
+}
+function patrolRouteBase(){
+  let b = '';
+  try{ b = localStorage.getItem('gen-route-base-city') || ''; }catch(e){}
+  return CITY_COORDS[b] ? b : '화성';
+}
+// 출장 갈 발전기 선택 (정비관리 표의 🚐 체크박스) - 이 PC에 기억
+let _patrolRouteSel = null;
+function patrolRouteSelected(){
+  if(!_patrolRouteSel){
+    let arr = [];
+    try{ arr = JSON.parse(localStorage.getItem('gen-route-selected')||'[]'); }catch(e){ arr = []; }
+    _patrolRouteSel = new Set(Array.isArray(arr)? arr : []);
+  }
+  return _patrolRouteSel;
+}
+function savePatrolRouteSelected(){ try{ localStorage.setItem('gen-route-selected', JSON.stringify([...patrolRouteSelected()])); }catch(e){} }
+function togglePatrolRouteGen(id, on){
+  const sel = patrolRouteSelected();
+  if(on) sel.add(id); else sel.delete(id);
+  savePatrolRouteSelected(); refreshPatrolRoute();
+}
+function clearPatrolRouteSelection(){ patrolRouteSelected().clear(); savePatrolRouteSelected(); renderMaintList(); refreshPatrolRoute(); }
+function setPatrolRouteBase(v){ try{ localStorage.setItem('gen-route-base-city', v); }catch(e){} refreshPatrolRoute(); }
+function refreshPatrolRoute(){ const w = document.getElementById('patrol-route-wrap'); if(w) w.innerHTML = patrolRouteCardHtml(); }
+function patrolRouteCardHtml(){
+  const baseName = patrolRouteBase();
+  const base = CITY_COORDS[baseName];
+  const sel = patrolRouteSelected();
+  const outs = activeGens().filter(g=>sel.has(g.id) && g.status==='out' && g.rental && (g.rental.address||g.rental.site));
+  // 같은 현장(같은 주소)에 여러 대면 한 번만 들르면 되므로 묶습니다.
+  const stopsMap = {};
+  const unknown = [];
+  outs.forEach(g=>{
+    const rt = g.rental;
+    const addr = String(rt.address||rt.site||'').trim();
+    const coord = routeCoordOf(addr);
+    if(!coord){ unknown.push(g); return; }
+    const key = addr.replace(/\s+/g,'');
+    if(!stopsMap[key]) stopsMap[key] = {addr, customer: rt.customer||'', coord, region: routeGroupOf(addr), city: cityOf(addr), gens: []};
+    stopsMap[key].gens.push(g);
+  });
+  const stops = Object.values(stopsMap);
+  const byRegion = {};
+  stops.forEach(s=>{ (byRegion[s.region] = byRegion[s.region] || []).push(s); });
+  const regions = Object.keys(byRegion).map(r=>{
+    const route = shortestRouteOrder(base, byRegion[r]);
+    let km = 0, cur = base; const legs = [];
+    route.forEach(s=>{ const d = routeKm(cur, s.coord); legs.push(d); km += d; cur = s.coord; });
+    const back = routeKm(cur, base);
+    const nearest = Math.min(...route.map(s=>routeKm(base, s.coord)));
+    return {region: r, route, legs, km: km+back, back, nearest};
+  }).sort((a,b)=>a.nearest-b.nearest);
+  const maintTag = g=>{
+    if(!(g.hoursKnown && (g.hours>0 || g.lastMaintHours>0))) return '';
+    const rem = Math.round(estRemaining(g));
+    if(rem<=0) return `<span class="pill danger" style="font-size:10.5px;">정비 ${Math.abs(rem)}h 초과</span>`;
+    if(rem<=(DB.warnThreshold||50)) return `<span class="pill warn" style="font-size:10.5px;">정비 ${rem}h 남음</span>`;
+    return '';
+  };
+  const regionCards = regions.map(rg=>`
+    <div class="material-card" style="margin:0;background:#fff;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+        <div style="font-size:15px;font-weight:800;">📍 ${escR(rg.region)} <span class="muted" style="font-size:12px;font-weight:400;">${rg.route.length}곳 · ${rg.route.reduce((t,s)=>t+s.gens.length,0)}대</span></div>
+        <div style="font-size:12px;font-weight:700;color:var(--primary-dark);">왕복 약 ${Math.round(rg.km)}km</div>
+      </div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:4px;">🏁 출발: ${escR(baseName)}</div>
+      ${rg.route.map((s,i)=>`
+        <div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px dashed var(--border);">
+          <div style="flex:0 0 24px;height:24px;border-radius:12px;background:var(--primary);color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;">${i+1}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:700;">${escR(s.city)} · ${escR(s.customer||'거래처 미기재')} <span class="muted" style="font-size:11px;font-weight:400;">(+${Math.round(rg.legs[i])}km)</span></div>
+            <div class="muted" style="font-size:11.5px;word-break:break-all;">${escR(s.addr)} <a href="https://map.kakao.com/link/search/${encodeURIComponent(s.addr)}" target="_blank" rel="noopener" style="font-size:11px;">지도</a></div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">${s.gens.map(g=>`<span class="pill gray" style="font-size:10.5px;">${escR(g.id)}</span>${maintTag(g)}${(()=>{ const d = lastPatrolDate(g.id); return (d && d>=(g.rental.outDate||'')) ? `<span class="pill" style="font-size:10.5px;background:#EDE7F6;color:#5E35B1;border-color:#5E35B1;">✅ 순회 ${d.slice(5).replace('-','/')}</span>` : ''; })()}`).join('')}</div>
+          </div>
+        </div>`).join('')}
+      <div class="muted" style="font-size:12px;padding-top:6px;border-top:1px dashed var(--border);">🏁 복귀: ${escR(baseName)} (+${Math.round(rg.back)}km)</div>
+    </div>`).join('');
+  const baseOptions = Object.keys(CITY_COORDS).sort((a,b)=>a.localeCompare(b,'ko')).map(c=>`<option value="${c}" ${c===baseName?'selected':''}>${c==='경기광주'?'광주(경기)':c}</option>`).join('');
+  return `
+    <div class="material-card" style="margin-top:20px;border:2px solid var(--primary);">
+      <div class="section-title" style="margin-top:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">🚐 출장(순회점검) 동선 <span class="cnt">${stops.length}곳</span>
+        <span style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;font-weight:400;">
+          <label style="display:flex;align-items:center;gap:4px;">출발지 <select onchange="setPatrolRouteBase(this.value)" style="padding:4px 6px;font-size:12.5px;">${baseOptions}</select></label>
+          ${sel.size? `<button type="button" class="btn sm" onclick="clearPatrolRouteSelection()">선택 모두 해제</button>` : ''}
+        </span>
+      </div>
+      <details class="info-toggle"><summary></summary><p class="muted">위 정비 주기 표에서 🚐 칸을 체크한 출고중 발전기만 서울·인천·경기북부·경기남부·강원도·충청도·전라도·경상도로 나누고, 출발지에서 출발해 모두 들르고 돌아오는 가장 짧은 순서를 계산합니다. 같은 현장에 여러 대가 있으면 한 번만 들르게 묶었습니다. 지도 길찾기가 아니라 시·군 위치 기준 직선거리로 계산한 대략 거리(×1.3)라서 실제 도로 사정과 다를 수 있습니다. 출발지는 이 PC에 기억됩니다.</p></details>
+      ${regions.length===0 ? `<div class="empty">위 정비 주기 표에서 출장 갈 발전기의 🚐 칸을 체크하면, 체크한 발전기만으로 동선을 짜드립니다.</div>` : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-top:8px;">${regionCards}</div>`}
+      ${unknown.length? `<div class="hint" style="margin-top:8px;">📌 주소로 위치를 알 수 없어 빠진 발전기: ${unknown.map(g=>`${escR(g.id)}(${escR((g.rental.address||g.rental.site||'').slice(0,20))})`).join(', ')}</div>` : ''}
+    </div>`;
 }
 let maintCapacityFilter = null; // 숫자(kW) 또는 null
 function viewCapacityMaintList(cap){
@@ -5324,6 +5485,7 @@ function renderMaintList(){
     return `<tr>
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
+      <td style="text-align:center;">${(g.status==='out' && g.rental) ? `<input type="checkbox" style="width:18px;height:18px;cursor:pointer;" title="출장 동선에 넣기" ${patrolRouteSelected().has(g.id)?'checked':''} onchange="togglePatrolRouteGen('${g.id}', this.checked)">` : ''}</td>
       <td style="white-space:nowrap;">${(g.status==='out' && g.rental) ? `<span class="pill" style="background:#E8EEF4;color:#5B7FA6;border-color:#5B7FA6;">${escR(cityOf(g.rental.address||g.rental.site||''))}</span>` : '<span class="muted" style="font-size:11.5px;">-</span>'}</td>
       <td>${patrolCellHtml(g)}</td>
       <td>${tankCleanCellHtml(g)}</td>
@@ -5348,7 +5510,7 @@ function renderMaintList(){
     ${capacityButtonsHtml}
     ${sorted.length===0 ? `<div class="empty">${maintCapacityFilter!=null? `${maintCapacityFilter}kW 용량의 발전기가 없습니다.` : '검색 결과가 없습니다.'}</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th>출고지역</th><th>순회점검</th><th>탱크청소</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
+      <thead><tr><th>번호</th><th>모델</th><th title="체크한 출고중 발전기만 아래 출장 동선에 들어갑니다">🚐 출장</th><th>출고지역</th><th>순회점검</th><th>탱크청소</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`}`;
 }
