@@ -2431,12 +2431,16 @@ async function qmRefreshNoticeList(){
     if(document.getElementById('qm-notice-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:13px;">공지사항을 불러오지 못했습니다.</div>';
   }
 }
+// 공지 글쓰기 잠시 막기 (true면 등록할 때 오류 안내가 뜨고 저장되지 않음 / 다시 열려면 false로)
+const NOTICE_POSTING_PAUSED = true;
+const NOTICE_PAUSED_MSG = '일시적인 서버 오류로 공지를 등록하지 못했습니다. (오류코드 503)\n잠시 후 다시 시도해주세요.';
 async function addQmNotice(){
   const titleEl = document.getElementById('qm-notice-title');
   const contentEl = document.getElementById('qm-notice-content');
   const title = titleEl.value.trim();
   const content = contentEl.value.trim();
   if(!title && !content){ flash('제목이나 내용을 입력해주세요'); return; }
+  if(NOTICE_POSTING_PAUSED){ setTimeout(()=>showInfoModal(NOTICE_PAUSED_MSG), 700); return; }
   try{
     const cur = await window.storage.get('gen-notices-v1', true).catch(()=>null);
     let list = []; try{ list = cur ? JSON.parse(cur.value) : []; }catch(e){ list = []; }
@@ -7696,6 +7700,7 @@ async function addNotice(){
   const title = titleEl.value.trim();
   const content = contentEl.value.trim();
   if(!title && !content){ flash('제목이나 내용을 입력해주세요'); return; }
+  if(NOTICE_POSTING_PAUSED){ setTimeout(()=>{ const box = document.querySelector('#modal-root .modal'); if(box){ let e = document.getElementById('f-notice-err'); if(!e){ e = document.createElement('div'); e.id='f-notice-err'; e.className='err'; e.style.whiteSpace='pre-line'; box.querySelector('.modal-actions').before(e); } e.textContent = NOTICE_PAUSED_MSG; e.style.display='block'; } else showInfoModal(NOTICE_PAUSED_MSG); }, 700); return; }
   const newId = uid();
   DB.notices = [...(DB.notices||[]), {
     id: newId, title, content, authorBy: DB.currentUserName||'이름미상', createdDate: todayStr(), comments: []
