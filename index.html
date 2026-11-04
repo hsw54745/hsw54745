@@ -1645,6 +1645,14 @@ function qmRenderMaintBody(){
           const cap = tankCapacityL(g); if(cap) parts.push(`🛢 탱크 ${cap.toLocaleString()}L`);
           const wt = genWeightT(g); if(wt) parts.push(`🏋️ ${wt}t`);
           return parts.length ? `<div style="display:flex;flex-wrap:wrap;gap:4px 10px;font-size:11.5px;font-weight:700;color:#5B4A2E;background:#FAF6EE;border-radius:8px;padding:5px 8px;margin-top:6px;">${parts.map(t=>`<span style="white-space:nowrap;">${t}</span>`).join('')}</div>` : ''; })()}
+        ${g.hoursKnown? (()=>{
+          const fmt = d=> d ? d.slice(2).replace(/-/g,'.') : '';
+          if(g.status==='out'){
+            const read = g.hoursReadDate && g.hoursReadDate > (rt.outDate||'');
+            return `<div style="font-size:12px;color:#2C4A66;margin-top:6px;">🚚 출고시 누적 <b>${(rt.startHours||0).toLocaleString()}h</b>${rt.outDate? ` <span style="color:#888;">(${fmt(rt.outDate)} 출고)</span>`:''}${read? ` · 📟 현장확인 <b>${(g.hours||0).toLocaleString()}h</b> <span style="color:#888;">(${fmt(g.hoursReadDate)})</span>`:''}</div>`;
+          }
+          return `<div style="font-size:12px;color:#2C4A66;margin-top:6px;">📟 현재 누적 <b>${(g.hours||0).toLocaleString()}h</b></div>`;
+        })() : ''}
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;">
           ${qmMaintStatusHtml(g)}
           <span style="font-size:11.5px;font-weight:800;color:${patrolDone?'#5E35B1':'#999'};">${patrolDone? `✅ 순회점검 ${pd.slice(5).replace('-','/')}` : '순회점검 미실시'}</span>
@@ -1673,7 +1681,7 @@ function openQmMaintHistory(id){
             <span style="font-size:14px;font-weight:800;">${escR(m.date||'')}</span>
             <span style="display:flex;gap:4px;flex-wrap:wrap;">${maintTypesOf(m).map(maintTypePillHtml).join('')}</span>
           </div>
-          <div style="font-size:12px;color:#666;margin-top:2px;">${m.hours? (m.hours||0).toLocaleString()+'h · ':''}${escR(m.technician||'')}</div>
+          <div style="font-size:13px;margin-top:3px;"><span style="color:#2C4A66;">📟 누적 <b>${m.hours? (m.hours||0).toLocaleString()+'h' : '기록없음'}</b></span>${m.voltage? ` · <span style="color:${voltageColor(m.voltage)||'#555'};font-weight:700;">${escR(m.voltage)}</span>`:''}<span style="color:#888;font-size:12px;"> · ${escR(m.technician||'정비자 미기재')}</span></div>
           ${m.content? `<div style="font-size:13px;margin-top:4px;line-height:1.4;">${escR(m.content)}</div>`:''}
         </div>`).join('')}
     </div>`);
