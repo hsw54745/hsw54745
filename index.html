@@ -699,7 +699,6 @@ function renderQuickModeUI(){
       <button type="button" onclick="renderQuickModeOutList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">🚚 출고중 발전기 리스트 보기</button>
       <button type="button" onclick="renderQuickModeSoonInList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#B2782C;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📅 입고 예정 리스트 보기</button>
       <button type="button" onclick="renderQmReservationList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:20px;">⏳ 출고대기 리스트 보기</button>
-      <button type="button" onclick="renderQmReturnRequestList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;position:relative;">🔻 철수요청 확인<span id="qm-return-count-badge"></span></button>
       <button type="button" onclick="renderQmMaintList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#00796B;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:20px;">🔧 정비관리 (출장용)</button>
       <button type="button" onclick="renderQuickModeTextChoice()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📝 문자 등록하기 (출고/철수)</button>
       <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:14px;cursor:pointer;">📝 출고예약 등록</button>
@@ -710,7 +709,7 @@ function renderQuickModeUI(){
     const st = document.getElementById('qm-install-status');
     if(st) st.innerHTML = '<div style="text-align:center;color:#2C6E49;font-weight:700;font-size:13px;">✅ 이미 앱으로 실행 중입니다</div>';
   }
-  qmRefreshReturnCountBadge();
+  // 철수요청 확인 버튼은 퀵메뉴에서 뺐습니다(쓰지 않음). 개수 배지도 더 이상 불러오지 않습니다.
 }
 async function qmRefreshReturnCountBadge(){
   try{
@@ -1701,7 +1700,13 @@ function openQmMaintForm(id){
       </div>
       <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:14px;margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;">
         <div style="flex:1;min-width:140px;"><div style="font-size:13px;font-weight:800;margin-bottom:4px;">정비일</div><input type="date" id="qmm-date" value="${todayStr()}" style="width:100%;font-size:15px;padding:9px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;"></div>
-        ${g.hoursKnown? `<div style="flex:1;min-width:140px;"><div style="font-size:13px;font-weight:800;margin-bottom:4px;">계기 누적시간(h)</div><input type="number" id="qmm-hours" inputmode="decimal" placeholder="계기 보고 입력" style="width:100%;font-size:15px;padding:9px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;"><div style="font-size:11px;color:#888;margin-top:2px;">마지막 기록 ${(g.hours||0).toLocaleString()}h · 엔진오일교체는 필수</div></div>` : ''}
+        ${g.hoursKnown? `<div style="flex:1;min-width:140px;"><div style="font-size:13px;font-weight:800;margin-bottom:4px;">계기 누적시간(h) <span style="color:#C23B3B;">*필수</span></div><input type="number" id="qmm-hours" inputmode="decimal" placeholder="계기 보고 입력" style="width:100%;font-size:15px;padding:9px;border-radius:10px;border:2px solid #E68A00;box-sizing:border-box;"><div style="font-size:11px;color:#888;margin-top:2px;">마지막 기록 ${(g.hours||0).toLocaleString()}h</div></div>` : `<div style="flex:1;min-width:140px;font-size:12px;color:#888;padding-top:22px;">누적시간 확인불가 발전기</div>`}
+      </div>
+      <div style="background:#FFF3E0;border:2px solid #E68A00;border-radius:12px;padding:14px;margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:800;color:#B35F00;">🔌 현재 전압 확인 <span style="color:#C23B3B;">*필수</span></div>
+        <div style="font-size:12px;color:#666;margin-top:2px;">프로그램 기록: <b>${escR(g.voltage||'미설정')}</b> · 발전기에 실제 설정된 전압을 눌러주세요</div>
+        <input type="hidden" id="qmm-voltage" value="">
+        ${pickVoltageButtonsHtml('qmm-voltage', true)}
       </div>
       <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:14px;margin-bottom:10px;">
         <div style="font-size:13px;font-weight:800;margin-bottom:6px;">정비 내용</div>
@@ -1729,10 +1734,12 @@ async function submitQmMaint(id){
   const hoursRaw = hoursEl ? hoursEl.value.trim() : '';
   let hours = hoursRaw==='' ? null : Number(hoursRaw);
   if(hoursRaw!=='' && (isNaN(hours) || hours<0)){ showErr('누적시간을 확인해주세요.'); return; }
-  if(hoursEl && isOil && hours===null){ showErr('엔진오일교체는 계기 누적시간을 꼭 입력해주세요.'); return; }
+  if(hoursEl && hours===null){ showErr('지금 계기 누적시간을 꼭 입력해주세요.'); return; }
+  const voltage = (document.getElementById('qmm-voltage')||{}).value || '';
+  if(!voltage){ showErr('발전기에 설정된 현재 전압을 눌러서 확인해주세요.'); return; }
   const contentItems = QM_MAINT_CONTENT.filter((c,i)=>{ const el = document.getElementById('qmm-c-'+i); return el && el.checked; });
   const contentEtc = (document.getElementById('qmm-etc').value||'').trim();
-  const content = [contentItems.join(', '), contentEtc].filter(Boolean).join(' / ');
+  const content = [contentItems.join(', '), contentEtc, `전압 ${voltage}`].filter(Boolean).join(' / ');
   if(btn){ btn.disabled = true; btn.textContent = '저장 중...'; }
   try{
     const [gc, mc] = await Promise.all([ window.storage.get('gen-fleet-v2', true), window.storage.get('gen-maintenance-v2', true).catch(()=>null) ]);
@@ -1741,10 +1748,24 @@ async function submitQmMaint(id){
     if(!Array.isArray(maint)) maint = [];
     const g = gens.find(x=>x && x.id===id);
     if(!g){ showErr('발전기를 찾을 수 없습니다.'); if(btn){btn.disabled=false;btn.textContent='정비 등록';} return; }
+    if(hours!==null && g.hoursKnown && hours < (g.hours||0)){
+      showErr(`입력한 누적시간(${hours.toLocaleString()}h)이 마지막 기록(${(g.hours||0).toLocaleString()}h)보다 작습니다. 계기를 다시 확인해주세요.`);
+      if(btn){btn.disabled=false;btn.textContent='정비 등록';} return;
+    }
     const recHours = (hours!==null) ? hours : (g.hours||0);
     const rec = { id: uid(), genId: g.id, model: g.model||'', date, hours: recHours, content, contentItems, contentEtc,
-      technician: qmLabel(), partsUsed: [], type: types[0], types, photos: [] };
+      technician: qmLabel(), partsUsed: [], type: types[0], types, photos: [], voltage };
     let gensChanged = false;
+    // 전압: 확인한 값으로 발전기 전압을 맞추고, 바뀌었으면 전압변경 기록도 남깁니다.
+    const oldV = g.voltage||'';
+    if(normVoltage(oldV)!==normVoltage(voltage)){
+      g.voltage = voltage; g.voltageUpdatedAt = nowDateTimeStr(); g.voltageUpdatedAtMs = Date.now(); g.voltageUpdatedBy = qmLabel();
+      const timeStr = new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'});
+      maint.push({ id: uid(), genId: g.id, model: g.model||'', date, hours: recHours,
+        content: `⚡ 전압변경: ${oldV||'미설정'} → ${voltage} (${qmLabel()} · ${date} ${timeStr})`,
+        contentItems: [], contentEtc: '', technician: qmLabel(), partsUsed: [], type: '전압변경', photo: null });
+      gensChanged = true;
+    }
     if(isOil){
       rec.prevLastMaint = {hours: g.lastMaintHours||0, date: g.lastMaintDate||null, oilDate: g.lastOilChangeDate||null};
       if(g.hoursKnown){
@@ -1756,7 +1777,8 @@ async function submitQmMaint(id){
         if(!g.lastOilChangeDate || date >= g.lastOilChangeDate) g.lastOilChangeDate = date;
       }
       gensChanged = true;
-    } else if(g.hoursKnown && hours!==null && hours >= (g.hours||0)){
+    }
+    if(!isOil && g.hoursKnown && hours!==null && hours >= (g.hours||0)){
       // 계기를 보고 입력했으면 누적시간을 최신으로 (출고중이면 이후 추정도 이 값부터)
       g.hours = hours; g.hoursReadDate = date; g.hoursUpdatedAt = nowDateTimeStr(); g.hoursUpdatedBy = qmLabel(); gensChanged = true;
     }
@@ -5307,6 +5329,7 @@ function renderOutList(){
         <div class="btn-row" style="flex-wrap:wrap;row-gap:4px;margin-top:4px;">
           <button class="btn sm" onclick="quickForceInPrompt('${g.id}')" style="white-space:nowrap;" title="발전기를 새로 등록해 시스템을 처음 시작할 때, 아직 임대 정보가 없는 발전기를 거래처 입력 없이 한 번에 [입고] 상태로 정리하는 용도입니다. 누적 사용시간은 여기서 입력되지 않으니, 실제 값은 [설정 → 발전기 모델 설정 → 관리]에서 직접 입력해주세요. 평소 운영 중에는 거의 쓸 일이 없습니다.">⚡ 강제입고</button>
           <button class="btn sm" onclick="cancelOutPrompt('${g.id}')" style="white-space:nowrap;color:var(--danger);border-color:var(--danger);" title="이번 출고를 취소하고 바로 창고 재고로 되돌립니다. 이번 출고 이력은 기록되지 않습니다.">🚫 출고취소</button>
+          <button class="btn sm" onclick="addMoreGenToSite('${g.id}')" style="white-space:nowrap;color:#1565C0;border-color:#1565C0;font-weight:700;" title="이미 나가 있는 이 현장(같은 거래처·주소)으로 발전기를 한 대 더 보낼 때 사용합니다. 출고예약 창이 이 현장 정보로 채워져서 열리고, 발전기(용량)만 고르면 출고대기에 들어갑니다.">➕ 같은 현장 추가출고</button>
         </div>
       </td>
     </tr>`;
@@ -10724,6 +10747,17 @@ function onRsvExtraGenChange(rowId){
   hoursEl.value = g.hours||0;
   hoursEl.min = g.hours||0;
 }
+// 출고중 → "➕ 같은 현장 추가출고": 이미 나가 있는 현장으로 발전기를 한 대 더 보낼 때, 현장 정보를 채워서 출고예약 창을 엽니다.
+function addMoreGenToSite(genId){
+  const g = findGen(genId);
+  if(!g || !g.rental) return;
+  const rt = g.rental;
+  openReserveNoGenModal(null, {
+    customer: rt.customer||'', site: rt.site||rt.customer||'', address: rt.address||'', manager: rt.manager||'', phone: rt.phone||'',
+    voltage: rt.voltage||g.voltage||'', freightBearer: rt.freightBearer||'우리배차',
+    plannedOutDate: todayStr(), loadDate: todayStr(), note: '', addOnFrom: g.id
+  });
+}
 function openReserveNoGenModal(resId, draft){
   const existing = resId ? DB.reservations.find(x=>x.id===resId) : null;
   let autoFilled = false;
@@ -10778,7 +10812,8 @@ function openReserveNoGenModal(resId, draft){
     <div class="modal modal-wide" style="text-align:left;">
       <h3 style="text-align:center;">📝 ${existing? '출고예약 수정' : '출고예약'}</h3>
       <div class="modal-sub">발전기를 아직 정하지 않았어도 거래처 정보를 먼저 등록해둘 수 있습니다. 나중에 [출고 대기]에서 발전기를 배정하면 정상 출고로 이어집니다.</div>
-      ${(!existing && draft) || autoFilled ? `<div class="hint" style="font-size:13px;color:var(--danger);font-weight:700;background:var(--danger-tint);padding:8px 10px;border-radius:8px;margin-bottom:6px;">⚠️ 문자 내용에서 자동으로 추출해 채워봤습니다 (노란 배경 칸). 100% 정확하지 않으니 하나씩 확인 후 저장해주세요. 인식하지 못한 칸은 비워뒀습니다.</div>` : ''}
+      ${(!existing && draft && draft.addOnFrom) ? `<div class="hint" style="font-size:13px;color:#1565C0;font-weight:700;background:#E8F0FE;padding:8px 10px;border-radius:8px;margin-bottom:6px;">➕ ${escR(draft.addOnFrom)}가 나가 있는 현장(${escR(draft.customer||'-')})에 발전기를 한 대 더 보냅니다. 아래 발전기 칸에서 보낼 발전기(용량)를 고르고 도착일·전압만 확인해 주세요.</div>` : ''}
+      ${(!existing && draft && !draft.addOnFrom) || autoFilled ? `<div class="hint" style="font-size:13px;color:var(--danger);font-weight:700;background:var(--danger-tint);padding:8px 10px;border-radius:8px;margin-bottom:6px;">⚠️ 문자 내용에서 자동으로 추출해 채워봤습니다 (노란 배경 칸). 100% 정확하지 않으니 하나씩 확인 후 저장해주세요. 인식하지 못한 칸은 비워뒀습니다.</div>` : ''}
       ${(!existing && draft && draft.rawText) ? `<details open style="text-align:left;background:var(--surface-alt,#F5F5F5);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:10px;">
         <summary style="cursor:pointer;font-weight:700;">📄 원본 문자 내용 보기</summary>
         <div style="white-space:pre-wrap;font-size:13.5px;margin-top:8px;color:#333;">${escR(draft.rawText)}</div>
