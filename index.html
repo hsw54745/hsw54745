@@ -699,7 +699,8 @@ function renderQuickModeUI(){
       <button type="button" onclick="renderQuickModeOutList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#5B7FA6;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">🚚 출고중 발전기 리스트 보기</button>
       <button type="button" onclick="renderQuickModeSoonInList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#B2782C;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📅 입고 예정 리스트 보기</button>
       <button type="button" onclick="renderQmReservationList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A6D00;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:20px;">⏳ 출고대기 리스트 보기</button>
-      <button type="button" onclick="renderQmReturnRequestList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:20px;position:relative;">🔻 철수요청 확인<span id="qm-return-count-badge"></span></button>
+      <button type="button" onclick="renderQmReturnRequestList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#B23A34;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;position:relative;">🔻 철수요청 확인<span id="qm-return-count-badge"></span></button>
+      <button type="button" onclick="renderQmMaintList()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#00796B;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:20px;">🔧 정비관리 (출장용)</button>
       <button type="button" onclick="renderQuickModeTextChoice()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#2C4A66;color:#fff;border:none;border-radius:14px;cursor:pointer;margin-bottom:10px;">📝 문자 등록하기 (출고/철수)</button>
       <button type="button" onclick="renderQuickModeReserveUI()" style="width:100%;padding:16px;font-size:18px;font-weight:800;background:#8A5A00;color:#fff;border:none;border-radius:14px;cursor:pointer;">📝 출고예약 등록</button>
       <div id="qm-install-status" style="margin-top:10px;"></div>
@@ -1557,6 +1558,219 @@ async function qmRefreshReservationList(){
     }).join('');
   }catch(e){
     if(document.getElementById('qm-res-list')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:14px;padding:20px 0;">목록을 불러오지 못했습니다.</div>';
+  }
+}
+// ===================== 퀵메뉴: 🔧 정비관리 (출장용) =====================
+// 현장에 나가서 폰으로 정비·순회점검을 바로 등록합니다. (사진·부품재고 차감은 사무실 화면에서)
+let qmMaintGroup = null;      // 지역 필터 (경기남부/전라도 …)
+let qmMaintIncludeIn = false; // 입고된 발전기도 보기
+let qmMaintSearch = '';
+const QM_MAINT_CONTENT = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1차교체','오일필터1차점검','오일필터2차교체','오일필터2차점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검 및 보충','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소','연료통청소'];
+async function qmLoadMaintData(){
+  const [gc, mc, matc, cic, wc] = await Promise.all([
+    window.storage.get('gen-fleet-v2', true),
+    window.storage.get('gen-maintenance-v2', true).catch(()=>null),
+    window.storage.get('gen-materials-v1', true).catch(()=>null),
+    window.storage.get('gen-company-info-v1', true).catch(()=>null),
+    window.storage.get('gen-warn-threshold-v1', true).catch(()=>null)
+  ]);
+  const parse = (c, d)=>{ try{ const v = c ? JSON.parse(c.value) : d; return v==null? d : v; }catch(e){ return d; } };
+  DB.gens = parse(gc, []); DB.maint = parse(mc, []); DB.materials = parse(matc, {});
+  DB.companyInfo = parse(cic, DB.companyInfo||{}); DB.warnThreshold = parse(wc, 50) || 50;
+  qmMaterialsLoadedAt = Date.now();
+}
+function qmMaintStatusHtml(g){
+  if(!(g.hoursKnown && (g.hours>0 || g.lastMaintHours>0))) return `<span style="font-size:11px;font-weight:800;color:#888;">정비 확인불가</span>`;
+  const rem = Math.round(g.status==='out' ? estRemaining(g) : remainingHours(g));
+  const est = g.status==='out' && effEstDaily(g)>0 ? ' (추정)' : '';
+  if(rem<=0) return `<span style="font-size:11.5px;font-weight:800;color:#C23B3B;">⚠️ 정비 ${Math.abs(rem).toLocaleString()}h 초과${est}</span>`;
+  const c = rem<=(DB.warnThreshold||50) ? '#C97A1E' : '#2C6E49';
+  return `<span style="font-size:11.5px;font-weight:800;color:${c};">정비까지 ${rem.toLocaleString()}h${est}</span>`;
+}
+async function renderQmMaintList(){
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:22px 18px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      <button type="button" onclick="renderQuickModeUI()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:12px;">← 뒤로가기</button>
+      <div style="text-align:center;margin-bottom:10px;">
+        <div style="font-size:22px;font-weight:800;color:#00796B;">🔧 정비관리 (출장용)</div>
+        <div style="font-size:13px;color:#555;margin-top:4px;">발전기를 찾아서 "정비등록"을 누르세요</div>
+      </div>
+      <div id="qm-maint-body"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+    </div>`);
+  try{ await qmLoadMaintData(); }catch(e){
+    const b = document.getElementById('qm-maint-body'); if(b) b.innerHTML = '<div style="text-align:center;color:#B23A34;padding:20px 0;">불러오지 못했습니다.</div>'; return;
+  }
+  qmRenderMaintBody();
+}
+function qmRenderMaintBody(){
+  const body = document.getElementById('qm-maint-body');
+  if(!body) return;
+  let list = (DB.gens||[]).filter(g=>g && !g.retired && (g.status==='out' || qmMaintIncludeIn));
+  const groupOf = g=> g.status==='out' && g.rental ? routeGroupOf(g.rental.address||g.rental.site||'') : '입고';
+  const groups = {}; list.forEach(g=>{ const k = groupOf(g); groups[k] = (groups[k]||0)+1; });
+  const groupKeys = Object.keys(groups).sort((a,b)=>{ const ia = ROUTE_GROUP_ORDER.indexOf(a), ib = ROUTE_GROUP_ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+  if(qmMaintGroup && !groups[qmMaintGroup]) qmMaintGroup = null;
+  if(qmMaintGroup) list = list.filter(g=>groupOf(g)===qmMaintGroup);
+  const q = qmMaintSearch.trim().toLowerCase();
+  if(q) list = list.filter(g=>[g.id, g.model, g.rental&&g.rental.customer, g.rental&&g.rental.address].filter(Boolean).join(' ').toLowerCase().includes(q));
+  list.sort(sortByIdNatural);
+  const btn = (label, on, onclick)=>`<button type="button" onclick="${onclick}" style="padding:8px 11px;font-size:13px;font-weight:800;border-radius:10px;border:2px solid #00796B;background:${on?'#00796B':'#fff'};color:${on?'#fff':'#00796B'};cursor:pointer;">${label}</button>`;
+  body.innerHTML = `
+    <input type="search" value="${escR(qmMaintSearch)}" placeholder="번호·거래처·주소 검색" oninput="qmMaintSearch=this.value;qmRenderMaintBodyKeepFocus()" id="qm-maint-search" style="width:100%;font-size:15px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;margin-bottom:8px;">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
+      ${btn(`전체 (${Object.values(groups).reduce((a,b)=>a+b,0)})`, !qmMaintGroup, "qmMaintGroup=null;qmRenderMaintBody()")}
+      ${groupKeys.map(k=>btn(`${k} (${groups[k]})`, qmMaintGroup===k, `qmMaintGroup='${k}';qmRenderMaintBody()`)).join('')}
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin:4px 0 10px;"><input type="checkbox" ${qmMaintIncludeIn?'checked':''} onchange="qmMaintIncludeIn=this.checked;qmRenderMaintBody()" style="width:18px;height:18px;"> 입고된 발전기도 보기</label>
+    <div style="font-size:12px;color:#888;text-align:right;margin-bottom:6px;">총 ${list.length}대</div>
+    ${list.length===0 ? '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">해당하는 발전기가 없습니다.</div>' : list.map(g=>{
+      const rt = g.rental||{};
+      const pd = lastPatrolDate(g.id);
+      const patrolDone = pd && (g.status!=='out' || pd>=(rt.outDate||''));
+      const tank = lastTankCleanDate(g.id);
+      return `
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:12px 14px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+          <div><span style="font-size:17px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span> <span style="font-size:12.5px;color:#333;">${escR(g.model||'')}</span></div>
+          <span style="font-size:11px;font-weight:800;color:${g.status==='out'?'#5B7FA6':'#2C6E49'};white-space:nowrap;">${g.status==='out'? escR(cityOf(rt.address||rt.site||'')) : '입고'}</span>
+        </div>
+        ${g.status==='out'? `<div style="font-size:12px;color:#666;margin-top:2px;">${escR(rt.customer||'거래처 미기재')}${rt.address? ' · '+escR(rt.address):''}</div>` : ''}
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;">
+          ${qmMaintStatusHtml(g)}
+          <span style="font-size:11.5px;font-weight:800;color:${patrolDone?'#5E35B1':'#999'};">${patrolDone? `✅ 순회점검 ${pd.slice(5).replace('-','/')}` : '순회점검 미실시'}</span>
+          <span style="font-size:11.5px;color:#666;">탱크청소 ${tank? tank.slice(2).replace(/-/g,'.') : '미실시'}</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <button type="button" onclick="openQmMaintForm('${g.id}')" style="flex:2;padding:11px;font-size:15px;font-weight:800;background:#00796B;color:#fff;border:none;border-radius:10px;cursor:pointer;">🔧 정비등록</button>
+          <button type="button" onclick="openQmMaintHistory('${g.id}')" style="flex:1;padding:11px;font-size:14px;font-weight:800;background:#fff;color:#00796B;border:2px solid #00796B;border-radius:10px;cursor:pointer;">📜 이력</button>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+function qmRenderMaintBodyKeepFocus(){
+  const el = document.getElementById('qm-maint-search'); const pos = el ? el.selectionStart : null;
+  qmRenderMaintBody();
+  const el2 = document.getElementById('qm-maint-search'); if(el2){ el2.focus(); if(pos!=null) try{ el2.setSelectionRange(pos,pos); }catch(e){} }
+}
+function qmMaintBackHtml(){
+  return `<button type="button" onclick="renderQmMaintList()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:12px;">← 정비관리 목록</button>`;
+}
+function openQmMaintHistory(id){
+  const g = (DB.gens||[]).find(x=>x.id===id); if(!g) return;
+  const recs = (DB.maint||[]).filter(m=>m.genId===id).sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,15);
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:22px 18px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      ${qmMaintBackHtml()}
+      <div style="font-size:20px;font-weight:800;color:#2C4A66;margin-bottom:10px;">📜 ${escR(g.id)} 정비이력 <span style="font-size:13px;color:#666;font-weight:400;">${escR(g.model||'')}</span></div>
+      ${recs.length===0 ? '<div style="text-align:center;color:#999;padding:20px 0;">정비 이력이 없습니다.</div>' : recs.map(m=>`
+        <div style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 12px;margin-bottom:6px;">
+          <div style="display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;align-items:center;">
+            <span style="font-size:14px;font-weight:800;">${escR(m.date||'')}</span>
+            <span style="display:flex;gap:4px;flex-wrap:wrap;">${maintTypesOf(m).map(maintTypePillHtml).join('')}</span>
+          </div>
+          <div style="font-size:12px;color:#666;margin-top:2px;">${m.hours? (m.hours||0).toLocaleString()+'h · ':''}${escR(m.technician||'')}</div>
+          ${m.content? `<div style="font-size:13px;margin-top:4px;line-height:1.4;">${escR(m.content)}</div>`:''}
+        </div>`).join('')}
+    </div>`);
+}
+let qmMaintTypesSel = [];
+function qmToggleMaintType(t){
+  qmMaintTypesSel = qmMaintTypesSel.includes(t) ? qmMaintTypesSel.filter(x=>x!==t) : sortMaintTypes([...qmMaintTypesSel, t]);
+  document.querySelectorAll('.qmm-type-btn').forEach(b=>{
+    const on = qmMaintTypesSel.includes(b.dataset.t);
+    b.style.background = on ? '#00796B' : '#fff'; b.style.color = on ? '#fff' : '#00796B';
+  });
+  const oil = document.getElementById('qmm-c-0');
+  if(oil){ oil.disabled = !qmMaintTypesSel.includes('정기정비'); if(oil.disabled) oil.checked = false; oil.parentElement.style.opacity = oil.disabled ? '.45' : '1'; }
+}
+function openQmMaintForm(id){
+  const g = (DB.gens||[]).find(x=>x.id===id); if(!g) return;
+  qmMaintTypesSel = [];
+  const types = [['정기정비','엔진오일교체'],['일반점검','일반점검'],['유지보수','유지보수'],['정기순회점검','정기순회점검'],['고장수리','고장·긴급수리']];
+  pwGateShow(`
+    <div style="background:#F4F6F5;border-radius:16px;padding:22px 18px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
+      ${qmMaintBackHtml()}
+      <div style="text-align:center;margin-bottom:12px;">
+        <div style="font-size:24px;font-weight:900;color:#2C4A66;">${escR(g.id)}</div>
+        <div style="font-size:13px;color:#555;">${escR(g.model||'')}${g.status==='out'&&g.rental? ' · '+escR(g.rental.customer||''):''}</div>
+        <div style="margin-top:4px;">${qmMaintStatusHtml(g)}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:14px;margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:800;margin-bottom:6px;">정비 유형 <span style="font-weight:400;color:#888;">(여러 개 선택 가능)</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">${types.map(([t,l])=>`<button type="button" class="qmm-type-btn" data-t="${t}" onclick="qmToggleMaintType('${t}')" style="padding:10px 12px;font-size:14px;font-weight:800;border-radius:10px;border:2px solid #00796B;background:#fff;color:#00796B;cursor:pointer;">${l}</button>`).join('')}</div>
+      </div>
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:14px;margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:140px;"><div style="font-size:13px;font-weight:800;margin-bottom:4px;">정비일</div><input type="date" id="qmm-date" value="${todayStr()}" style="width:100%;font-size:15px;padding:9px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;"></div>
+        ${g.hoursKnown? `<div style="flex:1;min-width:140px;"><div style="font-size:13px;font-weight:800;margin-bottom:4px;">계기 누적시간(h)</div><input type="number" id="qmm-hours" inputmode="decimal" placeholder="계기 보고 입력" style="width:100%;font-size:15px;padding:9px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;"><div style="font-size:11px;color:#888;margin-top:2px;">마지막 기록 ${(g.hours||0).toLocaleString()}h · 엔진오일교체는 필수</div></div>` : ''}
+      </div>
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:14px;margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:800;margin-bottom:6px;">정비 내용</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;">
+          ${QM_MAINT_CONTENT.map((c,i)=>`<label style="display:flex;align-items:center;gap:6px;font-size:13px;padding:5px 0;${i===0?'opacity:.45;':''}"><input type="checkbox" id="qmm-c-${i}" value="${c}" ${i===0?'disabled':''} style="width:18px;height:18px;flex:none;"> ${c}</label>`).join('')}
+        </div>
+        <textarea id="qmm-etc" placeholder="기타 내용 (예: 외부 도장, 현장 특이사항)" style="width:100%;min-height:60px;font-size:14px;padding:8px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;margin-top:8px;"></textarea>
+      </div>
+      <div style="font-size:12.5px;color:#555;margin-bottom:8px;">정비자: <b>${escR(qmCurrentUserName||'미지정')}</b> · 사진·부품재고 차감은 사무실 화면에서 수정해주세요</div>
+      <div id="qmm-status" style="display:none;margin-bottom:10px;padding:12px;border-radius:12px;font-size:14px;font-weight:700;text-align:center;"></div>
+      <button id="qmm-save-btn" onclick="submitQmMaint('${g.id}')" style="width:100%;padding:17px;font-size:19px;font-weight:800;background:#00796B;color:#fff;border:none;border-radius:14px;cursor:pointer;">정비 등록</button>
+    </div>`);
+}
+async function submitQmMaint(id){
+  const box = document.getElementById('qmm-status');
+  const btn = document.getElementById('qmm-save-btn');
+  const showErr = msg=>{ box.style.display='block'; box.style.background='#FBEAEA'; box.style.color='#B23A34'; box.textContent = msg; };
+  const types = sortMaintTypes(qmMaintTypesSel);
+  if(!types.length){ showErr('정비 유형을 하나 이상 선택해주세요.'); return; }
+  if(!qmCurrentUserName){ openQmUserGate(); return; }
+  const date = document.getElementById('qmm-date').value;
+  if(!date){ showErr('정비일을 확인해주세요.'); return; }
+  const isOil = types.includes('정기정비');
+  const hoursEl = document.getElementById('qmm-hours');
+  const hoursRaw = hoursEl ? hoursEl.value.trim() : '';
+  let hours = hoursRaw==='' ? null : Number(hoursRaw);
+  if(hoursRaw!=='' && (isNaN(hours) || hours<0)){ showErr('누적시간을 확인해주세요.'); return; }
+  if(hoursEl && isOil && hours===null){ showErr('엔진오일교체는 계기 누적시간을 꼭 입력해주세요.'); return; }
+  const contentItems = QM_MAINT_CONTENT.filter((c,i)=>{ const el = document.getElementById('qmm-c-'+i); return el && el.checked; });
+  const contentEtc = (document.getElementById('qmm-etc').value||'').trim();
+  const content = [contentItems.join(', '), contentEtc].filter(Boolean).join(' / ');
+  if(btn){ btn.disabled = true; btn.textContent = '저장 중...'; }
+  try{
+    const [gc, mc] = await Promise.all([ window.storage.get('gen-fleet-v2', true), window.storage.get('gen-maintenance-v2', true).catch(()=>null) ]);
+    let gens = []; try{ gens = gc ? JSON.parse(gc.value) : []; }catch(e){ gens = []; }
+    let maint = []; try{ maint = mc ? JSON.parse(mc.value) : []; }catch(e){ maint = []; }
+    if(!Array.isArray(maint)) maint = [];
+    const g = gens.find(x=>x && x.id===id);
+    if(!g){ showErr('발전기를 찾을 수 없습니다.'); if(btn){btn.disabled=false;btn.textContent='정비 등록';} return; }
+    const recHours = (hours!==null) ? hours : (g.hours||0);
+    const rec = { id: uid(), genId: g.id, model: g.model||'', date, hours: recHours, content, contentItems, contentEtc,
+      technician: qmLabel(), partsUsed: [], type: types[0], types, photos: [] };
+    let gensChanged = false;
+    if(isOil){
+      rec.prevLastMaint = {hours: g.lastMaintHours||0, date: g.lastMaintDate||null, oilDate: g.lastOilChangeDate||null};
+      if(g.hoursKnown){
+        // 사무실 정비등록과 같은 규칙: 마지막 정비값은 낮아지지 않게
+        if(recHours >= (g.lastMaintHours||0)){ g.lastMaintHours = recHours; g.lastMaintDate = date; }
+        if((g.hours||0) <= recHours){ g.hours = recHours; if(hours!==null) g.hoursReadDate = date; }
+        g.hoursUpdatedAt = nowDateTimeStr(); g.hoursUpdatedBy = qmLabel();
+      } else {
+        if(!g.lastOilChangeDate || date >= g.lastOilChangeDate) g.lastOilChangeDate = date;
+      }
+      gensChanged = true;
+    } else if(g.hoursKnown && hours!==null && hours >= (g.hours||0)){
+      // 계기를 보고 입력했으면 누적시간을 최신으로 (출고중이면 이후 추정도 이 값부터)
+      g.hours = hours; g.hoursReadDate = date; g.hoursUpdatedAt = nowDateTimeStr(); g.hoursUpdatedBy = qmLabel(); gensChanged = true;
+    }
+    maint.push(rec);
+    await window.storage.set('gen-maintenance-v2', JSON.stringify(maint), true);
+    if(gensChanged) await window.storage.set('gen-fleet-v2', JSON.stringify(gens), true);
+    DB.maint = maint; DB.gens = gens;
+    box.style.display='block'; box.style.background='#E7F5EC'; box.style.color='#1E7B45';
+    box.textContent = '✅ 정비가 등록되었습니다!';
+    if(btn) btn.textContent = '정비 등록';
+    setTimeout(()=>{ if(document.getElementById('qmm-status')) { renderQmMaintList(); } }, 900);
+  }catch(e){
+    showErr('저장하지 못했습니다. 인터넷 연결을 확인하고 다시 눌러주세요.');
+    if(btn){ btn.disabled=false; btn.textContent='정비 등록'; }
   }
 }
 async function renderQmReturnRequestList(){
@@ -3625,8 +3839,12 @@ function effEstDaily(g){
 function estCurrentHours(g){
   const ed = effEstDaily(g);
   if(g.status==='out' && g.rental && ed>0 && g.rental.outDate){
-    const days = Math.max(0,(Date.now() - new Date(g.rental.outDate+'T00:00:00').getTime())/86400000);
-    return (g.rental.startHours||0) + days*ed;
+    // 출고 후 현장에서 계기를 읽은 기록(hoursReadDate)이 있으면 그 시점부터 추정합니다.
+    const readLater = g.hoursReadDate && g.hoursReadDate > g.rental.outDate;
+    const fromDate = readLater ? g.hoursReadDate : g.rental.outDate;
+    const fromHours = readLater ? (g.hours||0) : (g.rental.startHours||0);
+    const days = Math.max(0,(Date.now() - new Date(fromDate+'T00:00:00').getTime())/86400000);
+    return fromHours + days*ed;
   }
   return g.hours||0;
 }
@@ -13508,6 +13726,8 @@ async function submitMaint(id, editId, completeRepair){
     if(isOil) newRec.prevLastMaint = prevLastMaintSnap;
     DB.maint.push(newRec);
   }
+  // 출고중 발전기에 계기 누적시간을 입력했으면, 그 날짜부터 사용시간을 다시 추정합니다.
+  if(g.hoursKnown && g.status==='out' && !isNaN(hours) && hours>0 && hours >= (g.hours||0)){ g.hours = hours; g.hoursReadDate = date; }
   maintPhotosPending = [];
   // 엔진오일교체 기록이 새로 생기거나 바뀐 경우에만 "마지막 정비"를 다시 계산합니다(일반점검·고장수리·전압변경은 정비주기와 무관).
   if(isOil || editedFromOilChange) recomputeLastMaint(g.id, editedFromOilChange, removedOilRec);
