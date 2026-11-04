@@ -1618,7 +1618,9 @@ function qmRenderMaintBody(){
   if(qmMaintGroup) list = list.filter(g=>groupOf(g)===qmMaintGroup);
   const q = qmMaintSearch.trim().toLowerCase();
   if(q) list = list.filter(g=>[g.id, g.model, g.rental&&g.rental.customer, g.rental&&g.rental.address].filter(Boolean).join(' ').toLowerCase().includes(q));
-  list.sort(sortByIdNatural);
+  // 엔진오일 교체 시기가 가까운 순서 (출고중은 하루평균 사용시간으로 추정한 값 적용). 누적시간 확인불가는 맨 뒤.
+  const remOf = g=> (g.hoursKnown && (g.hours>0 || g.lastMaintHours>0)) ? (g.status==='out' ? estRemaining(g) : remainingHours(g)) : Infinity;
+  list.sort((a,b)=>{ const ra = remOf(a), rb = remOf(b); if(ra!==rb) return ra-rb; return sortByIdNatural(a,b); });
   const btn = (label, on, onclick)=>`<button type="button" onclick="${onclick}" style="padding:8px 11px;font-size:13px;font-weight:800;border-radius:10px;border:2px solid #00796B;background:${on?'#00796B':'#fff'};color:${on?'#fff':'#00796B'};cursor:pointer;">${label}</button>`;
   dyn.innerHTML = `
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
@@ -1658,12 +1660,56 @@ function qmRenderMaintBody(){
           <span style="font-size:11.5px;font-weight:800;color:${patrolDone?'#5E35B1':'#999'};">${patrolDone? `✅ 순회점검 ${pd.slice(5).replace('-','/')}` : '순회점검 미실시'}</span>
           <span style="font-size:11.5px;color:#666;">탱크청소 ${tank? tank.slice(2).replace(/-/g,'.') : '미실시'}</span>
         </div>
+        ${g.status==='out' && g.rental ? `
+        <div id="qm-loc-nav-${g.id}">${siteNavLinksHtml(g, false)}</div>
+        <button type="button" onclick="qmSaveSiteLocation('${g.id}')" style="margin-top:6px;padding:7px 10px;font-size:12.5px;font-weight:800;background:#fff;color:#1565C0;border:1.5px solid #1565C0;border-radius:10px;cursor:pointer;">📍 ${g.rental.siteLoc? '현재 위치로 다시 저장' : '지금 여기를 현장 위치로 저장'}</button>
+        ${g.rental.siteLoc? `<span style="font-size:11px;color:#888;margin-left:6px;">저장됨 ${escR((g.rental.siteLoc.at||'').slice(5))}</span>`:''}
+        <div id="qm-loc-status-${g.id}" style="display:none;font-size:12px;font-weight:700;margin-top:4px;"></div>` : ''}
         <div style="display:flex;gap:6px;margin-top:8px;">
           <button type="button" onclick="openQmMaintForm('${g.id}')" style="flex:2;padding:11px;font-size:15px;font-weight:800;background:#00796B;color:#fff;border:none;border-radius:10px;cursor:pointer;">🔧 정비등록</button>
           <button type="button" onclick="openQmMaintHistory('${g.id}')" style="flex:1;padding:11px;font-size:14px;font-weight:800;background:#fff;color:#00796B;border:2px solid #00796B;border-radius:10px;cursor:pointer;">📜 이력</button>
         </div>
       </div>`;
     }).join('')}`;
+}
+// ---------- 현장 위치 저장 · 지도 길찾기 ----------
+// 현장에 가서 "📍 현재 위치 저장"을 누르면, 이번 출고(rental)에 위치가 저장됩니다. (입고되면 자연히 사라짐)
+function siteNavLinksHtml(g, big){
+  const loc = g && g.rental && g.rental.siteLoc;
+  if(!loc) return '';
+  const name = encodeURIComponent(`${g.id} ${(g.rental.customer||'')}`.trim());
+  const qs = `dlat=${loc.lat}&dlng=${loc.lng}&dname=${name}&appname=io.github.hsw54745`;
+  const naver = /Android/i.test(navigator.userAgent)
+    ? `intent://route/car?${qs}#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`
+    : `nmap://route/car?${qs}`;
+  const kakao = `https://map.kakao.com/link/to/${name},${loc.lat},${loc.lng}`;
+  const st = big ? 'flex:1;padding:10px;font-size:14px;' : 'padding:6px 10px;font-size:12px;';
+  return `<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+    <a href="${naver}" style="${st}font-weight:800;background:#03C75A;color:#fff;border-radius:10px;text-decoration:none;text-align:center;">🧭 네이버 길찾기</a>
+    <a href="${kakao}" target="_blank" rel="noopener" style="${st}font-weight:800;background:#FEE500;color:#3C1E1E;border-radius:10px;text-decoration:none;text-align:center;">🗺 카카오맵</a>
+  </div>`;
+}
+function qmSaveSiteLocation(id){
+  const st = document.getElementById('qm-loc-status-'+id);
+  const say = (msg, ok)=>{ if(st){ st.style.display='block'; st.style.color = ok? '#1E7B45' : '#B23A34'; st.textContent = msg; } };
+  if(!navigator.geolocation){ say('이 폰에서는 위치 기능을 쓸 수 없습니다.'); return; }
+  say('위치 확인 중... (위치 권한을 허용해주세요)', true);
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    try{
+      const cur = await window.storage.get('gen-fleet-v2', true);
+      let gens = []; try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
+      const g = gens.find(x=>x && x.id===id);
+      if(!g || !g.rental){ say('출고중인 발전기가 아니라 저장할 수 없습니다.'); return; }
+      g.rental.siteLoc = { lat: Math.round(pos.coords.latitude*1e6)/1e6, lng: Math.round(pos.coords.longitude*1e6)/1e6,
+        acc: Math.round(pos.coords.accuracy||0), at: nowDateTimeStr(), by: qmLabel() };
+      await window.storage.set('gen-fleet-v2', JSON.stringify(gens), true);
+      const mine = (DB.gens||[]).find(x=>x.id===id); if(mine && mine.rental) mine.rental.siteLoc = g.rental.siteLoc;
+      say(`✅ 현장 위치 저장 완료 (오차 약 ${g.rental.siteLoc.acc}m)`, true);
+      const nav = document.getElementById('qm-loc-nav-'+id); if(nav) nav.innerHTML = siteNavLinksHtml(mine||g, true);
+    }catch(e){ say('저장하지 못했습니다. 인터넷 연결을 확인해주세요.'); }
+  }, err=>{
+    say(err && err.code===1 ? '위치 권한이 꺼져 있습니다. 폰 설정에서 이 앱(브라우저)의 위치 권한을 허용해주세요.' : '위치를 가져오지 못했습니다. 잠시 후 다시 눌러주세요.');
+  }, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
 }
 function qmMaintBackHtml(){
   return `<button type="button" onclick="renderQmMaintList()" style="display:inline-block;background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:12px;">← 정비관리 목록</button>`;
@@ -5318,7 +5364,7 @@ function renderOutList(){
       <td class="wrap-ok">
         ${rt.customer||'<span class="muted">미기재</span>'}
         ${(rt.manager||rt.phone)? `<div class="muted" style="font-size:11px;">${[rt.manager,rt.phone].filter(Boolean).join(' · ')}</div>`:''}
-        <div class="muted" style="font-size:11px;">${[rt.site,rt.address].filter(Boolean).join(' · ')}</div>
+        <div class="muted" style="font-size:11px;">${[rt.site,rt.address].filter(Boolean).join(' · ')}${rt.siteLoc? ` <a href="https://map.kakao.com/link/map/${encodeURIComponent(g.id+' '+(rt.customer||''))},${rt.siteLoc.lat},${rt.siteLoc.lng}" target="_blank" rel="noopener" style="color:#1565C0;font-weight:700;" title="현장에서 저장한 위치 (${escR(rt.siteLoc.at||'')} · ${escR(rt.siteLoc.by||'')})">📍 현장위치</a>`:''}</div>
         <div class="muted" style="font-size:11px;">부자재: ${rt.supplies||'없음'}</div>
         ${rt.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${rt.fuelRequested}L${rt.fuelActual && rt.fuelActual!==rt.fuelRequested? ` (실제주입 ${rt.fuelActual}L)`:''}</div>`:''}
         ${(rt.loadDate||rt.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(rt.loadDate),rt.arriveTime].filter(Boolean).join(' · ')}</div>`:''}
