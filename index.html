@@ -857,7 +857,7 @@ async function renderQmStockListInner(){
         const elapsed = elapsedHours(g);
         const remaining = getCycle(g) - elapsed;
         const mColor = remaining<=0 ? '#C23B3B' : (remaining<=warnThreshold ? '#C97A1E' : '#2C6E49');
-        maintPill = `<span style="border:1px solid ${mColor};color:${mColor};background:${mColor}15;font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;white-space:nowrap;">마지막 정비 후 ${Math.round(elapsed).toLocaleString()}h 사용</span>`;
+        maintPill = `<span style="border:1px solid ${mColor};color:${mColor};background:${mColor}15;font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;white-space:nowrap;">마지막 오일교환 후 ${Math.round(elapsed).toLocaleString()}h 사용</span>`;
       } else {
         maintPill = `<span style="border:1px solid #C23B3B;color:#C23B3B;background:#C23B3B15;font-weight:800;font-size:10px;padding:6px 10px;border-radius:20px;white-space:nowrap;">확인불가</span>`;
       }
@@ -4115,10 +4115,10 @@ function inDCountLabel(dateStr){
   return `입고${diff}일전`;
 }
 
-// "마지막 정비: 1,311h (26.10.06)" 한 줄 (엔진오일교체 기준)
+// "마지막 오일교환: 1,311h (26.10.06)" 한 줄 (엔진오일교체 기준)
 function lastMaintLineHtml(g){
   if(!g || !g.hoursKnown || !(g.hours>0 || g.lastMaintHours>0)) return '';
-  return `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:3px;white-space:nowrap;">마지막 정비: <b style="color:var(--ink);">${Math.round(g.lastMaintHours||0).toLocaleString()}h</b>${g.lastMaintDate? ` <span>(${escR(g.lastMaintDate.slice(2).replace(/-/g,'.'))})</span>`:''}</div>`;
+  return `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:3px;white-space:nowrap;">마지막 오일교환: <b style="color:var(--ink);">${Math.round(g.lastMaintHours||0).toLocaleString()}h</b>${g.lastMaintDate? ` <span>(${escR(g.lastMaintDate.slice(2).replace(/-/g,'.'))})</span>`:''}</div>`;
 }
 function gaugeHtml(elapsed, remaining, cycle, isEstimate){
   const cyc = cycle || DEFAULT_CYCLE;
@@ -4127,7 +4127,7 @@ function gaugeHtml(elapsed, remaining, cycle, isEstimate){
   const color = st==='danger'?'var(--danger)':st==='warn'?'var(--warn)':'var(--ok)';
   const txt = remaining<0 ? (Math.abs(Math.round(remaining))+'h 초과') : (Math.round(remaining)+'h 남음');
   const estNote = isEstimate? `<div style="font-size:10.5px;color:var(--danger);font-weight:700;margin-top:1px;">(실측 아님 · 추정치)</div>` : '';
-  return `<div class="gauge-wrap"><div class="gauge"><div class="gauge-fill" style="width:${pct}%;background:${color}"></div></div><span class="gauge-txt" style="color:${color}">${txt}</span></div><div style="font-size:11px;margin-top:2px;color:var(--primary);">마지막 정비 후 ${Math.round(elapsed).toLocaleString()}시간 사용</div>${estNote}`;
+  return `<div class="gauge-wrap"><div class="gauge"><div class="gauge-fill" style="width:${pct}%;background:${color}"></div></div><span class="gauge-txt" style="color:${color}">${txt}</span></div><div style="font-size:11px;margin-top:2px;color:var(--primary);">마지막 오일교환 후 ${Math.round(elapsed).toLocaleString()}시간 사용</div>${estNote}`;
 }
 function pillHtml(status){
   const map={ok:['정상','ok'],warn:['임박','warn'],danger:['정비필요','danger']};
