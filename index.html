@@ -10540,6 +10540,7 @@ function parseSmsOrderText(text, baseTs){
       if(rest){
         const sp = splitCompanyPerson(rest);
         if(sp){ result.manager = sp.person; if(sp.company) customerFromManager = sp.company; }
+        else if(/^[가-힣]{2,4}$/.test(rest) && !result.manager){ result.manager = rest; } // "이승민01083288104"처럼 직함 없이 이름+번호
         else { managerPos = -1; processPiece(rest, pos); } // 담당자가 아니면(날짜·주소 등) 다시 처리
       }
       return;
@@ -10561,7 +10562,7 @@ function parseSmsOrderText(text, baseTs){
     if(qtyOnlyRe.test(l) || (supplyRe.test(l) && l.length<40)){ noteParts.push(l); return; }
     // "2시간대기후철수"처럼 대기시간을 설명하는 조각은 거래처명이 아니라 비고로 보내야 합니다.
     if(/\d+\s*시간.*(대기|후|뒤)/.test(l)){ noteParts.push(l); return; }
-    if(addressRe.test(l)){ result.address = result.address ? result.address+' '+l : l; return; }
+    if(addressRe.test(l)){ l = l.replace(/^(현장\s*)?(주소|위치)\s*[:：]?\s*/, '').trim(); result.address = result.address ? result.address+' '+l : l; return; }
     if(vm) return; // 전압만 있고 다른 정보가 없는 조각(예: "380볼트")은 업체명 후보에서 제외합니다.
     if(requestRe.test(l) && l.length>=8){ noteParts.push(l); return; } // "군산거하고 같이 한차로 해주세요"
     l = l.replace(fillerRe,'').trim();
@@ -10618,9 +10619,11 @@ function parseSmsOrderText(text, baseTs){
       else if(/오후\s*중/.test(arrivalLine)) result.arriveTime = '오후중';
     }
     const md = arrivalLine.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
-    if(arrivalLine.includes('오늘') || arrivalLine.includes('지금')) result.outDate = toLocalDateStr(baseDay);
-    else if(arrivalLine.includes('모레')){ const d = new Date(baseDay); d.setDate(d.getDate()+2); result.outDate = toLocalDateStr(d); }
-    else if(arrivalLine.includes('내일')){ const d = new Date(baseDay); d.setDate(d.getDate()+1); result.outDate = toLocalDateStr(d); }
+    // 날짜 숫자("7일", "10월 8일")가 있으면 그게 우선입니다. ("차량인적사항 오늘통보"의 '오늘'을 도착일로 잘못 보던 문제)
+    const hasDayNum = /(\d{1,2})\s*일/.test(arrivalLine);
+    if(!md && !hasDayNum && (arrivalLine.includes('오늘') || arrivalLine.includes('지금'))) result.outDate = toLocalDateStr(baseDay);
+    else if(!md && !hasDayNum && arrivalLine.includes('모레')){ const d = new Date(baseDay); d.setDate(d.getDate()+2); result.outDate = toLocalDateStr(d); }
+    else if(!md && !hasDayNum && arrivalLine.includes('내일')){ const d = new Date(baseDay); d.setDate(d.getDate()+1); result.outDate = toLocalDateStr(d); }
     else if(md){
       // "9월28일", "10월 1일(목)"처럼 월이 있으면 그 월을 그대로 씁니다. 두 달 넘게 지난 날짜면 내년으로 봅니다.
       let d = new Date(baseDay.getFullYear(), Number(md[1])-1, Number(md[2]));
