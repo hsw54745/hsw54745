@@ -5819,7 +5819,7 @@ function renderMaintList(){
       <td>${tankCapacityCellHtml(g)}</td>
       <td>${(()=>{ const wt = genWeightT(g); return wt ? `<span style="font-weight:700;white-space:nowrap;">${wt}t</span>` : '<span class="muted" style="font-size:11.5px;white-space:nowrap;">미입력</span>'; })()}</td>
       <td class="muted" style="font-size:12px;">${g.status==='in'?'입고':'출고중'}</td>
-      <td>${known? gaugeHtml(el,rem,getCycle(g),g.status!=='in' && g.rental && effEstDaily(g)>0) : unknownCellHtml}</td>
+      <td>${known? gaugeHtml(el,rem,getCycle(g),g.status!=='in' && g.rental && effEstDaily(g)>0) + `<div style="font-size:11.5px;color:var(--ink-soft);margin-top:3px;white-space:nowrap;">마지막 정비: <b style="color:var(--ink);">${Math.round(g.lastMaintHours||0).toLocaleString()}h</b>${g.lastMaintDate? ` <span>(${escR(g.lastMaintDate.slice(2).replace(/-/g,'.'))})</span>`:''}</div>` : unknownCellHtml}</td>
       <td>${known? pillHtml(maintStatus(rem)) : unknownPillHtml}</td>
       <td><div class="btn-row" style="align-items:center;">
         <button class="btn sm" onclick="openMaintModal('${g.id}')">정비 등록</button>
