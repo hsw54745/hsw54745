@@ -5421,6 +5421,7 @@ function renderOutList(){
       <td class="wrap-ok">${displayModel(g)}${genLengthHtml(g)}${outPatrolHtml(g)}${usableCapacityHtml(g)}${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
       <td class="muted" style="font-size:11px;">${rt.loadConfirmedBy? escR(rt.loadConfirmedBy) : (rt.outProcessedBy? escR(rt.outProcessedBy) : '-')}</td>
       <td>${(()=>{ const v=g.voltage||rt.voltage; const c=voltageColor(v); return v? `<span style="${c?`color:${c};font-weight:700;`:''}">${escR(v)}</span>` : '<span class="muted">-</span>'; })()}</td>
+      <td style="white-space:nowrap;">${(()=>{ const c = cityOf(rt.address||rt.site||''); return c? `<span class="pill" style="background:#E8EEF4;color:#5B7FA6;border-color:#5B7FA6;">${escR(c)}</span>` : '<span class="muted" style="font-size:11.5px;">-</span>'; })()}</td>
       <td class="wrap-ok">
         ${rt.customer||'<span class="muted">미기재</span>'}
         ${(rt.manager||rt.phone)? `<div class="muted" style="font-size:11px;">${[rt.manager,rt.phone].filter(Boolean).join(' · ')}</div>`:''}
@@ -5456,7 +5457,7 @@ function renderOutList(){
     </tr>`;
   };
   const allRows = list.map(rowHtml).join('');
-  const theadHtml = `<thead><tr><th style="width:30px;"><input type="checkbox" onchange="toggleSelectAllBulkIn(this)" title="전체 선택"></th><th>번호</th><th>모델</th><th>출고완료</th><th>전압</th><th>거래처/현장</th><th>출고일</th><th>사용일수</th><th>정비 주기(추정)</th><th>정비 예상시점</th><th>입고예정일</th><th></th></tr></thead>`;
+  const theadHtml = `<thead><tr><th style="width:30px;"><input type="checkbox" onchange="toggleSelectAllBulkIn(this)" title="전체 선택"></th><th>번호</th><th>모델</th><th>출고완료</th><th>전압</th><th>출고지역</th><th>거래처/현장</th><th>출고일</th><th>사용일수</th><th>정비 주기(추정)</th><th>정비 예상시점</th><th>입고예정일</th><th></th></tr></thead>`;
 
   // 용량(kW)별 버튼 목록
   const capacityCounts = {};
@@ -13203,8 +13204,18 @@ function openPrevRentalPopup(id){
       <div style="height:1px;background:var(--border);margin:2px 0;"></div>
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">출고시 누적</span><span style="font-size:14px;font-weight:700;font-family:var(--mono);">${prev.startHours!=null? prev.startHours.toLocaleString()+'h':'-'}</span></div>
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">입고시 누적</span><span style="font-size:14px;font-weight:700;font-family:var(--mono);">${prev.endHours!=null? prev.endHours.toLocaleString()+'h':'-'}</span></div>
-      <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">발전기 사용시간</span><span style="font-size:15px;font-weight:800;font-family:var(--mono);color:var(--primary-dark);">${(prev.usedHours||0).toLocaleString()}h${prevDays? ` <span style="font-size:12px;font-weight:700;color:var(--ink-soft);">(하루평균 ${Math.round((prev.usedHours||0)/prevDays*10)/10}h/일)</span>`:''}</span></div>
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">발전기 사용시간</span><span style="font-size:15px;font-weight:800;font-family:var(--mono);color:var(--primary-dark);">${prev.endHours==null? '<span style="color:var(--warn);font-size:13px;">미확인</span>' : `${(prev.usedHours||0).toLocaleString()}h`}${(prevDays && prev.endHours!=null)? ` <span style="font-size:12px;font-weight:700;color:var(--ink-soft);">(하루평균 ${Math.round((prev.usedHours||0)/prevDays*10)/10}h/일)</span>`:''}</span></div>
     </div>
+    ${(g && g.hoursKnown && prev.endHours==null) ? `
+    <div style="margin-top:12px;background:var(--warn-tint);border:1px solid var(--warn);border-radius:10px;padding:10px 12px;">
+      <div style="font-size:12.5px;font-weight:800;color:#8A5A00;margin-bottom:6px;">⚠️ 이 임대는 입고(반납)시 누적시간을 확인 못했습니다</div>
+      <div style="font-size:11.5px;color:#555;margin-bottom:8px;">현장이동 후 취소했거나 누적시간을 모르고 입고한 경우, 나중에 확인된 누적시간을 여기서 넣을 수 있습니다.${(g.status==='out' && g.rental && prevChainedToCurrent(g, prev))? ' 지금 나가 있는 현장의 출고시 누적시간도 같이 맞춰집니다.':''}</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <input type="number" id="prev-fill-end-hours" min="${prev.startHours||0}" placeholder="확인된 누적시간(h)" style="flex:1;padding:6px 8px;font-size:13px;">
+        <button class="btn sm primary" onclick="fillPrevRentalEndHours('${escR(id)}','${escR(prev.id)}')" style="white-space:nowrap;">저장</button>
+      </div>
+      <div id="prev-fill-err" style="display:none;color:var(--danger);font-size:12px;font-weight:700;margin-top:6px;"></div>
+    </div>` : ''}
     <div class="muted" style="font-size:11px;margin-top:10px;">${rentals.length}건의 임대 이력 중 가장 최근 건입니다.</div>`;
   box.innerHTML = `<div class="modal" style="max-width:420px;text-align:left;" onclick="event.stopPropagation()">
     <h3 style="text-align:center;">📜 이전 임대이력</h3>
@@ -13213,6 +13224,42 @@ function openPrevRentalPopup(id){
     <div class="modal-actions"><button class="btn" onclick="document.getElementById('prev-rental-popup').remove()">닫기</button></div>
   </div>`;
   document.body.appendChild(box);
+}
+// 지금 출고중인 임대가 직전 임대에서 "현장이동(반납 누적시간 미확인)"으로 바로 이어진 것인지
+function prevChainedToCurrent(g, prev){
+  const rt = g && g.rental;
+  return !!(rt && prev && prev.endHours==null && prev.inDate && rt.outDate===prev.inDate
+    && (rt.startHours||0)===(prev.startHours||0) && String(prev.note||'').includes('현장이동'));
+}
+// 직전 임대의 입고시 누적시간을 나중에 확인해서 넣습니다.
+async function fillPrevRentalEndHours(genId, rentalId){
+  const g = findGen(genId);
+  const prev = (DB.rentals||[]).find(r=>r && r.id===rentalId);
+  const errEl = document.getElementById('prev-fill-err');
+  const showErr = (m)=>{ if(errEl){ errEl.textContent = m; errEl.style.display='block'; } };
+  if(!g || !prev) return;
+  const v = Number((document.getElementById('prev-fill-end-hours')||{}).value);
+  if(!v || isNaN(v) || v<=0){ showErr('누적시간을 입력해주세요.'); return; }
+  if(v < (prev.startHours||0)){ showErr(`출고시 누적(${(prev.startHours||0).toLocaleString()}h)보다 작을 수 없습니다.`); return; }
+  const chained = prevChainedToCurrent(g, prev);
+  const used = v - (prev.startHours||0);
+  const days = (prev.outDate && prev.inDate) ? Math.max(1, Math.round((new Date(prev.inDate+'T00:00:00')-new Date(prev.outDate+'T00:00:00'))/86400000)) : 1;
+  if(used/days > 24 && !confirm(`사용시간 ${used.toLocaleString()}h를 ${days}일로 나누면 하루 ${(used/days).toFixed(1)}시간입니다. 숫자가 맞습니까?`)) return;
+  if(!confirm(`${g.id} 직전 임대(${prev.customer||'-'})의 입고시 누적시간을 ${v.toLocaleString()}h로 저장할까요?${chained? `\n\n지금 나가 있는 현장(${g.rental.customer||'-'})의 출고시 누적시간도 ${v.toLocaleString()}h로 바뀝니다.`:''}`)) return;
+  prev.endHours = v;
+  prev.usedHours = used;
+  prev.note = [String(prev.note||'').replace(/\s*-\s*반납시 누적시간 미확인/,''), `누적시간 나중에 입력 ${v.toLocaleString()}h (${DB.currentUserName||'-'} ${nowDateTimeStr()})`].filter(Boolean).join(' / ');
+  if(chained){
+    g.rental.startHours = v;
+    g.rental.note = String(g.rental.note||'').replace(/⚠️ 이전 현장\([^)]*\) 반납시 누적시간 미확인[^/]*/,'').replace(/^\s*\/\s*|\s*\/\s*$/g,'').trim();
+  }
+  // 발전기 현재 누적시간은 더 큰 값일 때만 올립니다 (이미 더 큰 실측이 있으면 그대로)
+  if(v > (g.hours||0)){ g.hours = v; g.hoursUpdatedAt = nowDateTimeStr(); g.hoursUpdatedBy = DB.currentUserName||null; }
+  await saveRentals();
+  await saveGens();
+  const pop = document.getElementById('prev-rental-popup'); if(pop) pop.remove();
+  renderContent();
+  flash('누적시간이 저장되었습니다');
 }
 function openInModal(id, isTransfer){
   const g = findGen(id);
