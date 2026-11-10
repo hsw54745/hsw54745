@@ -7272,12 +7272,14 @@ function openMonthRentalList(monthKey, genId){
   (DB.rentals||[]).forEach(r=>{
     if(!r || !r.outDate || r.outDate.slice(0,7)!==monthKey || !liveIds.has(r.genId)) return;
     if(genId && r.genId!==genId) return;
-    list.push({genId:r.genId, customer:r.customer||r.site||'', address:r.address||'', outDate:r.outDate, inDate:r.inDate||'', out:false, note:r.note||''});
+    list.push({genId:r.genId, customer:r.customer||r.site||'', address:r.address||'', outDate:r.outDate, inDate:r.inDate||'', out:false, note:r.note||'',
+      usedH: (r.endHours!=null && r.startHours!=null)? Math.max(0, r.endHours - r.startHours) : null});
   });
   (DB.gens||[]).forEach(g=>{
     if(g.status!=='out' || !g.rental || !g.rental.outDate || g.rental.outDate.slice(0,7)!==monthKey) return;
     if(genId && g.id!==genId) return;
-    list.push({genId:g.id, customer:g.rental.customer||g.rental.site||'', address:g.rental.address||'', outDate:g.rental.outDate, inDate:'', out:true, note:g.rental.note||''});
+    list.push({genId:g.id, customer:g.rental.customer||g.rental.site||'', address:g.rental.address||'', outDate:g.rental.outDate, inDate:'', out:true, note:g.rental.note||'',
+      usedH: null, estH: (g.hoursKnown && g.rental.startHours!=null)? Math.max(0, Math.round(estCurrentHours(g) - g.rental.startHours)) : null});
   });
   list.sort((a,b)=>a.outDate.localeCompare(b.outDate) || String(a.genId).localeCompare(String(b.genId),undefined,{numeric:true}));
   const days = (a,b)=>Math.max(0, Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000));
@@ -7294,6 +7296,10 @@ function openMonthRentalList(monthKey, genId){
       <td style="white-space:nowrap;">${x.outDate}</td>
       <td style="white-space:nowrap;">${x.out? '<span class="pill warn">출고중</span>' : (x.inDate||'-')}</td>
       <td style="white-space:nowrap;">${days(x.outDate, x.out? today : (x.inDate||x.outDate))}일</td>
+      <td style="white-space:nowrap;">${(()=>{ const hk = g ? g.hoursKnown : false;
+        if(!hk) return '<span class="muted">-</span>';
+        if(x.out) return x.estH!=null? `<span class="muted" title="출고중이라 추정값입니다">약 ${x.estH.toLocaleString()}h</span>` : '<span class="muted">-</span>';
+        return x.usedH!=null? `<b>${x.usedH.toLocaleString()}h</b>` : '<span style="color:var(--warn);font-size:11.5px;">미확인</span>'; })()}</td>
     </tr>`;
   }).join('');
   document.getElementById('modal-root').innerHTML = `
@@ -7302,9 +7308,9 @@ function openMonthRentalList(monthKey, genId){
       <h3 style="text-align:center;">📋 ${y}년 ${Number(m)}월 임대 목록${genId? ` · ${escR(genId)}` : ''}</h3>
       <div class="modal-sub" style="text-align:center;">그 달에 출고된 ${list.length}건 (현장이동 포함)</div>
       <div class="table-wrap" style="max-height:60vh;overflow:auto;"><table style="width:100%;table-layout:fixed;">
-        <colgroup><col style="width:30px;"><col style="width:52px;"><col style="width:170px;"><col style="width:22%;"><col><col style="width:88px;"><col style="width:88px;"><col style="width:58px;"></colgroup>
-        <thead><tr><th>#</th><th>번호</th><th>모델</th><th>거래처</th><th>현장 주소</th><th>출고일</th><th>입고일</th><th>사용일수</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="8" class="muted" style="text-align:center;">없음</td></tr>'}</tbody>
+        <colgroup><col style="width:30px;"><col style="width:52px;"><col style="width:170px;"><col style="width:22%;"><col><col style="width:88px;"><col style="width:88px;"><col style="width:58px;"><col style="width:72px;"></colgroup>
+        <thead><tr><th>#</th><th>번호</th><th>모델</th><th>거래처</th><th>현장 주소</th><th>출고일</th><th>입고일</th><th>사용일수</th><th>사용시간</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="9" class="muted" style="text-align:center;">없음</td></tr>'}</tbody>
       </table></div>
       <div class="modal-actions"><button class="btn primary" onclick="closeModal()">닫기</button></div>
     </div>
@@ -11778,7 +11784,8 @@ async function submitOutInfoEdit(id){
     qty: g.rental.qty||1,
     supplies: document.getElementById('f-oie-supplies').value.trim(),
     // 부자재를 고쳤으면 예전 선택목록은 버리고 적은 글 그대로 씁니다(화면 표시가 옛 목록으로 나오지 않게)
-    ...((document.getElementById('f-oie-supplies').value.trim() !== String(g.rental.supplies||'').trim()) ? {suppliesItems: [], suppliesCustom: document.getElementById('f-oie-supplies').value.trim()} : {}),
+    // (출고 때 재고에서 빠진 품목은 입고 때 재고로 돌려줘야 하므로 suppliesItemsDeducted에 따로 보관)
+    ...((document.getElementById('f-oie-supplies').value.trim() !== String(g.rental.supplies||'').trim()) ? {suppliesItems: [], suppliesCustom: document.getElementById('f-oie-supplies').value.trim(), suppliesItemsDeducted: [...(g.rental.suppliesItemsDeducted||[]), ...(g.rental.suppliesItems||[])]} : {}),
     paymentNote: (document.getElementById('f-oie-payment-note') ? document.getElementById('f-oie-payment-note').value.trim() : (g.rental.paymentNote||'')),
     fuelRequested: (document.getElementById('f-oie-fuel-toggle') && document.getElementById('f-oie-fuel-toggle').checked) ? (Number(document.getElementById('f-oie-fuel-req').value)||null) : null,
     fuelActual: (document.getElementById('f-oie-fuel-toggle') && document.getElementById('f-oie-fuel-toggle').checked) ? (Number(document.getElementById('f-oie-fuel-actual').value)||null) : null,
@@ -12708,9 +12715,10 @@ async function finishBulkIn(gens, inDate, hoursMap, voltMap, suppliesGens){
       g.hours = endHours;
     }
     // 부자재 재고 복원 (개별 입고 처리와 동일하게, 회수 확인된 건은 재고를 다시 채워줍니다)
-    if(g.rental && g.rental.suppliesItems && g.rental.suppliesItems.length){
+    const stockBackItems = g.rental ? [...(g.rental.suppliesItems||[]), ...(g.rental.suppliesItemsDeducted||[])] : [];
+    if(stockBackItems.length){
       DB.suppliesStock = DB.suppliesStock || {};
-      g.rental.suppliesItems.forEach(it=>{
+      stockBackItems.forEach(it=>{
         DB.suppliesStock[it.name] = (DB.suppliesStock[it.name]!==undefined ? DB.suppliesStock[it.name] : 0) + (it.qty||1);
       });
     }
@@ -13718,7 +13726,8 @@ async function submitIn(id, isTransfer){
   // "정말 맞습니까?" 확인 후 진행할 수 있게 합니다.
   if(g.rental.outDate && inDate && g.hoursKnown && endHours!==null){
     const usedH = endHours - g.rental.startHours;
-    const outD = new Date(g.rental.outDate+'T00:00:00');
+    // 현장이동(반납 누적 미확인)으로 이어진 출고면 출고시 누적이 처음 현장 값이므로, 처음 현장 출고일부터 일수를 셉니다
+    const outD = new Date((transferChainStartDate(g) || g.rental.outDate)+'T00:00:00');
     const inD = new Date(inDate+'T00:00:00');
     const days = Math.max(1, Math.round((inD-outD)/86400000));
     const avgDaily = usedH/days;
@@ -13774,9 +13783,10 @@ async function submitInFinish(id, isTransfer, vals){
     g.repairNote = '';
     g.repairSince = null;
   }
-  if(suppliesRecovered && rt.suppliesItems && rt.suppliesItems.length){
+  const stockBackItems = [...(rt.suppliesItems||[]), ...(rt.suppliesItemsDeducted||[])];
+  if(suppliesRecovered && stockBackItems.length){
     DB.suppliesStock = DB.suppliesStock || {};
-    rt.suppliesItems.forEach(it=>{
+    stockBackItems.forEach(it=>{
       DB.suppliesStock[it.name] = (DB.suppliesStock[it.name]!==undefined ? DB.suppliesStock[it.name] : 0) + (it.qty||1);
     });
     await saveSuppliesStock();
