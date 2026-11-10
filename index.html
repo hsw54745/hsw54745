@@ -3710,6 +3710,31 @@ function snapshotById(list){
   (list||[]).forEach(x=>{ if(x && x.id) m[x.id] = JSON.stringify(x); });
   return m;
 }
+// 자동 동기화용 3방향 병합: 서버에서 받아온 목록(remote)을 화면 데이터(local)에 반영하되,
+// 서버 쪽이 마지막 동기화(snap) 이후 그대로인 항목은 이 화면에서 고쳤을 수 있으므로(아직 저장 전) 화면 값을 유지합니다.
+// 서버 쪽이 바뀐 항목(다른 사람이 고친 것)은 서버 값을 받습니다.
+// (예전엔 저장 전에 동기화가 끼어들면 서버의 옛 값으로 덮어써서 방금 고친 내용이 사라졌음 - S-21 누적시간 사례)
+function syncMergeKeepLocal(local, remote, snap){
+  local = local || []; remote = remote || [];
+  if(!snap || Object.keys(snap).length===0) return remote; // 기준이 없으면 예전처럼 서버 값 그대로
+  const localById = {}; local.forEach(x=>{ if(x && x.id) localById[x.id] = x; });
+  const remoteIds = new Set();
+  const merged = [];
+  remote.forEach(r=>{
+    if(!r || !r.id){ merged.push(r); return; }
+    remoteIds.add(r.id);
+    const remoteUnchanged = snap[r.id]!==undefined && snap[r.id]===JSON.stringify(r);
+    if(remoteUnchanged){
+      if(localById[r.id]) merged.push(localById[r.id]);   // 서버는 그대로 → 화면 값(고친 내용 포함) 유지
+      // 화면에서 지웠고 서버는 그대로 → 지운 상태 유지
+    } else {
+      merged.push(r);                                      // 서버가 바뀜(다른 사람이 고침/추가) → 서버 값
+    }
+  });
+  // 화면에서 새로 추가했고 아직 서버에 없는 항목은 유지 (서버에서 지워진 항목은 다시 살리지 않음)
+  local.forEach(x=>{ if(x && x.id && !remoteIds.has(x.id) && snap[x.id]===undefined) merged.push(x); });
+  return merged;
+}
 async function saveGens(){
   const hasBaseline = Object.keys(lastSyncedGensSnapshot).length>0;
   if(hasBaseline && !hasPendingWrite('gen-fleet-v2', true)){
@@ -3770,7 +3795,10 @@ async function saveArrayMerged(key, dbField, lastSnapshotGetter, lastSnapshotSet
   lastSnapshotSetter(snapshotById(DB[dbField]));
 }
 async function saveRentals(){ await saveArrayMerged('gen-rentals-v2', 'rentals', ()=>lastSyncedRentalsSnapshot, (s)=>{ lastSyncedRentalsSnapshot = s; }); }
-async function saveMaint(){ await storageSetChecked('gen-maintenance-v2', JSON.stringify(DB.maint), true); }
+// 정비이력도 다른 사람(퀵메뉴 등)이 그 사이 등록한 기록을 지우지 않도록, 서버 최신본 위에 내가 바꾼 것만 얹어서 저장합니다.
+// (예전엔 통째로 덮어써서, 폰에서 정비 등록한 직후 사무실에서 정비를 등록하면 폰에서 넣은 기록이 사라질 수 있었음)
+let lastSyncedMaintSnapshot = {};
+async function saveMaint(){ await saveArrayMerged('gen-maintenance-v2', 'maint', ()=>lastSyncedMaintSnapshot, (s)=>{ lastSyncedMaintSnapshot = s; }); }
 async function saveReservations(){ await saveArrayMerged('gen-reservations-v1', 'reservations', ()=>lastSyncedReservationsSnapshot, (s)=>{ lastSyncedReservationsSnapshot = s; }); }
 async function saveMaterials(){ await storageSetChecked('gen-materials-v1', JSON.stringify(DB.materials), true); }
 async function saveTechnicians(){ await storageSetChecked('gen-technicians-v1', JSON.stringify(DB.technicians), true); }
@@ -6920,6 +6948,8 @@ function handleRestoreFile(input){
       DB.customerNotes = d.customerNotes || {};
       DB.readMarkers = d.readMarkers || {};
       DB.companyInfo = (d.companyInfo && d.companyInfo.name) ? d.companyInfo : DB.companyInfo;
+      // 백업 복원은 서버 내용을 백업과 똑같이 덮어써야 하므로, 병합 기준을 비워서 통째로 저장되게 합니다
+      lastSyncedGensSnapshot = {}; lastSyncedRentalsSnapshot = {}; lastSyncedMaintSnapshot = {}; lastSyncedReservationsSnapshot = {};
       await saveGens();
       await saveRentals();
       await saveMaint();
@@ -14278,6 +14308,7 @@ async function init(){
   DB.rentals = results.rentals;
   lastSyncedRentalsSnapshot = snapshotById(DB.rentals);
   DB.maint = results.maint;
+  lastSyncedMaintSnapshot = snapshotById(DB.maint);
   DB.reservations = results.reservations;
   lastSyncedReservationsSnapshot = snapshotById(DB.reservations);
   DB.materials = results.materials;
@@ -14450,14 +14481,18 @@ async function syncFrequentData(){
       peekStorage('gen-return-requests-v1', DB.returnRequests)
     ]);
     if(shouldSkipSync() || JSON.stringify({gens:DB.gens, reservations:DB.reservations}) !== localBeforePeek) return;
+    // 서버 값과 화면 값을 합친 결과가 지금 화면과 다를 때만 반영·다시 그리기
+    const mergedGens = syncMergeKeepLocal(DB.gens, gens, lastSyncedGensSnapshot);
+    const mergedRes = syncMergeKeepLocal(DB.reservations, reservations, lastSyncedReservationsSnapshot);
+    lastSyncedGensSnapshot = snapshotGens(gens); lastSyncedReservationsSnapshot = snapshotById(reservations);
     const before = JSON.stringify({gens:DB.gens, reservations:DB.reservations, returnRequests:DB.returnRequests});
-    const after = JSON.stringify({gens, reservations, returnRequests});
+    const after = JSON.stringify({gens:mergedGens, reservations:mergedRes, returnRequests});
     if(before !== after){
       const newReservations = (reservations||[]).filter(r=>r && (r.pendingLoad || r.genId===UNASSIGNED_GEN_ID) && !seenReservationIds.has(r.id) && r.outProcessedBy!==DB.currentUserName);
       seenReservationIds = new Set((reservations||[]).filter(r=>r.pendingLoad || r.genId===UNASSIGNED_GEN_ID).map(r=>r.id));
       const newReturnRequests = (returnRequests||[]).filter(r=>r && !seenReturnRequestIds.has(r.id) && r.authorBy!==DB.currentUserName);
       seenReturnRequestIds = new Set((returnRequests||[]).map(r=>r.id));
-      DB.gens = gens; lastSyncedGensSnapshot = snapshotGens(DB.gens); DB.reservations = reservations; lastSyncedReservationsSnapshot = snapshotById(DB.reservations);
+      DB.gens = mergedGens; DB.reservations = mergedRes;
       DB.returnRequests = returnRequests || [];
       if(!shouldSkipSync()){
         renderTabbar();
@@ -14517,14 +14552,16 @@ async function syncFromStorage(){
       peekStorage('gen-last-backup-date-v1', DB.lastBackupDate),
       peekStorage('gen-delete-log-v1', DB.deleteLog)
     ]);
+    const mergedRentals = syncMergeKeepLocal(DB.rentals, rentals, lastSyncedRentalsSnapshot); lastSyncedRentalsSnapshot = snapshotById(rentals);
+    const mergedMaint = syncMergeKeepLocal(DB.maint, maint, lastSyncedMaintSnapshot); lastSyncedMaintSnapshot = snapshotById(maint);
     const before = JSON.stringify({rentals:DB.rentals,maint:DB.maint,materials:DB.materials,technicians:DB.technicians,warnThreshold:DB.warnThreshold,partsStock:DB.partsStock,partsSpecs:DB.partsSpecs,partsUnit:DB.partsUnit,partsCategory:DB.partsCategory,partsSupplier:DB.partsSupplier,partsMinStock:DB.partsMinStock,partsPurchaseLog:DB.partsPurchaseLog,consumableOrders:DB.consumableOrders,orderMarks:DB.orderMarks,improvements:DB.improvements,teamMembers:DB.teamMembers,suppliesCatalog:DB.suppliesCatalog,suppliesStock:DB.suppliesStock,modelColors:DB.modelColors,notices:DB.notices,incomingSmsOrders:DB.incomingSmsOrders,calendarEvents:DB.calendarEvents,genColorOverrides:DB.genColorOverrides,cancelOutHistory:DB.cancelOutHistory,palletDefaultRemoved:DB.palletDefaultRemoved,suppliesSizes:DB.suppliesSizes,suppliesSpecs:DB.suppliesSpecs,suppliesCategories:DB.suppliesCategories,customerNotes:DB.customerNotes,readMarkers:DB.readMarkers,companyInfo:DB.companyInfo,lastBackupDate:DB.lastBackupDate,deleteLog:DB.deleteLog});
-    const after = JSON.stringify({rentals,maint,materials,technicians,warnThreshold,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,modelColors,notices,incomingSmsOrders,calendarEvents,genColorOverrides,cancelOutHistory,palletDefaultRemoved,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate,deleteLog});
+    const after = JSON.stringify({rentals:mergedRentals,maint:mergedMaint,materials,technicians,warnThreshold,partsStock,partsSpecs,partsUnit,partsCategory,partsSupplier,partsMinStock,partsPurchaseLog,consumableOrders,orderMarks,improvements,teamMembers,suppliesCatalog,suppliesStock,modelColors,notices,incomingSmsOrders,calendarEvents,genColorOverrides,cancelOutHistory,palletDefaultRemoved,suppliesSizes,suppliesSpecs,suppliesCategories,customerNotes,readMarkers,companyInfo,lastBackupDate,deleteLog});
     if(before !== after){
       const newNotices = (notices||[]).filter(n=>n && !seenNoticeIds.has(n.id) && n.authorBy!==DB.currentUserName);
       const newEvents = (calendarEvents||[]).filter(e=>e && !seenEventIds.has(e.id) && e.authorBy!==DB.currentUserName);
       seenNoticeIds = new Set((notices||[]).map(n=>n.id));
       seenEventIds = new Set((calendarEvents||[]).map(e=>e.id));
-      DB.rentals = rentals; lastSyncedRentalsSnapshot = snapshotById(DB.rentals); DB.maint = maint;
+      DB.rentals = mergedRentals; DB.maint = mergedMaint;
       DB.materials = materials; DB.technicians = technicians; DB.warnThreshold = warnThreshold;
       DB.partsStock = partsStock; DB.partsSpecs = partsSpecs; DB.partsUnit = partsUnit || {}; DB.partsCategory = partsCategory || {}; DB.partsSupplier = partsSupplier; DB.partsMinStock = partsMinStock; DB.partsPurchaseLog = partsPurchaseLog; DB.consumableOrders = consumableOrders; DB.orderMarks = orderMarks; DB.improvements = improvements; DB.teamMembers = teamMembers; DB.suppliesCatalog = suppliesCatalog; DB.suppliesStock = suppliesStock; DB.modelColors = modelColors; DB.notices = notices; DB.incomingSmsOrders = incomingSmsOrders || []; DB.calendarEvents = calendarEvents; DB.genColorOverrides = genColorOverrides; DB.cancelOutHistory = cancelOutHistory || []; DB.palletDefaultRemoved = palletDefaultRemoved === true; DB.suppliesSizes = suppliesSizes; DB.suppliesSpecs = suppliesSpecs; DB.suppliesCategories = suppliesCategories || {}; DB.customerNotes = customerNotes || {}; DB.readMarkers = readMarkers || {}; DB.companyInfo = (companyInfo && companyInfo.name) ? companyInfo : DB.companyInfo; DB.lastBackupDate = lastBackupDate; DB.deleteLog = deleteLog || []; lastSyncedDeleteLogSnapshot = snapshotById(DB.deleteLog);
       applyCompanyBranding();
