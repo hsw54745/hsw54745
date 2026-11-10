@@ -7113,8 +7113,20 @@ function deleteMaint(mid, genId){
   }, '삭제');
 }
 
+let SETTLE_MONTHS = [];
 function renderSettlementTab(){
   const cutoff = new Date(Date.now()-90*86400000);
+  { // 최근 3개월 (이번 달 포함, 오래된 달부터)
+    const now = new Date(); const todayS = toLocalDateStr(now);
+    SETTLE_MONTHS = [2,1,0].map(back=>{
+      const d = new Date(now.getFullYear(), now.getMonth()-back, 1);
+      const nx = new Date(d.getFullYear(), d.getMonth()+1, 1);
+      const start = toLocalDateStr(d), nextStr = toLocalDateStr(nx);
+      const endNext = back===0 ? (()=>{ const t=new Date(now); t.setDate(t.getDate()+1); const ts=toLocalDateStr(t); return ts<nextStr? ts : nextStr; })() : nextStr;
+      return {key:start.slice(0,7), label:`${d.getMonth()+1}월`, start, endNext,
+        daysInMonth: Math.round((new Date(endNext+'T00:00:00')-new Date(start+'T00:00:00'))/86400000)};
+    });
+  }
   const utilList = activeGens().sort(sortByIdNatural).map(g=>{
     const gRentals = DB.rentals.filter(r=>r.genId===g.id && r.outDate && r.inDate);
     let daysOut = 0;
@@ -7131,15 +7143,28 @@ function renderSettlementTab(){
       if(now>s) daysOut += Math.round((now-s)/86400000);
     }
     const rate = Math.max(0, Math.min(100, Math.round(daysOut/90*100)));
-    // 이번 달(1일~오늘)에 출고된 건수 (지금 나가 있는 건 포함, 현장이동도 1건)
-    const monthKey = toLocalDateStr(new Date()).slice(0,7);
-    let rentCount = DB.rentals.filter(r=>r.genId===g.id && r.outDate && r.outDate.slice(0,7)===monthKey).length;
-    if(g.status==='out' && g.rental && g.rental.outDate && g.rental.outDate.slice(0,7)===monthKey) rentCount++;
-    return {g, rate, daysOut, rentCount};
+    // 최근 3개월(이번 달 포함) 월별 임대건수·임대일수
+    //  건수: 그 달에 출고된 건수(지금 나가 있는 건·현장이동 포함)
+    //  일수: 그 달 안에서 나가 있던 일수(지난달부터 계속 나가 있는 것도 이번 달 일수에 들어감)
+    const todayStr = toLocalDateStr(new Date());
+    const spans = DB.rentals.filter(r=>r.genId===g.id && r.outDate).map(r=>({out:r.outDate, in:r.inDate||todayStr}));
+    if(g.status==='out' && g.rental && g.rental.outDate) spans.push({out:g.rental.outDate, in:todayStr});
+    const months = SETTLE_MONTHS.map(mo=>{
+      const count = spans.filter(sp=>sp.out.slice(0,7)===mo.key).length;
+      let days = 0;
+      spans.forEach(sp=>{
+        const st = sp.out > mo.start ? sp.out : mo.start;
+        const en = sp.in < mo.endNext ? sp.in : mo.endNext;
+        const d = Math.round((new Date(en+'T00:00:00') - new Date(st+'T00:00:00'))/86400000);
+        if(d>0) days += d;
+      });
+      return {count, days: Math.min(days, mo.daysInMonth)};
+    });
+    return {g, rate, daysOut, months};
   }).sort((a,b)=>b.rate-a.rate);
   const utilRowHtml = x=>{
     const color = x.rate>=70? 'var(--ok)' : x.rate>=40? 'var(--warn)' : 'var(--danger)';
-    return `<tr><td class="gid">${x.g.id}</td><td class="wrap-ok">${displayModel(x.g)}</td><td class="muted">${x.daysOut}일</td><td style="white-space:nowrap;">${x.rentCount>0? `<b>${x.rentCount}건</b>` : '<span class="muted">0건</span>'}</td><td><div class="gauge-wrap"><div class="gauge"><div class="gauge-fill" style="width:${x.rate}%;background:${color};"></div></div><span class="gauge-txt" style="color:${color};">${x.rate}%</span></div></td></tr>`;
+    return `<tr><td class="gid">${x.g.id}</td><td class="wrap-ok">${displayModel(x.g)}</td><td class="muted">${x.daysOut}일</td>${x.months.map(m=>`<td style="white-space:nowrap;font-size:11.5px;text-align:center;padding-left:4px;padding-right:4px;">${m.count>0? `<b>${m.count}건</b>` : '<span class="muted">0건</span>'}<span class="muted">·</span>${m.days>0? `${m.days}일` : '<span class="muted">0일</span>'}</td>`).join('')}<td><div class="gauge-wrap"><div class="gauge"><div class="gauge-fill" style="width:${x.rate}%;background:${color};"></div></div><span class="gauge-txt" style="color:${color};">${x.rate}%</span></div></td></tr>`;
   };
   const utilHalf = Math.ceil(utilList.length/2);
   const utilRows1 = utilList.slice(0, utilHalf).map(utilRowHtml).join('');
@@ -7169,14 +7194,14 @@ function renderSettlementTab(){
 
   return `
     <div class="section-title">📊 발전기별 임대율 (최근 90일)</div>
-    <details class="info-toggle"><summary></summary><p class="muted">최근 90일 중 출고(임대)되어 있던 비율입니다. 월 임대건수는 이번 달(1일~오늘)에 출고된 건수입니다(지금 나가 있는 건·현장이동 포함). 낮은 순으로 확인하면 놀고 있는 장비를 파악할 수 있습니다.</p></details>
+    <details class="info-toggle"><summary></summary><p class="muted">최근 90일 중 출고(임대)되어 있던 비율입니다. 월별 건수는 그 달에 출고된 건수(지금 나가 있는 건·현장이동 포함), 일수는 그 달 안에서 나가 있던 일수입니다(이번 달은 오늘까지). 낮은 순으로 확인하면 놀고 있는 장비를 파악할 수 있습니다.</p></details>
     <div class="util-two-col">
       <div class="util-table"><table>
-        <thead><tr><th>번호</th><th>모델</th><th>출고일수</th><th>${new Date().getMonth()+1}월 임대건수</th><th>임대율</th></tr></thead>
+        <thead><tr><th>번호</th><th>모델</th><th style="white-space:nowrap;">출고일수<br><span class="muted" style="font-weight:400;font-size:10px;">(90일)</span></th>${SETTLE_MONTHS.map(m=>`<th style="white-space:nowrap;text-align:center;">${m.label}<br><span class="muted" style="font-weight:400;font-size:10px;">건수·일수</span></th>`).join('')}<th>임대율</th></tr></thead>
         <tbody>${utilRows1}</tbody>
       </table></div>
       <div class="util-table"><table>
-        <thead><tr><th>번호</th><th>모델</th><th>출고일수</th><th>${new Date().getMonth()+1}월 임대건수</th><th>임대율</th></tr></thead>
+        <thead><tr><th>번호</th><th>모델</th><th style="white-space:nowrap;">출고일수<br><span class="muted" style="font-weight:400;font-size:10px;">(90일)</span></th>${SETTLE_MONTHS.map(m=>`<th style="white-space:nowrap;text-align:center;">${m.label}<br><span class="muted" style="font-weight:400;font-size:10px;">건수·일수</span></th>`).join('')}<th>임대율</th></tr></thead>
         <tbody>${utilRows2}</tbody>
       </table></div>
     </div>
