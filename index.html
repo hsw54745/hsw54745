@@ -1567,16 +1567,18 @@ let qmMaintIncludeIn = false; // 입고된 발전기도 보기
 let qmMaintSearch = '';
 const QM_MAINT_CONTENT = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1차교체','오일필터1차점검','오일필터2차교체','오일필터2차점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검 및 보충','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소','연료통청소'];
 async function qmLoadMaintData(){
-  const [gc, mc, matc, cic, wc] = await Promise.all([
+  const [gc, mc, matc, cic, wc, rc2] = await Promise.all([
     window.storage.get('gen-fleet-v2', true),
     window.storage.get('gen-maintenance-v2', true).catch(()=>null),
     window.storage.get('gen-materials-v1', true).catch(()=>null),
     window.storage.get('gen-company-info-v1', true).catch(()=>null),
-    window.storage.get('gen-warn-threshold-v1', true).catch(()=>null)
+    window.storage.get('gen-warn-threshold-v1', true).catch(()=>null),
+    window.storage.get('gen-rentals-v2', true).catch(()=>null)
   ]);
   const parse = (c, d)=>{ try{ const v = c ? JSON.parse(c.value) : d; return v==null? d : v; }catch(e){ return d; } };
   DB.gens = parse(gc, []); DB.maint = parse(mc, []); DB.materials = parse(matc, {});
   DB.companyInfo = parse(cic, DB.companyInfo||{}); DB.warnThreshold = parse(wc, 50) || 50;
+  DB.rentals = parse(rc2, []); // 현장이동으로 이어진 출고의 사용시간 추정(이전 현장부터 이어서)에 필요 - 읽기 전용
   qmMaterialsLoadedAt = Date.now();
 }
 function qmMaintStatusHtml(g){
@@ -3947,13 +3949,30 @@ function estCurrentHours(g){
   const ed = effEstDaily(g);
   if(g.status==='out' && g.rental && ed>0 && g.rental.outDate){
     // 출고 후 현장에서 계기를 읽은 기록(hoursReadDate)이 있으면 그 시점부터 추정합니다.
-    const readLater = g.hoursReadDate && g.hoursReadDate > g.rental.outDate;
-    const fromDate = readLater ? g.hoursReadDate : g.rental.outDate;
+    // 현장이동(공장 미경유)으로 이어진 출고면, 이전 현장 반납시 누적시간을 못 봤으므로
+    // 이전 현장 출고일부터 계속 이어서 추정합니다. (출고시 누적이 이전 현장 출고시 값 그대로라서)
+    const estStart = transferChainStartDate(g);
+    const readLater = g.hoursReadDate && g.hoursReadDate > estStart;
+    const fromDate = readLater ? g.hoursReadDate : estStart;
     const fromHours = readLater ? (g.hours||0) : (g.rental.startHours||0);
     const days = Math.max(0,(Date.now() - new Date(fromDate+'T00:00:00').getTime())/86400000);
     return fromHours + days*ed;
   }
   return g.hours||0;
+}
+// 현재 출고가 "현장이동 + 반납시 누적시간 미확인"으로 이어진 경우, 추정을 시작할 날짜(처음 현장 출고일)를 찾습니다.
+function transferChainStartDate(g){
+  const rt = g && g.rental;
+  if(!rt || !rt.outDate) return rt ? rt.outDate : null;
+  let start = rt.outDate, startHours = rt.startHours;
+  const list = (DB.rentals||[]).filter(r=>r && r.genId===g.id);
+  for(let i=0;i<10;i++){
+    const prev = list.find(r=>r.inDate===start && r.endHours==null && r.outDate && r.outDate<=start
+      && (r.startHours||0)===(startHours||0) && String(r.note||'').includes('현장이동'));
+    if(!prev) break;
+    start = prev.outDate;
+  }
+  return start;
 }
 function estElapsed(g){ return Math.max(0, estCurrentHours(g) - (g.lastMaintHours||0)); }
 function estRemaining(g){ return getCycle(g) - estElapsed(g); }
