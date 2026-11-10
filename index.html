@@ -7029,7 +7029,7 @@ function renderGenHistory(){
     <div class="section-title">📜 누적 임대 이력 <span class="cnt">${rentals.length}건</span>${rentals.length>0?` <button class="btn sm" onclick="exportRentalsCsv('${id}')">CSV 내보내기</button>`:''}</div>
     ${rentals.length===0? `<div class="empty">임대 이력이 없습니다.</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>도착일</th><th>입고일</th><th>사용일수</th><th>거래처</th><th>현장</th><th>출고시 누적</th><th>입고시 누적</th><th>발전기 사용시간</th><th></th></tr></thead>
+      <thead><tr><th>도착일</th><th>입고일</th><th>사용일수</th><th>거래처</th><th>현장</th><th>출고시 누적</th><th>입고시 누적</th><th>발전기 사용시간</th><th>하루평균</th><th></th></tr></thead>
       <tbody>${rentals.map(r=>`<tr>
         <td>${dow(r.outDate)||'-'}</td>
         <td>${dow(r.inDate)||'-'}</td>
@@ -7038,7 +7038,12 @@ function renderGenHistory(){
         <td class="wrap-ok">${[r.site,r.address].filter(Boolean).join(' · ')||'-'}${r.supplies? `<div class="muted" style="font-size:11px;">부자재(출고): ${r.supplies}</div>`:''}${r.supplies? `<div class="muted" style="font-size:11px;">부자재 회수: ${r.suppliesRecovered? '<span class="pill ok">회수됨</span>' : `<span class="pill danger">회수안됨</span>${r.suppliesNote? ` - ${r.suppliesNote}`:''}`}</div>`:''}${r.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${r.fuelRequested}L${r.fuelActual && r.fuelActual!==r.fuelRequested? ` (실제주입 ${r.fuelActual}L)`:''}</div>`:''}${r.fuelNotUsed? `<div class="muted" style="font-size:11px;">반납시 연료: <span class="pill gray">연료사용안함</span></div>`:''}${(!r.fuelNotUsed && r.measuredFuelHeightCm!=null)? `<div class="muted" style="font-size:11px;">반납시 연료: ${(()=>{ const L=computeFuelLiters(g, r.measuredFuelHeightCm); return L!=null? `약 ${L}L ` : ''; })()}(측정높이 ${r.measuredFuelHeightCm}cm)</div>`:''}${(()=>{ const given = r.fuelRequested!=null? r.fuelRequested : r.fuelActual; const remain = r.measuredFuelHeightCm!=null? computeFuelLiters(g, r.measuredFuelHeightCm) : null; if(given==null || remain==null) return ''; const used = Math.round((given-remain)*10)/10; return `<div class="muted" style="font-size:11px;font-weight:700;color:var(--primary-dark);">⛽ ${given}L 중 ${remain}L 남아서 반납 → 사용량 약 ${used}L</div>`; })()}${(r.loadDate||r.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(r.loadDate),r.arriveTime].filter(Boolean).join(' · ')}</div>`:''}${r.freightBearer? `<div class="muted" style="font-size:11px;">배차: ${r.freightBearer}</div>`:''}${r.note? `<div class="muted" style="font-size:11px;">비고: ${r.note}</div>`:''}${(r.loadConfirmedBy||r.outProcessedBy||r.inProcessedBy)? `<div class="muted" style="font-size:11px;">${[(r.loadConfirmedBy||r.outProcessedBy)? `출고: ${escR(r.loadConfirmedBy||r.outProcessedBy)}`:null, r.inProcessedBy? `입고: ${escR(r.inProcessedBy)}`:null].filter(Boolean).join(' · ')}</div>`:''}</td>
         <td class="muted">${r.startHours!=null? r.startHours.toLocaleString()+'h' : '-'}</td>
         <td class="muted">${r.endHours!=null? r.endHours.toLocaleString()+'h' : '-'}</td>
-        <td class="muted" style="font-weight:700;">${(r.usedHours||0).toLocaleString()}h</td>
+        <td class="muted" style="font-weight:700;">${(r.endHours==null && r.startHours!=null && g.hoursKnown)? '<span style="color:var(--warn);font-weight:700;">미확인</span>' : (r.usedHours||0).toLocaleString()+'h'}</td>
+        <td style="white-space:nowrap;">${(()=>{ // 사용시간 ÷ 사용일수(왼쪽에 보이는 일수 그대로)
+          const d = rentalUsedDaysInclusive(r);
+          if(!g.hoursKnown || !d || r.endHours==null) return '<span class="muted">-</span>';
+          const avg = (r.usedHours||0)/d;
+          return `<span style="${avg>24?'color:var(--danger);font-weight:800;':'font-weight:700;'}">${avg.toFixed(1)}h</span>`; })()}</td>
         <td><button class="btn sm danger" onclick="deleteRental('${r.id}','${id}')">삭제</button></td>
       </tr>`).join('')}</tbody>
     </table></div>`}
@@ -7290,16 +7295,22 @@ function openMonthRentalList(monthKey, genId){
     return `<tr>
       <td class="muted">${i+1}</td>
       <td class="gid">${escR(x.genId)}</td>
-      <td class="wrap-ok" style="font-size:11.5px;line-height:1.3;word-break:keep-all;">${g? displayModel(g) : '-'}</td>
+      <td style="font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${g? escR(g.model||'') : ''}">${g? displayModel(g) : '-'}</td>
       <td class="wrap-ok">${escR(x.customer)||'<span class="muted">미기재</span>'}${transfer?' <span class="pill" style="font-size:10px;">현장이동</span>':''}</td>
       <td class="wrap-ok" style="font-size:12px;">${escR(x.address)||'-'}</td>
       <td style="white-space:nowrap;">${x.outDate}</td>
       <td style="white-space:nowrap;">${x.out? '<span class="pill warn">출고중</span>' : (x.inDate||'-')}</td>
       <td style="white-space:nowrap;">${days(x.outDate, x.out? today : (x.inDate||x.outDate))}일</td>
-      <td style="white-space:nowrap;">${(()=>{ const hk = g ? g.hoursKnown : false;
-        if(!hk) return '<span class="muted">-</span>';
-        if(x.out) return x.estH!=null? `<span class="muted" title="출고중이라 추정값입니다">약 ${x.estH.toLocaleString()}h</span>` : '<span class="muted">-</span>';
-        return x.usedH!=null? `<b>${x.usedH.toLocaleString()}h</b>` : '<span style="color:var(--warn);font-size:11.5px;">미확인</span>'; })()}</td>
+      ${(()=>{ const hk = g ? g.hoursKnown : false;
+        const d = Math.max(1, days(x.outDate, x.out? today : (x.inDate||x.outDate))); // 당일 입출고도 1일로 나눔
+        if(!hk) return '<td class="muted">-</td><td class="muted">-</td>';
+        if(x.out){
+          if(x.estH==null) return '<td class="muted">-</td><td class="muted">-</td>';
+          return `<td style="white-space:nowrap;"><span class="muted" title="출고중이라 추정값입니다">약 ${x.estH.toLocaleString()}h</span></td><td style="white-space:nowrap;"><span class="muted" title="출고중이라 추정값입니다">약 ${(x.estH/d).toFixed(1)}h</span></td>`;
+        }
+        if(x.usedH==null) return '<td style="white-space:nowrap;color:var(--warn);font-size:11.5px;">미확인</td><td class="muted">-</td>';
+        const avg = x.usedH/d;
+        return `<td style="white-space:nowrap;"><b>${x.usedH.toLocaleString()}h</b></td><td style="white-space:nowrap;${avg>24?'color:var(--danger);font-weight:800;':''}">${avg.toFixed(1)}h</td>`; })()}
     </tr>`;
   }).join('');
   document.getElementById('modal-root').innerHTML = `
@@ -7308,9 +7319,9 @@ function openMonthRentalList(monthKey, genId){
       <h3 style="text-align:center;">📋 ${y}년 ${Number(m)}월 임대 목록${genId? ` · ${escR(genId)}` : ''}</h3>
       <div class="modal-sub" style="text-align:center;">그 달에 출고된 ${list.length}건 (현장이동 포함)</div>
       <div class="table-wrap" style="max-height:60vh;overflow:auto;"><table style="width:100%;table-layout:fixed;">
-        <colgroup><col style="width:30px;"><col style="width:52px;"><col style="width:170px;"><col style="width:22%;"><col><col style="width:88px;"><col style="width:88px;"><col style="width:58px;"><col style="width:72px;"></colgroup>
-        <thead><tr><th>#</th><th>번호</th><th>모델</th><th>거래처</th><th>현장 주소</th><th>출고일</th><th>입고일</th><th>사용일수</th><th>사용시간</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="9" class="muted" style="text-align:center;">없음</td></tr>'}</tbody>
+        <colgroup><col style="width:30px;"><col style="width:50px;"><col style="width:205px;"><col style="width:19%;"><col><col style="width:86px;"><col style="width:86px;"><col style="width:58px;"><col style="width:70px;"><col style="width:66px;"></colgroup>
+        <thead><tr><th>#</th><th>번호</th><th>모델</th><th>거래처</th><th>현장 주소</th><th>출고일</th><th>입고일</th><th>사용일수</th><th>사용시간</th><th>하루평균</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="10" class="muted" style="text-align:center;">없음</td></tr>'}</tbody>
       </table></div>
       <div class="modal-actions"><button class="btn primary" onclick="closeModal()">닫기</button></div>
     </div>
