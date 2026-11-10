@@ -5415,7 +5415,7 @@ function renderOutList(){
       return m && m.id===g.id;
     });
     const rowBg = rt.forcedOut ? 'var(--danger-tint)' : (matchedReq ? '#FFF3E0' : null);
-    return `<tr${rowBg? ` style="background:${rowBg};"`:''}>
+    return `<tr id="outrow-${escR(g.id)}"${rowBg? ` style="background:${rowBg};"`:''}>
       <td><input type="checkbox" class="bulk-in-chk" data-gid="${g.id}" ${bulkInSelection.has(g.id)?'checked':''} onchange="toggleBulkInSelect('${g.id}', this.checked)"></td>
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}${genLengthHtml(g)}${outPatrolHtml(g)}${usableCapacityHtml(g)}${(rt.fuelRequested!=null||rt.fuelActual!=null)? ` <span class="pill" style="color:var(--primary-dark);border-color:var(--primary);background:var(--primary-tint);" title="출고시 연료를 넣어드렸으니 입고시 잔량을 확인해주세요.">⛽ 기름체크 필요</span>`:''}${rt.forcedOut? `<div><span class="pill danger">🚨 미입금 출고</span></div><div class="muted" style="font-size:11px;color:var(--danger);">사유: ${escR(rt.forceReason||'-')}${rt.forcedBy? ` (${escR(rt.forcedBy)})`:''}</div>`:''}</td>
@@ -5494,7 +5494,11 @@ function renderOutList(){
         <div style="width:195px;height:250px;flex-shrink:0;background:#fff;${cardStyle}border-radius:10px;padding:10px;box-sizing:border-box;display:flex;flex-direction:column;">
           ${change? `<div style="background:var(--danger);color:#fff;font-size:10px;font-weight:800;border-radius:6px;padding:3px 5px;margin-bottom:4px;line-height:1.3;">⚠️ ${change.diffs.join('·')} 변경됨!<br>(${fmtCardDateTime(change.priorAt)} 문자와 다름)</div>` : ''}
           <div class="muted" style="font-size:11px;margin-bottom:2px;">${returnReqNumMap[r.id]? `<span style="color:#B23A34;font-weight:800;">#${returnReqNumMap[r.id]}</span> · `:''}${fmtCardDateTime(r.createdAtTs)}${r.authorBy? ` · ${escR(r.authorBy)}` : ''}</div>
-          <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;flex:1;overflow:hidden;" onclick="viewReturnRequestText('${r.id}')">${escR(r.text||'')}</div>
+          ${(()=>{ const ms = findAllMatchedGensForReturnRequest(r.text); return ms.length
+            ? `<div style="font-size:11px;font-weight:800;color:#1565C0;margin-bottom:3px;">👉 ${ms.map(g=>escR(g.id)).join(', ')} (눌러서 이동)</div>`
+            : `<div style="font-size:11px;font-weight:700;color:#999;margin-bottom:3px;">일치하는 출고중 발전기 없음</div>`; })()}
+          <div style="font-size:12px;line-height:1.4;white-space:pre-wrap;cursor:pointer;flex:1;overflow:hidden;" onclick="goToReturnRequestGen('${r.id}')" title="눌러서 해당 발전기로 이동">${escR(r.text||'')}</div>
+          <button class="btn sm" style="font-size:10px;padding:2px 4px;margin-top:4px;" onclick="viewReturnRequestText('${r.id}')">📄 문자 전체보기</button>
           <div style="display:flex;gap:4px;margin-top:6px;">
             <button class="btn sm danger" style="flex:1;font-size:10px;padding:2px 4px;" onclick="deleteReturnRequestCard('${r.id}')">🗑 삭제</button>
           </div>
@@ -5543,6 +5547,42 @@ function renderOutList(){
     </table></div>
     `}
   `;
+}
+// 철수요청 문자와 일치하는 출고중 발전기 전부 (연락처 일치 우선 → 주소 → 업체명). 같은 현장에 여러 대가 있으면 모두 돌려줍니다.
+function findAllMatchedGensForReturnRequest(text){
+  const parsed = parseReturnRequestText(text||'');
+  const outGens = activeGens().filter(g=>g.status==='out' && g.rental);
+  if(parsed.phone){
+    const m = outGens.filter(g=>g.rental.phone && g.rental.phone.replace(/[^0-9]/g,'')===parsed.phone);
+    if(m.length) return m;
+  }
+  if(parsed.address){
+    const m = outGens.filter(g=>g.rental.address && (g.rental.address.includes(parsed.address) || parsed.address.includes(g.rental.address)));
+    if(m.length) return m;
+  }
+  if(parsed.customer){
+    const m = outGens.filter(g=>g.rental.customer && (g.rental.customer.includes(parsed.customer) || parsed.customer.includes(g.rental.customer)));
+    if(m.length) return m;
+  }
+  return [];
+}
+// 철수요청 카드를 누르면 [출고중] 목록에서 해당 발전기 줄로 스크롤하고 깜빡여서 표시합니다.
+function goToReturnRequestGen(reqId){
+  const r = (DB.returnRequests||[]).find(x=>x && x.id===reqId);
+  if(!r) return;
+  const ms = findAllMatchedGensForReturnRequest(r.text);
+  if(!ms.length){ flash('일치하는 출고중 발전기를 찾지 못했습니다. 문자 내용을 보여드릴게요.'); viewReturnRequestText(reqId); return; }
+  // 지역/용량 필터 때문에 줄이 숨어있으면 못 찾으니 필터를 풀고 다시 그립니다.
+  if(outRegionFilter!=null || outCapacityFilter!=null){ outRegionFilter = null; outCapacityFilter = null; renderContent(); }
+  const rows = ms.map(g=>document.getElementById('outrow-'+g.id)).filter(Boolean);
+  if(!rows.length){ viewReturnRequestText(reqId); return; }
+  rows[0].scrollIntoView({behavior:'smooth', block:'center'});
+  rows.forEach(tr=>{
+    tr.style.outline = '3px solid #1565C0'; tr.style.outlineOffset = '-3px';
+    tr.animate([{backgroundColor:'#BBDEFB'},{backgroundColor:'#FFF3E0'},{backgroundColor:'#BBDEFB'},{backgroundColor:'#FFF3E0'}], {duration:1600});
+    setTimeout(()=>{ tr.style.outline=''; tr.style.outlineOffset=''; }, 4000);
+  });
+  if(ms.length>1) flash(`같은 현장 ${ms.length}대: ${ms.map(g=>g.id).join(', ')}`);
 }
 function viewReturnRequestText(id){
   const r = (DB.returnRequests||[]).find(x=>x && x.id===id);
