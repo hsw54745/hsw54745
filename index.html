@@ -192,6 +192,10 @@
   .util-table td, .util-table th{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .util-table .gauge-wrap{min-width:0;gap:4px;}
   .util-table .gauge-txt{min-width:40px;font-size:14px;}
+  .util-settle td, .util-settle th{padding-left:5px;padding-right:5px;}
+  .util-settle th{overflow:visible;text-overflow:clip;}
+  .util-settle td:nth-child(2){white-space:normal;overflow:visible;text-overflow:clip;word-break:keep-all;font-size:12.5px;}
+  .util-settle .gauge-txt{min-width:34px;font-size:12.5px;}
   .util-two-col .settings-table{flex:1;min-width:0;overflow-x:visible;}
   .util-two-col .settings-table table{width:100%;min-width:0;table-layout:auto;}
   .util-two-col .settings-table td, .util-two-col .settings-table th{white-space:normal;overflow:hidden;}
@@ -7196,11 +7200,13 @@ function renderSettlementTab(){
     <div class="section-title">📊 발전기별 임대율 (최근 90일)</div>
     <details class="info-toggle"><summary></summary><p class="muted">최근 90일 중 출고(임대)되어 있던 비율입니다. 월별 건수는 그 달에 출고된 건수(지금 나가 있는 건·현장이동 포함), 일수는 그 달 안에서 나가 있던 일수입니다(이번 달은 오늘까지). 낮은 순으로 확인하면 놀고 있는 장비를 파악할 수 있습니다.</p></details>
     <div class="util-two-col">
-      <div class="util-table"><table>
+      <div class="util-table util-settle"><table>
+        <colgroup><col style="width:44px;"><col><col style="width:58px;"><col style="width:62px;"><col style="width:62px;"><col style="width:62px;"><col style="width:96px;"></colgroup>
         <thead><tr><th>번호</th><th>모델</th><th style="white-space:nowrap;">출고일수<br><span class="muted" style="font-weight:400;font-size:10px;">(90일)</span></th>${SETTLE_MONTHS.map(m=>`<th style="white-space:nowrap;text-align:center;">${m.label}<br><span class="muted" style="font-weight:400;font-size:10px;">건수·일수</span></th>`).join('')}<th>임대율</th></tr></thead>
         <tbody>${utilRows1}</tbody>
       </table></div>
-      <div class="util-table"><table>
+      <div class="util-table util-settle"><table>
+        <colgroup><col style="width:44px;"><col><col style="width:58px;"><col style="width:62px;"><col style="width:62px;"><col style="width:62px;"><col style="width:96px;"></colgroup>
         <thead><tr><th>번호</th><th>모델</th><th style="white-space:nowrap;">출고일수<br><span class="muted" style="font-weight:400;font-size:10px;">(90일)</span></th>${SETTLE_MONTHS.map(m=>`<th style="white-space:nowrap;text-align:center;">${m.label}<br><span class="muted" style="font-weight:400;font-size:10px;">건수·일수</span></th>`).join('')}<th>임대율</th></tr></thead>
         <tbody>${utilRows2}</tbody>
       </table></div>
