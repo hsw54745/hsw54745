@@ -13464,8 +13464,10 @@ async function fillPrevRentalEndHours(genId, rentalId){
   }
   // 발전기 현재 누적시간은 더 큰 값일 때만 올립니다 (이미 더 큰 실측이 있으면 그대로)
   if(v > (g.hours||0)){ g.hours = v; g.hoursUpdatedAt = nowDateTimeStr(); g.hoursUpdatedBy = DB.currentUserName||null; }
-  await saveRentals();
+  // 발전기 목록을 먼저 저장합니다. (임대이력 저장을 기다리는 동안 자동 동기화가 서버의 옛 발전기 목록으로 덮어써서
+  //  누적시간 변경이 사라지는 문제가 있었음 - S-21 1803h 입력했는데 발전기는 1798h로 남음)
   await saveGens();
+  await saveRentals();
   const pop = document.getElementById('prev-rental-popup'); if(pop) pop.remove();
   renderContent();
   flash('누적시간이 저장되었습니다');
@@ -14422,6 +14424,7 @@ function shouldSkipSync(){
   if(saveInFlightCount>0) return true;
   const modalRoot = document.getElementById('modal-root');
   if(modalRoot && modalRoot.innerHTML.trim() !== '') return true;
+  if(document.getElementById('prev-rental-popup')) return true; // 직전 임대 보기 창이 열려 있는 동안
   const active = document.activeElement;
   if(active && ['INPUT','TEXTAREA','SELECT'].includes(active.tagName)) return true;
   if(document.querySelector('.mc.dirty')) return true; // 자재 카드에 저장 안 한 입력이 있으면 화면을 다시 그리지 않음
@@ -14439,11 +14442,14 @@ async function syncFrequentData(){
   if(shouldSkipSync()) return;
   syncFrequentInFlight = true;
   try{
+    // 서버에서 받아오는 동안 이 화면에서 발전기/예약을 고쳤으면(아직 저장 전), 받아온 옛 값으로 덮어쓰면 안 되므로 이번 동기화는 건너뜁니다
+    const localBeforePeek = JSON.stringify({gens:DB.gens, reservations:DB.reservations});
     const [gens, reservations, returnRequests] = await Promise.all([
       peekStorage('gen-fleet-v2', DB.gens),
       peekStorage('gen-reservations-v1', DB.reservations),
       peekStorage('gen-return-requests-v1', DB.returnRequests)
     ]);
+    if(shouldSkipSync() || JSON.stringify({gens:DB.gens, reservations:DB.reservations}) !== localBeforePeek) return;
     const before = JSON.stringify({gens:DB.gens, reservations:DB.reservations, returnRequests:DB.returnRequests});
     const after = JSON.stringify({gens, reservations, returnRequests});
     if(before !== after){
