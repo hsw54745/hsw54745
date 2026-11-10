@@ -4205,7 +4205,7 @@ function voltageButtonsHtml(targetInputId, opts){
 function suppliesPickerHtml(prefix, currentItems, currentCustom, genModel){
   const initialSelections = [];
   (currentItems||[]).forEach(it=>{ if(it && it.name) initialSelections.push({name: it.name, qty: it.qty||1, tracked: true}); });
-  (currentCustom||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(c=>{
+  (currentCustom||'').split(/[,\n]/).map(s=>s.trim()).filter(Boolean).forEach(c=>{ // 출고예약에서 줄바꿈으로 적은 부자재도 한 줄씩 나눠서 넣습니다
     const m = c.match(/^(.*?)(?:\s*x\s*(\d+))?$/i);
     const name = (m && m[1] ? m[1].trim() : c);
     const qty = (m && m[2]) ? Number(m[2]) : 1;
@@ -9962,7 +9962,9 @@ function renderReserveTab(){
       const suppliesCell2 = r.supplies
         ? `<button class="btn sm" style="color:var(--danger);font-weight:700;border-color:var(--danger);" onclick="showSuppliesModal('${r.id}')">부자재확인</button>`
         : `<span class="muted">부자재없음</span>`;
-      const noteMarker2 = (r.note && r.note.trim()) ? `<button class="btn sm" style="color:var(--primary-dark);font-weight:700;border-color:var(--primary);text-align:center;margin-top:4px;" onclick="showNoteModal('${r.id}')">비고확인</button>` : '';
+      const noteMarker2 = (()=>{ const nb = (r.note && r.note.trim()) ? `<button class="btn sm" style="color:var(--primary-dark);font-weight:700;border-color:var(--primary);text-align:center;" onclick="showNoteModal('${r.id}')">비고확인</button>` : '';
+      const mb = (r.paymentNote && String(r.paymentNote).trim()) ? `<button class="btn sm" style="color:#6A3FA0;font-weight:700;border-color:#6A3FA0;background:#F4EEFB;text-align:center;" onclick="showMemoModal('${r.id}')">메모확인</button>` : '';
+      return (nb||mb) ? `<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:nowrap;">${nb}${mb}</div>` : ''; })();
       const smsMarker2 = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 출고오더확인${smsOrderNumMap[r.id]? ` #${smsOrderNumMap[r.id]}`:''}</button>` : '';
       const rowStyle = isRaw ? ' style="background:#FFFDF3;"' : (isDelayed2? ' style="background:var(--danger-tint);"' : '');
       return `<tr${rowStyle}>
@@ -10000,7 +10002,9 @@ function renderReserveTab(){
     const suppliesCell = r.supplies
       ? `<button class="btn sm" style="color:var(--danger);font-weight:700;border-color:var(--danger);" onclick="showSuppliesModal('${r.id}')">부자재확인</button>`
       : `<span class="muted">부자재없음</span>`;
-    const noteMarker = (r.note && r.note.trim()) ? `<button class="btn sm" style="color:var(--primary-dark);font-weight:700;border-color:var(--primary);text-align:center;margin-top:4px;" onclick="showNoteModal('${r.id}')">비고확인</button>` : '';
+    const noteMarker = (()=>{ const nb = (r.note && r.note.trim()) ? `<button class="btn sm" style="color:var(--primary-dark);font-weight:700;border-color:var(--primary);text-align:center;" onclick="showNoteModal('${r.id}')">비고확인</button>` : '';
+      const mb = (r.paymentNote && String(r.paymentNote).trim()) ? `<button class="btn sm" style="color:#6A3FA0;font-weight:700;border-color:#6A3FA0;background:#F4EEFB;text-align:center;" onclick="showMemoModal('${r.id}')">메모확인</button>` : '';
+      return (nb||mb) ? `<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:nowrap;">${nb}${mb}</div>` : ''; })();
     const smsMarker = (r.smsOrder && r.smsOrder.trim()) ? `<button class="btn sm" style="color:#8A6D00;font-weight:700;border-color:#E8B923;background:#FFF8E1;text-align:center;margin-top:4px;" onclick="showSmsOrderModal('${r.id}')">📩 출고오더확인${smsOrderNumMap[r.id]? ` #${smsOrderNumMap[r.id]}`:''}</button>` : '';
     return `<tr${isDelayed? ` style="background:var(--danger-tint);"`:''}>
       <td class="gid">${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)}</td>
@@ -10097,6 +10101,22 @@ function showSuppliesModal(resId){
       <h3>📦 부자재 내역</h3>
       <div class="modal-sub">${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)}</div>
       <div style="font-size:14px;line-height:1.6;border:1px solid var(--border);border-radius:8px;padding:12px;">${suppliesListHtml(r.suppliesItems, r.suppliesCustom, r.supplies)}</div>
+      <div class="modal-actions">
+        <button class="btn primary" onclick="closeModal()">닫기</button>
+      </div>
+    </div>
+  </div>`;
+}
+// 출고예약 메모(인수증에는 안 나오는 내부 메모) 보기
+function showMemoModal(resId){
+  const r = DB.reservations.find(x=>x.id===resId);
+  if(!r) return;
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closeModal)">
+    <div class="modal">
+      <h3>🗒 메모</h3>
+      <div class="modal-sub">${r.genId===UNASSIGNED_GEN_ID? '🅾 미지정' : escR(r.genId)} · 인수증에는 나오지 않습니다</div>
+      <div style="font-size:14px;white-space:pre-wrap;line-height:1.6;border:1px solid #6A3FA0;background:#F4EEFB;border-radius:8px;padding:12px;">${escR(r.paymentNote||'')}</div>
       <div class="modal-actions">
         <button class="btn primary" onclick="closeModal()">닫기</button>
       </div>
@@ -11059,11 +11079,11 @@ function openReserveNoGenModal(resId, draft){
           <input type="text" id="f-rsv-voltage" value="${(pre&&pre.voltage)||''}" placeholder="예: 380V" style="${autoStyle('voltage')}">
           ${voltageButtonsHtml('f-rsv-voltage')}
         </div></div>
-        <div class="field f-eq"><div class="out-card"><label>부자재 출고</label>${suppliesPickerHtml('f-rsv-supplies', (pre&&pre.suppliesItems)||[], (pre? (pre.suppliesItems?(pre.suppliesCustom||''):(pre.supplies||'')) : ''), '')}</div></div>
+        <div class="field f-eq"><div class="out-card"><label>부자재 출고</label><textarea id="f-rsv-supplies" placeholder="예: 케이블 50m 2개, 분전반 1대">${escR((pre&&pre.supplies)||'')}</textarea></div></div>
         <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-rsv-note" style="${autoStyle('note')}">${(pre&&pre.note)||''}</textarea></div></div>
       </div>
       <div class="out-row">
-        <div class="field f-lg">
+        <div class="field" style="flex:1 1 200px;max-width:300px;min-width:0;">
           <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
             <input type="checkbox" id="f-rsv-fuel-toggle" ${(pre&&(pre.fuelRequested!=null||pre.fuelActual!=null))?'checked':''} onchange="toggleFuelFields('f-rsv-fuel-toggle','f-rsv-fuel-fields-wrap')">
             <label for="f-rsv-fuel-toggle">⛽ 연료넣고 출고</label>
@@ -11082,8 +11102,8 @@ function openReserveNoGenModal(resId, draft){
             </div>
           </div>
         </div>
-        <div class="field f-eq">
-          <input type="text" id="f-rsv-payment-note" value="${escR((pre&&pre.paymentNote)||'')}" placeholder="입금관련 메모">
+        <div class="field" style="flex:3 1 320px;min-width:0;"><label>메모 <span class="muted" style="font-size:11px;font-weight:400;">(인수증에 안 나옴)</span></label>
+          <textarea id="f-rsv-payment-note" placeholder="메모" style="width:100%;min-height:42px;">${escR((pre&&pre.paymentNote)||'')}</textarea>
         </div>
       </div>
       ${(pre&&pre.smsOrder)? `<div class="out-row">
@@ -11104,7 +11124,7 @@ function openReserveNoGenModal(resId, draft){
       </div>
     </div>
   </div>`;
-  initSuppliesPicker('f-rsv-supplies');
+  // 출고예약의 부자재 출고는 비고처럼 자유롭게 적는 칸입니다(선택 목록 없음).
 }
 function reapplySmsOrderToRsvForm(){
   if(!_rsvSmsOrderRaw){ return; }
@@ -11216,11 +11236,10 @@ function submitReserveNoGen(resId){
   const manager = document.getElementById('f-rsv-manager').value.trim();
   const phone = document.getElementById('f-rsv-phone').value.trim();
   const address = document.getElementById('f-rsv-address').value.trim();
+  // 부자재 출고는 자유 입력(비고처럼). 출고하기 화면에서는 이 내용이 직접입력 부자재로 넘어갑니다.
   const supplies = document.getElementById('f-rsv-supplies').value.trim();
-  let suppliesItems = [];
-  try{ suppliesItems = JSON.parse(document.getElementById('f-rsv-supplies-items').value || '[]'); }catch(e){ suppliesItems = []; }
-  const suppliesCustomEl = document.getElementById('f-rsv-supplies-custom');
-  const suppliesCustom = suppliesCustomEl ? suppliesCustomEl.value.trim() : '';
+  const suppliesItems = [];
+  const suppliesCustom = supplies;
   const voltage = document.getElementById('f-rsv-voltage').value.trim();
   const fuelEnabled = document.getElementById('f-rsv-fuel-toggle').checked;
   const fuelRequested = fuelEnabled ? (Number(document.getElementById('f-rsv-fuel-req').value)||null) : null;
@@ -11823,7 +11842,7 @@ function openOutModal(id, reservationId){
         <div class="field f-eq"><div class="out-card"><label>비고</label><textarea id="f-note">${(res&&res.note)||''}</textarea></div></div>
       </div>
       <div class="out-row">
-        <div class="field f-lg">
+        <div class="field" style="flex:1 1 200px;max-width:300px;min-width:0;">
           <div class="field chk" style="background:var(--primary-tint);border:1px solid var(--primary);border-radius:8px;padding:10px 12px;height:100%;justify-content:center;">
             <input type="checkbox" id="f-fuel-toggle" ${(res&&(res.fuelRequested!=null||res.fuelActual!=null))?'checked':''} onchange="toggleFuelFields('f-fuel-toggle','f-fuel-fields-wrap')">
             <label for="f-fuel-toggle">⛽ 연료넣고 출고</label>
@@ -11842,8 +11861,8 @@ function openOutModal(id, reservationId){
             </div>
           </div>
         </div>
-        <div class="field f-eq">
-          <input type="text" id="f-payment-note" value="${escR(res&&res.paymentNote||'')}" placeholder="입금관련 메모">
+        <div class="field" style="flex:3 1 320px;min-width:0;"><label>메모 <span class="muted" style="font-size:11px;font-weight:400;">(인수증에 안 나옴)</span></label>
+          <textarea id="f-payment-note" placeholder="메모" style="width:100%;min-height:42px;">${escR(res&&res.paymentNote||'')}</textarea>
         </div>
       </div>
       <div id="f-err" class="err" style="display:none;"></div>
@@ -13009,7 +13028,7 @@ function receiptTextSummary(g, rtIn){
     `현장주소: ${addrFull||'-'}`,
     `담당자: ${rt.manager||'-'} ${rt.phone? `(${rt.phone})`:''}`,
     (rt.fuelRequested!=null || rt.fuelActual!=null) ? `연료: 요청 ${rt.fuelRequested!=null?rt.fuelRequested:'-'}L / 주입 ${rt.fuelActual!=null?rt.fuelActual:'-'}L` : null,
-    rt.supplies? `부자재: ${rt.supplies}` : `부자재: -`,
+    rt.supplies? `부자재: ${String(rt.supplies).replace(/\s*\n+\s*/g,', ')}` : `부자재: -`,
     rt.note? `비고: ${rt.note}` : null
   ].filter(Boolean).join('\n');
 }
