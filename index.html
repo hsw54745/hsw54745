@@ -1777,7 +1777,7 @@ function qmToggleMaintType(t){
 function openQmMaintForm(id){
   const g = (DB.gens||[]).find(x=>x.id===id); if(!g) return;
   qmMaintTypesSel = [];
-  const types = [['정기정비','엔진오일교체'],['일반점검','일반점검'],['유지보수','유지보수'],['정기순회점검','정기순회점검'],['고장수리','고장·긴급수리']];
+  const types = [['정기정비','엔진오일교체'],['일반점검','일반점검'],['유지보수','유지보수'],['정기순회점검','정기순회점검'],['긴급순회점검','긴급순회점검'],['고장수리','고장·긴급수리']];
   pwGateShow(`
     <div style="background:#F4F6F5;border-radius:16px;padding:22px 18px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
       ${qmMaintBackHtml()}
@@ -5105,7 +5105,7 @@ function lastTankCleanDate(gid){
 }
 // ---------- 정비 유형 (여러 개 선택 가능) ----------
 // 예전 기록은 type 하나만, 새 기록은 types 배열(여러 개) + type(대표 유형, 호환용)으로 저장합니다.
-const MAINT_TYPE_ORDER = ['정기정비','고장수리','정기순회점검','유지보수','일반점검','전압변경'];
+const MAINT_TYPE_ORDER = ['정기정비','고장수리','긴급순회점검','정기순회점검','유지보수','일반점검','전압변경'];
 function maintTypesOf(m){
   if(!m) return [];
   if(Array.isArray(m.types) && m.types.length) return m.types;
@@ -5119,15 +5119,16 @@ function maintTypePillHtml(t){
   if(t==='일반점검') return '<span class="pill" style="background:#F0F0F0;color:#555;border-color:#999;">일반점검</span>';
   if(t==='유지보수') return '<span class="pill" style="background:#E0F2F1;color:#00796B;border-color:#00796B;">유지보수</span>';
   if(t==='정기순회점검') return '<span class="pill" style="background:#EDE7F6;color:#5E35B1;border-color:#5E35B1;">정기순회점검</span>';
+  if(t==='긴급순회점검') return '<span class="pill" style="background:#FFF3E0;color:#E65100;border-color:#E65100;">긴급순회점검</span>';
   return '<span class="pill gray">엔진오일교체</span>';
 }
 function maintTypePillsHtml(m){
   return `<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;">${maintTypesOf(m).map(maintTypePillHtml).join('')}</div>`;
 }
-// 마지막 정기순회점검 날짜 (정비등록에서 유형 "정기순회점검"으로 등록한 기록 중 가장 최근)
+// 마지막 순회점검 날짜 (정비등록에서 유형 "정기순회점검" 또는 "긴급순회점검"으로 등록한 기록 중 가장 최근)
 function lastPatrolDate(gid){
   let last = '';
-  (DB.maint||[]).forEach(m=>{ if(m && m.genId===gid && maintHasType(m,'정기순회점검') && m.date && m.date>last) last = m.date; });
+  (DB.maint||[]).forEach(m=>{ if(m && m.genId===gid && (maintHasType(m,'정기순회점검') || maintHasType(m,'긴급순회점검')) && m.date && m.date>last) last = m.date; });
   return last;
 }
 function patrolPillHtml(d){
@@ -5849,6 +5850,7 @@ function patrolRouteCardHtml(){
       <div class="section-title" style="margin-top:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">🚐 출장(순회점검) 동선 <span class="cnt">${stops.length}곳</span>
         <span style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;font-weight:400;">
           <label style="display:flex;align-items:center;gap:4px;">출발지 <select onchange="setPatrolRouteBase(this.value)" style="padding:4px 6px;font-size:12.5px;">${baseOptions}</select></label>
+          <button type="button" class="btn sm primary" onclick="openPatrolMapModal()">🗺 출고중 지도로 보기</button>
           ${sel.size? `<button type="button" class="btn sm" onclick="clearPatrolRouteSelection()">선택 모두 해제</button>` : ''}
         </span>
       </div>
@@ -5856,6 +5858,160 @@ function patrolRouteCardHtml(){
       ${regions.length===0 ? `<div class="empty">위 정비 주기 표에서 출장 갈 발전기의 🚐 칸을 체크하면, 체크한 발전기만으로 동선을 짜드립니다.</div>` : `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin-top:8px;">${regionCards}</div>`}
       ${unknown.length? `<div class="hint" style="margin-top:8px;">📌 주소로 위치를 알 수 없어 빠진 발전기: ${unknown.map(g=>`${escR(g.id)}(${escR((g.rental.address||g.rental.site||'').slice(0,20))})`).join(', ')}</div>` : ''}
     </div>`;
+}
+
+// ===================== 🗺 출고중 발전기 지도 =====================
+// 지도는 무료 오픈소스(Leaflet + OpenStreetMap)를 처음 열 때만 불러옵니다. (API 키 필요 없음)
+// 위치: 퀵메뉴에서 "현재 위치 저장"한 현장은 정확한 GPS, 나머지는 주소의 시·군(동네) 중심 좌표(대략 위치)입니다.
+let _leafletLoading = null;
+function loadLeaflet(){
+  if(window.L && window.L.map) return Promise.resolve();
+  if(_leafletLoading) return _leafletLoading;
+  _leafletLoading = new Promise((resolve, reject)=>{
+    const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'; document.head.appendChild(css);
+    const js = document.createElement('script'); js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    js.onload = ()=>resolve(); js.onerror = ()=>{ _leafletLoading = null; reject(new Error('지도 불러오기 실패')); };
+    document.head.appendChild(js);
+  });
+  return _leafletLoading;
+}
+let _patrolMap = null, _patrolMapLayer = null;
+// 출고중 발전기를 현장(같은 주소)별로 묶어서 지도용 좌표와 함께 돌려줍니다
+function patrolMapSites(){
+  const sites = {};
+  activeGens().filter(g=>g.status==='out' && g.rental).forEach(g=>{
+    const rt = g.rental;
+    const addr = String(rt.address||rt.site||'').trim();
+    const key = addr.replace(/\s+/g,'') || ('nokey-'+g.id);
+    if(!sites[key]) sites[key] = {key, addr, customer: rt.customer||'', gens: [], gps: null, approx: null};
+    const st = sites[key];
+    st.gens.push(g);
+    if(rt.siteLoc && rt.siteLoc.lat && rt.siteLoc.lng) st.gps = [rt.siteLoc.lat, rt.siteLoc.lng];
+  });
+  const list = Object.values(sites);
+  list.forEach(st=>{
+    if(st.gps) return;
+    const c = routeCoordOf(st.addr);
+    if(!c) return;
+    // 같은 시·군 중심에 여러 현장이 겹치지 않게 주소마다 조금씩(약 1~2km) 벌려서 찍습니다
+    let h = 0; for(const ch of st.key) h = (h*31 + ch.charCodeAt(0)) >>> 0;
+    const ang = (h % 360) * Math.PI/180, r = 0.006 + ((h>>9) % 10) * 0.0012;
+    st.approx = [c[0] + r*Math.sin(ang), c[1] + r*Math.cos(ang)];
+  });
+  return list;
+}
+function patrolGenRemain(g){
+  if(!(g.hoursKnown && (g.hours>0 || g.lastMaintHours>0))) return null;
+  return Math.round(estRemaining(g));
+}
+async function openPatrolMapModal(){
+  document.getElementById('modal-root').innerHTML = `
+  <div class="overlay" onclick="backdropClick(this,event,closePatrolMapModal)">
+    <div class="modal modal-wide" style="text-align:left;max-width:1300px;width:96vw;padding:16px 18px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+        <h3 style="margin:0;">🗺 출고중 발전기 지도</h3>
+        <span id="patrol-map-count" class="muted" style="font-size:12.5px;"></span>
+        <span style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;align-items:center;">
+          <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2C4A66;vertical-align:middle;"></span> 출고중</span>
+          <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#E8A317;vertical-align:middle;"></span> 정비 임박/초과</span>
+          <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#C62828;vertical-align:middle;"></span> 🚐 출장 선택</span>
+          <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;border:2px dashed #555;vertical-align:middle;"></span> 대략 위치(주소 기준)</span>
+          <span>📍 실선 테두리 = GPS 저장된 정확한 위치</span>
+        </span>
+      </div>
+      <div id="patrol-map" style="height:72vh;min-height:420px;border-radius:10px;border:1px solid var(--border);background:#E8EEF4;display:flex;align-items:center;justify-content:center;color:#666;">지도를 불러오는 중…</div>
+      <div id="patrol-map-unknown" class="muted" style="font-size:11.5px;margin-top:6px;"></div>
+      <div class="modal-actions" style="margin-top:10px;"><button class="btn primary" onclick="closePatrolMapModal()">닫기</button></div>
+    </div>
+  </div>`;
+  try{ await loadLeaflet(); }
+  catch(e){ const el = document.getElementById('patrol-map'); if(el) el.textContent = '지도를 불러오지 못했습니다. 인터넷 연결을 확인해주세요.'; return; }
+  const el = document.getElementById('patrol-map');
+  if(!el) return;
+  el.textContent = ''; el.style.display = 'block';
+  if(_patrolMap){ try{ _patrolMap.remove(); }catch(e){} _patrolMap = null; }
+  _patrolMap = L.map(el, {zoomControl:true}).setView([36.35, 127.8], 7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, attribution: '&copy; OpenStreetMap'}).addTo(_patrolMap);
+  drawPatrolMap(true);
+}
+function closePatrolMapModal(){
+  if(_patrolMap){ try{ _patrolMap.remove(); }catch(e){} _patrolMap = null; _patrolMapLayer = null; }
+  closeModal();
+  if(currentTab==='maint'){ renderMaintList(); refreshPatrolRoute(); }
+}
+function patrolMapToggleSite(key){
+  const st = patrolMapSites().find(x=>x.key===key); if(!st) return;
+  const sel = patrolRouteSelected();
+  const allOn = st.gens.every(g=>sel.has(g.id));
+  st.gens.forEach(g=>{ if(allOn) sel.delete(g.id); else sel.add(g.id); });
+  savePatrolRouteSelected();
+  drawPatrolMap(false);
+}
+function drawPatrolMap(fit){
+  if(!_patrolMap || !window.L) return;
+  if(_patrolMapLayer){ _patrolMapLayer.remove(); }
+  _patrolMapLayer = L.layerGroup().addTo(_patrolMap);
+  const sel = patrolRouteSelected();
+  const sites = patrolMapSites();
+  const shown = sites.filter(st=>st.gps || st.approx);
+  const unknown = sites.filter(st=>!st.gps && !st.approx);
+  const bounds = [];
+  // 출발지
+  const baseName = patrolRouteBase(), base = CITY_COORDS[baseName];
+  if(base){
+    L.marker(base, {icon: L.divIcon({className:'', html:`<div style="background:#1B5E20;color:#fff;font-weight:800;font-size:11px;padding:3px 6px;border-radius:6px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.4);">🏁 ${escR(baseName)}(출발)</div>`, iconSize:null, iconAnchor:[30,12]})}).addTo(_patrolMapLayer);
+    bounds.push(base);
+  }
+  // 선택된 현장 동선 (지역별, 동선 카드와 같은 순서)
+  const selSites = shown.filter(st=>st.gens.some(g=>sel.has(g.id)));
+  const orderNo = {};
+  if(base && selSites.length){
+    const byRegion = {};
+    selSites.forEach(st=>{ const r = routeGroupOf(st.addr); (byRegion[r] = byRegion[r]||[]).push({...st, coord: st.gps||st.approx}); });
+    const colors = ['#C62828','#6A1B9A','#00838F','#EF6C00','#2E7D32','#AD1457','#283593'];
+    Object.keys(byRegion).forEach((r,ri)=>{
+      const route = shortestRouteOrder(base, byRegion[r]);
+      route.forEach((s,i)=>{ orderNo[s.key] = `${r} ${i+1}`; });
+      L.polyline([base, ...route.map(s=>s.coord), base], {color: colors[ri%colors.length], weight:3, opacity:.75, dashArray:'6 6'}).addTo(_patrolMapLayer);
+    });
+  }
+  shown.forEach(st=>{
+    const pos = st.gps || st.approx;
+    bounds.push(pos);
+    const picked = st.gens.some(g=>sel.has(g.id));
+    const rems = st.gens.map(patrolGenRemain).filter(v=>v!=null);
+    const urgent = rems.some(v=>v<=(DB.warnThreshold||50));
+    const color = picked ? '#C62828' : (urgent ? '#E8A317' : '#2C4A66');
+    const n = st.gens.length;
+    const html = `<div style="width:26px;height:26px;border-radius:50%;background:${color};color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;border:${st.gps? '2.5px solid #fff' : '2.5px dashed #fff'};box-shadow:0 1px 4px rgba(0,0,0,.5);">${n}</div>`;
+    const genLines = st.gens.map(g=>{
+      const rem = patrolGenRemain(g);
+      const remTxt = rem==null ? '' : (rem<=0 ? `<b style="color:#C62828;">정비 ${Math.abs(rem)}h 초과</b>` : (rem<=(DB.warnThreshold||50)? `<b style="color:#B26A00;">정비 ${rem}h 남음</b>` : `정비까지 ${rem}h`));
+      const pd = lastPatrolDate(g.id);
+      return `<div style="padding:2px 0;"><b>${escR(g.id)}</b> <span style="color:#666;">${escR(g.model||'')}</span>${g.voltage? ` · ${escR(g.voltage)}`:''}<br><span style="font-size:11px;">${remTxt}${pd? ` · 순회점검 ${pd.slice(2).replace(/-/g,'.')}`:''}</span></div>`;
+    }).join('');
+    const q = encodeURIComponent(st.addr);
+    const popup = `<div style="min-width:220px;font-size:12px;line-height:1.4;">
+      <div style="font-weight:800;font-size:13px;">${escR(st.customer||'거래처 미기재')}</div>
+      <div style="color:#555;margin-bottom:4px;">${escR(st.addr||'-')}</div>
+      <div style="font-size:11px;color:${st.gps?'#1565C0':'#888'};margin-bottom:4px;">${st.gps? '📍 GPS 저장된 정확한 위치' : '대략 위치 (주소의 시·군 기준)'}${orderNo[st.key]? ` · 🚐 동선 ${escR(orderNo[st.key])}번째`:''}</div>
+      ${genLines}
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+        <button type="button" onclick="patrolMapToggleSite('${st.key.replace(/'/g,"\\'")}')" style="padding:4px 8px;font-size:11.5px;font-weight:700;border:1px solid #C62828;border-radius:6px;background:${picked?'#C62828':'#fff'};color:${picked?'#fff':'#C62828'};cursor:pointer;">${picked? '🚐 출장에서 빼기' : '🚐 출장에 넣기'}</button>
+        <a href="https://map.naver.com/p/search/${q}" target="_blank" rel="noopener" style="font-size:11.5px;">네이버지도</a>
+        <a href="https://map.kakao.com/link/search/${q}" target="_blank" rel="noopener" style="font-size:11.5px;">카카오맵</a>
+      </div>
+    </div>`;
+    L.marker(pos, {icon: L.divIcon({className:'', html, iconSize:[26,26], iconAnchor:[13,13]}), title: `${st.customer||''} ${st.gens.map(g=>g.id).join(',')}`})
+      .bindPopup(popup).bindTooltip(`${escR(st.customer||'')} · ${st.gens.map(g=>escR(g.id)).join(', ')}`, {direction:'top', offset:[0,-12]})
+      .addTo(_patrolMapLayer);
+  });
+  const cnt = document.getElementById('patrol-map-count');
+  if(cnt) cnt.textContent = `현장 ${shown.length}곳 · 발전기 ${shown.reduce((t,s)=>t+s.gens.length,0)}대${sel.size? ` · 🚐 출장 선택 ${selSites.length}곳`:''}`;
+  const un = document.getElementById('patrol-map-unknown');
+  if(un) un.innerHTML = unknown.length ? `📌 주소로 위치를 알 수 없어 지도에 못 찍은 발전기: ${unknown.map(st=>st.gens.map(g=>`${escR(g.id)}(${escR((st.addr||'주소없음').slice(0,18))})`).join(', ')).join(', ')}` : '';
+  if(fit && bounds.length) _patrolMap.fitBounds(bounds, {padding:[30,30], maxZoom: 11});
+  setTimeout(()=>{ try{ _patrolMap.invalidateSize(); }catch(e){} }, 150);
 }
 let maintCapacityFilter = null; // 숫자(kW) 또는 null
 function viewCapacityMaintList(cap){
@@ -14044,6 +14200,7 @@ function openMaintModal(id, editId, repairComplete){
       <button type="button" class="btn sm${currentTypes.includes('일반점검')?' primary':''}" id="f-mtype-btn-일반점검" onclick="setMaintType('일반점검')" title="누적시간·점검 내용만 기록되고, 정비주기에는 영향을 주지 않습니다.">일반점검</button>
       <button type="button" class="btn sm${currentTypes.includes('유지보수')?' primary':''}" id="f-mtype-btn-유지보수" onclick="setMaintType('유지보수')" title="도장·부품 손질 등 유지보수 작업을 기록합니다. 정비주기에는 영향을 주지 않습니다.">유지보수</button>
       <button type="button" class="btn sm${currentTypes.includes('정기순회점검')?' primary':''}" id="f-mtype-btn-정기순회점검" onclick="setMaintType('정기순회점검')" title="출고중인 현장을 돌며 하는 정기 순회점검을 기록합니다. 정비주기에는 영향을 주지 않습니다.">정기순회점검</button>
+      <button type="button" class="btn sm${currentTypes.includes('긴급순회점검')?' primary':''}" id="f-mtype-btn-긴급순회점검" onclick="setMaintType('긴급순회점검')" title="고객 요청·이상 발생 등으로 급하게 현장에 나가서 한 순회점검을 기록합니다. 정비주기에는 영향을 주지 않습니다.">긴급순회점검</button>
       <button type="button" class="btn sm${currentTypes.includes('고장수리')?' primary':''}" id="f-mtype-btn-고장수리" onclick="setMaintType('고장수리')" title="정비주기에는 영향을 주지 않습니다.">고장/긴급수리</button>
       ${isVoltageChangeRec? `<button type="button" class="btn sm${currentTypes.includes('전압변경')?' primary':''}" id="f-mtype-btn-전압변경" onclick="setMaintType('전압변경')" title="전압변경 자동기록은 정비가 아니라 언제·누가 바꿨는지 남기는 기록입니다.">전압변경</button>` : ''}
     </div>`;
