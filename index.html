@@ -602,8 +602,7 @@ const TABS = [
   {id:'out', label:'📤 출고중', color:'#B0472F'},
   {id:'maint', label:'🔧 정비 관리', color:'#8A4FBE'},
   {id:'materials', label:'🧰 자재 관리', color:'#1E8E8E'},
-  {id:'history', label:'📜 임대이력조회', color:'#6B6F1A'},
-  {id:'settlement', label:'📊 임대율 통계', color:'#B0338E'},
+  {id:'settlement', label:'📊 임대이력 통계', color:'#B0338E'}, // 예전 [임대이력조회] 탭을 합침 (발전기별/거래처별 이력이 맨 위)
   {id:'consumable-order', label:'🛒 소모품주문', color:'#3A5FCD'},
   {id:'improvements', label:'📝 보완요청', color:'#CA5A2E'},
   {id:'settings', label:'⚙️ 설정', color:'#555B6E'},
@@ -4534,13 +4533,13 @@ function renderContent(){
   else if(currentTab==='reserve') c.innerHTML = renderReserveTab();
   else if(currentTab==='maint') c.innerHTML = renderMaintTab();
   else if(currentTab==='materials') c.innerHTML = renderMaterialsTab();
-  else if(currentTab==='history') c.innerHTML = renderHistoryTab();
-  else if(currentTab==='settlement') c.innerHTML = renderSettlementTab();
+  else if(currentTab==='history'){ currentTab = 'settlement'; c.innerHTML = renderHistoryTab() + settlementDividerHtml() + renderSettlementTab(); }
+  else if(currentTab==='settlement') c.innerHTML = renderHistoryTab() + settlementDividerHtml() + renderSettlementTab();
   else if(currentTab==='consumable-order') c.innerHTML = renderConsumableOrderTab();
   else if(currentTab==='manual') c.innerHTML = renderManualTab();
   else if(currentTab==='improvements') c.innerHTML = renderImprovementsTab();
   else if(currentTab==='settings') c.innerHTML = renderSettingsTab();
-  if(currentTab==='history'){ if(historyViewMode==='customer') renderCustomerHistoryView(); else initHistorySelect(); }
+  if(currentTab==='settlement'){ if(historyViewMode==='customer') renderCustomerHistoryView(); else initHistorySelect(); }
   if(currentTab==='maint') renderMaintList();
   if(currentTab==='consumable-order') renderConsumableOrderTable();
   if(currentTab==='improvements') renderImprovementsList();
@@ -4850,7 +4849,7 @@ function renderDashboard(){
     ${lowStockBannerHtml()}
     ${outMaintBannerHtml()}
     <div class="cards">
-      <div class="card" style="cursor:pointer;" onclick="switchTab('history')"><div class="num">${total}</div><div class="lbl">전체 발전기</div></div>
+      <div class="card" style="cursor:pointer;" onclick="switchTab('settlement')"><div class="num">${total}</div><div class="lbl">전체 발전기</div></div>
       <div class="card ok" style="cursor:pointer;" onclick="switchTab('in')"><div class="num">${inCount}</div><div class="lbl">입고</div></div>
       <div class="card warn" style="cursor:pointer;" onclick="switchTab('out')"><div class="num">${outCount}<span style="font-size:14px;font-weight:700;margin-left:3px;">(${total>0?Math.round(outCount/total*100):0}%)</span></div><div class="lbl">출고중 · 출고율</div></div>
       <div class="card danger" style="cursor:pointer;" onclick="switchTab('maint')"><div class="num">${dangerCount}</div><div class="lbl">정비 필요</div></div>
@@ -5970,7 +5969,7 @@ function renderMaintByModel(){
 }
 
 function goToHistory(id){
-  currentTab = 'history';
+  currentTab = 'settlement'; historyViewMode = 'gen';
   renderTabbar();
   renderContent();
   const sel = document.getElementById('hist-select');
@@ -6269,6 +6268,8 @@ function renderHistoryTab(){
     `}
   `;
 }
+// 임대이력 통계 탭: 위쪽 이력조회와 아래 통계 사이 구분선
+function settlementDividerHtml(){ return `<div style="border-top:2px dashed var(--border);margin:28px 0 8px;"></div>`; }
 function switchHistoryView(mode){
   historyViewMode = mode;
   renderContent();
@@ -7652,8 +7653,8 @@ function renderManualTab(){
       ['부자재 목록 · 재고 관리', '출고 처리시 선택할 수 있는 부자재(깔판, 전선규격, 분전함 등)를 품명·규격/사이즈·재고수량으로 등록합니다. 품명을 똑같이 입력하고 규격/사이즈만 다르게(예: 품명 "분전함" + 규격 "대"·"중"·"소") 여러 번 등록하면, 같은 품명끼리 묶여서 화면 폭에 따라 카드가 나란히(2단 이상) 배치됩니다. 출고(상차완료) 시 선택한 수량만큼 자동 차감되고, 입고시 "회수됨"으로 확인하면 재고가 복구됩니다. 재고가 0이 되면 빨간색으로 표시되지만 선택 자체는 계속 가능합니다.']
     ])}
 
-    ${manualSection('📜','이력 조회', false,
-      '상단에서 "발전기별 이력"과 "거래처별 이력" 중 골라서 볼 수 있습니다.', [
+    ${manualSection('📊','임대이력 통계 (위쪽: 이력 조회)', false,
+      '[임대이력 통계] 탭 맨 위에서 "발전기별 이력"과 "거래처별 이력" 중 골라서 볼 수 있습니다. 그 아래에 임대율 통계가 이어집니다.', [
       ['발전기별 이력', '발전기 하나를 선택해서 그 발전기의 임대·정비 이력을 전부 확인합니다. 드롭다운에서 번호를 고르면 아래에 상세 정보가 뜹니다.'],
       ['정보 수정', '모델, 년식, 사용률 등 기본 정보를 고칩니다.'],
       ['고장 등록 / 수리 완료 처리', '고장이 났을 때 등록하고, 수리가 끝나면 완료 처리합니다.'],
@@ -7662,9 +7663,11 @@ function renderManualTab(){
       ['거래처별 이력 · 주의사항', '지금까지 거래한 모든 업체 목록과 임대 건수를 보여줍니다 (임대 건수가 많은 순으로 정렬됩니다). 업체를 클릭하면 "입금 문제", "장비 관리 불량", "회수일자 지연" 같은 주의 태그를 선택하고, 목록에 없는 태그는 직접 입력해서 추가할 수도 있습니다. 메모도 자유롭게 남길 수 있습니다. 태그·메모가 있는 업체는 목록에서 빨간색으로 표시됩니다. 이렇게 설정해두면, 나중에 출고하기 화면에서 그 거래처명을 입력할 때 주의사항이 자동으로 빨간 박스로 함께 뜹니다. 아래 임대 이력에는 완료·진행중·예약/상차대기 상태와 함께 발전기 번호·모델, 임대기간과 임대사용시간(그 임대 건 동안 실제로 돌아간 총 시간 = 입고시 누적시간 − 출고시 누적시간), 담당자·연락처, 현장주소, 전압·부자재·연료·비고까지 출고시 입력된 내용이 카드 형태로 전부 표시됩니다. "🖨 인쇄" 버튼으로 이 거래처의 주의 태그·메모와 임대 이력 전체를 인쇄용 파일로 받을 수 있습니다.']
     ])}
 
-    ${manualSection('📊','임대율 통계', false,
-      '전체 운영 현황을 숫자로 확인하는 화면입니다.', [
-      ['발전기별 임대율(최근 90일)', '최근 90일 중 출고되어 있던 비율입니다. 낮을수록 놀고 있는 장비라는 뜻입니다.']
+    ${manualSection('📊','임대이력 통계 (아래쪽: 임대율 통계)', false,
+      '[임대이력 통계] 탭에서 이력 조회 아래에 있는, 전체 운영 현황을 숫자로 확인하는 부분입니다.', [
+      ['발전기별 임대율', '연도별 1~12월 건수·일수와 최근 1년 임대율입니다. 건수를 누르면 그 달 임대 목록(사용시간·하루평균 포함)이 뜹니다.'],
+      ['용량별 임대 통계', '용량별 최근 1년 평균 임대율과 연도별 임대율·건수입니다.'],
+      ['월별 임대건수 기록', '연도(가로) × 월(세로)로 전체 임대 건수를 기록합니다.']
     ])}
 
     ${manualSection('🛒','소모품주문', false,
