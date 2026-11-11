@@ -5926,7 +5926,7 @@ async function openPatrolMapModal(){
   <div class="overlay" onclick="backdropClick(this,event,closePatrolMapModal)">
     <div class="modal modal-wide" style="text-align:left;max-width:none;width:98vw;max-height:97vh;padding:12px 14px;">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
-        <h3 style="margin:0;">🗺 출고중 발전기 지도 <span style="font-size:10px;color:#aaa;font-weight:400;">v1111h</span></h3>
+        <h3 style="margin:0;">🗺 출고중 발전기 지도 <span style="font-size:10px;color:#aaa;font-weight:400;">v1111i</span></h3>
         <span id="patrol-map-count" class="muted" style="font-size:12.5px;"></span>
         <span style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;align-items:center;">
           <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2C4A66;vertical-align:middle;"></span> 출고중</span>
@@ -6040,12 +6040,14 @@ function naverRouteLink(fromName, from, toName, to){
 }
 async function drawPatrolManualRoute(base, baseName, ordered){
   const box = document.getElementById('patrol-map-legs');
+  // 새로 그릴 때마다 번호를 올려서, 그 전에 보낸 도로경로 계산이 늦게 도착해도 무시합니다
+  // (예전엔 순서를 지워도 늦게 온 이전 계산 결과가 경로를 다시 그려서 "지우기가 안 되는" 것처럼 보였음)
+  const reqNo = ++_patrolRouteReq;
   if(!box) return;
   if(!ordered.length){
     box.innerHTML = `<div class="muted" style="font-size:12px;">💡 갈 순서대로 <b>지도 동그라미를 누르면</b> 1번, 2번, 3번… 순서가 붙고 ${escR(baseName)}에서부터 구간별 거리·소요시간이 여기에 나옵니다.</div>`;
     return;
   }
-  const reqNo = ++_patrolRouteReq;
   box.innerHTML = `<div class="muted" style="font-size:12px;">🛣 도로 거리·시간 계산 중…</div>`;
   const pts = [base, ...ordered.map(o=>o.pos), base];
   const r = await patrolFetchRoadLegs(pts);
@@ -6239,7 +6241,7 @@ async function openQmPatrolMap(){
     <div style="background:#F4F6F5;border-radius:16px;padding:12px 10px;max-width:900px;width:100%;max-height:96vh;overflow:auto;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
         <button type="button" onclick="qmClosePatrolMap()" style="background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;padding:7px 14px;border-radius:10px;">← 뒤로</button>
-        <div style="font-size:18px;font-weight:900;color:#C62828;">🗺 출고중 지도 <span style="font-size:10px;color:#aaa;font-weight:400;">v1111h</span></div>
+        <div style="font-size:18px;font-weight:900;color:#C62828;">🗺 출고중 지도 <span style="font-size:10px;color:#aaa;font-weight:400;">v1111i</span></div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;align-items:center;">
         <span style="font-size:13px;font-weight:700;">출발지</span>
