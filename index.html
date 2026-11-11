@@ -5926,7 +5926,7 @@ async function openPatrolMapModal(){
   <div class="overlay" onclick="backdropClick(this,event,closePatrolMapModal)">
     <div class="modal modal-wide" style="text-align:left;max-width:none;width:98vw;max-height:97vh;padding:12px 14px;">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
-        <h3 style="margin:0;">🗺 출고중 발전기 지도 <span style="font-size:10px;color:#aaa;font-weight:400;">v1111e</span></h3>
+        <h3 style="margin:0;">🗺 출고중 발전기 지도 <span style="font-size:10px;color:#aaa;font-weight:400;">v1111f</span></h3>
         <span id="patrol-map-count" class="muted" style="font-size:12.5px;"></span>
         <span style="margin-left:auto;display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;align-items:center;">
           <span><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2C4A66;vertical-align:middle;"></span> 출고중</span>
@@ -6112,8 +6112,17 @@ function drawPatrolMap(fit){
   _patrolMarkers = {};
   // 직접 정한 출장 순서 (지금 출고중이 아닌 현장은 자동으로 정리)
   const shownKeys = new Set(shown.map(st=>st.key));
-  let manual = patrolManualOrder().filter(k=>shownKeys.has(k));
-  if(manual.length !== patrolManualOrder().length) savePatrolManualOrder(manual);
+  // 출장 순서 = 🚐 출장 선택과 하나로 맞춥니다.
+  //  - 정비 표에서 🚐 체크를 푼 현장은 순서에서 빠지고
+  //  - 정비 표에서 🚐 체크한(또는 예전에 선택해둔) 현장은 순서 뒤에 차례로 붙습니다
+  const selNow = patrolRouteSelected();
+  const siteByKey = {}; shown.forEach(st=>{ siteByKey[st.key] = st; });
+  let manual = patrolManualOrder().filter(k=>shownKeys.has(k) && siteByKey[k].gens.some(g=>selNow.has(g.id)));
+  [...selNow].forEach(id=>{
+    const st = shown.find(x=>x.gens.some(g=>g.id===id));
+    if(st && !manual.includes(st.key)) manual.push(st.key);
+  });
+  if(JSON.stringify(manual) !== JSON.stringify(patrolManualOrder())) savePatrolManualOrder(manual);
   const manualNo = {}; manual.forEach((k,i)=>{ manualNo[k] = i+1; });
   const unknown = sites.filter(st=>!st.gps && !st.approx);
   const bounds = [];
@@ -6217,7 +6226,7 @@ async function openQmPatrolMap(){
     <div style="background:#F4F6F5;border-radius:16px;padding:12px 10px;max-width:900px;width:100%;max-height:96vh;overflow:auto;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
         <button type="button" onclick="qmClosePatrolMap()" style="background:#fff;border:2px solid #2C4A66;color:#2C4A66;font-size:15px;font-weight:700;padding:7px 14px;border-radius:10px;">← 뒤로</button>
-        <div style="font-size:18px;font-weight:900;color:#C62828;">🗺 출고중 지도 <span style="font-size:10px;color:#aaa;font-weight:400;">v1111e</span></div>
+        <div style="font-size:18px;font-weight:900;color:#C62828;">🗺 출고중 지도 <span style="font-size:10px;color:#aaa;font-weight:400;">v1111f</span></div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;align-items:center;">
         <span style="font-size:13px;font-weight:700;">출발지</span>
