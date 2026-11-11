@@ -5975,6 +5975,7 @@ function patrolManualOrder(){
 }
 function savePatrolManualOrder(arr){ try{ localStorage.setItem('gen-route-manual-order', JSON.stringify(arr)); }catch(e){} }
 let _patrolMapSiteList = [];
+let _patrolMarkers = {};
 // 지도 동그라미 팝업에서 출장 순서를 정합니다 (빈 값이면 순서에서 뺌). 순서에 넣으면 🚐 출장 선택에도 자동으로 들어갑니다.
 function patrolMapSetOrder(idx, val){
   const st = _patrolMapSiteList[idx]; if(!st) return;
@@ -6003,7 +6004,7 @@ function fmtDuration(sec){
   if(m < 60) return `${m}분`;
   return `${Math.floor(m/60)}시간 ${m%60? (m%60)+'분' : ''}`.trim();
 }
-// 도로 기준 거리·시간 (무료 OSRM 경로 서버, 교통상황 미반영). 실패하면 직선거리×1.3, 평균 60km/h로 추정합니다.
+// 도로 기준 거리·시간 (무료 OSRM 경로 서버, 교통상황 미반영). 실패하면 직선거리×1.3, 평균 70km/h로 추정합니다.
 let _patrolRouteReq = 0;
 async function patrolFetchRoadLegs(points){
   const coords = points.map(p=>`${p[1]},${p[0]}`).join(';');
@@ -6017,7 +6018,7 @@ async function patrolFetchRoadLegs(points){
     return {ok:true, legs: r.legs.map(l=>({km: l.distance/1000, sec: l.duration})), line: r.geometry.coordinates.map(c=>[c[1],c[0]])};
   }catch(e){
     const legs = [];
-    for(let i=0;i<points.length-1;i++){ const km = routeKm(points[i], points[i+1]); legs.push({km, sec: km/60*3600}); }
+    for(let i=0;i<points.length-1;i++){ const km = routeKm(points[i], points[i+1]); legs.push({km, sec: routeEstSec(km)}); }
     return {ok:false, legs, line: null};
   }finally{ clearTimeout(t); }
 }
@@ -6034,7 +6035,7 @@ async function drawPatrolManualRoute(base, baseName, ordered){
   const box = document.getElementById('patrol-map-legs');
   if(!box) return;
   if(!ordered.length){
-    box.innerHTML = `<div class="muted" style="font-size:12px;">💡 갈 순서대로 지도 동그라미를 눌러 <b>🚐 1번으로 넣기, 2번으로 넣기…</b>를 누르면 ${escR(baseName)}에서부터 구간별 거리·소요시간이 여기에 나옵니다.</div>`;
+    box.innerHTML = `<div class="muted" style="font-size:12px;">💡 갈 순서대로 <b>지도 동그라미를 누르면</b> 1번, 2번, 3번… 순서가 붙고 ${escR(baseName)}에서부터 구간별 거리·소요시간이 여기에 나옵니다.</div>`;
     return;
   }
   const reqNo = ++_patrolRouteReq;
@@ -6108,6 +6109,7 @@ function drawPatrolMap(fit){
   const sites = patrolMapSites();
   const shown = sites.filter(st=>st.gps || st.approx);
   _patrolMapSiteList = shown;
+  _patrolMarkers = {};
   // 직접 정한 출장 순서 (지금 출고중이 아닌 현장은 자동으로 정리)
   const shownKeys = new Set(shown.map(st=>st.key));
   let manual = patrolManualOrder().filter(k=>shownKeys.has(k));
@@ -6129,7 +6131,7 @@ function drawPatrolMap(fit){
   // 선택된 현장 동선 (지역별, 동선 카드와 같은 순서)
   const selSites = shown.filter(st=>st.gens.some(g=>sel.has(g.id)));
   const orderNo = {};
-  if(base && selSites.length && !manual.length){ // 직접 순서를 정했으면 자동 동선 대신 그 순서로 그림
+  if(false){ // 지도에서는 자동 지역별 동선을 그리지 않음 (동그라미를 누른 순서 1,2,3…만 사용)
     const byRegion = {};
     selSites.forEach(st=>{ const r = routeGroupOf(st.addr); (byRegion[r] = byRegion[r]||[]).push({...st, coord: st.gps||st.approx}); });
     const colors = ['#C62828','#6A1B9A','#00838F','#EF6C00','#2E7D32','#AD1457','#283593'];
@@ -6151,9 +6153,9 @@ function drawPatrolMap(fit){
     const visitDays = visit ? Math.round((new Date(toLocalDateStr(new Date())+'T00:00:00') - new Date(visit+'T00:00:00'))/86400000) : null;
     const recentVisit = visitDays!=null && visitDays <= 30;
     // 색: 출장 순서/선택 = 빨강, 한 달 안에 다녀옴 = 초록, 정비 임박 = 주황, 나머지 = 남색
-    const color = (picked || ordNo) ? '#C62828' : (recentVisit ? '#2E7D32' : (urgent ? '#E8A317' : '#2C4A66'));
-    const sz = recentVisit && !(picked||ordNo) ? 30 : 26;
-    const html = `<div style="position:relative;width:${sz}px;height:${sz}px;border-radius:50%;background:${color};color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;border:${st.gps? '2.5px solid #fff' : '2.5px dashed #fff'};box-shadow:${recentVisit && !(picked||ordNo)? '0 0 0 3px #A5D6A7,0 1px 4px rgba(0,0,0,.5)' : '0 1px 4px rgba(0,0,0,.5)'};">${recentVisit && !(picked||ordNo)? `✓${n}` : n}${ordNo? `<span style="position:absolute;top:-12px;left:14px;background:#fff;color:#C62828;border:2px solid #C62828;border-radius:10px;font-size:11px;font-weight:900;padding:0 5px;line-height:15px;white-space:nowrap;">${ordNo}번</span>`:''}${(recentVisit && (picked||ordNo))? `<span title="한 달 안에 방문" style="position:absolute;bottom:-6px;right:-8px;width:16px;height:16px;border-radius:50%;background:#2E7D32;color:#fff;border:2px solid #fff;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;">✓</span>`:''}</div>`;
+    const color = ordNo ? '#C62828' : (recentVisit ? '#2E7D32' : (urgent ? '#E8A317' : '#2C4A66'));
+    const sz = recentVisit && !ordNo ? 30 : 26;
+    const html = `<div style="position:relative;width:${sz}px;height:${sz}px;border-radius:50%;background:${color};color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;border:${st.gps? '2.5px solid #fff' : '2.5px dashed #fff'};box-shadow:${recentVisit && !ordNo? '0 0 0 3px #A5D6A7,0 1px 4px rgba(0,0,0,.5)' : '0 1px 4px rgba(0,0,0,.5)'};">${recentVisit && !ordNo? `✓${n}` : n}${ordNo? `<span style="position:absolute;top:-12px;left:14px;background:#fff;color:#C62828;border:2px solid #C62828;border-radius:10px;font-size:11px;font-weight:900;padding:0 5px;line-height:15px;white-space:nowrap;">${ordNo}번</span>`:''}${(recentVisit && ordNo)? `<span title="한 달 안에 방문" style="position:absolute;bottom:-6px;right:-8px;width:16px;height:16px;border-radius:50%;background:#2E7D32;color:#fff;border:2px solid #fff;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;">✓</span>`:''}</div>`;
     const genLines = st.gens.map(g=>{
       const rem = patrolGenRemain(g);
       const remTxt = rem==null ? '' : (rem<=0 ? `<b style="color:#C62828;">정비 ${Math.abs(rem)}h 초과</b>` : (rem<=(DB.warnThreshold||50)? `<b style="color:#B26A00;">정비 ${rem}h 남음</b>` : `정비까지 ${rem}h`));
@@ -6165,20 +6167,23 @@ function drawPatrolMap(fit){
       <div style="font-weight:800;font-size:13px;">${escR(st.customer||'거래처 미기재')}</div>
       <div style="color:#555;margin-bottom:4px;">${escR(st.addr||'-')}</div>
       ${visit? `<div style="font-size:11.5px;font-weight:800;margin-bottom:3px;color:${recentVisit?'#2E7D32':'#777'};">${recentVisit?'✓ ':''}최근 방문 ${visit.slice(2).replace(/-/g,'.')} (${visitDays===0?'오늘':visitDays+'일 전'})${recentVisit?' · 한 달 안에 다녀옴':''}</div>` : `<div style="font-size:11.5px;color:#B23A34;font-weight:700;margin-bottom:3px;">이번 현장 방문 기록 없음</div>`}
-      <div style="font-size:11px;color:${st.gps?'#1565C0':'#888'};margin-bottom:4px;">${st.gps? '📍 GPS 저장된 정확한 위치' : '대략 위치 (주소의 시·군 기준)'}${ordNo? ` · 🚐 출장 ${ordNo}번` : (orderNo[st.key]? ` · 🚐 자동동선 ${escR(orderNo[st.key])}번째`:'')}</div>
+      <div style="font-size:11px;color:${st.gps?'#1565C0':'#888'};margin-bottom:4px;">${st.gps? '📍 GPS 저장된 정확한 위치' : '대략 위치 (주소의 시·군 기준)'}${ordNo? ` · 🚐 출장 ${ordNo}번` : ''}</div>
       ${genLines}
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
         ${ordNo
           ? `<span style="font-size:12px;font-weight:900;color:#fff;background:#C62828;border-radius:6px;padding:4px 8px;">🚐 ${ordNo}번</span>
              <button type="button" onclick="patrolMapSetOrder(${shown.indexOf(st)}, '')" style="padding:4px 8px;font-size:11.5px;font-weight:700;border:1px solid #C62828;border-radius:6px;background:#fff;color:#C62828;cursor:pointer;">순서에서 빼기</button>`
-          : `<button type="button" onclick="patrolMapSetOrder(${shown.indexOf(st)}, '${manual.length+1}')" style="padding:5px 10px;font-size:12.5px;font-weight:800;border:none;border-radius:6px;background:#C62828;color:#fff;cursor:pointer;">🚐 ${manual.length+1}번으로 넣기</button>`}
+          : ''}
         <a href="https://map.naver.com/p/search/${q}" target="_blank" rel="noopener" style="font-size:11.5px;">네이버지도</a>
         <a href="https://map.kakao.com/link/search/${q}" target="_blank" rel="noopener" style="font-size:11.5px;">카카오맵</a>
       </div>
     </div>`;
-    L.marker(pos, {icon: L.divIcon({className:'', html, iconSize:[sz,sz], iconAnchor:[sz/2,sz/2]}), title: `${st.customer||''} ${st.gens.map(g=>g.id).join(',')}`})
+    const mk = L.marker(pos, {icon: L.divIcon({className:'', html, iconSize:[sz,sz], iconAnchor:[sz/2,sz/2]}), title: `${st.customer||''} ${st.gens.map(g=>g.id).join(',')}`})
       .bindPopup(popup).bindTooltip(`${escR(st.customer||'')} · ${st.gens.map(g=>escR(g.id)).join(', ')}`, {direction:'top', offset:[0,-12]})
       .addTo(_patrolMapLayer);
+    _patrolMarkers[st.key] = mk;
+    // 동그라미를 누르면 바로 다음 번호(1,2,3…)로 출장 순서에 들어가고, 정보창이 열립니다. 이미 번호가 있으면 정보창만 열림(빼기 버튼 있음)
+    if(!ordNo && mk.on) mk.on('click', ()=>{ const k = st.key; patrolMapSetOrder(shown.indexOf(st), String(manual.length+1)); setTimeout(()=>{ const m2 = _patrolMarkers[k]; if(m2 && m2.openPopup) m2.openPopup(); }, 0); });
   });
   drawPatrolManualRoute(base, baseName, manual.map(k=>{ const st = shown.find(x=>x.key===k); return {st, pos: st.gps||st.approx}; }));
   const cnt = document.getElementById('patrol-map-count');
@@ -6216,7 +6221,7 @@ async function openQmPatrolMap(){
       <div id="qm-map-msg" style="display:none;font-size:12.5px;font-weight:700;margin-bottom:6px;"></div>
       <div id="patrol-map-count" style="font-size:12.5px;color:#555;margin-bottom:4px;"></div>
       <div style="font-size:11px;color:#666;margin-bottom:6px;line-height:1.5;">
-        <span style="color:#2C4A66;">●</span> 출고중 <span style="color:#E8A317;">●</span> 정비 임박/초과 <span style="color:#C62828;">●</span> 출장 선택 · 숫자=대수 · 점선 테두리=대략 위치 <br><span style="color:#2E7D32;font-weight:900;">● ✓초록 = 한 달 안에 다녀온 곳</span><br>갈 순서대로 동그라미를 눌러 <b>🚐 N번으로 넣기</b>를 누르세요 (1, 2, 3…)
+        <span style="color:#2C4A66;">●</span> 출고중 <span style="color:#E8A317;">●</span> 정비 임박/초과 <span style="color:#C62828;">●</span> 출장 선택 · 숫자=대수 · 점선 테두리=대략 위치 <br><span style="color:#2E7D32;font-weight:900;">● ✓초록 = 한 달 안에 다녀온 곳</span><br>갈 순서대로 <b>동그라미를 누르면 1번, 2번, 3번…</b> 순서가 붙습니다
       </div>
       <div id="patrol-map" style="height:58vh;min-height:320px;border-radius:12px;border:1px solid #ccc;background:#E8EEF4;display:flex;align-items:center;justify-content:center;color:#666;">지도를 불러오는 중…</div>
       <div id="patrol-map-unknown" style="font-size:11.5px;color:#888;margin-top:6px;"></div>
