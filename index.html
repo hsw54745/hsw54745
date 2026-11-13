@@ -1235,14 +1235,17 @@ async function openQmInProcess(id){
     </div>
   `);
   try{
-    const [curGens, curMat] = await Promise.all([
+    const [curGens, curMat, curRentQ] = await Promise.all([
       window.storage.get('gen-fleet-v2', true),
-      window.storage.get('gen-materials-v1', true)
+      window.storage.get('gen-materials-v1', true),
+      window.storage.get('gen-rentals-v2', true).catch(()=>null)
     ]);
     let gens = []; try{ gens = curGens ? JSON.parse(curGens.value) : []; }catch(e){ gens = []; }
     if(!Array.isArray(gens)) gens = [];
     let materials = {}; try{ materials = curMat ? JSON.parse(curMat.value) : {}; }catch(e){ materials = {}; }
+    let rentalsQ = []; try{ rentalsQ = curRentQ ? JSON.parse(curRentQ.value) : []; }catch(e){ rentalsQ = []; }
     const g = gens.find(x=>x && String(x.id)===String(id));
+    const qmChainPrev = (g && g.hoursKnown) ? chainedPrevRental(g, Array.isArray(rentalsQ)? rentalsQ : []) : null;
     const body = document.getElementById('qm-in-body');
     if(!body) return; // 화면이 이미 닫혔으면 무시
     if(!g || g.status!=='out'){
@@ -1281,6 +1284,15 @@ async function openQmInProcess(id){
         <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:6px;">입고시(반납) 누적 사용시간(h)</label>
         <input type="number" id="qmin-endhours" placeholder="예: ${Math.round((g.hours||0))}" min="${r.startHours||0}" style="width:100%;font-size:16px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;">
         <div style="font-size:12.5px;color:#C23B3B;font-weight:700;margin-top:6px;">출고시 누적시간: ${(r.startHours||0).toLocaleString()}h</div>
+        ${qmChainPrev ? `<div style="margin-top:10px;background:#FFF8E1;border:1.5px solid #E8B923;border-radius:10px;padding:10px;">
+          <div style="font-size:13px;font-weight:800;color:#8A5A00;">⚠️ 직전 현장(${escR(qmChainPrev.customer||'-')}) 반납 누적시간을 확인 못 하고 이 현장으로 나갔습니다</div>
+          <div style="font-size:12px;color:#555;margin:4px 0 6px;">이번 현장(${escR(r.customer||'-')})에서 사용한 시간을 알면 넣어주세요 → 직전 현장 반납 누적이 자동 계산됩니다. (모르면 비워두세요)</div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span style="font-size:13px;font-weight:700;">이번 현장 사용</span>
+            <input type="number" id="qmin-cur-used" min="0" placeholder="예: 5" style="width:90px;font-size:16px;padding:8px;border-radius:8px;border:2px solid #E8B923;">
+            <span style="font-size:13px;">시간</span>
+          </div>
+        </div>` : ''}
         ` : `
         <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:4px;">누적 사용시간</label>
         <div style="font-size:14px;color:#C23B3B;font-weight:700;">확인불가</div>
@@ -1391,6 +1403,25 @@ async function submitQmInProcess(id, voltageAcked){
       showErr('입고일과 누적 사용시간을 확인해주세요. (출고시 누적시간보다 작을 수 없습니다)');
       return;
     }
+    // 직전 현장 반납 누적 미확인 → "이번 현장 사용시간"을 넣었으면 나눠서 직전 현장 반납 누적을 채움
+    let qmSplitPrev = null, qmSplitHours = null;
+    const curUsedElQ = document.getElementById('qmin-cur-used');
+    if(curUsedElQ && curUsedElQ.value!=='' && g.hoursKnown && endHours!==null){
+      const pvQ = chainedPrevRental(g, rentals);
+      const cu = Number(curUsedElQ.value);
+      if(pvQ){
+        const lower = Math.max(pvQ.startHours||0, r.startHours||0);
+        if(isNaN(cu) || cu < 0){ showErr('이번 현장 사용시간을 확인해주세요.'); return; }
+        if(endHours - cu < lower){ showErr(`이번 현장 사용시간이 너무 큽니다. (직전 현장 반납 누적이 ${lower.toLocaleString()}h보다 작아짐)`); return; }
+        qmSplitPrev = pvQ; qmSplitHours = endHours - cu;
+      }
+    }
+    if(qmSplitPrev){
+      qmSplitPrev.endHours = qmSplitHours;
+      qmSplitPrev.usedHours = qmSplitHours - (qmSplitPrev.startHours||0);
+      qmSplitPrev.note = [String(qmSplitPrev.note||'').replace(/\s*-\s*반납시 누적시간 미확인/,''), `반납 누적 계산 입력 ${qmSplitHours.toLocaleString()}h (다음 현장 ${r.customer||'-'} 입고 ${endHours.toLocaleString()}h - 사용 ${(endHours-qmSplitHours).toLocaleString()}h, ${qmLabel()})`].filter(Boolean).join(' / ');
+      r.startHours = qmSplitHours;
+    }
     if(r.outDate && inDate && g.hoursKnown && endHours!==null){
       const usedH = endHours - (r.startHours||0);
       const outD = new Date(r.outDate+'T00:00:00');
@@ -1425,7 +1456,8 @@ async function submitQmInProcess(id, voltageAcked){
       usedHours: endHours!=null ? endHours - (r.startHours||0) : null,
       voltage, outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: r.loadConfirmedBy||null, inProcessedBy: qmLabel(), inProcessedAt: nowDateTimeStr(),
       measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
-      paymentConfirmed: r.paymentConfirmed||false, forcedOut: r.forcedOut||false, forceReason: r.forceReason||'', forcedBy: r.forcedBy||null
+      paymentConfirmed: r.paymentConfirmed||false, forcedOut: r.forcedOut||false, forceReason: r.forceReason||'', forcedBy: r.forcedBy||null,
+      ...(g.external ? {borrowed:true, external:true, owner: g.owner||null, genModel: g.model||''} : {})
     });
 
     g.status = 'in';
@@ -1436,6 +1468,8 @@ async function submitQmInProcess(id, voltageAcked){
     g.voltageUpdatedAtMs = Date.now();
     g.voltageUpdatedBy = qmLabel();
     g.rental = null;
+    // 🤝 타사 발전기는 철수하면 원래 업체 반납 → 발전기 목록에서 지움 (임대이력은 남음)
+    if(g.external){ const ix = gens.indexOf(g); if(ix>=0) gens.splice(ix,1); }
 
     await Promise.all([
       window.storage.set('gen-fleet-v2', JSON.stringify(gens), true),
@@ -1623,7 +1657,7 @@ function qmRenderMaintBody(){
   }
   const dyn = document.getElementById('qm-maint-dyn');
   if(!dyn) return;
-  let list = (DB.gens||[]).filter(g=>g && !g.retired && (g.status==='out' || qmMaintIncludeIn));
+  let list = (DB.gens||[]).filter(g=>g && !g.retired && !g.external && (g.status==='out' || qmMaintIncludeIn)); // 🤝 타사 발전기 제외
   const groupOf = g=> g.status==='out' && g.rental ? routeGroupOf(g.rental.address||g.rental.site||'') : '입고';
   const groups = {}; list.forEach(g=>{ const k = groupOf(g); groups[k] = (groups[k]||0)+1; });
   const groupKeys = Object.keys(groups).sort((a,b)=>{ const ia = ROUTE_GROUP_ORDER.indexOf(a), ib = ROUTE_GROUP_ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
@@ -3750,7 +3784,11 @@ async function saveGens(){
         });
         const localById = {};
         DB.gens.forEach(g=>{ if(g && g.id) localById[g.id] = g; });
-        const merged = remoteList.map(rg => (rg && rg.id && dirtyIds.has(rg.id) && localById[rg.id]) ? localById[rg.id] : rg);
+        // 이 화면에서 지운 발전기(마지막 동기화 땐 있었는데 지금 목록엔 없음)는 서버 최신본에서도 빼고 저장합니다
+        // (예전엔 지운 발전기가 서버 쪽에서 다시 살아났음 - 타사 발전기 반납/임의추가 반납 등)
+        const deletedIds = new Set(Object.keys(lastSyncedGensSnapshot).filter(id=>!localById[id]));
+        const merged = remoteList.filter(rg => !(rg && rg.id && deletedIds.has(rg.id)))
+          .map(rg => (rg && rg.id && dirtyIds.has(rg.id) && localById[rg.id]) ? localById[rg.id] : rg);
         const remoteIds = new Set(remoteList.filter(rg=>rg && rg.id).map(rg=>rg.id));
         DB.gens.forEach(g=>{ if(g && g.id && !remoteIds.has(g.id)) merged.push(g); }); // 서버에 아직 없는 새 발전기(내가 방금 추가)는 뒤에 추가
         DB.gens = merged;
@@ -3914,7 +3952,7 @@ function genColorDot(g){
   const label = override ? `${g.id} 고정색상` : g.model;
   return `<span title="${escR(label)}" style="display:inline-block;width:15px;height:15px;border-radius:50%;background:${c};border:1px solid rgba(0,0,0,.25);margin-right:6px;vertical-align:middle;flex-shrink:0;"></span>`;
 }
-function displayModel(g){ return g && g.model ? (genColorDot(g) + g.model) : '미설정'; }
+function displayModel(g){ return g && g.model ? ((g.external? '<span title="타사(남의) 발전기">🤝</span> ' : '') + genColorDot(g) + g.model) : '미설정'; }
 
 function elapsedHours(g){
   return Math.max(0, (g.hours||0) - (g.lastMaintHours||0));
@@ -4000,14 +4038,31 @@ function estCurrentHours(g){
   return g.hours||0;
 }
 // 현재 출고가 "현장이동 + 반납시 누적시간 미확인"으로 이어진 경우, 추정을 시작할 날짜(처음 현장 출고일)를 찾습니다.
+// 직전 임대가 "현장이동(반납 누적 미확인)"이고 지금 출고로 이어진 것인지: 반납일이 이번 출고일과 같거나 며칠 앞(공장에 잠깐 들렀다 나간 경우 포함, 14일 이내),
+// 출고시 누적이 직전 임대 출고시 누적 그대로(=반납 누적을 몰라서 못 바꾼 값)
+//  strict=true(사용시간 추정용): 출고시 누적이 직전 임대 출고시 누적과 똑같을 때만 (중간에 실측이 있었으면 거기서부터 추정하므로 이어붙이지 않음)
+//  strict=false(반납 누적 채우기용): 직전 임대 중에 정비 등으로 누적을 한 번 읽어서 출고시 누적이 더 클 수도 있음 (예: S-20 은민 11/2 오일교환 1321h)
+function isChainPrevRental(r, outDate, startHours, strict){
+  if(!r || r.endHours!=null || !r.inDate || !r.outDate || !outDate) return false;
+  if(r.inDate > outDate) return false;
+  const gap = Math.round((new Date(outDate+'T00:00:00') - new Date(r.inDate+'T00:00:00'))/86400000);
+  if(gap > 14 || !String(r.note||'').includes('현장이동')) return false;
+  return strict ? (r.startHours||0)===(startHours||0) : (startHours||0) >= (r.startHours||0);
+}
+// 지금 출고 바로 앞의 "반납 누적 미확인" 임대 (없으면 null)
+function chainedPrevRental(g, rentalsList){
+  const rt = g && g.rental; if(!rt || !rt.outDate) return null;
+  const list = (rentalsList || DB.rentals || []).filter(r=>r && r.genId===g.id && isChainPrevRental(r, rt.outDate, rt.startHours));
+  list.sort((a,b)=>String(b.inDate).localeCompare(String(a.inDate)));
+  return list[0] || null;
+}
 function transferChainStartDate(g){
   const rt = g && g.rental;
   if(!rt || !rt.outDate) return rt ? rt.outDate : null;
   let start = rt.outDate, startHours = rt.startHours;
   const list = (DB.rentals||[]).filter(r=>r && r.genId===g.id);
   for(let i=0;i<10;i++){
-    const prev = list.find(r=>r.inDate===start && r.endHours==null && r.outDate && r.outDate<=start
-      && (r.startHours||0)===(startHours||0) && String(r.note||'').includes('현장이동'));
+    const prev = list.find(r=>isChainPrevRental(r, start, startHours, true) && r.outDate<=start);
     if(!prev) break;
     start = prev.outDate;
   }
@@ -5661,7 +5716,7 @@ function renderMaintTab(){
           <option value="">번호 선택</option>
           ${(()=>{
             const groups = {};
-            [...DB.gens].sort(sortByIdNatural).forEach(g=>{
+            [...DB.gens].filter(g=>!g.external).sort(sortByIdNatural).forEach(g=>{ // 🤝 타사 발전기는 정비관리 제외
               const cap = capacityOf(g);
               const key = cap===Infinity? '용량 미상' : cap+'kW';
               if(!groups[key]) groups[key] = [];
@@ -6385,7 +6440,7 @@ function renderMaintList(){
   const wrapCnt = document.getElementById('maint-list-cnt');
   const wrap = document.getElementById('maint-list-wrap');
   if(!wrap) return;
-  const allGens = activeGens();
+  const allGens = activeGens().filter(g=>!g.external); // 🤝 타사 발전기는 정비관리 제외
   const sorted = allGens.filter(g=>maintCapacityFilter==null || capacityOf(g)===maintCapacityFilter).sort((a,b)=>{
     const ra = hasHourData(a) ? (a.status==='in'? remainingHours(a): estRemaining(a)) : 9999;
     const rb = hasHourData(b) ? (b.status==='in'? remainingHours(b): estRemaining(b)) : 9999;
@@ -7821,10 +7876,10 @@ function openMonthRentalList(monthKey, genId){
   const today = toLocalDateStr(new Date());
   const list = [];
   (DB.rentals||[]).forEach(r=>{
-    if(!r || !r.outDate || r.outDate.slice(0,7)!==monthKey || !liveIds.has(r.genId)) return;
+    if(!r || !r.outDate || r.outDate.slice(0,7)!==monthKey || !(liveIds.has(r.genId) || r.external)) return;
     if(genId && r.genId!==genId) return;
     list.push({genId:r.genId, customer:r.customer||r.site||'', address:r.address||'', outDate:r.outDate, inDate:r.inDate||'', out:false, note:r.note||'',
-      usedH: (r.endHours!=null && r.startHours!=null)? Math.max(0, r.endHours - r.startHours) : null});
+      usedH: (r.endHours!=null && r.startHours!=null)? Math.max(0, r.endHours - r.startHours) : null, genModel: r.genModel||'', external: !!r.external});
   });
   (DB.gens||[]).forEach(g=>{
     if(g.status!=='out' || !g.rental || !g.rental.outDate || g.rental.outDate.slice(0,7)!==monthKey) return;
@@ -7841,7 +7896,7 @@ function openMonthRentalList(monthKey, genId){
     return `<tr>
       <td class="muted">${i+1}</td>
       <td class="gid">${escR(x.genId)}</td>
-      <td style="font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${g? escR(g.model||'') : ''}">${g? displayModel(g) : '-'}</td>
+      <td style="font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${g? escR(g.model||'') : escR(x.genModel||'')}">${(x.external||(g&&g.external))? '🤝 ':''}${g? displayModel(g) : (escR(x.genModel)||'-')}</td>
       <td class="wrap-ok">${escR(x.customer)||'<span class="muted">미기재</span>'}${transfer?' <span class="pill" style="font-size:10px;">현장이동</span>':''}</td>
       <td class="wrap-ok" style="font-size:12px;">${escR(x.address)||'-'}</td>
       <td style="white-space:nowrap;">${x.outDate}</td>
@@ -7879,7 +7934,7 @@ function monthlyRentalCountTableHtml(){
   const counts = {};
   const add = (d)=>{ if(d && /^\d{4}-\d{2}/.test(d)){ const k = d.slice(0,7); counts[k] = (counts[k]||0)+1; } };
   const liveIds = new Set((DB.gens||[]).map(g=>g.id));
-  (DB.rentals||[]).forEach(r=>{ if(r && liveIds.has(r.genId)) add(r.outDate); });
+  (DB.rentals||[]).forEach(r=>{ if(r && (liveIds.has(r.genId) || r.external)) add(r.outDate); }); // 타사 발전기(철수 후 목록에서 빠짐) 임대도 건수에 포함
   (DB.gens||[]).forEach(g=>{ if(g.status==='out' && g.rental) add(g.rental.outDate); });
   const firstKey = Object.keys(counts).sort()[0] || curKey;
   const years = [];
@@ -10973,22 +11028,94 @@ function processReservation(resId){
   if(g.underRepair){ showInfoModal('고장 수리 중인 발전기입니다. 수리 완료 처리 후 출고할 수 있습니다.'); return; }
   openOutModal(r.genId, resId);
 }
+
+// ===================== 🤝 타사(남의) 발전기 바로 추가 =====================
+// 출고예약 / 출고예약 수정 / 발전기 배정에서 우리 발전기가 아닌 다른 업체 발전기를 그 자리에서 추가해 배정합니다.
+// - 발전기 목록에는 borrowed:true(타사)로 들어가고, 정비관리에서는 빠집니다(누적시간 관리 안 함)
+// - 철수(입고 처리)하면 원래 업체에 반납한 것으로 보고 발전기 목록에서 자동으로 지워집니다 (임대이력·월별 건수에는 남음)
+function nextExternalGenId(){
+  let n = 1; while(findGen('타사-'+n) || (DB.rentals||[]).some(r=>r && r.genId==='타사-'+n)) n++;
+  return '타사-'+n;
+}
+let _extGenTarget = null; // {kind:'select', id} | {kind:'assign'} | {kind:'extra', rowId}
+function openExternalGenPopup(kind, targetId){
+  _extGenTarget = {kind, id: targetId};
+  const old = document.getElementById('ext-gen-popup'); if(old) old.remove();
+  const box = document.createElement('div');
+  box.id = 'ext-gen-popup';
+  box.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px;';
+  box.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:18px 18px 14px;max-width:420px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.3);text-align:left;">
+      <div style="font-size:17px;font-weight:900;margin-bottom:4px;">🤝 타사 발전기 추가</div>
+      <div style="font-size:12px;color:#666;margin-bottom:12px;">우리 발전기가 아닌 다른 업체 발전기를 이 출고에 배정합니다. 철수(입고)하면 목록에서 자동으로 빠집니다.</div>
+      <div class="field"><label>소유 업체 <span style="color:var(--danger);">*</span></label><input type="text" id="ext-owner" placeholder="예: 대흥발전기"></div>
+      <div style="display:flex;gap:8px;">
+        <div class="field" style="flex:1;"><label>용량(kW) <span style="color:var(--danger);">*</span></label><input type="number" id="ext-kw" min="1" placeholder="예: 100"></div>
+        <div class="field" style="flex:1.4;"><label>엔진/모델 (선택)</label><input type="text" id="ext-model" placeholder="예: 커민스"></div>
+      </div>
+      <div class="field"><label>전압</label><input type="text" id="ext-voltage" placeholder="전압 선택">${voltageButtonsHtml('ext-voltage')}</div>
+      <div class="field"><label>발전기 번호 (선택)</label><input type="text" id="ext-id" placeholder="비우면 자동: ${nextExternalGenId()}"></div>
+      <div id="ext-err" style="display:none;color:var(--danger);font-size:13px;font-weight:700;margin:4px 0;"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button type="button" class="btn" style="flex:1;" onclick="document.getElementById('ext-gen-popup').remove()">취소</button>
+        <button type="button" class="btn primary" style="flex:2;" onclick="submitExternalGen()">추가하고 배정</button>
+      </div>
+    </div>`;
+  document.body.appendChild(box);
+  setTimeout(()=>{ const i = document.getElementById('ext-owner'); if(i) i.focus(); }, 50);
+}
+async function submitExternalGen(){
+  const err = (m)=>{ const e = document.getElementById('ext-err'); if(e){ e.textContent = m; e.style.display = 'block'; } };
+  const owner = document.getElementById('ext-owner').value.trim();
+  const kw = Number(document.getElementById('ext-kw').value);
+  const modelTxt = document.getElementById('ext-model').value.trim();
+  const voltage = document.getElementById('ext-voltage').value.trim();
+  let idVal = document.getElementById('ext-id').value.trim();
+  if(!owner) return err('소유 업체를 입력해주세요.');
+  if(!kw || kw<=0) return err('용량(kW)을 입력해주세요.');
+  if(!idVal) idVal = nextExternalGenId();
+  if(findGen(idVal)) return err('이미 있는 발전기 번호입니다. 다른 번호를 넣어주세요.');
+  const g = {id: idVal, model: `${modelTxt? modelTxt+' ' : ''}${kw}kW (${owner})`, manufactureDate:null, voltage,
+    hours:0, lastMaintHours:0, hoursKnown:false, status:'in', rental:null, borrowed:true, external:true, owner,
+    createdAt: nowDateTimeStr(), createdBy: DB.currentUserName||null};
+  DB.gens.push(g);
+  try{ await saveGens(); }catch(e){ DB.gens = DB.gens.filter(x=>x!==g); return err('저장하지 못했습니다. 인터넷 연결을 확인해주세요.'); }
+  const pop = document.getElementById('ext-gen-popup'); if(pop) pop.remove();
+  // 열려 있는 발전기 선택칸들에 새 발전기를 넣고, 누른 자리에 바로 선택
+  const optHtml = `<option value="${escR(g.id)}">${genPickOptionLabel(g)}</option>`;
+  _rsvGenOptionsHtml += optHtml;
+  ['f-rsv-gen','f-target-gen'].forEach(id=>{ const sel = document.getElementById(id); if(sel) sel.insertAdjacentHTML('beforeend', optHtml); });
+  document.querySelectorAll('.rsv-extra-gen-select').forEach(sel=>sel.insertAdjacentHTML('beforeend', optHtml));
+  const t = _extGenTarget || {};
+  if(t.kind==='select'){
+    const sel = document.getElementById(t.id);
+    if(sel){ sel.value = g.id; sel.dispatchEvent(new Event('change')); }
+  } else if(t.kind==='extra'){
+    const row = document.getElementById(t.id); const sel = row && row.querySelector('.rsv-extra-gen-select');
+    if(sel){ sel.value = g.id; sel.dispatchEvent(new Event('change')); }
+  } else if(t.kind==='assign'){
+    const wrap = document.getElementById('assign-board-wrap');
+    if(wrap) wrap.insertAdjacentHTML('afterbegin', `<div style="margin-bottom:6px;"><button type="button" class="assign-chip" data-gen="${escR(g.id)}" onclick="pickAssignGen('${escR(g.id)}')" style="border:2px solid #6A3FA0;background:#F4EEFB;border-radius:8px;padding:6px 10px;font-weight:800;">🤝 ${escR(g.id)} · ${escR(g.model)}</button></div>`);
+    pickAssignGen(g.id);
+  }
+  flash(`🤝 타사 발전기 ${g.id}(${owner} ${kw}kW)를 추가했습니다.`);
+}
+function externalGenBtnHtml(kind, targetId){
+  return `<button type="button" class="btn sm" style="padding:2px 8px;font-size:11.5px;white-space:nowrap;border-color:#6A3FA0;color:#6A3FA0;font-weight:800;" onclick="openExternalGenPopup('${kind}','${targetId||''}')" title="우리 발전기가 아닌 다른 업체(타사) 발전기를 추가해서 배정">🤝 타사</button>`;
+}
 function openAssignGenModal(resId){
   const r = DB.reservations.find(x=>x.id===resId);
   if(!r) return;
   const candidates = activeGens().filter(x=>x.status==='in' && !x.underRepair && !DB.reservations.some(o=>o.genId===x.id)).sort(sortByIdNatural);
-  if(candidates.length===0){
-    showInfoModal('지금 배정할 수 있는(입고 상태인) 발전기가 없습니다.');
-    return;
-  }
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
       <h3>🔧 발전기 배정</h3>
       <div class="modal-sub">${escR(r.customer||r.site||'-')} · 출고예약</div>
-      <input type="hidden" id="f-assign-gen" value="${candidates[0].id}">
-      <div id="assign-picked" style="text-align:left;margin-top:6px;padding:8px 12px;border-radius:10px;background:var(--primary-tint);font-size:14px;">선택한 발전기: <b>${candidates[0].id}</b> · ${escR(candidates[0].model||'미설정')} · ${genPickInfoHtml(candidates[0])}</div>
-      ${assignGenCapacityBoardHtml(candidates)}
+      <input type="hidden" id="f-assign-gen" value="${candidates.length? candidates[0].id : ''}">
+      <div style="text-align:right;margin-top:4px;">${externalGenBtnHtml('assign','')}</div>
+      <div id="assign-picked" style="text-align:left;margin-top:6px;padding:8px 12px;border-radius:10px;background:var(--primary-tint);font-size:14px;">${candidates.length? `선택한 발전기: <b>${candidates[0].id}</b> · ${escR(candidates[0].model||'미설정')} · ${genPickInfoHtml(candidates[0])}` : '지금 배정할 수 있는(입고 상태인) 우리 발전기가 없습니다. 🤝 타사 추가로 다른 업체 발전기를 넣을 수 있습니다.'}</div>
+      <div id="assign-board-wrap">${assignGenCapacityBoardHtml(candidates)}</div>
       <div class="modal-actions">
         <button class="btn" onclick="closeModal()">취소</button>
         <button class="btn primary" onclick="confirmAssignGen('${resId}')">다음 (출고 정보 입력)</button>
@@ -11008,6 +11135,7 @@ function genMaintRemainInfo(g){
 }
 function genPickOptionLabel(x){
   const mi = genMaintRemainInfo(x);
+  if(x.external) return `🤝 ${x.id} · ${escR(x.model||'미설정')} · ${escR(x.voltage||'전압 미설정')} · 타사`;
   return `${x.id} · ${escR(x.model||'미설정')} · ${escR(x.voltage||'전압 미설정')} · ${mi.level==='danger'||mi.level==='warn'?'⚠️ ':''}${mi.text}`;
 }
 function genPickInfoHtml(g){
@@ -11646,6 +11774,7 @@ function addRsvExtraGenRow(){
   row.style.cssText = 'display:flex;align-items:center;gap:4px;margin-top:6px;';
   row.innerHTML = `
     <select class="rsv-extra-gen-select" style="flex:1;min-width:0;padding:5px 6px;font-size:12.5px;" onchange="onRsvExtraGenChange('${rowId}')">${_rsvGenOptionsHtml}</select>
+    ${externalGenBtnHtml('extra', rowId)}
     <input type="number" class="rsv-extra-gen-hours" id="${rowId}-hours" placeholder="누적h" title="출고시 누적 사용시간(h) - 마지막으로 확인된 값" readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;background:var(--surface-2);color:var(--ink-soft);">
     <button type="button" class="btn sm danger" style="flex:0 0 auto;padding:2px 7px;" onclick="document.getElementById('${rowId}').remove()">×</button>
   `;
@@ -11754,6 +11883,7 @@ function openReserveNoGenModal(resId, draft){
         <div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 <button type="button" class="btn sm" style="padding:1px 7px;font-size:11px;margin-left:4px;" onclick="addRsvExtraGenRow()">+ 추가</button></label>
           <div style="display:flex;align-items:center;gap:4px;">
             <select id="f-rsv-gen" onchange="onRsvGenChange()" style="flex:1;min-width:0;">${genOptionsHtml}</select>
+            ${externalGenBtnHtml('select','f-rsv-gen')}
             <input type="number" id="f-rsv-starthours" value="0" min="0" placeholder="누적h" title="출고시 누적 사용시간(h) - 마지막으로 확인된 값이 자동으로 들어가며, 실제 값과 다르면 [정비관리 → 직접수정]에서 먼저 바로잡아주세요." readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;display:none;background:var(--surface-2);color:var(--ink-soft);">
           </div>
           <div id="f-rsv-extra-gens-wrap"></div>
@@ -12520,6 +12650,7 @@ function openOutModal(id, reservationId){
         ${isEditingPending? `<div class="field f-sm" style="flex:2.3 1 230px;"><div class="out-card"><label>발전기 번호 (변경 가능) <button type="button" class="btn sm" style="padding:1px 7px;font-size:11px;margin-left:4px;" onclick="addRsvExtraGenRow()" title="같은 거래처·현장으로 발전기를 더 붙여서 상차대기로 등록합니다">+ 추가</button></label>
           <div style="display:flex;align-items:center;gap:4px;">
             <select id="f-target-gen" onchange="onTargetGenChange()" style="flex:1;min-width:0;">${targetGenOptionsHtml}</select>
+            ${externalGenBtnHtml('select','f-target-gen')}
             ${g.hoursKnown? `<input type="number" id="f-starthours" value="${g.hours||0}" min="${g.hours||0}" readonly style="width:54px;flex:0 0 auto;padding:5px 4px;font-size:12px;background:var(--surface-2);color:var(--ink-soft);">` : ''}
           </div>
           <div id="f-rsv-extra-gens-wrap"></div>
@@ -13985,8 +14116,7 @@ function openPrevRentalPopup(id){
 // 지금 출고중인 임대가 직전 임대에서 "현장이동(반납 누적시간 미확인)"으로 바로 이어진 것인지
 function prevChainedToCurrent(g, prev){
   const rt = g && g.rental;
-  return !!(rt && prev && prev.endHours==null && prev.inDate && rt.outDate===prev.inDate
-    && (rt.startHours||0)===(prev.startHours||0) && String(prev.note||'').includes('현장이동'));
+  return !!(rt && prev && isChainPrevRental(prev, rt.outDate, rt.startHours));
 }
 // 직전 임대의 입고시 누적시간을 나중에 확인해서 넣습니다.
 async function fillPrevRentalEndHours(genId, rentalId){
@@ -14061,9 +14191,19 @@ function openInModal(id, isTransfer){
         </div></div>
         ${g.hoursKnown? `<div class="field f-md"><div class="out-card">
           <label>입고시(반납) 누적 사용시간(h)</label>
-          <input type="number" id="f-endhours" placeholder="${isTransfer? '모르면 비워두세요' : `예: ${suggested}`}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}')">
+          <input type="number" id="f-endhours" placeholder="${isTransfer? '모르면 비워두세요' : `예: ${suggested}`}" min="${g.rental.startHours}" oninput="updateInUsagePreview(${g.rental.startHours||0}, '${rt.outDate||''}'); if(document.getElementById('f-in-cur-used')) updateInSplitPreview(${Math.max(((chainedPrevRental(g)||{}).startHours)||0, g.rental.startHours||0)}, ${g.rental.startHours||0}, '${rt.outDate||''}');">
           <div class="hint" style="font-size:13px;font-weight:700;color:var(--danger);">출고시 누적시간: ${(g.rental.startHours||0).toLocaleString()}h</div>
-        </div></div>` : `<div class="field f-md"><div class="out-card">
+        </div></div>${(()=>{ const pv = chainedPrevRental(g); if(!pv || isTransfer) return '';
+          return `<div class="field" style="flex:1 1 100%;"><div class="out-card" style="background:var(--warn-tint);border:1.5px solid var(--warn);">
+            <div style="font-size:13px;font-weight:800;color:#8A5A00;">⚠️ 직전 현장(${escR(pv.customer||'-')}, ~${escR(pv.inDate||'')}) 반납 누적시간을 확인 못 하고 이번 현장으로 나갔습니다</div>
+            <div style="font-size:12px;color:#555;margin:4px 0 6px;">그래서 이번 현장 출고시 누적(${(g.rental.startHours||0).toLocaleString()}h)이 실제보다 작게 들어가 있습니다. <b>이번 현장(${escR(rt.customer||'-')})에서 사용한 시간</b>을 알면 넣어주세요 → 직전 현장 반납 누적이 자동 계산됩니다. (모르면 비워두세요)</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <label style="font-size:13px;font-weight:700;margin:0;">이번 현장 사용시간</label>
+              <input type="number" id="f-in-cur-used" min="0" placeholder="예: 5" style="width:110px;" oninput="updateInSplitPreview(${Math.max(pv.startHours||0, g.rental.startHours||0)}, ${g.rental.startHours||0}, '${rt.outDate||''}')">
+              <span style="font-size:13px;">h</span>
+              <span id="f-in-split-preview" style="font-size:12.5px;font-weight:700;color:var(--primary-dark);"></span>
+            </div>
+          </div></div>`; })()}` : `<div class="field f-md"><div class="out-card">
           <label>누적 사용시간</label>
           <div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</div>
         </div></div>`}
@@ -14218,6 +14358,20 @@ function setSuppliesRecovered(recovered){
     applySuppliesNo();
   }
 }
+function updateInSplitPreview(prevStart, curStart, outDate){
+  const el = document.getElementById('f-in-split-preview'); if(!el) return;
+  const endV = (document.getElementById('f-endhours')||{}).value;
+  const curV = (document.getElementById('f-in-cur-used')||{}).value;
+  // 아래 "임대사용시간" 미리보기도 나눈 값 기준으로 다시 계산
+  if(curStart!=null && typeof updateInUsagePreview==='function' && !updateInSplitPreview._busy){
+    updateInSplitPreview._busy = true;
+    try{ updateInUsagePreview((curV!=='' && endV!=='') ? Number(endV)-Number(curV) : curStart, outDate); }finally{ updateInSplitPreview._busy = false; }
+  }
+  if(curV===''){ el.textContent = ''; return; }
+  if(endV===''){ el.textContent = '← 먼저 입고시 누적 사용시간을 넣어주세요'; return; }
+  const split = Number(endV) - Number(curV);
+  el.textContent = split < prevStart ? `⚠️ 계산값 ${split.toLocaleString()}h가 그 전에 확인된 누적(${prevStart.toLocaleString()}h)보다 작습니다` : `→ 직전 현장 반납 누적 ${split.toLocaleString()}h · 이번 현장 ${split.toLocaleString()} → ${Number(endV).toLocaleString()}h (${Number(curV).toLocaleString()}h 사용)`;
+}
 async function submitIn(id, isTransfer){
   const g = findGen(id);
   const inDate = document.getElementById('f-indate').value;
@@ -14264,6 +14418,18 @@ async function submitIn(id, isTransfer){
     errEl.textContent = '입력한 누적시간이 출고시 누적시간보다 작습니다. 확인 후 다시 입력해주세요.';
     errEl.style.display='block'; return;
   }
+  // 직전 현장 반납 누적 미확인 → "이번 현장 사용시간"을 넣었으면 나눠서 계산
+  let splitPrev = null;
+  const curUsedEl = document.getElementById('f-in-cur-used');
+  if(curUsedEl && curUsedEl.value!==''){
+    const pv = chainedPrevRental(g);
+    const curUsed = Number(curUsedEl.value);
+    if(!pv){ /* 이어진 임대가 없어졌으면 무시 */ }
+    else if(endHours===null || isNaN(endHours)){ errEl.textContent = '이번 현장 사용시간을 나누려면 입고시 누적 사용시간을 먼저 넣어주세요.'; errEl.style.display='block'; return; }
+    else if(isNaN(curUsed) || curUsed < 0){ errEl.textContent = '이번 현장 사용시간을 확인해주세요.'; errEl.style.display='block'; return; }
+    else if(endHours - curUsed < Math.max(pv.startHours||0, g.rental.startHours||0)){ errEl.textContent = `이번 현장 사용시간이 너무 큽니다. (직전 현장 반납 누적이 ${Math.max(pv.startHours||0, g.rental.startHours||0).toLocaleString()}h보다 작아짐 - 그 전에 확인된 누적시간)`; errEl.style.display='block'; return; }
+    else splitPrev = {rentalId: pv.id, splitHours: endHours - curUsed};
+  }
   const conditionEl = document.getElementById('f-in-condition');
   const condition = conditionEl ? (conditionEl.value || (isTransfer? 'ok' : '')) : 'ok';
   // 입고 상태는 미리 골라두지 않으므로, 정상입고/고장입고 중 하나를 꼭 눌러야 입고됩니다.
@@ -14286,9 +14452,10 @@ async function submitIn(id, isTransfer){
   // 최근에 현장이동(공장 미경유)이 있었던 발전기도 그 구간 사용량이 이번에 몰아서 잡히는 게 정상이라 무조건 막지 않고
   // "정말 맞습니까?" 확인 후 진행할 수 있게 합니다.
   if(g.rental.outDate && inDate && g.hoursKnown && endHours!==null){
-    const usedH = endHours - g.rental.startHours;
+    const usedH = endHours - (splitPrev ? splitPrev.splitHours : g.rental.startHours);
     // 현장이동(반납 누적 미확인)으로 이어진 출고면 출고시 누적이 처음 현장 값이므로, 처음 현장 출고일부터 일수를 셉니다
-    const outD = new Date((transferChainStartDate(g) || g.rental.outDate)+'T00:00:00');
+    // (이번 현장 사용시간을 나눠 넣었으면 이번 현장 출고일부터)
+    const outD = new Date((splitPrev ? g.rental.outDate : (transferChainStartDate(g) || g.rental.outDate))+'T00:00:00');
     const inD = new Date(inDate+'T00:00:00');
     const days = Math.max(1, Math.round((inD-outD)/86400000));
     const avgDaily = usedH/days;
@@ -14296,13 +14463,13 @@ async function submitIn(id, isTransfer){
       const recentTransferNote = (g.rental.note && g.rental.note.includes('현장이동')) || (g.rental.note && g.rental.note.includes('누적시간 미확인'));
       openConfirmModal(
         voltageDiffNote + `입력하신 누적시간 차이(${usedH.toLocaleString()}h)를 임대일수(${days}일)로 나누면 하루 평균 ${avgDaily.toFixed(1)}시간이 됩니다. 하루는 24시간을 넘을 수 없습니다.\n\n${recentTransferNote? '이 발전기는 최근 현장이동으로 누적시간을 한동안 확인 못한 이력이 있어서, 그 구간 사용량이 이번에 한꺼번에 잡혀 정상적으로 큰 값이 나올 수 있습니다.\n\n' : ''}오타가 아니라 실제로 확인하신 숫자가 맞다면 계속 진행하세요.`,
-        function(){ submitInFinish(id, isTransfer, {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm}); },
+        function(){ submitInFinish(id, isTransfer, {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm, splitPrev}); },
         '맞습니다, 계속 진행', '다시 확인할게요'
       );
       return;
     }
   }
-  const finishVals = {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm};
+  const finishVals = {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm, splitPrev};
   openConfirmModal(voltageDiffNote + `⚠️ [${g.id}] ${g.model||'미설정'} 발전기를 ${isTransfer? '현장이동':'입고'} 처리합니다.\n\n번호가 맞습니까?${voltageDiffNote? ' (전압도 맞는지 확인해주세요)':''}`, function(){
     submitInFinish(id, isTransfer, finishVals);
   }, '맞습니다, 처리', '다시 확인');
@@ -14316,6 +14483,18 @@ async function submitInFinish(id, isTransfer, vals){
   }
   const fuelExhaustNote = (remainingFuelLiters===0) ? '출고시 연료 모두 소진되어 입고' : '';
   const rt = g.rental;
+  // 직전 현장 반납 누적을 "이번 현장 사용시간"으로 나눠 계산해서 채움
+  if(vals.splitPrev){
+    const pv = (DB.rentals||[]).find(r=>r && r.id===vals.splitPrev.rentalId);
+    if(pv && pv.endHours==null){
+      const sh = vals.splitPrev.splitHours;
+      pv.endHours = sh;
+      pv.usedHours = sh - (pv.startHours||0);
+      pv.note = [String(pv.note||'').replace(/\s*-\s*반납시 누적시간 미확인/,''), `반납 누적 계산 입력 ${sh.toLocaleString()}h (다음 현장 ${rt.customer||'-'} 입고 ${endHours.toLocaleString()}h - 사용 ${(endHours-sh).toLocaleString()}h, ${DB.currentUserName||'-'})`].filter(Boolean).join(' / ');
+      rt.startHours = sh;
+      rt.note = String(rt.note||'').replace(/⚠️ 이전 현장\([^)]*\) 반납시 누적시간 미확인[^/]*/,'').replace(/^\s*\/\s*|\s*\/\s*$/g,'').trim();
+    }
+  }
   const transferNote = (isTransfer && g.hoursKnown && endHours===null) ? '현장이동(공장 미경유)으로 종료 - 반납시 누적시간 미확인' : (isTransfer ? '현장이동(공장 미경유)으로 종료' : '');
   const combinedNote = [rt.note, fuelExhaustNote, transferNote].filter(Boolean).join(' / ');
   const newRentalId = uid();
@@ -14326,7 +14505,8 @@ async function submitInFinish(id, isTransfer, vals){
     usedHours: endHours!=null ? endHours - rt.startHours : null,
     voltage, outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null, inProcessedAt: nowDateTimeStr(),
     measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
-    paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null
+    paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null,
+    ...(g.external ? {borrowed:true, external:true, owner: g.owner||null, genModel: g.model||''} : {})
   });
   // 누적시간 확인불가(설정에서 지정)은 여기서 hoursKnown을 절대 자동으로 켜지 않습니다.
   if(g.hoursKnown && endHours!==null){
@@ -14352,6 +14532,9 @@ async function submitInFinish(id, isTransfer, vals){
     });
     await saveSuppliesStock();
   }
+  // 🤝 타사 발전기는 철수(일반 입고)하면 원래 업체에 반납한 것으로 보고 발전기 목록에서 지웁니다 (임대이력은 남음). 현장이동은 계속 쓰므로 그대로.
+  const externalReturned = !!(g.external && !isTransfer);
+  if(externalReturned) DB.gens = DB.gens.filter(x=>x.id!==g.id);
   await saveGens();
   await saveRentals();
   await autoClearMatchedReturnRequests(rt); // 이 임대가 어떤 식으로 끝나든(현장이동/일반 입고), 매칭되는 철수요청은 이제 처리된 것이니 자동으로 지웁니다.
@@ -14368,7 +14551,7 @@ async function submitInFinish(id, isTransfer, vals){
   }
   closeModal();
   renderContent();
-  flash(condition==='broken' ? '입고 처리되었습니다 (고장 등록 - 수리 완료 전까지 출고 불가)' : '입고 처리되었습니다');
+  flash(externalReturned ? `🤝 타사 발전기 ${g.id} 철수 완료 - ${g.owner||'원래 업체'} 반납으로 목록에서 빠졌습니다 (임대이력에는 남음)` : (condition==='broken' ? '입고 처리되었습니다 (고장 등록 - 수리 완료 전까지 출고 불가)' : '입고 처리되었습니다'));
   if(isWithinVoiceAlertHours()) speakText('입고처리되었습니다.');
   maybeLogVoltageChange(id, oldVoltageForLog, voltage);
 }
