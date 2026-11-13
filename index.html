@@ -826,7 +826,7 @@ async function renderQmStockListInner(){
     let gens = [];
     try{ gens = cur ? JSON.parse(cur.value) : []; }catch(e){ gens = []; }
     if(!Array.isArray(gens)) gens = [];
-    const inStock = gens.filter(g=>g && !g.retired && g.status==='in').sort((a,b)=>{
+    const inStock = gens.filter(g=>g && !g.retired && !g.external && g.status==='in').sort((a,b)=>{
       const ka = (lastInMap[a.id]&&lastInMap[a.id].key) || '';
       const kb = (lastInMap[b.id]&&lastInMap[b.id].key) || '';
       if(ka || kb) return kb.localeCompare(ka);
@@ -4718,7 +4718,7 @@ function outMaintBannerHtml(){
     </div>`;
 }
 function renderDashboard(){
-  const active = activeGens();
+  const active = activeGens().filter(g=>!g.external); // 🤝 타사 발전기는 우리 보유 대수·현황에서 제외
   const total = active.length;
   const inCount = active.filter(g=>g.status==='in').length;
   const outCount = active.filter(g=>g.status==='out').length;
@@ -5251,7 +5251,7 @@ function clearInCapacityFilter(){
   renderContent();
 }
 function renderInList(){
-  const list = activeGens().filter(g=>g.status==='in' && (inCapacityFilter==null || capacityOf(g)===inCapacityFilter)).sort((a,b)=>{
+  const list = activeGens().filter(g=>g.status==='in' && !g.external && (inCapacityFilter==null || capacityOf(g)===inCapacityFilter)).sort((a,b)=>{
     if(!!a.hoursKnown !== !!b.hoursKnown) return a.hoursKnown? -1 : 1;
     return sortByIdNatural(a,b);
   });
@@ -5298,7 +5298,7 @@ function renderInList(){
     </tr>`;
   }).join('');
 
-  const allInGens = activeGens().filter(g=>g.status==='in');
+  const allInGens = activeGens().filter(g=>g.status==='in' && !g.external);
   const brokenCount = list.filter(g=>g.underRepair).length;
 
   // 용량(kW)별 버튼 목록
@@ -5732,7 +5732,7 @@ function renderMaintTab(){
         <select id="maint-model-filter" onchange="renderMaintByModel()" style="width:100%;padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;font-family:var(--sans);font-size:13px;background:#fff;">
           <option value="">모델 선택</option>
           ${(()=>{
-            const models = [...new Set(DB.gens.map(g=>g.model).filter(Boolean))];
+            const models = [...new Set(DB.gens.filter(g=>!g.external).map(g=>g.model).filter(Boolean))]; // 🤝 타사 발전기 모델 제외
             const groups = {};
             models.forEach(m=>{
               const cap = capacityFromModelStr(m);
@@ -6803,7 +6803,7 @@ function recomputeLastMaint(genId, allowLower, removedRec){
 function renderHistorySelectOptions(keepId){
   const sel = document.getElementById('hist-select');
   if(!sel) return;
-  const list = [...DB.gens].sort(sortByIdNatural);
+  const list = [...DB.gens].filter(g=>!g.external).sort(sortByIdNatural); // 🤝 타사 발전기 제외
   const groups = {};
   list.forEach(g=>{
     const cap = capacityOf(g);
@@ -7788,7 +7788,7 @@ function renderSettlementTab(){
     SETTLE_YEARS.push({y, start:st, endNext:en, days: Math.max(0, settleDayDiff(st, en)), future: ys > todayStr, noData: yn <= dataStart});
   }
 
-  const utilList = activeGens().sort(sortByIdNatural).map(g=>{
+  const utilList = activeGens().filter(g=>!g.external).sort(sortByIdNatural).map(g=>{ // 🤝 타사 발전기는 우리 임대율·용량별 통계에서 제외
     const spans = settleSpansOf(g, todayStr);
     const daysOut = settleSpanDays(spans, rateStart, tomorrowStr);
     const rate = Math.max(0, Math.min(100, Math.round(daysOut/rateDays*100)));
@@ -7876,13 +7876,13 @@ function openMonthRentalList(monthKey, genId){
   const today = toLocalDateStr(new Date());
   const list = [];
   (DB.rentals||[]).forEach(r=>{
-    if(!r || !r.outDate || r.outDate.slice(0,7)!==monthKey || !(liveIds.has(r.genId) || r.external)) return;
+    if(!r || !r.outDate || r.outDate.slice(0,7)!==monthKey || r.external || !liveIds.has(r.genId)) return;
     if(genId && r.genId!==genId) return;
     list.push({genId:r.genId, customer:r.customer||r.site||'', address:r.address||'', outDate:r.outDate, inDate:r.inDate||'', out:false, note:r.note||'',
       usedH: (r.endHours!=null && r.startHours!=null)? Math.max(0, r.endHours - r.startHours) : null, genModel: r.genModel||'', external: !!r.external});
   });
   (DB.gens||[]).forEach(g=>{
-    if(g.status!=='out' || !g.rental || !g.rental.outDate || g.rental.outDate.slice(0,7)!==monthKey) return;
+    if(g.external || g.status!=='out' || !g.rental || !g.rental.outDate || g.rental.outDate.slice(0,7)!==monthKey) return;
     if(genId && g.id!==genId) return;
     list.push({genId:g.id, customer:g.rental.customer||g.rental.site||'', address:g.rental.address||'', outDate:g.rental.outDate, inDate:'', out:true, note:g.rental.note||'',
       usedH: null, estH: (g.hoursKnown && g.rental.startHours!=null)? Math.max(0, Math.round(estCurrentHours(g) - g.rental.startHours)) : null});
@@ -7934,8 +7934,8 @@ function monthlyRentalCountTableHtml(){
   const counts = {};
   const add = (d)=>{ if(d && /^\d{4}-\d{2}/.test(d)){ const k = d.slice(0,7); counts[k] = (counts[k]||0)+1; } };
   const liveIds = new Set((DB.gens||[]).map(g=>g.id));
-  (DB.rentals||[]).forEach(r=>{ if(r && (liveIds.has(r.genId) || r.external)) add(r.outDate); }); // 타사 발전기(철수 후 목록에서 빠짐) 임대도 건수에 포함
-  (DB.gens||[]).forEach(g=>{ if(g.status==='out' && g.rental) add(g.rental.outDate); });
+  (DB.rentals||[]).forEach(r=>{ if(r && !r.external && liveIds.has(r.genId)) add(r.outDate); }); // 🤝 타사 발전기 임대는 우리 건수에서 제외
+  (DB.gens||[]).forEach(g=>{ if(g.status==='out' && g.rental && !g.external) add(g.rental.outDate); });
   const firstKey = Object.keys(counts).sort()[0] || curKey;
   const years = [];
   // 화면을 꽉 채우도록 10년치(2026~2035) 칸을 만들고, 그 뒤로 가면 최근 10년이 보이게 밀립니다
@@ -9023,7 +9023,7 @@ function renderSettingsTab(){
   const teamMemberInputs = [0,1,2].map(i=>`
     <div class="field"><label>사용자${i+1}</label><input type="text" value="${(DB.teamMembers[i]||'').replace(/"/g,'&quot;')}" placeholder="이름" onchange="updateTeamMember(${i}, this.value)"></div>
   `).join('');
-  const activeList = activeGens().sort(sortByIdNatural);
+  const activeList = activeGens().filter(g=>!g.external).sort(sortByIdNatural); // 🤝 타사(1회성) 발전기는 설정 목록에서 제외 - 철수하면 자동으로 지워짐
   const retiredList = DB.gens.filter(g=>g.retired);
   const disposedList = retiredList.filter(g=>g.retiredReason!=='매각');
   const soldList = retiredList.filter(g=>g.retiredReason==='매각');
@@ -10068,7 +10068,7 @@ async function updateUsageRatio(id, value){
   flash('저장되었습니다');
 }
 function openBulkUsageRatioModal(){
-  const known = activeGens().filter(g=>isFinite(capacityOf(g)));
+  const known = activeGens().filter(g=>!g.external && isFinite(capacityOf(g)));
   if(known.length===0){ showInfoModal('용량(kW)이 인식되는 발전기가 없습니다. 모델명에 kW를 포함해서 입력해주세요.'); return; }
   const capacities = [...new Set(known.map(g=>capacityOf(g)))].sort((a,b)=>a-b);
   const scopeOptions = `<option value="all">전체 (${known.length}대)</option>` +
@@ -10100,7 +10100,7 @@ async function submitBulkUsageRatio(){
   try{
     const scope = document.getElementById('f-bulk-ratio-scope').value;
     const ratio = Number(document.getElementById('f-bulk-ratio-value').value);
-    const targets = activeGens().filter(g=>isFinite(capacityOf(g)) && (scope==='all' || capacityOf(g)===Number(scope)));
+    const targets = activeGens().filter(g=>!g.external && isFinite(capacityOf(g)) && (scope==='all' || capacityOf(g)===Number(scope)));
     if(targets.length===0){ 
       const errEl = document.getElementById('f-err');
       errEl.textContent='적용 대상 발전기가 없습니다.'; errEl.style.display='block';
@@ -10472,7 +10472,7 @@ async function saveMaterialCard(i){
   flash(newParts.length? `저장했습니다 (새 품번 ${newParts.length}개는 부품 재고에 0개로 추가)` : '저장했습니다');
 }
 function renderMaterialsTab(){
-  const models = sortModelsByCapacity([...new Set(DB.gens.map(g=>g.model).filter(Boolean))]);
+  const models = sortModelsByCapacity([...new Set(DB.gens.filter(g=>!g.external).map(g=>g.model).filter(Boolean))]); // 🤝 타사 발전기 모델 제외
   if(models.length===0){
     return `<div class="section-title">🧰 자재 관리</div><div class="empty">먼저 [설정] 탭에서 발전기 모델을 입력해주세요.</div>`;
   }
@@ -10504,7 +10504,7 @@ function inGensPrintCss(){
   `;
 }
 function downloadInGensPrintFile(){
-  const list = activeGens().filter(g=>g.status==='in' && (inCapacityFilter==null || capacityOf(g)===inCapacityFilter)).sort(sortByIdNatural);
+  const list = activeGens().filter(g=>g.status==='in' && !g.external && (inCapacityFilter==null || capacityOf(g)===inCapacityFilter)).sort(sortByIdNatural);
   if(list.length===0){ showInfoModal('인쇄할 입고 발전기가 없습니다.'); return; }
   const rows = list.map(g=>{
     const rem = estRemaining(g);
