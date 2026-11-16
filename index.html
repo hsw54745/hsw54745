@@ -1955,7 +1955,7 @@ async function qmRefreshReturnRequestList(){
     // 사무실 화면과 똑같은 기준(연락처 → 주소 → 거래처명 순)으로 어느 발전기인지 추정해봅니다.
     const outGens = gens.filter(g=>g && g.status==='out' && g.rental);
     wrap.innerHTML = list.map((r,i)=>{
-      const parsed = parseReturnRequestText(r.text);
+      const parsed = parseReturnRequestText(r.text, r.createdAtTs);
       let matched = null;
       if(parsed.phone) matched = outGens.find(g=>g.rental.phone && g.rental.phone.replace(/[^0-9]/g,'')===parsed.phone);
       if(!matched && parsed.address) matched = outGens.find(g=>g.rental.address && (g.rental.address.includes(parsed.address) || parsed.address.includes(g.rental.address)));
@@ -11594,13 +11594,15 @@ function parseSmsOrderText(text, baseTs){
 }
 // 철수(회수) 요청 문자에서 주소·연락처·담당자·회수예정일을 뽑아냅니다.
 // 오늘/내일/"OO일 후"/특정 날짜("18일") 표현을 인식합니다. 시간은 철수 요청에서는 안 쓰므로 뽑지 않습니다.
-function parseReturnRequestText(text){
+// baseTs: 철수 문자를 등록한 시간. "내일/오늘/N일 후"는 이 시간 기준으로 계산합니다.
+// (예전엔 화면을 연 날 기준이라, 어제 등록한 "내일 철수"를 오늘 열면 하루 밀려서 나왔음)
+function parseReturnRequestText(text, baseTs){
   const result = {address:'', phone:'', manager:'', customer:'', recallDate:''};
   if(!text) return result;
   const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
   const phoneRe = /01[0-9][-\s]?\d{3,4}[-\s]?\d{4}/;
   const addressRe = /(시|도|군|구|읍|면|동|리|로|길)[\s]*\d|산\s*\d|(^|\s)[가-힣]{2,}(시|도|군|구|읍|면|동|리)(\s|$)/;
-  const today = new Date();
+  const today = baseTs ? new Date(baseTs) : new Date();
   const leftover = [];
 
   // 날짜는 더 구체적인 표현(특정 날짜 > N일 후 > 내일 > 오늘) 순으로 찾습니다.
@@ -11613,6 +11615,9 @@ function parseReturnRequestText(text){
     const day = Number(dayMatch[1]);
     let d = new Date(today.getFullYear(), today.getMonth(), day);
     if(d < new Date(today.getFullYear(), today.getMonth(), today.getDate())) d = new Date(today.getFullYear(), today.getMonth()+1, day);
+    result.recallDate = toLocalDateStr(d);
+  } else if(/모레|모래/.test(text)){ // "내일모레"도 모레(2일 뒤)
+    const d = new Date(today); d.setDate(d.getDate()+2);
     result.recallDate = toLocalDateStr(d);
   } else if(/내일/.test(text)){
     const d = new Date(today); d.setDate(d.getDate()+1);
@@ -11683,14 +11688,14 @@ function detectSmsOrderChange(item, allItems){
 // 철수요청 문자도 같은 방식으로: 연락처/업체명이 같은데 24시간 이내 먼저 온 철수문자와 주소·회수예정일이 달라졌으면 알려줍니다.
 function detectReturnRequestChange(item, allItems){
   if(!item || !item.text || !item.createdAtTs) return null;
-  const cur = parseReturnRequestText(item.text);
+  const cur = parseReturnRequestText(item.text, item.createdAtTs);
   if(!cur.phone && !cur.customer) return null;
   let prior = null, priorParsed = null;
   (allItems||[]).forEach(o=>{
     if(!o || o.id===item.id || !o.text || !o.createdAtTs) return;
     if(o.createdAtTs >= item.createdAtTs) return;
     if(item.createdAtTs - o.createdAtTs > SMS_CHANGE_WINDOW_MS) return;
-    const op = parseReturnRequestText(o.text);
+    const op = parseReturnRequestText(o.text, o.createdAtTs);
     const samePhone = cur.phone && op.phone && cur.phone===op.phone;
     const sameCustomer = !samePhone && cur.customer && op.customer && cur.customer===op.customer;
     if(!samePhone && !sameCustomer) return;
@@ -11725,7 +11730,7 @@ function viewMatchedReturnRequest(genId, reqId){
   const g = findGen(genId);
   const r = (DB.returnRequests||[]).find(x=>x && x.id===reqId);
   if(!g || !r) return;
-  const parsed = parseReturnRequestText(r.text);
+  const parsed = parseReturnRequestText(r.text, r.createdAtTs);
   document.getElementById('modal-root').innerHTML = `
   <div class="overlay" onclick="backdropClick(this,event,closeModal)">
     <div class="modal">
@@ -14561,7 +14566,7 @@ async function submitInFinish(id, isTransfer, vals){
 async function autoClearMatchedReturnRequests(rt){
   const autoMatched = (DB.returnRequests||[]).filter(r=>{
     if(!r) return false;
-    const parsed = parseReturnRequestText(r.text);
+    const parsed = parseReturnRequestText(r.text, r.createdAtTs);
     if(parsed.phone && rt.phone && parsed.phone===rt.phone.replace(/[^0-9]/g,'')) return true;
     if(parsed.address && rt.address && (rt.address.includes(parsed.address) || parsed.address.includes(rt.address))) return true;
     if(parsed.customer && rt.customer && (rt.customer.includes(parsed.customer) || parsed.customer.includes(rt.customer))) return true;
