@@ -4252,6 +4252,7 @@ function voltageColor(voltage){
   const map = {
     '220V': '#2C7A4B',
     '380V': '#2C4A66',
+    '400V': '#00838F',
     '440V': '#8A5A00',
     '480V': '#7A2C8A'
   };
@@ -4261,7 +4262,7 @@ function voltageColor(voltage){
 function normVoltage(v){ return String(v||'').replace(/\s+/g,'').toUpperCase(); }
 // 상차·입고 때 "실제 전압"을 눌러서 고르는 버튼 (고른 값은 hidden input에 들어감, 고른 버튼만 색이 채워짐)
 function pickVoltageButtonsHtml(hiddenId, big){
-  return `<div style="display:flex;gap:6px;margin-top:8px;">${['220V','380V','440V','480V'].map(v=>{
+  return `<div style="display:flex;gap:6px;margin-top:8px;">${['220V','380V','400V','440V','480V'].map(v=>{
     const c = voltageColor(v);
     return `<button type="button" class="pickv-${hiddenId}" data-v="${v}" onclick="pickVoltage('${hiddenId}','${v}')" style="flex:1;min-width:0;padding:${big?'14px 4px':'9px 4px'};font-size:${big?'17px':'13px'};font-weight:800;border-radius:8px;border:2px solid ${c};color:${c};background:#fff;cursor:pointer;">${v}</button>`;
   }).join('')}</div>`;
@@ -4284,7 +4285,7 @@ function loadVoltageCheckError(orderVoltage, actualVoltage){
 }
 function voltageButtonsHtml(targetInputId, opts){
   opts = opts || {};
-  const voltages = ['220V','380V','440V','480V'];
+  const voltages = ['220V','380V','400V','440V','480V'];
   const containerStyle = opts.vertical
     ? 'display:flex;flex-direction:column;gap:8px;margin-top:8px;'
     : 'display:flex;gap:4px;margin-top:6px;flex-wrap:nowrap;';
@@ -13260,7 +13261,7 @@ function openBulkInModal(){
     return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0 8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
       <span style="font-size:11.5px;font-weight:700;white-space:nowrap;">🔌 입고 전압</span>
       <select id="fbi-volt-${g.id}" style="flex:0 0 110px;padding:4px 6px;font-size:12.5px;">
-        <option value="">확인 후 선택</option>${['220V','380V','440V','480V'].map(v=>`<option value="${v}">${v}</option>`).join('')}
+        <option value="">확인 후 선택</option>${['220V','380V','400V','440V','480V'].map(v=>`<option value="${v}">${v}</option>`).join('')}
       </select>
       <span class="muted" style="font-size:11.5px;">출고시 ${escR(outV||'미기록')}</span>
     </div>`;
