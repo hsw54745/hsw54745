@@ -2585,7 +2585,7 @@ async function qmRefreshCalendar(scrollToToday){
       const numColor = red ? '#B23A34' : blue ? '#1565C0' : '#333';
       const evs = (byDate[ds]||[]).slice().sort((a,b)=>(a.createdDate||'').localeCompare(b.createdDate||''));
       const content = evs.length
-        ? evs.map(e=>`<div style="font-size:13.5px;white-space:pre-wrap;color:${isPast?'#888':'#222'};line-height:1.4;padding:1px 0;">• ${escR(e.text)} <span style="color:#aaa;font-size:10.5px;">${escR(e.authorBy||'')}</span></div>`).join('')
+        ? evs.map(e=>`<div style="font-size:13.5px;font-weight:700;white-space:pre-wrap;color:${isPast?'#7A9CC6':'#0D47A1'};line-height:1.4;padding:1px 0;">• ${escR(e.text)} <span style="color:#aaa;font-size:10.5px;">${escR(e.authorBy||'')}</span></div>`).join('')
         : `<div style="font-size:12px;color:#ccc;padding:2px 0;">＋</div>`;
       const bg = isToday ? '#FFF8E1' : (red ? '#FFF6F6' : blue ? '#F5F9FF' : '#fff');
       html += `<div id="qm-cal-day-${ds}" onclick="openQmCalendarDayModal('${ds}')" style="display:flex;gap:10px;align-items:flex-start;background:${bg};border:1px solid ${isToday?'#E0B000':'#e6e6e6'};${isToday?'border-width:2px;':''}border-radius:8px;padding:7px 10px;margin-bottom:4px;cursor:pointer;${isPast&&!evs.length?'opacity:.6;':''}">
