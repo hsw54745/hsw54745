@@ -644,6 +644,21 @@ function pwGateHide(){
 }
 // ===== 간편모드 (문자 붙여넣기 전용, 로그인/이름선택 없이 바로 접속) =====
 // 주소 뒤에 ?quick=1 을 붙여서 접속하면(예: https://.../index.html?quick=1) 이 화면만 뜹니다.
+// 전화번호를 눌러서 바로 전화 걸 수 있게 tel: 링크로 바꿈 (문자열 안 여러 번호도 처리)
+function telLinkHtml(text, big){
+  const t = String(text||'');
+  if(!t) return '';
+  const re = /(0\d{1,2}[-.\s]?\d{3,4}[-.\s]?\d{4}|1[568]\d{2}[-.\s]?\d{4})/g;
+  let out='', last=0, m;
+  while((m=re.exec(t))){
+    out += escR(t.slice(last, m.index));
+    const digits = m[1].replace(/\D/g,'');
+    out += `<a href="tel:${digits}" onclick="event.stopPropagation();" style="display:inline-block;color:#1565C0;font-weight:800;text-decoration:none;background:#E8F0FE;border:1px solid #90B4E8;border-radius:14px;padding:${big?'4px 12px':'1px 8px'};margin:1px 0;white-space:nowrap;">📞 ${escR(m[1])}</a>`;
+    last = m.index + m[1].length;
+  }
+  out += escR(t.slice(last));
+  return out;
+}
 function isQuickMode(){
   try{ return new URLSearchParams(location.search).get('quick')==='1'; }catch(e){ return false; }
 }
@@ -1053,7 +1068,8 @@ async function renderQmOutListInner(){
         </div>
         ${qmGenSpecHtml(g)}
         ${outDate? `<div style="font-size:11px;color:#888;margin-top:3px;">🚚 출고일 ${escR(outDate)}</div>` : ''}
-        ${g.rental && (g.rental.address||g.rental.site) ? `<div style="font-size:11.5px;color:#555;margin-top:3px;">📍 ${escR(g.rental.address||g.rental.site)}</div>${addrMapLinksHtml(g.rental.address||g.rental.site, {big:true, mt:6})}` : ''}
+        ${g.rental && (g.rental.customer||g.rental.manager||g.rental.phone) ? `<div style="font-size:11.5px;color:#555;margin-top:3px;">🏢 ${escR(g.rental.customer||'')}${g.rental.manager? ' · '+escR(g.rental.manager):''}${g.rental.phone? ' '+telLinkHtml(g.rental.phone, true):''}</div>` : ''}
+        ${g.rental && (g.rental.address||g.rental.site) ? `<div style="font-size:11.5px;color:#555;margin-top:3px;">📍 ${escR(g.rental.address||g.rental.site)}</div>${addrMapLinksHtml(g.rental.address||g.rental.site, {big:true, mt:6})}` : ''}${g.rental && g.rental.siteLoc ? siteNavLinksHtml(g, true) : ''}
         <div style="display:flex;gap:6px;align-items:center;margin-top:8px;">
           <span class="pill" style="background:#EAF2E9;color:#2C6E49;border:1px solid #2C6E49;font-size:10px;white-space:nowrap;">${escR(g.voltage)||'전압 미설정'}</span>
           <span class="pill" style="background:#E8EEF4;color:#5B7FA6;border:1px solid #5B7FA6;font-size:10px;">${escR(city)}</span>
@@ -1179,7 +1195,7 @@ async function openQmOutDetail(id){
     const rows = [
       ['업체명', r.customer],
       ['담당자', r.manager],
-      ['연락처', r.phone],
+      ['연락처', r.phone? {raw: telLinkHtml(r.phone, true)} : null],
       ['주소', r.address || r.site],
       ['출고일', r.outDate? `${fmtDateKR(r.outDate)}${r.arriveTime? ` (${r.arriveTime})` : ''}` : null],
       
@@ -1565,7 +1581,7 @@ async function qmRefreshReservationList(){
       const dCustomer = r.customer || (auto&&auto.customer) || r.site || '거래처 미기재';
       const infoRows = [
         ['담당자', r.manager || (auto&&auto.manager)],
-        ['연락처', r.phone || (auto&&auto.phone)],
+        ['연락처', (r.phone || (auto&&auto.phone)) ? {raw: telLinkHtml(r.phone || (auto&&auto.phone))} : null],
         ['주소', r.address || r.site || (auto&&auto.address)],
         ['전압', r.voltage || (auto&&auto.voltage)],
         ['연료', (r.fuelRequested!=null||r.fuelActual!=null) ? `요청 ${r.fuelRequested!=null?r.fuelRequested:'-'}L / 실제 ${r.fuelActual!=null?r.fuelActual:'-'}L` : ((auto&&(auto.fuelRequested!=null||auto.fuelActual!=null)) ? `요청 ${auto.fuelRequested!=null?auto.fuelRequested:'-'}L / 실제 ${auto.fuelActual!=null?auto.fuelActual:'-'}L` : null)],
@@ -1587,7 +1603,7 @@ async function qmRefreshReservationList(){
           ${infoRows.map(([k,v])=>`
             <div style="display:flex;gap:8px;font-size:12.5px;line-height:1.4;">
               <span style="color:#999;flex-shrink:0;width:42px;">${k}</span>
-              <span style="color:#333;word-break:break-all;">${escR(v)}</span>
+              <span style="color:#333;word-break:break-all;">${(v&&v.raw!=null)? v.raw : escR(v)}</span>
             </div>`).join('')}
         </div>` : ''}
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
@@ -1687,7 +1703,7 @@ function qmRenderMaintBody(){
           <div><span style="font-size:17px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span> <span style="font-size:12.5px;color:#333;">${escR(g.model||'')}</span></div>
           <span style="font-size:11px;font-weight:800;color:${g.status==='out'?'#5B7FA6':'#2C6E49'};white-space:nowrap;">${g.status==='out'? escR(cityOf(rt.address||rt.site||'')) : '입고'}</span>
         </div>
-        ${g.status==='out'? `<div style="font-size:12px;color:#666;margin-top:2px;">${escR(rt.customer||'거래처 미기재')}${rt.address? ' · '+escR(rt.address):''}</div>` : ''}
+        ${g.status==='out'? `<div style="font-size:12px;color:#666;margin-top:2px;">${escR(rt.customer||'거래처 미기재')}${rt.address? ' · '+escR(rt.address):''}</div>${(rt.manager||rt.phone)? `<div style="font-size:12px;color:#666;margin-top:3px;">${rt.manager? '👤 '+escR(rt.manager)+' ':''}${rt.phone? telLinkHtml(rt.phone, true):''}</div>`:''}${addrMapLinksHtml(rt.address||rt.site)}` : ''}
         ${(()=>{ const parts = [];
           const len = genLengthText(g); if(len) parts.push(`📏 ${len}`);
           const eo = genEngineOil(g); if(eo) parts.push(`🛢 오일 ${eo.liters}L${eo.spec? ' ('+escR(eo.spec)+')':''}`);
@@ -2103,7 +2119,7 @@ async function openQmConfirmLoad(resId){
     const infoRows = [
       ['거래처', r.customer||r.site||''],
       ['담당자', r.manager||''],
-      ['연락처', r.phone||''],
+      ['연락처', r.phone? {raw: telLinkHtml(r.phone, true)} : ''],
       ['현장 주소', r.address||''],
       ['전압', r.voltage||'']
     ].filter(([k,v])=>v);
@@ -2116,7 +2132,7 @@ async function openQmConfirmLoad(resId){
         ${infoRows.map(([k,v])=>`
           <div style="padding:8px 0;border-bottom:1px solid #eee;">
             <div style="font-size:12px;color:#888;">${k}</div>
-            <div style="font-size:15px;font-weight:700;color:#222;">${escR(v)}</div>
+            <div style="font-size:15px;font-weight:700;color:#222;">${(v&&v.raw!=null)? v.raw : escR(v)}</div>
           </div>`).join('') || '<div style="color:#999;font-size:13px;">등록된 거래처 정보가 없습니다.</div>'}
         <div style="margin-top:10px;">
           <div style="font-size:12px;color:#888;margin-bottom:4px;">부자재</div>
@@ -4608,7 +4624,7 @@ function renderContent(){
   if(currentTab==='notice') c.innerHTML = renderNoticeTab();
   else if(currentTab==='dashboard') c.innerHTML = renderDashboard();
   else if(currentTab==='in') c.innerHTML = renderInList();
-  else if(currentTab==='out') c.innerHTML = renderOutList();
+  else if(currentTab==='out'){ c.innerHTML = renderOutList(); if(outSearchText) filterOutRows(outSearchText); }
   else if(currentTab==='reserve') c.innerHTML = renderReserveTab();
   else if(currentTab==='maint') c.innerHTML = renderMaintTab();
   else if(currentTab==='materials') c.innerHTML = renderMaterialsTab();
@@ -5407,6 +5423,25 @@ function clearOutRegionFilter(){
   renderContent();
 }
 let outCapacityFilter = null; // 숫자(kW) 또는 null
+let outSearchText = ''; // [출고중] 검색어 (다시 그려도 유지)
+// [출고중] 검색: 화면을 다시 그리지 않고 줄만 숨겨서, 입력하는 중에 글자칸이 끊기지 않게 합니다.
+function filterOutRows(q){
+  outSearchText = q || '';
+  const words = outSearchText.trim().toLowerCase().replace(/-/g,'').split(/\s+/).filter(Boolean);
+  const rows = document.querySelectorAll('tr[id^="outrow-"]');
+  let shown = 0;
+  rows.forEach(tr=>{
+    const g = findGen(tr.id.slice(7));
+    const rt = (g && g.rental) || {};
+    const hay = [tr.innerText, g&&g.id, g&&g.model, rt.customer, rt.site, rt.address, rt.manager, rt.phone, rt.note, rt.voltage]
+      .filter(Boolean).join(' ').toLowerCase().replace(/-/g,'');
+    const ok = words.every(w=>hay.includes(w));
+    tr.style.display = ok ? '' : 'none';
+    if(ok) shown++;
+  });
+  const cnt = document.getElementById('out-search-count');
+  if(cnt) cnt.textContent = words.length ? `${shown}대 찾음` : '';
+}
 function viewCapacityOutList(cap){
   outCapacityFilter = cap;
   switchTab('out');
@@ -5583,10 +5618,14 @@ function renderOutList(){
       <button type="button" class="btn sm" onclick="clearEstDailyFromAll()" title="기본값을 비웁니다(모르거나 필요 없을 때)">비우기</button>
       <span style="font-size:11px;color:#888;">※ 출고중 발전기 전체가 이 값으로 정비주기를 추정합니다</span>
     </span>`;
-  const capacityButtonsHtml = capacityEntries.length===0 ? '' : `
+  const capacityButtonsHtml = `
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;align-items:center;">
-      <button class="btn sm${outCapacityFilter==null?' primary':''}" onclick="clearOutCapacityFilter()">전체</button>
-      ${capacityEntries.map(([cap,cnt])=>`<button class="btn sm${outCapacityFilter===cap?' primary':''}" onclick="viewCapacityOutList(${cap})">${cap}kW <span class="muted" style="font-size:11px;">(${cnt})</span></button>`).join('')}
+      ${capacityEntries.length? `<button class="btn sm${outCapacityFilter==null?' primary':''}" onclick="clearOutCapacityFilter()">전체</button>
+      ${capacityEntries.map(([cap,cnt])=>`<button class="btn sm${outCapacityFilter===cap?' primary':''}" onclick="viewCapacityOutList(${cap})">${cap}kW <span class="muted" style="font-size:11px;">(${cnt})</span></button>`).join('')}` : ''}
+      <span style="margin-left:auto;display:inline-flex;align-items:center;gap:4px;">
+        <input type="search" id="out-search" value="${escR(outSearchText)}" oninput="filterOutRows(this.value)" placeholder="🔍 번호·거래처·주소·담당자·연락처 검색" style="width:260px;max-width:60vw;padding:5px 9px;font-size:12.5px;border:1.5px solid var(--primary);border-radius:8px;">
+        <span id="out-search-count" class="muted" style="font-size:11.5px;white-space:nowrap;"></span>
+      </span>
     </div>`;
 
   const returnReqAll = DB.returnRequests||[];
@@ -5681,7 +5720,7 @@ function goToReturnRequestGen(reqId){
   const ms = findAllMatchedGensForReturnRequest(r.text);
   if(!ms.length){ flash('일치하는 출고중 발전기를 찾지 못했습니다. 문자 내용을 보여드릴게요.'); viewReturnRequestText(reqId); return; }
   // 지역/용량 필터 때문에 줄이 숨어있으면 못 찾으니 필터를 풀고 다시 그립니다.
-  if(outRegionFilter!=null || outCapacityFilter!=null){ outRegionFilter = null; outCapacityFilter = null; renderContent(); }
+  if(outRegionFilter!=null || outCapacityFilter!=null || outSearchText){ outRegionFilter = null; outCapacityFilter = null; outSearchText = ''; renderContent(); }
   const rows = ms.map(g=>document.getElementById('outrow-'+g.id)).filter(Boolean);
   if(!rows.length){ viewReturnRequestText(reqId); return; }
   rows[0].scrollIntoView({behavior:'smooth', block:'center'});
@@ -6509,7 +6548,7 @@ function renderMaintList(){
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
       <td style="text-align:center;">${(g.status==='out' && g.rental) ? `<input type="checkbox" style="width:18px;height:18px;cursor:pointer;" title="출장 동선에 넣기" ${patrolRouteSelected().has(g.id)?'checked':''} onchange="togglePatrolRouteGen('${g.id}', this.checked)">` : ''}</td>
-      <td style="white-space:nowrap;">${(g.status==='out' && g.rental) ? `<span class="pill" style="background:#E8EEF4;color:#5B7FA6;border-color:#5B7FA6;">${escR(cityOf(g.rental.address||g.rental.site||''))}</span>` : '<span class="muted" style="font-size:11.5px;">-</span>'}</td>
+      <td style="white-space:nowrap;">${(g.status==='out' && g.rental) ? `<span class="pill" style="background:#E8EEF4;color:#5B7FA6;border-color:#5B7FA6;">${escR(cityOf(g.rental.address||g.rental.site||''))}</span>${addrMapLinksHtml(g.rental.address||g.rental.site, {short:true})}` : '<span class="muted" style="font-size:11.5px;">-</span>'}</td>
       <td>${patrolCellHtml(g)}</td>
       <td>${tankCleanCellHtml(g)}</td>
       <td>${engineOilCellHtml(g)}</td>
@@ -11822,12 +11861,21 @@ function addrMapLinksHtml(address, opts){
   opts = opts || {};
   const q = encodeURIComponent(a);
   const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const naver = mobile ? `https://m.map.naver.com/search2/search.naver?query=${q}` : `https://map.naver.com/p/search/${q}`;
-  const kakao = `https://map.kakao.com/link/search/${q}`;
+  const android = /Android/i.test(navigator.userAgent);
+  // 폰: 웹 대신 네이버지도/카카오맵 "앱"으로 바로 열어서, 주소 검색 결과에서 [도착]→[안내시작]만 누르면 바로 내비가 됩니다.
+  // (주소만 있고 좌표가 없으면 앱이 바로 경로안내로 들어갈 수는 없음. 현장 위치를 저장해 둔 곳은 🧭 네이버 길찾기 버튼으로 바로 안내)
+  const naverWeb = mobile ? `https://m.map.naver.com/search2/search.naver?query=${q}` : `https://map.naver.com/p/search/${q}`;
+  const kakaoWeb = `https://map.kakao.com/link/search/${q}`;
+  const naver = !mobile ? naverWeb
+    : android ? `intent://search?query=${q}&appname=io.github.hsw54745#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;S.browser_fallback_url=${encodeURIComponent(naverWeb)};end`
+    : `nmap://search?query=${q}&appname=io.github.hsw54745`;
+  const kakao = !mobile ? kakaoWeb
+    : android ? `intent://search?q=${q}#Intent;scheme=kakaomap;package=net.daum.android.map;S.browser_fallback_url=${encodeURIComponent(kakaoWeb)};end`
+    : `kakaomap://search?q=${q}`;
   const st = opts.big ? 'padding:8px 12px;font-size:13px;' : 'padding:3px 8px;font-size:11.5px;';
   return `<div style="display:flex;gap:4px;flex-wrap:wrap;${opts.mt!=null?`margin-top:${opts.mt}px;`:'margin-top:4px;'}">
-    <a href="${naver}" target="_blank" rel="noopener" style="${st}font-weight:800;background:#03C75A;color:#fff;border-radius:8px;text-decoration:none;white-space:nowrap;" title="${escR(a)}">N 네이버지도</a>
-    <a href="${kakao}" target="_blank" rel="noopener" style="${st}font-weight:800;background:#FEE500;color:#3C1E1E;border-radius:8px;text-decoration:none;white-space:nowrap;" title="${escR(a)}">K 카카오맵</a>
+    <a href="${naver}" ${mobile? '' : 'target="_blank" rel="noopener"'} style="${st}font-weight:800;background:#03C75A;color:#fff;border-radius:8px;text-decoration:none;white-space:nowrap;" title="${escR(a)}">${opts.short? 'N 네이버' : 'N 네이버지도'}</a>
+    <a href="${kakao}" ${mobile? '' : 'target="_blank" rel="noopener"'} style="${st}font-weight:800;background:#FEE500;color:#3C1E1E;border-radius:8px;text-decoration:none;white-space:nowrap;" title="${escR(a)}">${opts.short? 'K 카카오' : 'K 카카오맵'}</a>
   </div>`;
 }
 function addMoreGenToSite(genId){
