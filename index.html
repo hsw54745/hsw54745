@@ -4259,21 +4259,39 @@ function voltageColor(voltage){
   return map[v] || null;
 }
 // 전압 비교용 (공백·대소문자 무시)
-function normVoltage(v){ return String(v||'').replace(/\s+/g,'').toUpperCase(); }
+function normVoltage(v){
+  // 공백·대소문자 무시, "208볼트"/"208" → "208V" 로 맞춰서 비교
+  let t = String(v||'').replace(/\s+/g,'').toUpperCase().replace(/볼트$/,'V');
+  if(/^\d+(\.\d+)?$/.test(t)) t += 'V';
+  return t;
+}
+// 직접 입력한 전압을 저장용으로 다듬기 ("208" → "208V")
+function cleanVoltageInput(v){ const t = String(v||'').trim(); if(!t) return ''; return /^\d+(\.\d+)?$/.test(t) ? t+'V' : t.replace(/\s*볼트$/,'V'); }
 // 상차·입고 때 "실제 전압"을 눌러서 고르는 버튼 (고른 값은 hidden input에 들어감, 고른 버튼만 색이 채워짐)
+// 목록에 없는 전압(예: 208V, 230V)은 "기타"를 눌러 직접 입력합니다.
 function pickVoltageButtonsHtml(hiddenId, big){
-  return `<div style="display:flex;gap:6px;margin-top:8px;">${['220V','380V','400V','440V','480V'].map(v=>{
-    const c = voltageColor(v);
-    return `<button type="button" class="pickv-${hiddenId}" data-v="${v}" onclick="pickVoltage('${hiddenId}','${v}')" style="flex:1;min-width:0;padding:${big?'14px 4px':'9px 4px'};font-size:${big?'17px':'13px'};font-weight:800;border-radius:8px;border:2px solid ${c};color:${c};background:#fff;cursor:pointer;">${v}</button>`;
-  }).join('')}</div>`;
+  const btn = (v, label, c)=>`<button type="button" class="pickv-${hiddenId}" data-v="${v}" onclick="pickVoltage('${hiddenId}','${v}')" style="flex:1;min-width:0;padding:${big?'14px 2px':'9px 2px'};font-size:${big?'16px':'13px'};font-weight:800;border-radius:8px;border:2px solid ${c};color:${c};background:#fff;cursor:pointer;">${label}</button>`;
+  return `<div style="display:flex;gap:5px;margin-top:8px;">${['220V','380V','400V','440V','480V'].map(v=>btn(v, v, voltageColor(v))).join('')}${btn('__etc','기타','#555')}</div>
+    <input type="text" id="${hiddenId}-etc" placeholder="목록에 없는 전압 직접 입력 (예: 208V)" oninput="pickVoltageEtc('${hiddenId}')" style="display:none;width:100%;box-sizing:border-box;margin-top:6px;padding:${big?'12px':'7px 9px'};font-size:${big?'17px':'13px'};font-weight:700;border:2px solid #555;border-radius:8px;">`;
 }
 function pickVoltage(hiddenId, v){
   const el = document.getElementById(hiddenId);
-  if(el) el.value = v;
+  const etc = document.getElementById(hiddenId+'-etc');
+  if(v==='__etc'){
+    if(etc){ etc.style.display = 'block'; etc.focus(); }
+    if(el) el.value = etc ? cleanVoltageInput(etc.value) : '';
+  } else {
+    if(etc) etc.style.display = 'none';
+    if(el) el.value = v;
+  }
   document.querySelectorAll('.pickv-'+hiddenId).forEach(b=>{
-    const on = b.dataset.v===v; const c = voltageColor(b.dataset.v);
+    const on = b.dataset.v===v; const c = voltageColor(b.dataset.v) || '#555';
     b.style.background = on ? c : '#fff'; b.style.color = on ? '#fff' : c;
   });
+}
+function pickVoltageEtc(hiddenId){
+  const el = document.getElementById(hiddenId), etc = document.getElementById(hiddenId+'-etc');
+  if(el && etc) el.value = cleanVoltageInput(etc.value);
 }
 // 상차 전 전압 확인 결과 문구 (주문 전압과 실제 전압이 다르면 막음)
 function loadVoltageCheckError(orderVoltage, actualVoltage){
@@ -4295,7 +4313,11 @@ function voltageButtonsHtml(targetInputId, opts){
       ? `padding:14px 8px;font-size:17px;border-radius:8px;border:2px solid ${c};color:${c};background:${c}15;font-weight:800;cursor:pointer;width:100%;`
       : `flex:1;min-width:0;padding:4px 2px;font-size:11px;border-radius:6px;border:1px solid ${c};color:${c};background:${c}15;font-weight:700;cursor:pointer;`;
     return `<button type="button" style="${btnStyle}" onclick="document.getElementById('${targetInputId}').value='${v}'">${v}</button>`;
-  }).join('')}</div>`;
+  }).join('')}${(()=>{ const c = '#555';
+    const st = opts.big
+      ? `padding:14px 4px;font-size:17px;border-radius:8px;border:2px solid ${c};color:${c};background:#fff;font-weight:800;cursor:pointer;width:100%;white-space:nowrap;`
+      : `flex:1;min-width:0;padding:4px 2px;font-size:11px;border-radius:6px;border:1px solid ${c};color:${c};background:#fff;font-weight:700;cursor:pointer;`;
+    return `<button type="button" style="${st}" title="목록에 없는 전압은 위 칸에 직접 입력하세요" onclick="const i=document.getElementById('${targetInputId}'); i.value=''; i.placeholder='전압 직접 입력 (예: 208V)'; i.focus();">기타</button>`; })()}</div>`;
 }
 // 부자재 출고는 비고처럼 자유롭게 적는 칸입니다(모든 화면 공통). 기존 저장값(선택 목록)은 글로 바꿔서 채워줍니다.
 // 저장 코드가 읽는 칸 이름(prefix / -items / -custom / -selections)은 그대로 유지합니다.
@@ -11580,15 +11602,8 @@ function parseSmsOrderText(text, baseTs){
     }
   }
   if(result.outDate){
-    if(isLoadDateHint){
-      // 문자에 "도착"이 아니라 "상차"만 언급된 경우, 그 날짜 자체가 상차일입니다(하루 전으로 계산하지 않음).
-      result.loadDate = result.outDate;
-    } else {
-      // 발전기는 도착일 하루 전에 상차해야 하므로 상차일 = 출고(도착)예정일 - 1일
-      const d = new Date(result.outDate+'T00:00:00');
-      d.setDate(d.getDate()-1);
-      result.loadDate = toLocalDateStr(d);
-    }
+    // 상차일은 문자의 날짜 그대로 넣습니다. (예전엔 도착일 하루 전으로 자동 계산했는데, 요청으로 없앰 - 필요하면 직접 고침)
+    result.loadDate = result.outDate;
   }
   return result;
 }
@@ -13265,9 +13280,10 @@ function openBulkInModal(){
     const outV = (g.rental && g.rental.voltage) || g.voltage || '';
     return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0 8px;padding-bottom:8px;border-bottom:1px dashed var(--border);">
       <span style="font-size:11.5px;font-weight:700;white-space:nowrap;">🔌 입고 전압</span>
-      <select id="fbi-volt-${g.id}" style="flex:0 0 110px;padding:4px 6px;font-size:12.5px;">
-        <option value="">확인 후 선택</option>${['220V','380V','400V','440V','480V'].map(v=>`<option value="${v}">${v}</option>`).join('')}
+      <select id="fbi-volt-${g.id}" style="flex:0 0 110px;padding:4px 6px;font-size:12.5px;" onchange="const e=document.getElementById('fbi-volt-etc-${g.id}'); if(e){ e.style.display = this.value==='__etc' ? 'block' : 'none'; if(this.value==='__etc') e.focus(); }">
+        <option value="">확인 후 선택</option>${['220V','380V','400V','440V','480V'].map(v=>`<option value="${v}">${v}</option>`).join('')}<option value="__etc">기타(직접입력)</option>
       </select>
+      <input type="text" id="fbi-volt-etc-${g.id}" placeholder="예: 208V" style="display:none;flex:0 0 90px;padding:4px 6px;font-size:12.5px;">
       <span class="muted" style="font-size:11.5px;">출고시 ${escR(outV||'미기록')}</span>
     </div>`;
   };
@@ -13373,7 +13389,8 @@ async function submitBulkIn(){
   const missingV = [];
   for(const g of gens){
     const el = document.getElementById(`fbi-volt-${g.id}`);
-    const v = el ? el.value : '';
+    let v = el ? el.value : '';
+    if(v==='__etc'){ const e = document.getElementById(`fbi-volt-etc-${g.id}`); v = e ? cleanVoltageInput(e.value) : ''; }
     if(!v) missingV.push(g.id); else voltMap[g.id] = v;
   }
   if(missingV.length){
