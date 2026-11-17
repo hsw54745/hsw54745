@@ -2535,70 +2535,74 @@ async function addQmNoticeComment(noticeId){
 }
 // ===== 퀵메뉴: 일정표 =====
 let qmCalYear = null, qmCalMonth = null;
+// 폰 일정표: 달력 대신, 한 달의 날짜를 하루씩 아래로 쭉 나열 (빈 날도 표시 → 눌러서 바로 일정 넣기). 열면 오늘 위치로 스크롤.
 async function renderQmCalendarView(){
   const now = new Date();
   if(qmCalYear==null){ qmCalYear = now.getFullYear(); qmCalMonth = now.getMonth(); }
   pwGateShow(`
-    <div style="background:#F4F6F5;border-radius:16px;padding:26px 22px;max-width:520px;width:100%;max-height:92vh;overflow:auto;">
-      <button type="button" onclick="renderQuickModeUI()" style="display:inline-block;background:#fff;border:2px solid #1565C0;color:#1565C0;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:14px;">← 뒤로가기</button>
-      <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;">
+    <div id="qm-cal-scroll" style="background:#F4F6F5;border-radius:16px;padding:22px 16px;max-width:520px;width:100%;max-height:92vh;overflow:auto;box-sizing:border-box;">
+      <button type="button" onclick="renderQuickModeUI()" style="display:inline-block;background:#fff;border:2px solid #1565C0;color:#1565C0;font-size:15px;font-weight:700;cursor:pointer;padding:8px 16px;border-radius:10px;margin-bottom:12px;">← 뒤로가기</button>
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:10px;">
         <button type="button" onclick="navQmCalendar(-1)" style="background:#fff;border:1.5px solid #ccc;border-radius:8px;font-size:16px;padding:6px 12px;cursor:pointer;">◀</button>
         <div id="qm-cal-label" style="font-size:19px;font-weight:800;color:#1565C0;min-width:110px;text-align:center;"></div>
         <button type="button" onclick="navQmCalendar(1)" style="background:#fff;border:1.5px solid #ccc;border-radius:8px;font-size:16px;padding:6px 12px;cursor:pointer;">▶</button>
+        <button type="button" onclick="qmCalGoToday()" style="background:#fff;border:1.5px solid #E0B000;color:#8A6D00;font-weight:800;border-radius:8px;font-size:13px;padding:6px 10px;cursor:pointer;">오늘</button>
       </div>
-      <div id="qm-cal-wrap" style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:10px;"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
+      <div id="qm-cal-wrap"><div style="text-align:center;color:#999;font-size:13px;padding:20px 0;">불러오는 중...</div></div>
     </div>
   `);
-  await qmRefreshCalendar();
+  await qmRefreshCalendar(true);
 }
 function navQmCalendar(delta){
   qmCalMonth += delta;
   if(qmCalMonth<0){ qmCalMonth=11; qmCalYear--; }
   else if(qmCalMonth>11){ qmCalMonth=0; qmCalYear++; }
-  qmRefreshCalendar();
+  qmRefreshCalendar(false).then(()=>{ const sc = document.getElementById('qm-cal-scroll'); if(sc) sc.scrollTop = 0; });
 }
-async function qmRefreshCalendar(){
+function qmCalGoToday(){ const n = new Date(); qmCalYear = n.getFullYear(); qmCalMonth = n.getMonth(); qmRefreshCalendar(true); }
+async function qmRefreshCalendar(scrollToToday){
   const wrap = document.getElementById('qm-cal-wrap');
   const labelEl = document.getElementById('qm-cal-label');
+  if(!wrap) return;
   if(labelEl) labelEl.textContent = `${qmCalYear}년 ${qmCalMonth+1}월`;
   try{
     const cur = await window.storage.get('gen-calendar-events-v1', true).catch(()=>null);
     let events = []; try{ events = cur ? JSON.parse(cur.value) : []; }catch(e){ events = []; }
     if(!Array.isArray(events)) events = [];
     if(!document.getElementById('qm-cal-wrap')) return;
-    const firstDow = new Date(qmCalYear, qmCalMonth, 1).getDay();
-    const totalDays = new Date(qmCalYear, qmCalMonth+1, 0).getDate();
     const todayS = todayStr();
-    const cells = [];
-    for(let i=0;i<firstDow;i++) cells.push(null);
-    for(let d=1; d<=totalDays; d++) cells.push(d);
-    while(cells.length % 7 !== 0) cells.push(null);
+    const byDate = {};
+    events.forEach(e=>{ if(e && e.date){ (byDate[e.date] = byDate[e.date] || []).push(e); } });
+    const totalDays = new Date(qmCalYear, qmCalMonth+1, 0).getDate();
     const dowLabels = ['일','월','화','수','목','금','토'];
-    const headHtml = dowLabels.map((l,i)=>`<th style="text-align:center;font-size:12px;font-weight:700;padding:4px 0;color:${i===0?'#B23A34':i===6?'#1565C0':'#555'};">${l}</th>`).join('');
-    let rowsHtml = '';
-    for(let r=0; r<cells.length; r+=7){
-      const rowCells = cells.slice(r, r+7).map((d,ci)=>{
-        if(d==null) return `<td style="min-width:14.28%;height:56px;background:#F4F6F5;border:1px solid #fff;border-radius:6px;"></td>`;
-        const dateStr = `${qmCalYear}-${pad2(qmCalMonth+1)}-${pad2(d)}`;
-        const isToday = dateStr===todayS;
-        const dowIdx = ci % 7;
-        const holiday = koreanHolidayName(dateStr);
-        const evs = events.filter(e=>e && e.date===dateStr);
-        const numColor = holiday? '#B23A34' : (dowIdx===0?'#B23A34':dowIdx===6?'#1565C0':'#333');
-        return `<td onclick="openQmCalendarDayModal('${dateStr}')" style="min-width:14.28%;height:56px;vertical-align:top;border:1px solid #eee;border-radius:6px;padding:4px;cursor:pointer;box-sizing:border-box;${isToday?'background:#FFF3C4;border-color:#E8B923;':''}">
-          <div style="font-size:12px;font-weight:${isToday?'800':'600'};color:${numColor};">${d}</div>
-          ${holiday? `<div style="color:#B23A34;font-weight:700;font-size:9.5px;margin-top:1px;">${escR(holiday)}</div>`:''}
-          ${evs.length? `<div style="color:#1565C0;font-weight:700;font-size:10px;margin-top:2px;">●${evs.length}</div>` : ''}
-        </td>`;
-      }).join('');
-      rowsHtml += `<tr>${rowCells}</tr>`;
+    let html = '';
+    for(let d=1; d<=totalDays; d++){
+      const ds = `${qmCalYear}-${pad2(qmCalMonth+1)}-${pad2(d)}`;
+      const di = new Date(qmCalYear, qmCalMonth, d).getDay();
+      const holiday = koreanHolidayName(ds);
+      const isToday = ds===todayS, isPast = ds<todayS;
+      const red = holiday || di===0, blue = !red && di===6;
+      const numColor = red ? '#B23A34' : blue ? '#1565C0' : '#333';
+      const evs = (byDate[ds]||[]).slice().sort((a,b)=>(a.createdDate||'').localeCompare(b.createdDate||''));
+      const content = evs.length
+        ? evs.map(e=>`<div style="font-size:13.5px;white-space:pre-wrap;color:${isPast?'#888':'#222'};line-height:1.4;padding:1px 0;">• ${escR(e.text)} <span style="color:#aaa;font-size:10.5px;">${escR(e.authorBy||'')}</span></div>`).join('')
+        : `<div style="font-size:12px;color:#ccc;padding:2px 0;">＋</div>`;
+      const bg = isToday ? '#FFF8E1' : (red ? '#FFF6F6' : blue ? '#F5F9FF' : '#fff');
+      html += `<div id="qm-cal-day-${ds}" onclick="openQmCalendarDayModal('${ds}')" style="display:flex;gap:10px;align-items:flex-start;background:${bg};border:1px solid ${isToday?'#E0B000':'#e6e6e6'};${isToday?'border-width:2px;':''}border-radius:8px;padding:7px 10px;margin-bottom:4px;cursor:pointer;${isPast&&!evs.length?'opacity:.6;':''}">
+        <div style="flex-shrink:0;width:54px;">
+          <div style="font-size:15px;font-weight:800;color:${numColor};line-height:1.2;">${d}<span style="font-size:12px;margin-left:3px;">(${dowLabels[di]})</span></div>
+          ${isToday? `<div style="font-size:10px;font-weight:800;color:#8A6D00;">오늘</div>`:''}
+          ${holiday? `<div style="font-size:10px;font-weight:700;color:#B23A34;line-height:1.2;">${escR(holiday)}</div>`:''}
+        </div>
+        <div style="flex:1;min-width:0;">${content}</div>
+      </div>`;
     }
-    wrap.innerHTML = `
-      <table style="width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed;">
-        <thead><tr>${headHtml}</tr></thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
-    `;
+    wrap.innerHTML = html;
+    if(scrollToToday){
+      const el = document.getElementById('qm-cal-day-'+todayS);
+      const sc = document.getElementById('qm-cal-scroll');
+      if(el && sc) sc.scrollTop = Math.max(0, el.offsetTop - sc.offsetTop - 80);
+    }
   }catch(e){
     if(document.getElementById('qm-cal-wrap')) wrap.innerHTML = '<div style="text-align:center;color:#B23A34;font-size:13px;padding:20px 0;">일정을 불러오지 못했습니다.</div>';
   }
