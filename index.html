@@ -1747,10 +1747,10 @@ function siteNavLinksHtml(g, big){
     ? `intent://route/car?${qs}#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end`
     : `nmap://route/car?${qs}`;
   const kakao = `https://map.kakao.com/link/to/${name},${loc.lat},${loc.lng}`;
-  const st = big ? 'flex:1;padding:10px;font-size:14px;' : 'padding:6px 10px;font-size:12px;';
+  const st = big ? 'flex:1;min-width:0;padding:10px 4px;font-size:13px;white-space:nowrap;' : 'padding:6px 10px;font-size:12px;white-space:nowrap;';
   return `<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
-    <a href="${naver}" style="${st}font-weight:800;background:#03C75A;color:#fff;border-radius:10px;text-decoration:none;text-align:center;">🧭 네이버 길찾기</a>
-    <a href="${kakao}" target="_blank" rel="noopener" style="${st}font-weight:800;background:#FEE500;color:#3C1E1E;border-radius:10px;text-decoration:none;text-align:center;">🗺 카카오맵</a>
+    <a href="${naver}" style="${st}font-weight:800;background:#03C75A;color:#fff;border-radius:10px;text-decoration:none;text-align:center;">🧭 네이버길찾기</a>
+    <a href="#" data-name="${escR(decodeURIComponent(name))}" onclick="event.preventDefault();event.stopPropagation();kakaoNaviGo('', ${Number(loc.lat)}, ${Number(loc.lng)}, this.dataset.name);" style="${st}font-weight:800;background:#1E1E1E;color:#FEE500;border-radius:10px;text-decoration:none;text-align:center;">🚗 카카오내비</a>
   </div>`;
 }
 function qmSaveSiteLocation(id, confirmed){
@@ -6221,7 +6221,7 @@ async function drawPatrolManualRoute(base, baseName, ordered){
             <span style="font-size:16px;font-weight:900;color:#2C4A66;">${Math.round(l.km)}km · ${fmtDuration(l.sec)}</span>
             <span style="font-size:11.5px;color:#888;">누적 ${fmtDuration(acc)}</span>
             ${isQuickMode()
-              ? `<a href="${naverRouteLink(plainNames[i], pts[i], plainNames[i+1], pts[i+1])}" style="margin-left:auto;padding:8px 12px;font-size:13px;font-weight:800;background:#03C75A;color:#fff;border-radius:10px;text-decoration:none;">🧭 네이버 길찾기</a>
+              ? `<a href="${naverRouteLink(plainNames[i], pts[i], plainNames[i+1], pts[i+1])}" style="margin-left:auto;padding:8px 12px;font-size:13px;font-weight:800;background:#03C75A;color:#fff;border-radius:10px;text-decoration:none;">🧭 네이버길찾기</a>
                  <a href="${kakaoRouteLink(plainNames[i], pts[i], plainNames[i+1], pts[i+1])}" target="_blank" rel="noopener" style="padding:8px 10px;font-size:13px;font-weight:800;background:#FEE500;color:#3C1E1E;border-radius:10px;text-decoration:none;">카카오</a>`
               : `<a href="${kakaoRouteLink(plainNames[i], pts[i], plainNames[i+1], pts[i+1])}" target="_blank" rel="noopener" style="margin-left:auto;padding:5px 9px;font-size:12px;font-weight:800;background:#FEE500;color:#3C1E1E;border-radius:8px;text-decoration:none;">카카오 길찾기(실시간)</a>`}
           </div>
@@ -11855,6 +11855,56 @@ function onRsvExtraGenChange(rowId){
 }
 // 출고중 → "➕ 같은 현장 추가출고": 이미 나가 있는 현장으로 발전기를 한 대 더 보낼 때, 현장 정보를 채워서 출고예약 창을 엽니다.
 // 출고 주소로 네이버지도·카카오맵 검색 (현장 GPS 위치 저장과는 별개 - 적어둔 주소 글자로 찾음)
+// ===== 카카오내비 바로 안내 =====
+// 카카오 개발자 앱(해성발전기) JavaScript 키. 이 키는 등록된 사이트(hsw54745.github.io)에서만 작동합니다.
+const KAKAO_JS_KEY = 'a3e264f836bf87d06f51393558fefeb6';
+let _kakaoSdkPromise = null, _kakaoMapsPromise = null;
+function loadScriptOnce(src){
+  return new Promise((res, rej)=>{ const el = document.createElement('script'); el.src = src; el.onload = ()=>res(); el.onerror = ()=>rej(new Error('load fail')); document.head.appendChild(el); });
+}
+function ensureKakaoSdk(){
+  if(!_kakaoSdkPromise){
+    _kakaoSdkPromise = (window.Kakao ? Promise.resolve() : loadScriptOnce('https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js'))
+      .then(()=>{ if(!window.Kakao.isInitialized()) window.Kakao.init(KAKAO_JS_KEY); })
+      .catch(e=>{ _kakaoSdkPromise = null; throw e; });
+  }
+  return _kakaoSdkPromise;
+}
+function ensureKakaoMaps(){
+  if(!_kakaoMapsPromise){
+    _kakaoMapsPromise = ((window.kakao && window.kakao.maps) ? Promise.resolve() : loadScriptOnce(`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_JS_KEY}&libraries=services&autoload=false`))
+      .then(()=>new Promise(res=>window.kakao.maps.load(res)))
+      .catch(e=>{ _kakaoMapsPromise = null; throw e; });
+  }
+  return _kakaoMapsPromise;
+}
+// 주소 → 좌표 (주소검색이 안 되면 장소 이름검색으로 한 번 더)
+function kakaoGeocode(addr){
+  return ensureKakaoMaps().then(()=>new Promise(res=>{
+    const S = window.kakao.maps.services;
+    new S.Geocoder().addressSearch(addr, (r, st)=>{
+      if(st===S.Status.OK && r[0]) return res({lat:+r[0].y, lng:+r[0].x, name:addr});
+      new S.Places().keywordSearch(addr, (r2, st2)=>{
+        if(st2===S.Status.OK && r2[0]) return res({lat:+r2[0].y, lng:+r2[0].x, name:r2[0].place_name||addr});
+        res(null);
+      });
+    });
+  }));
+}
+async function kakaoNaviStart(name, lat, lng){
+  await ensureKakaoSdk();
+  window.Kakao.Navi.start({ name: String(name||'목적지').slice(0,40), x: Number(lng), y: Number(lat), coordType: 'wgs84' });
+}
+async function kakaoNaviGo(addr, lat, lng, name){
+  try{
+    if(lat!=null && lng!=null && lat!=='' && lng!==''){ await kakaoNaviStart(name||addr, lat, lng); return; }
+    const p = await kakaoGeocode(addr);
+    if(!p){ alert('카카오에서 이 주소를 찾지 못했습니다.\n카카오맵 버튼으로 검색해 주세요.'); return; }
+    await kakaoNaviStart(name||addr, p.lat, p.lng);
+  }catch(e){
+    alert('카카오내비를 열지 못했습니다. (인터넷 연결 또는 카카오 설정 확인)\n카카오맵 버튼을 이용해 주세요.');
+  }
+}
 function addrMapLinksHtml(address, opts){
   const a = String(address||'').replace(/\(.*?\)/g,' ').replace(/\s+/g,' ').trim(); // 괄호 메모는 빼고 검색
   if(!a) return '';
@@ -11875,7 +11925,8 @@ function addrMapLinksHtml(address, opts){
   const st = opts.big ? 'padding:8px 12px;font-size:13px;' : 'padding:3px 8px;font-size:11.5px;';
   return `<div style="display:flex;gap:4px;flex-wrap:wrap;${opts.mt!=null?`margin-top:${opts.mt}px;`:'margin-top:4px;'}">
     <a href="${naver}" ${mobile? '' : 'target="_blank" rel="noopener"'} style="${st}font-weight:800;background:#03C75A;color:#fff;border-radius:8px;text-decoration:none;white-space:nowrap;" title="${escR(a)}">${opts.short? 'N 네이버' : 'N 네이버지도'}</a>
-    <a href="${kakao}" ${mobile? '' : 'target="_blank" rel="noopener"'} style="${st}font-weight:800;background:#FEE500;color:#3C1E1E;border-radius:8px;text-decoration:none;white-space:nowrap;" title="${escR(a)}">${opts.short? 'K 카카오' : 'K 카카오맵'}</a>
+    ${mobile? '' : `<a href="${kakao}" ${mobile? '' : 'target="_blank" rel="noopener"'} style="${st}font-weight:800;background:#FEE500;color:#3C1E1E;border-radius:8px;text-decoration:none;white-space:nowrap;" title="${escR(a)}">${opts.short? 'K 카카오' : 'K 카카오맵'}</a>`}
+    ${mobile? `<a href="#" data-addr="${escR(a)}" onclick="event.preventDefault();event.stopPropagation();kakaoNaviGo(this.dataset.addr);" style="${st}font-weight:800;background:#1E1E1E;color:#FEE500;border-radius:8px;text-decoration:none;white-space:nowrap;">🚗 카카오내비</a>` : ''}
   </div>`;
 }
 function addMoreGenToSite(genId){
