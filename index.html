@@ -1336,6 +1336,10 @@ async function openQmInProcess(id){
         <input type="hidden" id="qmin-sup-recovered" value="yes">
         <textarea id="qmin-sup-note" placeholder="회수 안 된 부자재나 사유를 적어주세요" style="display:none;width:100%;margin-top:8px;font-size:14px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;min-height:60px;"></textarea>
       </div>
+      <div style="background:#fff;border:1px solid #ddd;border-radius:12px;padding:16px;margin-bottom:14px;">
+        <label style="display:block;font-size:13px;font-weight:800;color:#333;margin-bottom:6px;">📝 입고 메모 <span style="font-weight:400;color:#888;">(선택 · 거래처 임대이력에 남음)</span></label>
+        <textarea id="qmin-memo" placeholder="예: 분전반 파손, 외함 찌그러짐, 케이블 손상" style="width:100%;min-height:60px;font-size:15px;padding:10px;border-radius:10px;border:2px solid #ccc;box-sizing:border-box;"></textarea>
+      </div>
       <div id="qmin-status" style="display:none;margin-bottom:14px;padding:14px;border-radius:12px;font-size:15px;font-weight:700;text-align:center;"></div>
       <button id="qmin-save-btn" onclick="submitQmInProcess('${id}')" style="width:100%;padding:18px;font-size:20px;font-weight:800;background:#2C6E49;color:#fff;border:none;border-radius:16px;cursor:pointer;">입고처리 완료</button>
     `;
@@ -1461,6 +1465,7 @@ async function submitQmInProcess(id, voltageAcked){
     if(measuredFuelHeightCm!=null) remainingFuelLiters = qmComputeFuelLiters(g, measuredFuelHeightCm, materials);
     const fuelExhaustNote = (remainingFuelLiters===0) ? '출고시 연료 모두 소진되어 입고' : '';
     const combinedNote = [r.note, fuelExhaustNote].filter(Boolean).join(' / ');
+    const inMemoQ = ((document.getElementById('qmin-memo')||{}).value||'').trim();
 
     if(btn){ btn.disabled = true; btn.textContent = '처리 중...'; }
 
@@ -1471,7 +1476,7 @@ async function submitQmInProcess(id, voltageAcked){
       outDate: r.outDate, inDate, startHours: r.startHours, endHours,
       usedHours: endHours!=null ? endHours - (r.startHours||0) : null,
       voltage, outProcessedBy: r.outProcessedBy||null, loadConfirmedBy: r.loadConfirmedBy||null, inProcessedBy: qmLabel(), inProcessedAt: nowDateTimeStr(),
-      measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
+      measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed, inMemo: inMemoQ,
       paymentConfirmed: r.paymentConfirmed||false, forcedOut: r.forcedOut||false, forceReason: r.forceReason||'', forcedBy: r.forcedBy||null,
       ...(g.external ? {borrowed:true, external:true, owner: g.owner||null, genModel: g.model||''} : {})
     });
@@ -1703,6 +1708,7 @@ function qmRenderMaintBody(){
           <div><span style="font-size:17px;font-weight:800;color:#2C4A66;">${escR(g.id)}</span> <span style="font-size:12.5px;color:#333;">${escR(g.model||'')}</span></div>
           <span style="font-size:11px;font-weight:800;color:${g.status==='out'?'#5B7FA6':'#2C6E49'};white-space:nowrap;">${g.status==='out'? escR(cityOf(rt.address||rt.site||'')) : '입고'}</span>
         </div>
+        ${g.status==='out' && rt.outDate? `<div style="font-size:12px;color:#5B7FA6;font-weight:700;margin-top:2px;">🚚 출고 ${escR(rt.outDate)} · 사용 ${rentalUsedDaysInclusive({outDate: rt.outDate, inDate: todayStr()})||'-'}일째</div>` : ''}
         ${g.status==='out'? `<div style="font-size:12px;color:#666;margin-top:2px;">${escR(rt.customer||'거래처 미기재')}${rt.address? ' · '+escR(rt.address):''}</div>${(rt.manager||rt.phone)? `<div style="font-size:12px;color:#666;margin-top:3px;">${rt.manager? '👤 '+escR(rt.manager)+' ':''}${rt.phone? telLinkHtml(rt.phone, true):''}</div>`:''}${addrMapLinksHtml(rt.address||rt.site)}` : ''}
         ${(()=>{ const parts = [];
           const len = genLengthText(g); if(len) parts.push(`📏 ${len}`);
@@ -6989,6 +6995,7 @@ function openCustomerNotesModal(customer){
         현장 주소: ${escR(r.address||r.site||'-')}<br>
         전압: ${escR(r.voltage||'-')} · 부자재: ${escR(String(r.supplies||'없음').replace(/\s*\n+\s*/g,', '))} · 연료: ${fuel!=null? fuel+'L':'-'}
         ${r.note? `<br>비고: ${escR(r.note)}`:''}
+        ${r.inMemo? `<br><b style="color:var(--danger);">📝 입고 메모: ${escR(r.inMemo)}</b>`:''}
       </div>
     </div>`;
   };
@@ -7081,6 +7088,7 @@ function downloadCustomerHistoryPrintFile(customer){
         현장 주소: ${escR(r.address||r.site||'-')}<br>
         전압: ${escR(r.voltage||'-')} · 부자재: ${escR(String(r.supplies||'없음').replace(/\s*\n+\s*/g,', '))} · 연료: ${fuel!=null? fuel+'L':'-'}
         ${r.note? `<br>비고: ${escR(r.note)}`:''}
+        ${r.inMemo? `<br><b style="color:#B00020;">📝 입고 메모: ${escR(r.inMemo)}</b>`:''}
       </div>
     </div>`;
   }).join('');
@@ -7702,7 +7710,7 @@ function renderGenHistory(){
         <td>${dow(r.inDate)||'-'}</td>
         <td style="font-weight:700;white-space:nowrap;">${rentalUsedDaysInclusive(r)!=null? rentalUsedDaysInclusive(r)+'일' : '-'}</td>
         <td class="wrap-ok">${r.customer||'-'}${(r.manager||r.phone)? `<div class="muted" style="font-size:11px;">${[r.manager,r.phone].filter(Boolean).join(' · ')}</div>`:''}</td>
-        <td class="wrap-ok">${[r.site,r.address].filter(Boolean).join(' · ')||'-'}${r.supplies? `<div class="muted" style="font-size:11px;">부자재(출고): ${r.supplies}</div>`:''}${r.supplies? `<div class="muted" style="font-size:11px;">부자재 회수: ${r.suppliesRecovered? '<span class="pill ok">회수됨</span>' : `<span class="pill danger">회수안됨</span>${r.suppliesNote? ` - ${r.suppliesNote}`:''}`}</div>`:''}${r.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${r.fuelRequested}L${r.fuelActual && r.fuelActual!==r.fuelRequested? ` (실제주입 ${r.fuelActual}L)`:''}</div>`:''}${r.fuelNotUsed? `<div class="muted" style="font-size:11px;">반납시 연료: <span class="pill gray">연료사용안함</span></div>`:''}${(!r.fuelNotUsed && r.measuredFuelHeightCm!=null)? `<div class="muted" style="font-size:11px;">반납시 연료: ${(()=>{ const L=computeFuelLiters(g, r.measuredFuelHeightCm); return L!=null? `약 ${L}L ` : ''; })()}(측정높이 ${r.measuredFuelHeightCm}cm)</div>`:''}${(()=>{ const given = r.fuelRequested!=null? r.fuelRequested : r.fuelActual; const remain = r.measuredFuelHeightCm!=null? computeFuelLiters(g, r.measuredFuelHeightCm) : null; if(given==null || remain==null) return ''; const used = Math.round((given-remain)*10)/10; return `<div class="muted" style="font-size:11px;font-weight:700;color:var(--primary-dark);">⛽ ${given}L 중 ${remain}L 남아서 반납 → 사용량 약 ${used}L</div>`; })()}${(r.loadDate||r.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(r.loadDate),r.arriveTime].filter(Boolean).join(' · ')}</div>`:''}${r.freightBearer? `<div class="muted" style="font-size:11px;">배차: ${r.freightBearer}</div>`:''}${r.note? `<div class="muted" style="font-size:11px;">비고: ${r.note}</div>`:''}${(r.loadConfirmedBy||r.outProcessedBy||r.inProcessedBy)? `<div class="muted" style="font-size:11px;">${[(r.loadConfirmedBy||r.outProcessedBy)? `출고: ${escR(r.loadConfirmedBy||r.outProcessedBy)}`:null, r.inProcessedBy? `입고: ${escR(r.inProcessedBy)}`:null].filter(Boolean).join(' · ')}</div>`:''}</td>
+        <td class="wrap-ok">${[r.site,r.address].filter(Boolean).join(' · ')||'-'}${r.inMemo? `<div style="font-size:11.5px;font-weight:800;color:var(--danger);">📝 입고 메모: ${escR(r.inMemo)}</div>`:''}${r.supplies? `<div class="muted" style="font-size:11px;">부자재(출고): ${r.supplies}</div>`:''}${r.supplies? `<div class="muted" style="font-size:11px;">부자재 회수: ${r.suppliesRecovered? '<span class="pill ok">회수됨</span>' : `<span class="pill danger">회수안됨</span>${r.suppliesNote? ` - ${r.suppliesNote}`:''}`}</div>`:''}${r.fuelRequested? `<div class="muted" style="font-size:11px;">연료: 요청 ${r.fuelRequested}L${r.fuelActual && r.fuelActual!==r.fuelRequested? ` (실제주입 ${r.fuelActual}L)`:''}</div>`:''}${r.fuelNotUsed? `<div class="muted" style="font-size:11px;">반납시 연료: <span class="pill gray">연료사용안함</span></div>`:''}${(!r.fuelNotUsed && r.measuredFuelHeightCm!=null)? `<div class="muted" style="font-size:11px;">반납시 연료: ${(()=>{ const L=computeFuelLiters(g, r.measuredFuelHeightCm); return L!=null? `약 ${L}L ` : ''; })()}(측정높이 ${r.measuredFuelHeightCm}cm)</div>`:''}${(()=>{ const given = r.fuelRequested!=null? r.fuelRequested : r.fuelActual; const remain = r.measuredFuelHeightCm!=null? computeFuelLiters(g, r.measuredFuelHeightCm) : null; if(given==null || remain==null) return ''; const used = Math.round((given-remain)*10)/10; return `<div class="muted" style="font-size:11px;font-weight:700;color:var(--primary-dark);">⛽ ${given}L 중 ${remain}L 남아서 반납 → 사용량 약 ${used}L</div>`; })()}${(r.loadDate||r.arriveTime)? `<div class="muted" style="font-size:11px;">상차/도착: ${[dow(r.loadDate),r.arriveTime].filter(Boolean).join(' · ')}</div>`:''}${r.freightBearer? `<div class="muted" style="font-size:11px;">배차: ${r.freightBearer}</div>`:''}${r.note? `<div class="muted" style="font-size:11px;">비고: ${r.note}</div>`:''}${(r.loadConfirmedBy||r.outProcessedBy||r.inProcessedBy)? `<div class="muted" style="font-size:11px;">${[(r.loadConfirmedBy||r.outProcessedBy)? `출고: ${escR(r.loadConfirmedBy||r.outProcessedBy)}`:null, r.inProcessedBy? `입고: ${escR(r.inProcessedBy)}`:null].filter(Boolean).join(' · ')}</div>`:''}</td>
         <td class="muted">${r.startHours!=null? r.startHours.toLocaleString()+'h' : '-'}</td>
         <td class="muted">${r.endHours!=null? r.endHours.toLocaleString()+'h' : '-'}</td>
         <td class="muted" style="font-weight:700;">${(r.endHours==null && r.startHours!=null && g.hoursKnown)? '<span style="color:var(--warn);font-weight:700;">미확인</span>' : (r.usedHours||0).toLocaleString()+'h'}</td>
@@ -14220,6 +14228,7 @@ function openPrevRentalPopup(id){
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">입고시 누적</span><span style="font-size:14px;font-weight:700;font-family:var(--mono);">${prev.endHours!=null? prev.endHours.toLocaleString()+'h':'-'}</span></div>
       <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;"><span class="muted" style="font-size:12px;flex:0 0 auto;">발전기 사용시간</span><span style="font-size:15px;font-weight:800;font-family:var(--mono);color:var(--primary-dark);">${prev.endHours==null? '<span style="color:var(--warn);font-size:13px;">미확인</span>' : `${(prev.usedHours||0).toLocaleString()}h`}${(prevDays && prev.endHours!=null)? ` <span style="font-size:12px;font-weight:700;color:var(--ink-soft);">(하루평균 ${Math.round((prev.usedHours||0)/prevDays*10)/10}h/일)</span>`:''}</span></div>
     </div>
+    ${prev.inMemo? `<div style="margin-top:10px;background:var(--danger-tint);border:1px solid var(--danger);border-radius:8px;padding:8px 10px;font-size:12.5px;font-weight:800;color:var(--danger);">📝 입고 메모: ${escR(prev.inMemo)}</div>` : ''}
     ${(g && g.hoursKnown && prev.endHours==null) ? `
     <div style="margin-top:12px;background:var(--warn-tint);border:1px solid var(--warn);border-radius:10px;padding:10px 12px;">
       <div style="font-size:12.5px;font-weight:800;color:#8A5A00;margin-bottom:6px;">⚠️ 이 임대는 입고(반납)시 누적시간을 확인 못했습니다</div>
@@ -14382,6 +14391,10 @@ function openInModal(id, isTransfer){
             <textarea id="f-supplies-note" placeholder="미회수 내역을 적어주세요 (예: 케이블 20m 미회수)"></textarea>
           </div>
         </div></div>
+      </div>
+      <div class="field" style="margin-top:8px;">
+        <label>📝 입고 메모 <span class="muted" style="font-weight:400;font-size:12px;">(선택 · 거래처 임대이력에 남음)</span></label>
+        <textarea id="f-in-memo" placeholder="예: 분전반 파손, 외함 찌그러짐, 케이블 손상" style="min-height:50px;"></textarea>
       </div>
       <div id="f-err" class="err" style="display:none;"></div>
       <div class="modal-actions" style="justify-content:center;">
@@ -14565,6 +14578,7 @@ async function submitIn(id, isTransfer){
   }
   const repairNoteEl = document.getElementById('f-in-repairnote');
   const repairNote = repairNoteEl ? repairNoteEl.value.trim() : '';
+  const inMemo = ((document.getElementById('f-in-memo')||{}).value||'').trim();
   if(condition==='broken' && !repairNote){
     errEl.textContent = '고장 내용을 입력해주세요.';
     errEl.style.display='block'; return;
@@ -14589,13 +14603,13 @@ async function submitIn(id, isTransfer){
       const recentTransferNote = (g.rental.note && g.rental.note.includes('현장이동')) || (g.rental.note && g.rental.note.includes('누적시간 미확인'));
       openConfirmModal(
         voltageDiffNote + `입력하신 누적시간 차이(${usedH.toLocaleString()}h)를 임대일수(${days}일)로 나누면 하루 평균 ${avgDaily.toFixed(1)}시간이 됩니다. 하루는 24시간을 넘을 수 없습니다.\n\n${recentTransferNote? '이 발전기는 최근 현장이동으로 누적시간을 한동안 확인 못한 이력이 있어서, 그 구간 사용량이 이번에 한꺼번에 잡혀 정상적으로 큰 값이 나올 수 있습니다.\n\n' : ''}오타가 아니라 실제로 확인하신 숫자가 맞다면 계속 진행하세요.`,
-        function(){ submitInFinish(id, isTransfer, {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm, splitPrev}); },
+        function(){ submitInFinish(id, isTransfer, {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm, splitPrev, inMemo}); },
         '맞습니다, 계속 진행', '다시 확인할게요'
       );
       return;
     }
   }
-  const finishVals = {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm, splitPrev};
+  const finishVals = {inDate, endHours, voltage, oldVoltageForLog, suppliesRecovered, suppliesNote, condition, repairNote, fuelNotUsed, measuredFuelHeightCm, splitPrev, inMemo};
   openConfirmModal(voltageDiffNote + `⚠️ [${g.id}] ${g.model||'미설정'} 발전기를 ${isTransfer? '현장이동':'입고'} 처리합니다.\n\n번호가 맞습니까?${voltageDiffNote? ' (전압도 맞는지 확인해주세요)':''}`, function(){
     submitInFinish(id, isTransfer, finishVals);
   }, '맞습니다, 처리', '다시 확인');
@@ -14630,7 +14644,7 @@ async function submitInFinish(id, isTransfer, vals){
     outDate: rt.outDate, inDate, startHours: rt.startHours, endHours,
     usedHours: endHours!=null ? endHours - rt.startHours : null,
     voltage, outProcessedBy: rt.outProcessedBy||null, loadConfirmedBy: rt.loadConfirmedBy||null, inProcessedBy: DB.currentUserName||null, inProcessedAt: nowDateTimeStr(),
-    measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed,
+    measuredFuelHeightCm, remainingFuelLiters, fuelNotUsed, inMemo: vals.inMemo||'',
     paymentConfirmed: rt.paymentConfirmed||false, forcedOut: rt.forcedOut||false, forceReason: rt.forceReason||'', forcedBy: rt.forcedBy||null,
     ...(g.external ? {borrowed:true, external:true, owner: g.owner||null, genModel: g.model||''} : {})
   });
