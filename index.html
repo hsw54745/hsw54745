@@ -1629,6 +1629,7 @@ async function qmRefreshReservationList(){
 let qmMaintGroup = null;      // 지역 필터 (경기남부/전라도 …)
 let qmMaintIncludeIn = false; // 입고된 발전기도 보기
 let qmMaintSearch = '';
+let qmMaintCap = null;         // 용량(kW) 필터
 const QM_MAINT_CONTENT = ['엔진오일교체','엔진오일점검','에어필터교체','에어필터점검','오일필터1차교체','오일필터1차점검','오일필터2차교체','오일필터2차점검','연료필터1교체','연료필터1점검','연료필터2교체','연료필터2점검','부동액교체','부동액점검 및 보충','배터리교체','배터리점검','팬벨트교체','출력단자체결상태','누전차단기볼트교체','배터리터미널조임상태','팬청소','연료통청소'];
 async function qmLoadMaintData(){
   const [gc, mc, matc, cic, wc, rc2] = await Promise.all([
@@ -1684,11 +1685,16 @@ function qmRenderMaintBody(){
   const groupKeys = Object.keys(groups).sort((a,b)=>{ const ia = ROUTE_GROUP_ORDER.indexOf(a), ib = ROUTE_GROUP_ORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
   if(qmMaintGroup && !groups[qmMaintGroup]) qmMaintGroup = null;
   if(qmMaintGroup) list = list.filter(g=>groupOf(g)===qmMaintGroup);
+  const capCounts = {}; list.forEach(g=>{ const c = capacityOf(g); if(isFinite(c)) capCounts[c] = (capCounts[c]||0)+1; });
+  if(qmMaintCap!=null && !capCounts[qmMaintCap]) qmMaintCap = null;
+  if(qmMaintCap!=null) list = list.filter(g=>capacityOf(g)===qmMaintCap);
+  const capKeys = Object.keys(capCounts).map(Number).sort((a,b)=>a-b);
   const q = qmMaintSearch.trim().toLowerCase();
   if(q) list = list.filter(g=>[g.id, g.model, g.rental&&g.rental.customer, g.rental&&g.rental.address].filter(Boolean).join(' ').toLowerCase().includes(q));
   // 엔진오일 교체 시기가 가까운 순서 (출고중은 하루평균 사용시간으로 추정한 값 적용). 누적시간 확인불가는 맨 뒤.
   const remOf = g=> (g.hoursKnown && (g.hours>0 || g.lastMaintHours>0)) ? (g.status==='out' ? estRemaining(g) : remainingHours(g)) : Infinity;
-  list.sort((a,b)=>{ const ra = remOf(a), rb = remOf(b); if(ra!==rb) return ra-rb; return sortByIdNatural(a,b); });
+  if(maintSortMode==='cycle') list.sort((a,b)=>{ const ra = remOf(a), rb = remOf(b); if(ra!==rb) return ra-rb; return sortByIdNatural(a,b); });
+  else list.sort(maintSortCompare); // 사무실 정비관리와 같은 정렬 (출고일·지역·순회점검·거래처·번호)
   const btn = (label, on, onclick)=>`<button type="button" onclick="${onclick}" style="padding:8px 11px;font-size:13px;font-weight:800;border-radius:10px;border:2px solid #00796B;background:${on?'#00796B':'#fff'};color:${on?'#fff':'#00796B'};cursor:pointer;">${label}</button>`;
   dyn.innerHTML = `
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
@@ -1696,6 +1702,14 @@ function qmRenderMaintBody(){
       ${groupKeys.map(k=>btn(`${k} (${groups[k]})`, qmMaintGroup===k, `qmMaintGroup='${k}';qmRenderMaintBody()`)).join('')}
     </div>
     <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin:4px 0 10px;"><input type="checkbox" ${qmMaintIncludeIn?'checked':''} onchange="qmMaintIncludeIn=this.checked;qmRenderMaintBody()" style="width:18px;height:18px;"> 입고된 발전기도 보기</label>
+    <div style="display:flex;align-items:center;gap:6px;margin:0 0 8px;">
+      <span style="font-size:13px;font-weight:800;color:#00796B;white-space:nowrap;">↕ 정렬</span>
+      <select onchange="maintSortMode=this.value;try{localStorage.setItem('gen-maint-sort',this.value);}catch(e){};qmRenderMaintBody()" style="flex:1;min-width:0;font-size:14px;padding:8px;border-radius:8px;border:2px solid #00796B;background:#fff;">${MAINT_SORT_OPTIONS.map(([v,l])=>`<option value="${v}"${maintSortMode===v?' selected':''}>${l}</option>`).join('')}</select>
+    </div>
+    ${capKeys.length>1? `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">
+      <button type="button" onclick="qmMaintCap=null;qmRenderMaintBody()" style="padding:6px 10px;font-size:12px;font-weight:800;border-radius:8px;border:2px solid #5B7FA6;background:${qmMaintCap==null?'#5B7FA6':'#fff'};color:${qmMaintCap==null?'#fff':'#5B7FA6'};">전체 kW</button>
+      ${capKeys.map(c=>`<button type="button" onclick="qmMaintCap=${c};qmRenderMaintBody()" style="padding:6px 10px;font-size:12px;font-weight:800;border-radius:8px;border:2px solid #5B7FA6;background:${qmMaintCap===c?'#5B7FA6':'#fff'};color:${qmMaintCap===c?'#fff':'#5B7FA6'};">${c}kW (${capCounts[c]})</button>`).join('')}
+    </div>` : ''}
     <div style="font-size:12px;color:#888;text-align:right;margin-bottom:6px;">총 ${list.length}대</div>
     ${list.length===0 ? '<div style="text-align:center;color:#999;font-size:14px;padding:20px 0;">해당하는 발전기가 없습니다.</div>' : list.map(g=>{
       const rt = g.rental||{};
@@ -6517,6 +6531,7 @@ const MAINT_SORT_OPTIONS = [
   ['outNew','출고일 (최근 순)'],
   ['region','지역별 (서울→인천→경기→…)'],
   ['patrol','순회점검 (오래된 순)'],
+  ['customer','거래처 (가나다 순)'],
   ['id','발전기 번호 순']
 ];
 function setMaintSort(v){ maintSortMode = v; try{ localStorage.setItem('gen-maint-sort', v); }catch(e){} renderMaintList(); }
@@ -6547,6 +6562,11 @@ function maintSortCompare(a, b){
       const pa = lastPatrolDate(a.id)||'', pb = lastPatrolDate(b.id)||'';
       if(pa!==pb) return pa.localeCompare(pb); // 한 번도 안 간 곳('')이 맨 위
       return outD(a).localeCompare(outD(b)) || sortByIdNatural(a,b);
+    }
+    case 'customer': {
+      const na = (a.status==='out' && a.rental && a.rental.customer) || '', nb = (b.status==='out' && b.rental && b.rental.customer) || '';
+      if(!na && nb) return 1; if(na && !nb) return -1;
+      return na.localeCompare(nb,'ko') || sortByIdNatural(a,b);
     }
     case 'id': return sortByIdNatural(a,b);
     default: return byCycle;
@@ -6610,6 +6630,10 @@ function renderMaintList(){
       <td class="gid">${g.id}</td>
       <td class="wrap-ok">${displayModel(g)}</td>
       <td style="text-align:center;">${(g.status==='out' && g.rental) ? `<input type="checkbox" style="width:18px;height:18px;cursor:pointer;" title="출장 동선에 넣기" ${patrolRouteSelected().has(g.id)?'checked':''} onchange="togglePatrolRouteGen('${g.id}', this.checked)">` : ''}</td>
+      <td class="wrap-ok" style="font-size:12px;min-width:150px;max-width:220px;line-height:1.35;">${(g.status==='out' && g.rental) ? (()=>{ const rt = g.rental;
+        return `<b style="font-size:12.5px;">${escR(rt.customer||'-')}</b>${rt.site && rt.site!==rt.customer? ` <span class="muted" style="font-size:11px;">(${escR(rt.site)})</span>`:''}
+        ${(rt.manager||rt.phone)? `<div style="font-size:11.5px;margin-top:2px;">${rt.manager? '👤 '+escR(rt.manager)+' ':''}${rt.phone? telLinkHtml(rt.phone):''}</div>`:''}
+        ${rt.address? `<div class="muted" style="font-size:11px;margin-top:2px;">📍 ${escR(rt.address)}</div>`:''}`; })() : '<span class="muted" style="font-size:11.5px;">-</span>'}</td>
       <td style="white-space:nowrap;">${(g.status==='out' && g.rental) ? `<span class="pill" style="background:#E8EEF4;color:#5B7FA6;border-color:#5B7FA6;">${escR(cityOf(g.rental.address||g.rental.site||''))}</span>${addrMapLinksHtml(g.rental.address||g.rental.site, {short:true})}` : '<span class="muted" style="font-size:11.5px;">-</span>'}</td>
       <td style="white-space:nowrap;text-align:center;">${(g.status==='out' && g.rental && g.rental.outDate) ? `<div style="font-size:12px;">${escR(g.rental.outDate.slice(2).replace(/-/g,'.'))}</div><div style="font-size:11.5px;font-weight:800;color:var(--primary-dark);">${rentalUsedDaysInclusive({outDate: g.rental.outDate, inDate: todayStr()})||'-'}일째</div>` : '<span class="muted" style="font-size:11.5px;">-</span>'}</td>
       <td>${patrolCellHtml(g)}</td>
@@ -6637,7 +6661,7 @@ function renderMaintList(){
     ${sortBarHtml}
     ${sorted.length===0 ? `<div class="empty">${maintCapacityFilter!=null? `${maintCapacityFilter}kW 용량의 발전기가 없습니다.` : '검색 결과가 없습니다.'}</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th title="체크한 출고중 발전기만 아래 출장 동선에 들어갑니다">🚐 출장</th><th>출고지역</th><th title="출고일 · 출고일 포함 사용일수">출고일</th><th>순회점검</th><th>탱크청소</th><th>엔진오일양</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
+      <thead><tr><th>번호</th><th>모델</th><th title="체크한 출고중 발전기만 아래 출장 동선에 들어갑니다">🚐 출장</th><th>거래처 · 담당자 · 주소</th><th>출고지역</th><th title="출고일 · 출고일 포함 사용일수">출고일</th><th>순회점검</th><th>탱크청소</th><th>엔진오일양</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`}`;
 }
