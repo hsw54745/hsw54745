@@ -6559,6 +6559,7 @@ function renderMaintList(){
       <td class="wrap-ok">${displayModel(g)}</td>
       <td style="text-align:center;">${(g.status==='out' && g.rental) ? `<input type="checkbox" style="width:18px;height:18px;cursor:pointer;" title="출장 동선에 넣기" ${patrolRouteSelected().has(g.id)?'checked':''} onchange="togglePatrolRouteGen('${g.id}', this.checked)">` : ''}</td>
       <td style="white-space:nowrap;">${(g.status==='out' && g.rental) ? `<span class="pill" style="background:#E8EEF4;color:#5B7FA6;border-color:#5B7FA6;">${escR(cityOf(g.rental.address||g.rental.site||''))}</span>${addrMapLinksHtml(g.rental.address||g.rental.site, {short:true})}` : '<span class="muted" style="font-size:11.5px;">-</span>'}</td>
+      <td style="white-space:nowrap;text-align:center;">${(g.status==='out' && g.rental && g.rental.outDate) ? `<div style="font-size:12px;">${escR(g.rental.outDate.slice(2).replace(/-/g,'.'))}</div><div style="font-size:11.5px;font-weight:800;color:var(--primary-dark);">${rentalUsedDaysInclusive({outDate: g.rental.outDate, inDate: todayStr()})||'-'}일째</div>` : '<span class="muted" style="font-size:11.5px;">-</span>'}</td>
       <td>${patrolCellHtml(g)}</td>
       <td>${tankCleanCellHtml(g)}</td>
       <td>${engineOilCellHtml(g)}</td>
@@ -6583,7 +6584,7 @@ function renderMaintList(){
     ${capacityButtonsHtml}
     ${sorted.length===0 ? `<div class="empty">${maintCapacityFilter!=null? `${maintCapacityFilter}kW 용량의 발전기가 없습니다.` : '검색 결과가 없습니다.'}</div>` : `
     <div class="table-scroll"><table>
-      <thead><tr><th>번호</th><th>모델</th><th title="체크한 출고중 발전기만 아래 출장 동선에 들어갑니다">🚐 출장</th><th>출고지역</th><th>순회점검</th><th>탱크청소</th><th>엔진오일양</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
+      <thead><tr><th>번호</th><th>모델</th><th title="체크한 출고중 발전기만 아래 출장 동선에 들어갑니다">🚐 출장</th><th>출고지역</th><th title="출고일 · 출고일 포함 사용일수">출고일</th><th>순회점검</th><th>탱크청소</th><th>엔진오일양</th><th>연료소모량(h)</th><th>탱크용량</th><th>총중량</th><th>현황</th><th>정비 주기</th><th>상태</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`}`;
 }
@@ -14308,7 +14309,7 @@ function openInModal(id, isTransfer){
         <button type="button" class="btn sm" onclick="openPrevRentalPopup('${g.id}')">📜 이전 임대이력</button>
       </div>
       <div class="out-row stretch">
-        <div class="field f-md"><div class="out-card">
+        <div class="field" style="flex:0.7 1 130px;"><div class="out-card">
           <label>입고 상태</label>
           <input type="hidden" id="f-in-condition" value="${isTransfer? 'ok' : ''}">
           <div class="btn-row" style="justify-content:center;">
@@ -14342,7 +14343,7 @@ function openInModal(id, isTransfer){
           <label>누적 사용시간</label>
           <div class="hint" style="margin-top:8px;color:var(--danger);font-weight:700;">누적시간 체크 불가 (관리제외)</div>
         </div></div>`}
-        <div class="field f-sm"><div class="out-card">
+        <div class="field" style="flex:1.9 1 300px;"><div class="out-card">
           <label>입고 전압 확인</label>
           <input type="text" id="f-in-voltage" value="${isTransfer? escR(g.rental.voltage||g.voltage||'') : ''}" placeholder="실제 전압 확인 후 선택">
           ${voltageButtonsHtml('f-in-voltage')}
